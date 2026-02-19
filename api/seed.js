@@ -48,6 +48,24 @@ export default async function handler(req, res) {
       )
     `;
 
+    // Add nanny auth columns if not exists
+    await sql`ALTER TABLE nannies ADD COLUMN IF NOT EXISTS email VARCHAR(255)`;
+    await sql`ALTER TABLE nannies ADD COLUMN IF NOT EXISTS pin VARCHAR(6) DEFAULT ''`;
+
+    // Create notifications table
+    await sql`
+      CREATE TABLE IF NOT EXISTS nanny_notifications (
+        id SERIAL PRIMARY KEY,
+        nanny_id INTEGER REFERENCES nannies(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        message TEXT NOT NULL,
+        booking_id INTEGER REFERENCES bookings(id) ON DELETE SET NULL,
+        is_read BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+
     // Check if nannies already seeded
     const existing = await sql`SELECT COUNT(*) as count FROM nannies`;
     if (parseInt(existing[0].count) > 0) {
@@ -65,7 +83,15 @@ export default async function handler(req, res) {
       ('Houda El Fassi', 'Targa, Marrakech', 4.8, 'Houda is a multilingual nanny who loves introducing children to Moroccan culture through stories, songs, and creative play.', '["Cultural Activities","Storytelling","School-Age Children"]', '["Arabic","French","English","Italian"]', 150, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face', '7 years', true)
     `;
 
-    return res.status(200).json({ message: 'Database seeded successfully with 6 nannies' });
+    // Seed nanny login credentials
+    await sql`UPDATE nannies SET email = 'fatima@callananny.ma', pin = '123456' WHERE name = 'Fatima Zahra'`;
+    await sql`UPDATE nannies SET email = 'amina@callananny.ma', pin = '123456' WHERE name = 'Amina Benali'`;
+    await sql`UPDATE nannies SET email = 'sara@callananny.ma', pin = '123456' WHERE name = 'Sara Tazi'`;
+    await sql`UPDATE nannies SET email = 'khadija@callananny.ma', pin = '123456' WHERE name = 'Khadija Alami'`;
+    await sql`UPDATE nannies SET email = 'nadia@callananny.ma', pin = '123456' WHERE name = 'Nadia Moussaoui'`;
+    await sql`UPDATE nannies SET email = 'houda@callananny.ma', pin = '123456' WHERE name = 'Houda El Fassi'`;
+
+    return res.status(200).json({ message: 'Database seeded successfully with 6 nannies and login credentials' });
   } catch (error) {
     console.error('Seed error:', error);
     return res.status(500).json({ error: error.message });

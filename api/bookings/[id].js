@@ -43,9 +43,30 @@ export default async function handler(req, res) {
         RETURNING *
       `;
       if (result.length === 0) return res.status(404).json({ error: 'Booking not found' });
+
+      // Create notification for nanny on status change
+      if (status && result[0] && result[0].nanny_id) {
+        try {
+          const notifMessages = {
+            confirmed: { title: 'Booking Confirmed', type: 'booking_confirmed', message: `Your booking with ${result[0].client_name} on ${result[0].date} has been confirmed.` },
+            cancelled: { title: 'Booking Cancelled', type: 'booking_cancelled', message: `The booking with ${result[0].client_name} on ${result[0].date} has been cancelled.` },
+            completed: { title: 'Booking Completed', type: 'booking_completed', message: `Your booking with ${result[0].client_name} on ${result[0].date} has been marked as completed.` },
+          };
+          const notif = notifMessages[status];
+          if (notif) {
+            await sql`
+              INSERT INTO nanny_notifications (nanny_id, type, title, message, booking_id)
+              VALUES (${result[0].nanny_id}, ${notif.type}, ${notif.title}, ${notif.message}, ${id})
+            `;
+          }
+        } catch (notifError) {
+          console.error('Failed to create notification:', notifError);
+        }
+      }
+
       return res.status(200).json(result[0]);
     }
-    
+
     if (req.method === 'DELETE') {
       await sql`DELETE FROM bookings WHERE id = ${id}`;
       return res.status(200).json({ success: true });

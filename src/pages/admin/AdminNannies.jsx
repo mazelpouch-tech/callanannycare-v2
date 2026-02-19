@@ -22,6 +22,8 @@ const emptyForm = {
   experience: "",
   specialties: "",
   image: "",
+  email: "",
+  pin: "",
   available: true,
 };
 
@@ -66,6 +68,8 @@ export default function AdminNannies() {
         ? nanny.specialties.join(", ")
         : nanny.specialties || "",
       image: nanny.image || "",
+      email: nanny.email || "",
+      pin: nanny.pin || "",
       available: nanny.available ?? true,
     });
     setModalOpen(true);
@@ -99,6 +103,8 @@ export default function AdminNannies() {
         .map((s) => s.trim())
         .filter(Boolean),
       image: form.image.trim(),
+      email: form.email.trim(),
+      pin: form.pin.trim(),
       available: form.available,
       rating: editingNanny?.rating || 5.0,
     };
@@ -548,6 +554,43 @@ export default function AdminNannies() {
                   placeholder="https://example.com/photo.jpg"
                   className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
                 />
+              </div>
+
+              {/* Portal Login Credentials */}
+              <div className="border-t border-border pt-4 mt-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                  Nanny Portal Login
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => handleFormChange("email", e.target.value)}
+                      placeholder="nanny@callananny.ma"
+                      className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      PIN Code
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={form.pin}
+                      onChange={(e) =>
+                        handleFormChange("pin", e.target.value.replace(/\D/g, ""))
+                      }
+                      placeholder="123456"
+                      className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all tracking-widest font-mono"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Available Toggle */}

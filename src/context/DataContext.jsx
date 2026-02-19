@@ -13,6 +13,8 @@ const STORAGE_KEYS = {
   nannies: "callanannycare_nannies",
   bookings: "callanannycare_bookings",
   admin: "callanannycare_admin",
+  nanny: "callanannycare_nanny",
+  nannyProfile: "callanannycare_nanny_profile",
 };
 
 function loadFromStorage(key, fallback) {
@@ -61,6 +63,17 @@ export function DataProvider({ children }) {
     loadFromStorage(STORAGE_KEYS.admin, false)
   );
   const [loading, setLoading] = useState(true);
+
+  // Nanny portal state
+  const [isNanny, setIsNanny] = useState(() =>
+    loadFromStorage(STORAGE_KEYS.nanny, false)
+  );
+  const [nannyProfile, setNannyProfile] = useState(() =>
+    loadFromStorage(STORAGE_KEYS.nannyProfile, null)
+  );
+  const [nannyBookings, setNannyBookings] = useState([]);
+  const [nannyNotifications, setNannyNotifications] = useState([]);
+  const [nannyStats, setNannyStats] = useState(null);
 
   // Fetch data from API on mount
   useEffect(() => {
@@ -123,6 +136,11 @@ export function DataProvider({ children }) {
   useEffect(() => {
     saveToStorage(STORAGE_KEYS.admin, isAdmin);
   }, [isAdmin]);
+
+  // Persist nanny auth to localStorage
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.nanny, isNanny);
+  }, [isNanny]);
 
   // --- Nanny CRUD ---
 
@@ -332,6 +350,136 @@ export function DataProvider({ children }) {
     });
   }, []);
 
+  // --- Nanny Portal Auth & Data ---
+
+  const nannyLogin = useCallback(async (email, pin) => {
+    try {
+      const result = await apiFetch("/nanny/login", {
+        method: "POST",
+        body: JSON.stringify({ email, pin }),
+      });
+      if (result.success) {
+        setIsNanny(true);
+        setNannyProfile(result.nanny);
+        saveToStorage(STORAGE_KEYS.nannyProfile, result.nanny);
+        return { success: true };
+      }
+      return { success: false, error: "Invalid email or PIN" };
+    } catch {
+      return { success: false, error: "Login failed. Please try again." };
+    }
+  }, []);
+
+  const nannyLogout = useCallback(() => {
+    setIsNanny(false);
+    setNannyProfile(null);
+    setNannyBookings([]);
+    setNannyNotifications([]);
+    setNannyStats(null);
+    localStorage.removeItem(STORAGE_KEYS.nannyProfile);
+  }, []);
+
+  const normalizeBooking = useCallback((b) => ({
+    id: b.id,
+    nannyId: b.nanny_id,
+    nannyName: b.nanny_name || "",
+    nannyImage: b.nanny_image || "",
+    clientName: b.client_name,
+    clientEmail: b.client_email,
+    clientPhone: b.client_phone,
+    hotel: b.hotel,
+    date: b.date,
+    startTime: b.start_time,
+    endTime: b.end_time,
+    plan: b.plan,
+    childrenCount: b.children_count,
+    childrenAges: b.children_ages,
+    notes: b.notes,
+    totalPrice: b.total_price,
+    status: b.status,
+    createdAt: b.created_at,
+  }), []);
+
+  const fetchNannyBookings = useCallback(async () => {
+    if (!nannyProfile?.id) return;
+    try {
+      const data = await apiFetch(`/nanny/bookings?nannyId=${nannyProfile.id}`);
+      setNannyBookings(data.map(normalizeBooking));
+    } catch {
+      console.warn("Failed to fetch nanny bookings");
+    }
+  }, [nannyProfile, normalizeBooking]);
+
+  const fetchNannyStats = useCallback(async () => {
+    if (!nannyProfile?.id) return;
+    try {
+      const data = await apiFetch(`/nanny/stats?nannyId=${nannyProfile.id}`);
+      setNannyStats(data);
+    } catch {
+      console.warn("Failed to fetch nanny stats");
+    }
+  }, [nannyProfile]);
+
+  const fetchNannyNotifications = useCallback(async () => {
+    if (!nannyProfile?.id) return;
+    try {
+      const data = await apiFetch(`/nanny/notifications?nannyId=${nannyProfile.id}`);
+      setNannyNotifications(data.map((n) => ({
+        id: n.id,
+        nannyId: n.nanny_id,
+        type: n.type,
+        title: n.title,
+        message: n.message,
+        bookingId: n.booking_id,
+        isRead: n.is_read,
+        createdAt: n.created_at,
+      })));
+    } catch {
+      console.warn("Failed to fetch nanny notifications");
+    }
+  }, [nannyProfile]);
+
+  const markNotificationsRead = useCallback(async (notificationIds) => {
+    try {
+      await apiFetch("/nanny/notifications", {
+        method: "PUT",
+        body: JSON.stringify({ notificationIds }),
+      });
+      setNannyNotifications((prev) =>
+        prev.map((n) => notificationIds.includes(n.id) ? { ...n, isRead: true } : n)
+      );
+    } catch {
+      console.warn("Failed to mark notifications as read");
+    }
+  }, []);
+
+  const updateNannyProfile = useCallback(async (updates) => {
+    if (!nannyProfile?.id) return;
+    try {
+      const result = await apiFetch("/nanny/profile", {
+        method: "PUT",
+        body: JSON.stringify({ nannyId: nannyProfile.id, ...updates }),
+      });
+      const updated = {
+        ...nannyProfile,
+        ...result,
+        specialties: typeof result.specialties === "string" ? JSON.parse(result.specialties) : result.specialties || [],
+        languages: typeof result.languages === "string" ? JSON.parse(result.languages) : result.languages || [],
+      };
+      setNannyProfile(updated);
+      saveToStorage(STORAGE_KEYS.nannyProfile, updated);
+      // Also update in the nannies list
+      setNannies((prev) => {
+        const updatedList = prev.map((n) => n.id === nannyProfile.id ? { ...n, ...updated } : n);
+        saveToStorage(STORAGE_KEYS.nannies, updatedList);
+        return updatedList;
+      });
+      return { success: true };
+    } catch {
+      return { success: false, error: "Failed to update profile" };
+    }
+  }, [nannyProfile]);
+
   // --- Admin Auth ---
 
   const adminLogin = useCallback(async (email, password) => {
@@ -379,6 +527,11 @@ export function DataProvider({ children }) {
     return { totalBookings, pendingBookings, confirmedBookings, totalRevenue, todayBookings };
   }, [bookings]);
 
+  const unreadNotifications = useMemo(
+    () => nannyNotifications.filter((n) => !n.isRead).length,
+    [nannyNotifications]
+  );
+
   const value = useMemo(
     () => ({
       nannies,
@@ -396,11 +549,28 @@ export function DataProvider({ children }) {
       adminLogin,
       adminLogout,
       loading,
+      // Nanny portal
+      isNanny,
+      nannyProfile,
+      nannyBookings,
+      nannyNotifications,
+      nannyStats,
+      unreadNotifications,
+      nannyLogin,
+      nannyLogout,
+      fetchNannyBookings,
+      fetchNannyStats,
+      fetchNannyNotifications,
+      markNotificationsRead,
+      updateNannyProfile,
     }),
     [
       nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability,
       bookings, addBooking, updateBooking, updateBookingStatus, deleteBooking,
       stats, isAdmin, adminLogin, adminLogout, loading,
+      isNanny, nannyProfile, nannyBookings, nannyNotifications, nannyStats,
+      unreadNotifications, nannyLogin, nannyLogout, fetchNannyBookings,
+      fetchNannyStats, fetchNannyNotifications, markNotificationsRead, updateNannyProfile,
     ]
   );
 

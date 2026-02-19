@@ -10,6 +10,13 @@ import AdminLayout from './pages/admin/AdminLayout'
 import Dashboard from './pages/admin/Dashboard'
 import AdminBookings from './pages/admin/AdminBookings'
 import AdminNannies from './pages/admin/AdminNannies'
+import NannyLogin from './pages/nanny/NannyLogin'
+import NannyLayout from './pages/nanny/NannyLayout'
+import NannyDashboard from './pages/nanny/NannyDashboard'
+import NannyCalendar from './pages/nanny/NannyCalendar'
+import NannyBookings from './pages/nanny/NannyBookings'
+import NannyNotifications from './pages/nanny/NannyNotifications'
+import NannyProfile from './pages/nanny/NannyProfile'
 
 export default function App() {
   return (
@@ -29,6 +36,16 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="bookings" element={<AdminBookings />} />
         <Route path="nannies" element={<AdminNannies />} />
+      </Route>
+
+      {/* Nanny portal routes */}
+      <Route path="/nanny/login" element={<NannyLogin />} />
+      <Route path="/nanny" element={<NannyLayout />}>
+        <Route index element={<NannyDashboard />} />
+        <Route path="calendar" element={<NannyCalendar />} />
+        <Route path="bookings" element={<NannyBookings />} />
+        <Route path="notifications" element={<NannyNotifications />} />
+        <Route path="profile" element={<NannyProfile />} />
       </Route>
     </Routes>
   )
