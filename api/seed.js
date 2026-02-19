@@ -65,6 +65,10 @@ export default async function handler(req, res) {
     // Backfill existing nannies to 'active'
     await sql`UPDATE nannies SET status = 'active', registered_at = NOW() WHERE pin IS NOT NULL AND pin != '' AND status IS NULL`;
 
+    // Add clock in/out columns to bookings
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS clock_in TIMESTAMPTZ`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS clock_out TIMESTAMPTZ`;
+
     // Create notifications table
     await sql`
       CREATE TABLE IF NOT EXISTS nanny_notifications (
@@ -106,30 +110,27 @@ export default async function handler(req, res) {
       `;
     }
 
-    // Update existing nannies with real names, credentials, and phone numbers
-    await sql`UPDATE nannies SET name = 'Fatima Zahra El Idrissi', email = 'fatima@callanannycare.com', pin = '123456', phone = '+212 6 61 23 45 67' WHERE name = 'Fatima Zahra' OR name = 'Fatima Zahra El Idrissi'`;
-    await sql`UPDATE nannies SET name = 'Amina Bouziane', email = 'amina@callanannycare.com', pin = '123456', phone = '+212 6 72 34 56 78' WHERE name = 'Amina Benali' OR name = 'Amina Bouziane'`;
-    await sql`UPDATE nannies SET name = 'Sara Lamrani', email = 'sara@callanannycare.com', pin = '123456', phone = '+212 6 53 45 67 89' WHERE name = 'Sara Tazi' OR name = 'Sara Lamrani'`;
-    await sql`UPDATE nannies SET name = 'Khadija Ait Ouahmane', email = 'khadija@callanannycare.com', pin = '123456', phone = '+212 6 64 56 78 90' WHERE name = 'Khadija Alami' OR name = 'Khadija Ait Ouahmane'`;
-    await sql`UPDATE nannies SET name = 'Nadia Berrada', email = 'nadia@callanannycare.com', pin = '123456', phone = '+212 6 75 67 89 01' WHERE name = 'Nadia Moussaoui' OR name = 'Nadia Berrada'`;
-    await sql`UPDATE nannies SET name = 'Houda Chraibi', email = 'houda@callanannycare.com', pin = '123456', phone = '+212 6 86 78 90 12' WHERE name = 'Houda El Fassi' OR name = 'Houda Chraibi'`;
+    // Delete old generic nannies and replace with real ones
+    await sql`DELETE FROM nannies WHERE name IN ('Fatima Zahra', 'Amina Benali', 'Sara Tazi', 'Khadija Alami', 'Nadia Moussaoui', 'Houda El Fassi', 'Fatima Zahra El Idrissi', 'Amina Bouziane', 'Sara Lamrani', 'Khadija Ait Ouahmane', 'Nadia Berrada', 'Houda Chraibi')`;
 
-    // Check if nannies already seeded
-    const existing = await sql`SELECT COUNT(*) as count FROM nannies`;
-    if (parseInt(existing[0].count) > 0) {
-      return res.status(200).json({ message: 'Database updated with real names and phone numbers', nannies: parseInt(existing[0].count) });
+    // Check if real nannies already exist
+    const sanaeExists = await sql`SELECT COUNT(*) as count FROM nannies WHERE name = 'Sanae'`;
+    if (parseInt(sanaeExists[0].count) === 0) {
+      // Insert real nannies
+      await sql`
+        INSERT INTO nannies (name, location, rating, bio, specialties, languages, rate, image, experience, available, phone, email, pin, status) VALUES
+        ('Sanae', 'Gueliz, Marrakech', 4.9, 'Sanae is a dedicated and experienced nanny with a warm approach to childcare. She is great with children of all ages and ensures a safe, fun environment.', '["Early Childhood","First Aid Certified","Creative Activities"]', '["Arabic","French","English"]', 150, '', '5 years', true, '+212 631 363 797', 'sanae@callanannycare.com', '123456', 'active'),
+        ('Fatima Zahra', 'Hivernage, Marrakech', 4.8, 'Fatima Zahra is an experienced childcare professional who specializes in early childhood development and speaks fluent French and English.', '["Early Childhood","Montessori","Newborn Care"]', '["Arabic","French","English"]', 150, '', '8 years', true, '+212 674 666 498', 'fatimazahra@callanannycare.com', '123456', 'active'),
+        ('Majda', 'Medina, Marrakech', 4.7, 'Majda brings creativity and patience to every family she works with. She loves outdoor activities and has a gentle approach with toddlers.', '["Outdoor Activities","Toddler Specialist","Pediatric First Aid"]', '["Arabic","French"]', 150, '', '4 years', true, '+212 677 191 510', 'majda@callanannycare.com', '123456', 'active'),
+        ('Hayat', 'Palmeraie, Marrakech', 4.9, 'Hayat has extensive experience working with international families and luxury hotel guests. She provides premium childcare with attention to every detail.', '["Premium Care","Hotel Experience","Multiple Children"]', '["Arabic","French","English"]', 150, '', '10 years', true, '+212 672 456 927', 'hayat@callanannycare.com', '123456', 'active'),
+        ('Naima', 'Amelkis, Marrakech', 4.6, 'Naima specializes in infant care and has completed advanced training in newborn care. She is calm, patient, and incredibly nurturing.', '["Infant Specialist","Night Care","Sleep Training"]', '["Arabic","French"]', 150, '', '6 years', true, '+212 639 196 589', 'naima@callanannycare.com', '123456', 'active'),
+        ('Laila', 'Targa, Marrakech', 4.8, 'Laila is a multilingual nanny who loves introducing children to Moroccan culture through stories, songs, and creative play.', '["Cultural Activities","Storytelling","School-Age Children"]', '["Arabic","French","English"]', 150, '', '7 years', true, '+212 668 932 117', 'laila@callanannycare.com', '123456', 'active'),
+        ('Samira', 'Gueliz, Marrakech', 4.8, 'Samira brings warmth and energy to every family. With a background in education, she creates engaging activities that children love.', '["Creative Activities","Education Background","Multiple Children"]', '["Arabic","French","English"]', 150, '', '5 years', true, '+212 661 744 300', 'samira@callanannycare.com', '123456', 'active')
+      `;
     }
 
-    // Seed nannies (fresh DB only)
-    await sql`
-      INSERT INTO nannies (name, location, rating, bio, specialties, languages, rate, image, experience, available, phone, email, pin) VALUES
-      ('Fatima Zahra El Idrissi', 'Gueliz, Marrakech', 4.9, 'Fatima is an experienced childcare professional with over 8 years working with international families. She specializes in early childhood development and speaks fluent English and French.', '["Early Childhood","First Aid Certified","Montessori"]', '["Arabic","French","English"]', 150, 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&h=400&fit=crop&crop=face', '8 years', true, '+212 6 61 23 45 67', 'fatima@callanannycare.com', '123456'),
-      ('Amina Bouziane', 'Hivernage, Marrakech', 4.8, 'Amina brings warmth and creativity to every family she works with. With a background in education, she creates engaging activities that children love.', '["Creative Activities","Education Background","Newborn Care"]', '["Arabic","French","English","Spanish"]', 150, 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=400&h=400&fit=crop&crop=face', '5 years', true, '+212 6 72 34 56 78', 'amina@callanannycare.com', '123456'),
-      ('Sara Lamrani', 'Medina, Marrakech', 4.7, 'Sara is a certified pediatric first-aider with a gentle approach to childcare. She is particularly great with toddlers and loves outdoor activities.', '["Outdoor Activities","Pediatric First Aid","Toddler Specialist"]', '["Arabic","French","English"]', 150, 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&h=400&fit=crop&crop=face', '4 years', true, '+212 6 53 45 67 89', 'sara@callanannycare.com', '123456'),
-      ('Khadija Ait Ouahmane', 'Palmeraie, Marrakech', 4.9, 'Khadija has extensive experience with high-profile families and luxury hotel guests. She provides premium childcare with attention to every detail.', '["Premium Care","Hotel Experience","Multiple Children"]', '["Arabic","French","English","German"]', 150, 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop&crop=face', '10 years', true, '+212 6 64 56 78 90', 'khadija@callanannycare.com', '123456'),
-      ('Nadia Berrada', 'Amelkis, Marrakech', 4.6, 'Nadia specializes in caring for infants and has completed advanced training in newborn care. She is calm, patient, and incredibly nurturing.', '["Infant Specialist","Night Care","Sleep Training"]', '["Arabic","French"]', 150, 'https://images.unsplash.com/photo-1509967419530-da38b4704bc6?w=400&h=400&fit=crop&crop=face', '6 years', false, '+212 6 75 67 89 01', 'nadia@callanannycare.com', '123456'),
-      ('Houda Chraibi', 'Targa, Marrakech', 4.8, 'Houda is a multilingual nanny who loves introducing children to Moroccan culture through stories, songs, and creative play.', '["Cultural Activities","Storytelling","School-Age Children"]', '["Arabic","French","English","Italian"]', 150, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face', '7 years', true, '+212 6 86 78 90 12', 'houda@callanannycare.com', '123456')
-    `;
+    const existing = await sql`SELECT COUNT(*) as count FROM nannies`;
+    return res.status(200).json({ message: 'Database updated with real nanny names and phone numbers', nannies: parseInt(existing[0].count) });
 
     return res.status(200).json({ message: 'Database seeded successfully with 6 nannies and login credentials' });
   } catch (error) {

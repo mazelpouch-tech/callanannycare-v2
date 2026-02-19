@@ -117,6 +117,8 @@ export function DataProvider({ children }) {
             totalPrice: b.total_price,
             status: b.status,
             createdAt: b.created_at,
+            clockIn: b.clock_in,
+            clockOut: b.clock_out,
           }));
           setBookings(normalizedBookings);
           saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -338,6 +340,44 @@ export function DataProvider({ children }) {
     });
   }, []);
 
+  const clockInBooking = useCallback(async (id) => {
+    const clockTime = new Date().toISOString();
+    try {
+      await apiFetch(`/bookings/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ clock_in: clockTime }),
+      });
+    } catch {
+      console.warn("API clock-in failed, updating locally");
+    }
+    setBookings((prev) => {
+      const updated = prev.map((b) => b.id === id ? { ...b, clockIn: clockTime } : b);
+      saveToStorage(STORAGE_KEYS.bookings, updated);
+      return updated;
+    });
+    // Also update nanny bookings
+    setNannyBookings((prev) => prev.map((b) => b.id === id ? { ...b, clockIn: clockTime } : b));
+  }, []);
+
+  const clockOutBooking = useCallback(async (id) => {
+    const clockTime = new Date().toISOString();
+    try {
+      await apiFetch(`/bookings/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ clock_out: clockTime, status: "completed" }),
+      });
+    } catch {
+      console.warn("API clock-out failed, updating locally");
+    }
+    setBookings((prev) => {
+      const updated = prev.map((b) => b.id === id ? { ...b, clockOut: clockTime, status: "completed" } : b);
+      saveToStorage(STORAGE_KEYS.bookings, updated);
+      return updated;
+    });
+    // Also update nanny bookings
+    setNannyBookings((prev) => prev.map((b) => b.id === id ? { ...b, clockOut: clockTime, status: "completed" } : b));
+  }, []);
+
   const deleteBooking = useCallback(async (id) => {
     try {
       await apiFetch(`/bookings/${id}`, { method: "DELETE" });
@@ -400,6 +440,8 @@ export function DataProvider({ children }) {
     totalPrice: b.total_price,
     status: b.status,
     createdAt: b.created_at,
+    clockIn: b.clock_in,
+    clockOut: b.clock_out,
   }), []);
 
   const fetchNannyBookings = useCallback(async () => {
@@ -738,6 +780,8 @@ export function DataProvider({ children }) {
       addBooking,
       updateBooking,
       updateBookingStatus,
+      clockInBooking,
+      clockOutBooking,
       deleteBooking,
       stats,
       isAdmin,
@@ -770,7 +814,7 @@ export function DataProvider({ children }) {
     }),
     [
       nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability, inviteNanny, toggleNannyStatus, resendInvite,
-      bookings, addBooking, updateBooking, updateBookingStatus, deleteBooking,
+      bookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking,
       stats, isAdmin, adminProfile, adminUsers, adminLogin, adminLogout,
       fetchAdminUsers, addAdminUser, updateAdminUser, deleteAdminUser,
       changeAdminPassword, forgotAdminPassword, resetAdminPassword, loading,

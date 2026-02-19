@@ -22,9 +22,9 @@ export default async function handler(req, res) {
     }
     
     if (req.method === 'PUT') {
-      const { status, client_name, client_email, client_phone, hotel, date, start_time, end_time, plan, children_count, children_ages, notes, total_price } = req.body;
+      const { status, client_name, client_email, client_phone, hotel, date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out } = req.body;
       const result = await sql`
-        UPDATE bookings SET 
+        UPDATE bookings SET
           status = COALESCE(${status}, status),
           client_name = COALESCE(${client_name}, client_name),
           client_email = COALESCE(${client_email}, client_email),
@@ -38,6 +38,8 @@ export default async function handler(req, res) {
           children_ages = COALESCE(${children_ages}, children_ages),
           notes = COALESCE(${notes}, notes),
           total_price = COALESCE(${total_price}, total_price),
+          clock_in = COALESCE(${clock_in ? clock_in : null}, clock_in),
+          clock_out = COALESCE(${clock_out ? clock_out : null}, clock_out),
           updated_at = NOW()
         WHERE id = ${id}
         RETURNING *

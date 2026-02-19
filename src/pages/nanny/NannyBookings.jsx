@@ -13,6 +13,9 @@ import {
   MessageCircle,
   Phone,
   Loader2,
+  PlayCircle,
+  StopCircle,
+  Timer,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { Fragment } from "react";
@@ -24,8 +27,61 @@ const statusColors = {
   cancelled: "bg-red-100 text-red-700",
 };
 
+const HOURLY_RATE = 250 / 7; // ~35.71 MAD/hr
+
+function formatDuration(ms) {
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function formatHoursWorked(clockIn, clockOut) {
+  const ms = new Date(clockOut) - new Date(clockIn);
+  const hours = ms / 3600000;
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return `${h}h ${m}m`;
+}
+
+function calcShiftPay(clockIn, clockOut) {
+  const ms = new Date(clockOut) - new Date(clockIn);
+  const hours = ms / 3600000;
+  let pay = Math.round(hours * HOURLY_RATE);
+  // Evening bonus: +100 MAD if clocked in at or after 7 PM
+  const inHour = new Date(clockIn).getHours();
+  if (inHour >= 19) pay += 100;
+  return pay;
+}
+
+// Live timer component
+function LiveTimer({ clockIn }) {
+  const [elapsed, setElapsed] = useState(Date.now() - new Date(clockIn).getTime());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsed(Date.now() - new Date(clockIn).getTime());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [clockIn]);
+
+  return (
+    <span className="font-mono text-sm font-bold tabular-nums">
+      {formatDuration(elapsed)}
+    </span>
+  );
+}
+
+function isToday(dateStr) {
+  if (!dateStr) return false;
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  return dateStr === todayStr;
+}
+
 export default function NannyBookings() {
-  const { nannyBookings, fetchNannyBookings, updateBookingStatus } = useData();
+  const { nannyBookings, fetchNannyBookings, updateBookingStatus, clockInBooking, clockOutBooking } = useData();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
@@ -35,6 +91,12 @@ export default function NannyBookings() {
   useEffect(() => {
     fetchNannyBookings();
   }, [fetchNannyBookings]);
+
+  // Find active shift (clocked in but not clocked out)
+  const activeShift = useMemo(
+    () => nannyBookings.find((b) => b.clockIn && !b.clockOut && b.status !== "cancelled"),
+    [nannyBookings]
+  );
 
   const handleAccept = async (id) => {
     setActionLoading(id);
@@ -46,6 +108,20 @@ export default function NannyBookings() {
   const handleDecline = async (id) => {
     setActionLoading(id);
     await updateBookingStatus(id, "cancelled");
+    await fetchNannyBookings();
+    setActionLoading(null);
+  };
+
+  const handleClockIn = async (id) => {
+    setActionLoading(id);
+    await clockInBooking(id);
+    await fetchNannyBookings();
+    setActionLoading(null);
+  };
+
+  const handleClockOut = async (id) => {
+    setActionLoading(id);
+    await clockOutBooking(id);
     await fetchNannyBookings();
     setActionLoading(null);
   };
@@ -94,6 +170,40 @@ export default function NannyBookings() {
             : "View all your past and upcoming bookings"}
         </p>
       </div>
+
+      {/* Active Shift Banner */}
+      {activeShift && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center animate-pulse">
+              <Timer className="w-5 h-5 text-green-700" />
+            </div>
+            <div>
+              <p className="font-semibold text-green-800">Active Shift</p>
+              <p className="text-sm text-green-700">
+                {activeShift.clientName} · {activeShift.hotel || "No hotel"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="bg-green-100 px-3 py-1.5 rounded-lg">
+              <LiveTimer clockIn={activeShift.clockIn} />
+            </div>
+            <button
+              onClick={() => handleClockOut(activeShift.id)}
+              disabled={actionLoading === activeShift.id}
+              className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {actionLoading === activeShift.id ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <StopCircle className="w-4 h-4" />
+              )}
+              Clock Out
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -147,6 +257,7 @@ export default function NannyBookings() {
                     <th className="px-5 py-3 font-medium">Time</th>
                     <th className="px-5 py-3 font-medium">Plan</th>
                     <th className="px-5 py-3 font-medium">Status</th>
+                    <th className="px-5 py-3 font-medium">Shift</th>
                     <th className="px-5 py-3 font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -177,6 +288,26 @@ export default function NannyBookings() {
                           </span>
                         </td>
                         <td className="px-5 py-3">
+                          {/* Clock data */}
+                          {booking.clockIn && booking.clockOut ? (
+                            <div className="text-xs">
+                              <span className="font-medium text-blue-700">
+                                {formatHoursWorked(booking.clockIn, booking.clockOut)}
+                              </span>
+                              <span className="text-muted-foreground ml-1">
+                                · {calcShiftPay(booking.clockIn, booking.clockOut)} MAD
+                              </span>
+                            </div>
+                          ) : booking.clockIn && !booking.clockOut ? (
+                            <div className="flex items-center gap-1.5 text-green-700">
+                              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                              <LiveTimer clockIn={booking.clockIn} />
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3">
                           <div className="flex items-center gap-1.5">
                             {/* Accept/Decline for pending */}
                             {booking.status === "pending" && (
@@ -202,6 +333,38 @@ export default function NannyBookings() {
                                   <XCircle className="w-4 h-4" />
                                 </button>
                               </>
+                            )}
+                            {/* Clock In for confirmed bookings today, no active shift elsewhere */}
+                            {booking.status === "confirmed" && !booking.clockIn && isToday(booking.date) && !activeShift && (
+                              <button
+                                onClick={() => handleClockIn(booking.id)}
+                                disabled={actionLoading === booking.id}
+                                className="flex items-center gap-1 px-2.5 py-1.5 bg-green-50 text-green-700 text-xs font-medium rounded-lg hover:bg-green-100 transition-colors disabled:opacity-50"
+                                title="Clock In"
+                              >
+                                {actionLoading === booking.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <PlayCircle className="w-3.5 h-3.5" />
+                                )}
+                                Clock In
+                              </button>
+                            )}
+                            {/* Clock Out for active shift */}
+                            {booking.clockIn && !booking.clockOut && booking.status !== "cancelled" && (
+                              <button
+                                onClick={() => handleClockOut(booking.id)}
+                                disabled={actionLoading === booking.id}
+                                className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-700 text-xs font-medium rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+                                title="Clock Out"
+                              >
+                                {actionLoading === booking.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <StopCircle className="w-3.5 h-3.5" />
+                                )}
+                                Clock Out
+                              </button>
                             )}
                             {/* WhatsApp parent */}
                             {booking.clientPhone && (
@@ -239,7 +402,7 @@ export default function NannyBookings() {
                       </tr>
                       {expandedId === booking.id && (
                         <tr className="bg-muted/20">
-                          <td colSpan={6} className="px-5 py-4">
+                          <td colSpan={7} className="px-5 py-4">
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                               <div>
                                 <span className="text-muted-foreground">Email</span>
@@ -262,6 +425,18 @@ export default function NannyBookings() {
                                     : ""}
                                 </p>
                               </div>
+                              {booking.clockIn && (
+                                <div>
+                                  <span className="text-muted-foreground">Clocked In</span>
+                                  <p className="font-medium">{new Date(booking.clockIn).toLocaleTimeString()}</p>
+                                </div>
+                              )}
+                              {booking.clockOut && (
+                                <div>
+                                  <span className="text-muted-foreground">Clocked Out</span>
+                                  <p className="font-medium">{new Date(booking.clockOut).toLocaleTimeString()}</p>
+                                </div>
+                              )}
                               {booking.notes && (
                                 <div className="col-span-full">
                                   <span className="text-muted-foreground">Notes</span>
@@ -311,31 +486,84 @@ export default function NannyBookings() {
                     </div>
                   </div>
 
-                  {/* Action buttons for mobile */}
-                  {booking.status === "pending" && (
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        onClick={() => handleAccept(booking.id)}
-                        disabled={actionLoading === booking.id}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors disabled:opacity-50"
-                      >
-                        {actionLoading === booking.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <CheckCircle className="w-3.5 h-3.5" />
-                        )}
-                        Accept
-                      </button>
-                      <button
-                        onClick={() => handleDecline(booking.id)}
-                        disabled={actionLoading === booking.id}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50 text-red-700 text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-50"
-                      >
-                        <XCircle className="w-3.5 h-3.5" />
-                        Decline
-                      </button>
+                  {/* Shift info */}
+                  {booking.clockIn && booking.clockOut && (
+                    <div className="mt-2 flex items-center gap-2 text-xs">
+                      <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-medium">
+                        {formatHoursWorked(booking.clockIn, booking.clockOut)}
+                      </span>
+                      <span className="bg-green-50 text-green-700 px-2 py-1 rounded font-medium">
+                        {calcShiftPay(booking.clockIn, booking.clockOut)} MAD
+                      </span>
                     </div>
                   )}
+                  {booking.clockIn && !booking.clockOut && booking.status !== "cancelled" && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      <span className="text-green-700 text-xs font-medium">Active:</span>
+                      <LiveTimer clockIn={booking.clockIn} />
+                    </div>
+                  )}
+
+                  {/* Action buttons for mobile */}
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {booking.status === "pending" && (
+                      <>
+                        <button
+                          onClick={() => handleAccept(booking.id)}
+                          disabled={actionLoading === booking.id}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors disabled:opacity-50"
+                        >
+                          {actionLoading === booking.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <CheckCircle className="w-3.5 h-3.5" />
+                          )}
+                          Accept
+                        </button>
+                        <button
+                          onClick={() => handleDecline(booking.id)}
+                          disabled={actionLoading === booking.id}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50 text-red-700 text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-50"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          Decline
+                        </button>
+                      </>
+                    )}
+
+                    {/* Clock In for confirmed bookings today */}
+                    {booking.status === "confirmed" && !booking.clockIn && isToday(booking.date) && !activeShift && (
+                      <button
+                        onClick={() => handleClockIn(booking.id)}
+                        disabled={actionLoading === booking.id}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+                      >
+                        {actionLoading === booking.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <PlayCircle className="w-4 h-4" />
+                        )}
+                        Clock In
+                      </button>
+                    )}
+
+                    {/* Clock Out for active shift */}
+                    {booking.clockIn && !booking.clockOut && booking.status !== "cancelled" && (
+                      <button
+                        onClick={() => handleClockOut(booking.id)}
+                        disabled={actionLoading === booking.id}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+                      >
+                        {actionLoading === booking.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <StopCircle className="w-4 h-4" />
+                        )}
+                        Clock Out
+                      </button>
+                    )}
+                  </div>
 
                   {/* WhatsApp + details toggle */}
                   <div className="flex items-center gap-2 mt-2">
@@ -377,6 +605,18 @@ export default function NannyBookings() {
                           ? ` (ages: ${booking.childrenAges})`
                           : ""}
                       </p>
+                      {booking.clockIn && (
+                        <p>
+                          <span className="text-muted-foreground">Clocked In:</span>{" "}
+                          {new Date(booking.clockIn).toLocaleTimeString()}
+                        </p>
+                      )}
+                      {booking.clockOut && (
+                        <p>
+                          <span className="text-muted-foreground">Clocked Out:</span>{" "}
+                          {new Date(booking.clockOut).toLocaleTimeString()}
+                        </p>
+                      )}
                       {booking.notes && (
                         <p>
                           <span className="text-muted-foreground">Notes:</span>{" "}

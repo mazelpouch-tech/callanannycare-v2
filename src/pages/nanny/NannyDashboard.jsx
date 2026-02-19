@@ -21,15 +21,30 @@ const statusColors = {
 
 const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-// Helper: calculate nanny pay for a booking (250 MAD/day + 100 MAD if after 7 PM)
+const HOURLY_RATE = 250 / 7; // ~35.71 MAD/hr
+
+// Helper: calculate nanny pay for a booking
+// If clock data exists: real hours * (250/7) + evening bonus
+// Else: fixed 250 MAD + evening bonus
 function calcNannyPay(booking) {
   if (booking.status === "cancelled") return 0;
+
+  // Use real clock data if available
+  if (booking.clockIn && booking.clockOut) {
+    const ms = new Date(booking.clockOut) - new Date(booking.clockIn);
+    const hours = ms / 3600000;
+    let pay = Math.round(hours * HOURLY_RATE);
+    // Evening bonus: +100 MAD if clocked in at or after 7 PM
+    const inHour = new Date(booking.clockIn).getHours();
+    if (inHour >= 19) pay += 100;
+    return pay;
+  }
+
+  // Fallback: fixed 250 MAD per booking + evening bonus
   let pay = 250;
-  // Check if evening booking (startTime after 7 PM / 19:00)
   const st = booking.startTime || "";
   const hour = parseInt(st.replace(/[^0-9]/g, "")) || 0;
   const isPM = st.toLowerCase().includes("pm") || st.includes("PM");
-  // Handle "7:00 PM", "19:00", "8 PM" etc.
   let hour24 = hour;
   if (isPM && hour < 12) hour24 = hour + 12;
   if (hour24 >= 19) pay += 100;
@@ -88,7 +103,7 @@ function PayChart({ bookings }) {
         })}
       </div>
       <p className="text-[10px] text-muted-foreground mt-3 text-center">
-        250 MAD/day · +100 MAD evening (after 7 PM)
+        250 MAD/7h ({Math.round(HOURLY_RATE)} MAD/hr) · +100 MAD evening (after 7 PM)
       </p>
     </div>
   );

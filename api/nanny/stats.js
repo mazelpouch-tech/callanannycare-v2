@@ -24,11 +24,13 @@ export default async function handler(req, res) {
       WHERE nanny_id = ${nannyId}
     `;
 
-    // Calculate hours from completed bookings
+    // Calculate hours from completed bookings (prioritize clock data)
     const hoursResult = await sql`
-      SELECT 
+      SELECT
         COALESCE(SUM(
-          CASE 
+          CASE
+            WHEN clock_out IS NOT NULL AND clock_in IS NOT NULL THEN
+              EXTRACT(EPOCH FROM (clock_out - clock_in)) / 3600
             WHEN end_time != '' AND start_time != '' THEN
               EXTRACT(EPOCH FROM (end_time::time - start_time::time)) / 3600
             WHEN plan = 'half-day' THEN 5
