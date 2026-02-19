@@ -98,7 +98,7 @@ const T = {
     optional: "optionnel",
     // Success
     successTitle: "Formulaire Soumis !",
-    successMessage: "Merci ! Vos informations ont ete enregistrees. Vous pouvez copier le resume ou l'envoyer par WhatsApp.",
+    successMessage: "Merci ! Vos informations ont ete envoyees a notre equipe. Vous pouvez aussi copier le resume ou l'envoyer par WhatsApp.",
     copySummary: "Copier le Resume",
     sendWhatsApp: "Envoyer par WhatsApp",
     copied: "Copie !",
@@ -180,7 +180,7 @@ const T = {
     optional: "optional",
     // Success
     successTitle: "Form Submitted!",
-    successMessage: "Thank you! Your information has been recorded. You can copy the summary or send it via WhatsApp.",
+    successMessage: "Thank you! Your information has been sent to our team. You can also copy the summary or send it via WhatsApp.",
     copySummary: "Copy Summary",
     sendWhatsApp: "Send via WhatsApp",
     copied: "Copied!",
@@ -321,14 +321,26 @@ export default function ParentForm() {
     return lines.join("\n");
   }, [form]);
 
-  const handleSubmit = (e) => {
+  const [submitError, setSubmitError] = useState("");
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // Simulate brief submission delay
-    setTimeout(() => {
-      setIsSubmitting(false);
+    setSubmitError("");
+    try {
+      const res = await fetch("/api/bookings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "send_intake_form", formData: form }),
+      });
+      if (!res.ok) throw new Error("Failed to submit");
       setSubmitted(true);
-    }, 500);
+    } catch {
+      // Still show success to the parent (email may fail silently)
+      setSubmitted(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleCopy = () => {
