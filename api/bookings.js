@@ -1,7 +1,7 @@
 import { getDb } from './_db.js';
 import { Resend } from 'resend';
 
-const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'admin@callananny.ma';
+const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL || 'info@callanannycare.com';
 
 export default async function handler(req, res) {
   const sql = getDb();
