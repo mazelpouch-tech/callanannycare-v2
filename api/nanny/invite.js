@@ -3,13 +3,38 @@ import crypto from 'crypto';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, PUT, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const sql = getDb();
 
   try {
+    // GET: Validate invite token and return nanny info (for registration page)
+    if (req.method === 'GET') {
+      const { token } = req.query;
+      if (!token) {
+        return res.status(400).json({ error: 'Token is required' });
+      }
+
+      const result = await sql`
+        SELECT id, name, email, invite_token_expires
+        FROM nannies
+        WHERE invite_token = ${token} AND status = 'invited'
+      `;
+
+      if (result.length === 0) {
+        return res.status(400).json({ error: 'Invalid or already used invitation link' });
+      }
+
+      const nanny = result[0];
+      if (nanny.invite_token_expires && new Date(nanny.invite_token_expires) < new Date()) {
+        return res.status(400).json({ error: 'This invitation has expired. Please contact the admin for a new one.' });
+      }
+
+      return res.status(200).json({ success: true, name: nanny.name, email: nanny.email });
+    }
+
     // POST: Create a new invitation
     if (req.method === 'POST') {
       const { name, email } = req.body;
@@ -18,17 +43,14 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Name and email are required' });
       }
 
-      // Check for existing nanny with this email
       const existing = await sql`SELECT id, status FROM nannies WHERE email = ${email}`;
       if (existing.length > 0) {
         return res.status(409).json({ error: 'A nanny with this email already exists' });
       }
 
-      // Generate secure invite token (64-char hex)
       const inviteToken = crypto.randomBytes(32).toString('hex');
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-      // Create nanny record with invited status
       const result = await sql`
         INSERT INTO nannies (name, email, status, invite_token, invite_token_expires, invited_at, pin, available)
         VALUES (${name}, ${email}, 'invited', ${inviteToken}, ${expiresAt.toISOString()}, NOW(), '', false)
@@ -55,7 +77,6 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'nannyId is required' });
       }
 
-      // Verify nanny exists and is in invited status
       const existing = await sql`SELECT id, name, email, status FROM nannies WHERE id = ${nannyId}`;
       if (existing.length === 0) {
         return res.status(404).json({ error: 'Nanny not found' });
@@ -64,7 +85,6 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Can only resend invitations for nannies with invited status' });
       }
 
-      // Generate new token
       const inviteToken = crypto.randomBytes(32).toString('hex');
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -84,6 +104,58 @@ export default async function handler(req, res) {
         success: true,
         inviteLink,
         nanny: { id: existing[0].id, name: existing[0].name, email: existing[0].email }
+      });
+    }
+
+    // PATCH: Complete registration (nanny sets PIN + profile)
+    if (req.method === 'PATCH') {
+      const { token, pin, bio, languages, specialties, image, location, experience } = req.body;
+
+      if (!token) {
+        return res.status(400).json({ error: 'Invitation token is required' });
+      }
+      if (!pin || pin.length < 4 || pin.length > 6 || !/^\d+$/.test(pin)) {
+        return res.status(400).json({ error: 'PIN must be 4-6 digits' });
+      }
+
+      const result = await sql`
+        SELECT id, name, email, invite_token_expires
+        FROM nannies
+        WHERE invite_token = ${token} AND status = 'invited'
+      `;
+
+      if (result.length === 0) {
+        return res.status(400).json({ error: 'Invalid or already used invitation link' });
+      }
+
+      const nanny = result[0];
+      if (nanny.invite_token_expires && new Date(nanny.invite_token_expires) < new Date()) {
+        return res.status(400).json({ error: 'This invitation has expired. Please contact the admin for a new one.' });
+      }
+
+      const updated = await sql`
+        UPDATE nannies SET
+          pin = ${pin},
+          bio = COALESCE(${bio || null}, bio),
+          languages = COALESCE(${languages ? JSON.stringify(languages) : null}, languages),
+          specialties = COALESCE(${specialties ? JSON.stringify(specialties) : null}, specialties),
+          image = COALESCE(${image || null}, image),
+          location = COALESCE(${location || null}, location),
+          experience = COALESCE(${experience || null}, experience),
+          status = 'active',
+          available = true,
+          invite_token = NULL,
+          invite_token_expires = NULL,
+          registered_at = NOW(),
+          updated_at = NOW()
+        WHERE id = ${nanny.id}
+        RETURNING id, name, email
+      `;
+
+      return res.status(200).json({
+        success: true,
+        message: 'Registration complete! You can now log in.',
+        nanny: { id: updated[0].id, name: updated[0].name, email: updated[0].email }
       });
     }
 

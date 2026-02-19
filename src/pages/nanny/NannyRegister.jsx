@@ -34,7 +34,7 @@ export default function NannyRegister() {
 
     const validateToken = async () => {
       try {
-        const res = await fetch(`${API}/api/nanny/invite-info?token=${token}`);
+        const res = await fetch(`${API}/api/nanny/invite?token=${token}`);
         const data = await res.json();
         if (res.ok && data.success) {
           setNannyInfo(data);
@@ -78,8 +78,8 @@ export default function NannyRegister() {
         image: image || undefined,
       };
 
-      const res = await fetch(`${API}/api/nanny/register`, {
-        method: "POST",
+      const res = await fetch(`${API}/api/nanny/invite`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
