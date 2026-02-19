@@ -199,7 +199,7 @@ export default function NannyBookings() {
               ) : (
                 <StopCircle className="w-4 h-4" />
               )}
-              Clock Out
+              End Shift
             </button>
           </div>
         </div>
@@ -334,36 +334,36 @@ export default function NannyBookings() {
                                 </button>
                               </>
                             )}
-                            {/* Clock In for confirmed bookings today, no active shift elsewhere */}
+                            {/* Start Shift for confirmed bookings today, no active shift elsewhere */}
                             {booking.status === "confirmed" && !booking.clockIn && isToday(booking.date) && !activeShift && (
                               <button
                                 onClick={() => handleClockIn(booking.id)}
                                 disabled={actionLoading === booking.id}
                                 className="flex items-center gap-1 px-2.5 py-1.5 bg-green-50 text-green-700 text-xs font-medium rounded-lg hover:bg-green-100 transition-colors disabled:opacity-50"
-                                title="Clock In"
+                                title="Start Shift"
                               >
                                 {actionLoading === booking.id ? (
                                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                 ) : (
                                   <PlayCircle className="w-3.5 h-3.5" />
                                 )}
-                                Clock In
+                                Start Shift
                               </button>
                             )}
-                            {/* Clock Out for active shift */}
+                            {/* End Shift for active shift */}
                             {booking.clockIn && !booking.clockOut && booking.status !== "cancelled" && (
                               <button
                                 onClick={() => handleClockOut(booking.id)}
                                 disabled={actionLoading === booking.id}
                                 className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-700 text-xs font-medium rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
-                                title="Clock Out"
+                                title="End Shift"
                               >
                                 {actionLoading === booking.id ? (
                                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                 ) : (
                                   <StopCircle className="w-3.5 h-3.5" />
                                 )}
-                                Clock Out
+                                End Shift
                               </button>
                             )}
                             {/* WhatsApp parent */}
@@ -532,7 +532,7 @@ export default function NannyBookings() {
                       </>
                     )}
 
-                    {/* Clock In for confirmed bookings today */}
+                    {/* Start Shift for confirmed bookings today */}
                     {booking.status === "confirmed" && !booking.clockIn && isToday(booking.date) && !activeShift && (
                       <button
                         onClick={() => handleClockIn(booking.id)}
@@ -544,11 +544,11 @@ export default function NannyBookings() {
                         ) : (
                           <PlayCircle className="w-4 h-4" />
                         )}
-                        Clock In
+                        Start Shift
                       </button>
                     )}
 
-                    {/* Clock Out for active shift */}
+                    {/* End Shift for active shift */}
                     {booking.clockIn && !booking.clockOut && booking.status !== "cancelled" && (
                       <button
                         onClick={() => handleClockOut(booking.id)}
@@ -560,7 +560,7 @@ export default function NannyBookings() {
                         ) : (
                           <StopCircle className="w-4 h-4" />
                         )}
-                        Clock Out
+                        End Shift
                       </button>
                     )}
                   </div>

@@ -269,8 +269,6 @@ function NannyHoursReport({ bookings, nannies }) {
       .sort((a, b) => b.totalHours - a.totalHours);
   }, [bookings]);
 
-  if (nannyHours.length === 0) return null;
-
   const totalAllHours = nannyHours.reduce((s, n) => s + n.totalHours, 0);
   const totalAllPay = nannyHours.reduce((s, n) => s + n.totalPay, 0);
   const totalAllShifts = nannyHours.reduce((s, n) => s + n.shifts, 0);
@@ -282,76 +280,93 @@ function NannyHoursReport({ bookings, nannies }) {
           <Timer className="w-4 h-4 text-primary" />
           Nanny Hours Report
         </h2>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <span>{totalAllShifts} shifts</span>
-          <span>{totalAllHours.toFixed(1)} hrs</span>
-          <span className="font-semibold text-foreground">{totalAllPay.toLocaleString()} MAD</span>
-        </div>
-      </div>
-
-      {/* Desktop table */}
-      <div className="hidden md:block overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nanny</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Shifts</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hours</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Avg/Shift</th>
-              <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pay</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {nannyHours.map((nanny, i) => (
-              <tr key={i} className="hover:bg-muted/50 transition-colors">
-                <td className="px-6 py-3">
-                  <p className="text-sm font-medium text-foreground">{nanny.name}</p>
-                </td>
-                <td className="px-6 py-3 text-sm text-muted-foreground">{nanny.shifts}</td>
-                <td className="px-6 py-3 text-sm text-muted-foreground">{nanny.totalHours}h</td>
-                <td className="px-6 py-3 text-sm text-muted-foreground">
-                  {(nanny.totalHours / nanny.shifts).toFixed(1)}h
-                </td>
-                <td className="px-6 py-3 text-sm font-semibold text-foreground text-right">
-                  {nanny.totalPay.toLocaleString()} MAD
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="border-t-2 border-border bg-muted/30">
-              <td className="px-6 py-3 text-sm font-bold text-foreground">Total</td>
-              <td className="px-6 py-3 text-sm font-bold text-foreground">{totalAllShifts}</td>
-              <td className="px-6 py-3 text-sm font-bold text-foreground">{totalAllHours.toFixed(1)}h</td>
-              <td className="px-6 py-3 text-sm font-bold text-foreground">
-                {totalAllShifts > 0 ? (totalAllHours / totalAllShifts).toFixed(1) : 0}h
-              </td>
-              <td className="px-6 py-3 text-sm font-bold text-foreground text-right">{totalAllPay.toLocaleString()} MAD</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      {/* Mobile cards */}
-      <div className="md:hidden divide-y divide-border">
-        {nannyHours.map((nanny, i) => (
-          <div key={i} className="px-5 py-4 space-y-1">
-            <div className="flex items-center justify-between">
-              <p className="font-medium text-foreground text-sm">{nanny.name}</p>
-              <span className="text-sm font-semibold text-foreground">{nanny.totalPay.toLocaleString()} MAD</span>
-            </div>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span>{nanny.shifts} shifts</span>
-              <span>{nanny.totalHours}h total</span>
-              <span>{(nanny.totalHours / nanny.shifts).toFixed(1)}h avg</span>
-            </div>
+        {nannyHours.length > 0 && (
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span>{totalAllShifts} shifts</span>
+            <span>{totalAllHours.toFixed(1)} hrs</span>
+            <span className="font-semibold text-foreground">{totalAllPay.toLocaleString()} MAD</span>
           </div>
-        ))}
+        )}
       </div>
 
-      <div className="px-6 py-3 border-t border-border text-[10px] text-muted-foreground">
-        Rate: 250 MAD/7h ({Math.round(NANNY_HOURLY_RATE)} MAD/hr) · +100 MAD for evening shifts (after 7 PM)
-      </div>
+      {/* Empty state */}
+      {nannyHours.length === 0 && (
+        <div className="px-6 py-10 text-center">
+          <Timer className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-muted-foreground font-medium">No shift data yet</p>
+          <p className="text-sm text-muted-foreground/70 mt-1">
+            Hours will appear here once nannies start using Start Shift / End Shift.
+          </p>
+        </div>
+      )}
+
+      {nannyHours.length > 0 && (
+        <>
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nanny</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Shifts</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hours</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Avg/Shift</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pay</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {nannyHours.map((nanny, i) => (
+                  <tr key={i} className="hover:bg-muted/50 transition-colors">
+                    <td className="px-6 py-3">
+                      <p className="text-sm font-medium text-foreground">{nanny.name}</p>
+                    </td>
+                    <td className="px-6 py-3 text-sm text-muted-foreground">{nanny.shifts}</td>
+                    <td className="px-6 py-3 text-sm text-muted-foreground">{nanny.totalHours}h</td>
+                    <td className="px-6 py-3 text-sm text-muted-foreground">
+                      {(nanny.totalHours / nanny.shifts).toFixed(1)}h
+                    </td>
+                    <td className="px-6 py-3 text-sm font-semibold text-foreground text-right">
+                      {nanny.totalPay.toLocaleString()} MAD
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border bg-muted/30">
+                  <td className="px-6 py-3 text-sm font-bold text-foreground">Total</td>
+                  <td className="px-6 py-3 text-sm font-bold text-foreground">{totalAllShifts}</td>
+                  <td className="px-6 py-3 text-sm font-bold text-foreground">{totalAllHours.toFixed(1)}h</td>
+                  <td className="px-6 py-3 text-sm font-bold text-foreground">
+                    {totalAllShifts > 0 ? (totalAllHours / totalAllShifts).toFixed(1) : 0}h
+                  </td>
+                  <td className="px-6 py-3 text-sm font-bold text-foreground text-right">{totalAllPay.toLocaleString()} MAD</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden divide-y divide-border">
+            {nannyHours.map((nanny, i) => (
+              <div key={i} className="px-5 py-4 space-y-1">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-foreground text-sm">{nanny.name}</p>
+                  <span className="text-sm font-semibold text-foreground">{nanny.totalPay.toLocaleString()} MAD</span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span>{nanny.shifts} shifts</span>
+                  <span>{nanny.totalHours}h total</span>
+                  <span>{(nanny.totalHours / nanny.shifts).toFixed(1)}h avg</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="px-6 py-3 border-t border-border text-[10px] text-muted-foreground">
+            Rate: 250 MAD/7h ({Math.round(NANNY_HOURLY_RATE)} MAD/hr) · +100 MAD for evening shifts (after 7 PM)
+          </div>
+        </>
+      )}
     </div>
   );
 }

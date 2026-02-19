@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Clock,
@@ -9,6 +9,11 @@ import {
   MapPin,
   User,
   TrendingUp,
+  PlayCircle,
+  StopCircle,
+  Timer,
+  Loader2,
+  Coffee,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 
@@ -23,24 +28,53 @@ const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "S
 
 const HOURLY_RATE = 250 / 7; // ~35.71 MAD/hr
 
+// Helper: check if a date string is today
+function isToday(dateStr) {
+  if (!dateStr) return false;
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  return dateStr === todayStr;
+}
+
+// Helper: format milliseconds to HH:MM:SS
+function formatDuration(ms) {
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function formatHoursWorked(clockIn, clockOut) {
+  const ms = new Date(clockOut) - new Date(clockIn);
+  const hours = ms / 3600000;
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return `${h}h ${m}m`;
+}
+
+function calcShiftPay(clockIn, clockOut) {
+  const ms = new Date(clockOut) - new Date(clockIn);
+  const hours = ms / 3600000;
+  let pay = Math.round(hours * HOURLY_RATE);
+  const inHour = new Date(clockIn).getHours();
+  if (inHour >= 19) pay += 100;
+  return pay;
+}
+
 // Helper: calculate nanny pay for a booking
-// If clock data exists: real hours * (250/7) + evening bonus
-// Else: fixed 250 MAD + evening bonus
 function calcNannyPay(booking) {
   if (booking.status === "cancelled") return 0;
 
-  // Use real clock data if available
   if (booking.clockIn && booking.clockOut) {
     const ms = new Date(booking.clockOut) - new Date(booking.clockIn);
     const hours = ms / 3600000;
     let pay = Math.round(hours * HOURLY_RATE);
-    // Evening bonus: +100 MAD if clocked in at or after 7 PM
     const inHour = new Date(booking.clockIn).getHours();
     if (inHour >= 19) pay += 100;
     return pay;
   }
 
-  // Fallback: fixed 250 MAD per booking + evening bonus
   let pay = 250;
   const st = booking.startTime || "";
   const hour = parseInt(st.replace(/[^0-9]/g, "")) || 0;
@@ -49,6 +83,24 @@ function calcNannyPay(booking) {
   if (isPM && hour < 12) hour24 = hour + 12;
   if (hour24 >= 19) pay += 100;
   return pay;
+}
+
+// Live timer component
+function LiveTimer({ clockIn, large }) {
+  const [elapsed, setElapsed] = useState(Date.now() - new Date(clockIn).getTime());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsed(Date.now() - new Date(clockIn).getTime());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [clockIn]);
+
+  return (
+    <span className={`font-mono font-bold tabular-nums ${large ? "text-3xl sm:text-4xl" : "text-sm"}`}>
+      {formatDuration(elapsed)}
+    </span>
+  );
 }
 
 // Simple bar chart for nanny pay
@@ -117,6 +169,10 @@ function DashboardSkeleton() {
         <div className="h-8 w-48 bg-muted rounded-lg" />
         <div className="h-4 w-32 bg-muted rounded mt-2" />
       </div>
+      <div className="bg-card rounded-xl border border-border p-6">
+        <div className="h-6 w-32 bg-muted rounded mb-4" />
+        <div className="h-16 w-full bg-muted rounded-lg" />
+      </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="bg-card rounded-xl border border-border p-5">
@@ -128,26 +184,186 @@ function DashboardSkeleton() {
           </div>
         ))}
       </div>
-      <div className="bg-card rounded-xl border border-border">
-        <div className="p-5 border-b border-border">
-          <div className="h-6 w-40 bg-muted rounded" />
+    </div>
+  );
+}
+
+// ─── My Shift Section (prominent, always visible) ────────────────
+
+function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyBookings }) {
+  const [actionLoading, setActionLoading] = useState(false);
+
+  // Find active shift (clocked in, not clocked out)
+  const activeShift = useMemo(
+    () => bookings.find((b) => b.clockIn && !b.clockOut && b.status !== "cancelled"),
+    [bookings]
+  );
+
+  // Today's confirmed bookings (not yet clocked in)
+  const todayReadyBookings = useMemo(
+    () => bookings.filter((b) => b.status === "confirmed" && !b.clockIn && isToday(b.date)),
+    [bookings]
+  );
+
+  // Today's completed shifts (has clock data)
+  const todayCompleted = useMemo(
+    () => bookings.filter((b) => b.clockIn && b.clockOut && isToday(b.date)),
+    [bookings]
+  );
+
+  const handleStartShift = async (id) => {
+    setActionLoading(true);
+    await clockInBooking(id);
+    await fetchNannyBookings();
+    setActionLoading(false);
+  };
+
+  const handleEndShift = async (id) => {
+    setActionLoading(true);
+    await clockOutBooking(id);
+    await fetchNannyBookings();
+    setActionLoading(false);
+  };
+
+  // ── STATE 1: Active shift in progress ──
+  if (activeShift) {
+    return (
+      <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-2xl p-6 sm:p-8">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+          <h2 className="font-serif text-lg sm:text-xl font-bold text-green-800">
+            Shift in Progress
+          </h2>
         </div>
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="p-4 border-b border-border last:border-0">
-            <div className="flex items-center justify-between">
-              <div className="h-4 w-28 bg-muted rounded" />
-              <div className="h-5 w-16 bg-muted rounded-full" />
+
+        <div className="text-center py-4">
+          <LiveTimer clockIn={activeShift.clockIn} large />
+          <p className="text-sm text-green-700 mt-2">
+            {activeShift.clientName} · {activeShift.hotel || "No hotel"} · {activeShift.plan}
+          </p>
+          <p className="text-xs text-green-600 mt-1">
+            Started at {new Date(activeShift.clockIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          </p>
+        </div>
+
+        <button
+          onClick={() => handleEndShift(activeShift.id)}
+          disabled={actionLoading}
+          className="w-full mt-4 flex items-center justify-center gap-2 py-4 px-6 bg-red-600 text-white text-lg font-bold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 shadow-lg"
+        >
+          {actionLoading ? (
+            <Loader2 className="w-6 h-6 animate-spin" />
+          ) : (
+            <StopCircle className="w-6 h-6" />
+          )}
+          End Shift
+        </button>
+      </div>
+    );
+  }
+
+  // ── STATE 2: Today has confirmed bookings ready to start ──
+  if (todayReadyBookings.length > 0) {
+    return (
+      <div className="bg-card border-2 border-primary/30 rounded-2xl p-6 sm:p-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Timer className="w-5 h-5 text-primary" />
+          <h2 className="font-serif text-lg sm:text-xl font-bold text-foreground">
+            My Shift
+          </h2>
+        </div>
+
+        <div className="space-y-3">
+          {todayReadyBookings.map((booking) => (
+            <div key={booking.id} className="bg-muted/30 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="font-semibold text-foreground">{booking.clientName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {booking.startTime}{booking.endTime ? ` - ${booking.endTime}` : ""} · {booking.plan}
+                    {booking.hotel ? ` · ${booking.hotel}` : ""}
+                  </p>
+                </div>
+                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-green-100 text-green-700">
+                  Confirmed
+                </span>
+              </div>
+
+              <button
+                onClick={() => handleStartShift(booking.id)}
+                disabled={actionLoading}
+                className="w-full flex items-center justify-center gap-2 py-4 px-6 bg-green-600 text-white text-lg font-bold rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 shadow-lg"
+              >
+                {actionLoading ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  <PlayCircle className="w-6 h-6" />
+                )}
+                Start Shift
+              </button>
             </div>
-            <div className="flex gap-3 mt-2">
-              <div className="h-3 w-20 bg-muted rounded" />
-              <div className="h-3 w-16 bg-muted rounded" />
-            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── STATE 3: Today's shift completed ──
+  if (todayCompleted.length > 0) {
+    const totalHoursToday = todayCompleted.reduce((sum, b) => {
+      const ms = new Date(b.clockOut) - new Date(b.clockIn);
+      return sum + ms / 3600000;
+    }, 0);
+    const totalPayToday = todayCompleted.reduce((sum, b) => sum + calcShiftPay(b.clockIn, b.clockOut), 0);
+
+    return (
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 sm:p-8">
+        <div className="flex items-center gap-2 mb-4">
+          <CheckCircle className="w-5 h-5 text-blue-600" />
+          <h2 className="font-serif text-lg sm:text-xl font-bold text-blue-800">
+            Shift Completed Today
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <div>
+            <p className="text-2xl font-bold text-blue-800">{todayCompleted.length}</p>
+            <p className="text-xs text-blue-600">Shift{todayCompleted.length > 1 ? "s" : ""}</p>
           </div>
-        ))}
+          <div>
+            <p className="text-2xl font-bold text-blue-800">{formatHoursWorked(todayCompleted[0].clockIn, todayCompleted[todayCompleted.length - 1].clockOut)}</p>
+            <p className="text-xs text-blue-600">Hours</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-blue-800">{totalPayToday}</p>
+            <p className="text-xs text-blue-600">MAD earned</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── STATE 4: No shifts today ──
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6 sm:p-8">
+      <div className="flex items-center gap-2 mb-2">
+        <Timer className="w-5 h-5 text-muted-foreground" />
+        <h2 className="font-serif text-lg sm:text-xl font-bold text-foreground">
+          My Shift
+        </h2>
+      </div>
+      <div className="text-center py-6">
+        <Coffee className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+        <p className="text-muted-foreground font-medium">No shifts scheduled today</p>
+        <p className="text-sm text-muted-foreground/70 mt-1">
+          When you have a confirmed booking for today, you can start your shift here.
+        </p>
       </div>
     </div>
   );
 }
+
+// ─── Main Dashboard Component ────────────────────────────────────
 
 export default function NannyDashboard() {
   const {
@@ -156,6 +372,8 @@ export default function NannyDashboard() {
     nannyBookings,
     fetchNannyStats,
     fetchNannyBookings,
+    clockInBooking,
+    clockOutBooking,
   } = useData();
 
   useEffect(() => {
@@ -218,6 +436,14 @@ export default function NannyDashboard() {
           Here&apos;s your schedule overview.
         </p>
       </div>
+
+      {/* ── MY SHIFT (prominent, always visible) ── */}
+      <MyShiftSection
+        bookings={nannyBookings}
+        clockInBooking={clockInBooking}
+        clockOutBooking={clockOutBooking}
+        fetchNannyBookings={fetchNannyBookings}
+      />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
