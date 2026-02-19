@@ -4,6 +4,7 @@ import Home from './pages/Home'
 import Nannies from './pages/Nannies'
 import HowItWorks from './pages/HowItWorks'
 import Book from './pages/Book'
+import ParentForm from './pages/ParentForm'
 import NotFound from './pages/NotFound'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminLayout from './pages/admin/AdminLayout'
@@ -31,6 +32,9 @@ export default function App() {
         <Route path="/book" element={<Book />} />
         <Route path="*" element={<NotFound />} />
       </Route>
+
+      {/* Public standalone form (no navbar/footer) */}
+      <Route path="/parent-form" element={<ParentForm />} />
 
       {/* Admin routes */}
       <Route path="/admin/login" element={<AdminLogin />} />
