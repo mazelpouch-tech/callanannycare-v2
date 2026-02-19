@@ -152,7 +152,7 @@ export default function Home() {
         <div className="mx-auto max-w-7xl">
           <div className="text-center mb-14">
             <h2 className="font-serif text-3xl sm:text-4xl font-bold text-foreground">
-              Why Choose Call a Nanny?
+              Why Choose call a nanny?
             </h2>
             <p className="mt-4 text-muted-foreground text-lg max-w-xl mx-auto">
               We make finding trusted childcare in Marrakech simple and stress-free.
@@ -317,7 +317,7 @@ export default function Home() {
             Ready to Find Your Perfect Nanny?
           </h2>
           <p className="text-lg text-muted-foreground mb-10 max-w-xl mx-auto leading-relaxed">
-            Join hundreds of Marrakech families who trust Call a Nanny for
+            Join hundreds of Marrakech families who trust call a nanny for
             reliable childcare.
           </p>
           <Link

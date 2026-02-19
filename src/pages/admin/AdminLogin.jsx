@@ -41,7 +41,7 @@ export default function AdminLogin() {
         {/* Logo */}
         <div className="text-center mb-8">
           <h1 className="font-serif text-3xl font-bold text-foreground">
-            Call a Nanny
+            call a nanny
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Administration Portal

@@ -32,7 +32,7 @@ export default function Navbar() {
             to="/"
             className="font-serif text-xl font-bold text-gradient-warm tracking-tight"
           >
-            Call a Nanny
+            call a nanny
           </Link>
 
           {/* Desktop Navigation */}
@@ -83,7 +83,7 @@ export default function Navbar() {
       >
         <div className="flex items-center justify-between p-4 border-b border-border">
           <span className="font-serif text-lg font-bold text-gradient-warm">
-            Call a Nanny
+            call a nanny
           </span>
           <button
             onClick={() => setMobileOpen(false)}

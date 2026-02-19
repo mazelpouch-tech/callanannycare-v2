@@ -49,7 +49,7 @@ export default function AdminLayout() {
             </div>
             <div>
               <h1 className="font-serif text-lg font-bold text-foreground leading-tight">
-                Call a Nanny
+                call a nanny
               </h1>
               <span className="inline-block text-[10px] font-semibold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full mt-0.5">
                 Admin Panel

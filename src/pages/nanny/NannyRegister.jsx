@@ -155,7 +155,7 @@ export default function NannyRegister() {
               Registration Complete!
             </h1>
             <p className="text-muted-foreground mb-6">
-              Welcome to Call a Nanny! You can now sign in with your email and PIN.
+              Welcome to call a nanny! You can now sign in with your email and PIN.
             </p>
             <Link
               to="/nanny/login"
@@ -187,7 +187,7 @@ export default function NannyRegister() {
               Welcome, {nannyInfo?.name}!
             </h1>
             <p className="text-muted-foreground mt-2">
-              Complete your registration to join Call a Nanny
+              Complete your registration to join call a nanny
             </p>
             <p className="text-sm text-primary mt-1 font-medium">{nannyInfo?.email}</p>
           </div>
