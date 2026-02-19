@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import {
   format,
   addMonths,
@@ -29,6 +29,7 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle,
+  MessageCircle,
 } from "lucide-react";
 import { useData } from "../context/DataContext";
 
@@ -750,7 +751,14 @@ function StepReview({
 }
 
 // --- Success State ---
-function BookingSuccess({ onBookAnother, onGoHome }) {
+function BookingSuccess({ onBookAnother, onGoHome, bookingData, nannyName }) {
+  const whatsAppConfirm = () => {
+    const msg = encodeURIComponent(
+      `Hi! I just booked a nanny session with call a nanny.\n\nNanny: ${nannyName}\nDate: ${bookingData.date}\nTime: ${bookingData.startTime}${bookingData.endTime ? ` - ${bookingData.endTime}` : ""}\nPlan: ${bookingData.plan}\n\nLooking forward to it!`
+    );
+    window.open(`https://wa.me/212600000000?text=${msg}`, "_blank");
+  };
+
   return (
     <div className="flex flex-col items-center justify-center py-12 sm:py-20 text-center">
       <div className="relative mb-6">
@@ -762,28 +770,55 @@ function BookingSuccess({ onBookAnother, onGoHome }) {
       <h2 className="font-serif text-3xl sm:text-4xl font-bold text-foreground mb-3">
         Booking Submitted!
       </h2>
-      <p className="text-muted-foreground text-lg max-w-md mb-8">
-        We'll confirm your booking shortly. You'll receive a confirmation email
+      <p className="text-muted-foreground text-lg max-w-md mb-4">
+        We'll confirm your booking shortly. You'll receive a confirmation
         with all the details.
       </p>
-      <div className="flex flex-col sm:flex-row gap-3">
+
+      {/* Parent form CTA */}
+      <div className="bg-accent/5 border border-accent/20 rounded-xl p-5 max-w-md mb-8 w-full">
+        <p className="text-sm font-semibold text-foreground mb-1.5">
+          One more step!
+        </p>
+        <p className="text-sm text-muted-foreground mb-3">
+          Please fill out the child information form so your nanny can prepare
+          for a great experience.
+        </p>
+        <Link
+          to="/parent-form"
+          className="bg-accent text-white font-semibold px-5 py-2.5 rounded-lg hover:opacity-90 transition-opacity inline-flex items-center gap-2 text-sm"
+        >
+          <FileText className="w-4 h-4" />
+          Fill Child Info Form
+        </Link>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
+        <button
+          type="button"
+          onClick={whatsAppConfirm}
+          className="flex-1 bg-green-500 text-white font-semibold px-5 py-3 rounded-full hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
+        >
+          <MessageCircle className="w-4 h-4" />
+          Confirm via WhatsApp
+        </button>
         <button
           type="button"
           onClick={onBookAnother}
-          className="gradient-warm text-white font-semibold px-6 py-3 rounded-full hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2"
+          className="flex-1 gradient-warm text-white font-semibold px-5 py-3 rounded-full hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2"
         >
           <Calendar className="w-4 h-4" />
           Book Another
         </button>
-        <button
-          type="button"
-          onClick={onGoHome}
-          className="px-6 py-3 rounded-full border border-border text-foreground font-semibold hover:bg-muted transition-colors flex items-center justify-center gap-2"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Home
-        </button>
       </div>
+      <button
+        type="button"
+        onClick={onGoHome}
+        className="mt-3 px-6 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5"
+      >
+        <ArrowLeft className="w-3.5 h-3.5" />
+        Back to Home
+      </button>
     </div>
   );
 }
@@ -858,27 +893,29 @@ export default function Book() {
     const startLabel = TIME_SLOTS.find((s) => s.value === startTime)?.label || startTime;
     const endLabel = TIME_SLOTS.find((s) => s.value === endTime)?.label || endTime;
 
+    const bookingPayload = {
+      nannyId: selectedNanny.id,
+      nannyName: selectedNanny.name,
+      date: format(selectedDate, "yyyy-MM-dd"),
+      startTime: startLabel,
+      endTime: endLabel,
+      plan: selectedPlan,
+      hours,
+      totalPrice,
+      clientName: details.fullName,
+      clientEmail: details.email,
+      clientPhone: details.phone,
+      accommodation: details.accommodation,
+      numChildren: details.numChildren,
+      childrenAges: details.childrenAges,
+      notes: details.notes,
+      status: "pending",
+    };
+
     // Simulate brief delay
     setTimeout(() => {
-      addBooking({
-        nannyId: selectedNanny.id,
-        nannyName: selectedNanny.name,
-        date: format(selectedDate, "yyyy-MM-dd"),
-        startTime: startLabel,
-        endTime: endLabel,
-        plan: selectedPlan,
-        hours,
-        totalPrice,
-        clientName: details.fullName,
-        clientEmail: details.email,
-        clientPhone: details.phone,
-        accommodation: details.accommodation,
-        numChildren: details.numChildren,
-        childrenAges: details.childrenAges,
-        notes: details.notes,
-        status: "pending",
-      });
-
+      addBooking(bookingPayload);
+      setLastBookingData(bookingPayload);
       setIsSubmitting(false);
       setIsSuccess(true);
     }, 600);
@@ -908,6 +945,9 @@ export default function Book() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [step, isSuccess]);
 
+  // Store last booking data for success screen
+  const [lastBookingData, setLastBookingData] = useState(null);
+
   if (isSuccess) {
     return (
       <div className="min-h-screen bg-background">
@@ -915,6 +955,8 @@ export default function Book() {
           <BookingSuccess
             onBookAnother={handleBookAnother}
             onGoHome={() => navigate("/")}
+            bookingData={lastBookingData}
+            nannyName={selectedNanny?.name || ""}
           />
         </div>
       </div>

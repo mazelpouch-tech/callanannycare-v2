@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   Clock,
@@ -8,6 +8,7 @@ import {
   ArrowRight,
   MapPin,
   User,
+  TrendingUp,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 
@@ -17,6 +18,103 @@ const statusColors = {
   completed: "bg-blue-100 text-blue-700",
   cancelled: "bg-red-100 text-red-700",
 };
+
+const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// Simple SVG bar chart for earnings
+function EarningsChart({ bookings }) {
+  const monthlyEarnings = useMemo(() => {
+    const now = new Date();
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+        label: MONTHS_SHORT[d.getMonth()],
+        total: 0,
+      });
+    }
+    bookings.forEach((b) => {
+      if (b.status === "cancelled" || !b.date || !b.totalPrice) return;
+      const monthKey = b.date.substring(0, 7);
+      const month = months.find((m) => m.key === monthKey);
+      if (month) month.total += Number(b.totalPrice) || 0;
+    });
+    return months;
+  }, [bookings]);
+
+  const maxVal = Math.max(...monthlyEarnings.map((m) => m.total), 1);
+
+  return (
+    <div className="bg-card rounded-xl border border-border p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold text-foreground text-lg flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-primary" />
+          Earnings (6 months)
+        </h2>
+      </div>
+      <div className="flex items-end gap-2 h-32">
+        {monthlyEarnings.map((month) => {
+          const heightPct = maxVal > 0 ? (month.total / maxVal) * 100 : 0;
+          return (
+            <div key={month.key} className="flex-1 flex flex-col items-center gap-1">
+              <span className="text-[10px] text-muted-foreground font-medium">
+                {month.total > 0 ? `${month.total}` : ""}
+              </span>
+              <div className="w-full flex justify-center">
+                <div
+                  className="w-full max-w-[32px] rounded-t-md gradient-warm transition-all duration-500"
+                  style={{ height: `${Math.max(heightPct, 2)}%`, minHeight: "4px" }}
+                />
+              </div>
+              <span className="text-[10px] text-muted-foreground font-medium">{month.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Loading skeleton
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      <div>
+        <div className="h-8 w-48 bg-muted rounded-lg" />
+        <div className="h-4 w-32 bg-muted rounded mt-2" />
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="bg-card rounded-xl border border-border p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="h-4 w-20 bg-muted rounded" />
+              <div className="w-9 h-9 bg-muted rounded-lg" />
+            </div>
+            <div className="h-8 w-24 bg-muted rounded" />
+          </div>
+        ))}
+      </div>
+      <div className="bg-card rounded-xl border border-border">
+        <div className="p-5 border-b border-border">
+          <div className="h-6 w-40 bg-muted rounded" />
+        </div>
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="p-4 border-b border-border last:border-0">
+            <div className="flex items-center justify-between">
+              <div className="h-4 w-28 bg-muted rounded" />
+              <div className="h-5 w-16 bg-muted rounded-full" />
+            </div>
+            <div className="flex gap-3 mt-2">
+              <div className="h-3 w-20 bg-muted rounded" />
+              <div className="h-3 w-16 bg-muted rounded" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function NannyDashboard() {
   const {
@@ -34,8 +132,12 @@ export default function NannyDashboard() {
 
   const upcomingBookings = nannyBookings
     .filter((b) => b.status === "confirmed" || b.status === "pending")
-    .sort((a, b) => a.date.localeCompare(b.date))
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
     .slice(0, 5);
+
+  const isLoading = !nannyStats && nannyBookings.length === 0;
+
+  if (isLoading) return <DashboardSkeleton />;
 
   const statCards = [
     {
@@ -78,7 +180,7 @@ export default function NannyDashboard() {
           Welcome back, {nannyProfile?.name?.split(" ")[0] || "there"}
         </h1>
         <p className="text-muted-foreground mt-1">
-          Here's your schedule overview.
+          Here&apos;s your schedule overview.
         </p>
       </div>
 
@@ -113,6 +215,9 @@ export default function NannyDashboard() {
           );
         })}
       </div>
+
+      {/* Earnings Chart */}
+      <EarningsChart bookings={nannyBookings} />
 
       {/* Upcoming Bookings */}
       <div className="bg-card rounded-xl border border-border">
@@ -177,7 +282,7 @@ export default function NannyDashboard() {
                       <td className="px-5 py-3 text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <MapPin className="w-3.5 h-3.5" />
-                          {booking.hotel || "—"}
+                          {booking.hotel || "\u2014"}
                         </div>
                       </td>
                       <td className="px-5 py-3">

@@ -21,7 +21,7 @@ const sidebarLinks = [
 ];
 
 export default function NannyLayout() {
-  const { isNanny, nannyProfile, nannyLogout, unreadNotifications } = useData();
+  const { isNanny, nannyProfile, nannyLogout, unreadNotifications, fetchNannyNotifications } = useData();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Check if nanny has been blocked since login
@@ -30,6 +30,13 @@ export default function NannyLayout() {
       nannyLogout();
     }
   }, [isNanny, nannyProfile?.status, nannyLogout]);
+  useEffect(() => {
+    if (!isNanny) return;
+    const interval = setInterval(() => {
+      fetchNannyNotifications();
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [isNanny, fetchNannyNotifications]);
 
   if (!isNanny) return <Navigate to="/nanny/login" replace />;
 

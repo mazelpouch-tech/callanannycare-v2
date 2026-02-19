@@ -1,27 +1,42 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Outlet, NavLink, Navigate } from "react-router-dom";
 import {
   LayoutDashboard,
   CalendarDays,
+  CalendarRange,
   Users,
   ShieldCheck,
   LogOut,
   Menu,
   X,
   ChevronLeft,
+  Bell,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 
 const sidebarLinks = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/admin/bookings", label: "Bookings", icon: CalendarDays },
+  { to: "/admin/calendar", label: "Calendar", icon: CalendarRange },
   { to: "/admin/nannies", label: "Nannies", icon: Users },
   { to: "/admin/users", label: "Admin Users", icon: ShieldCheck },
 ];
 
 export default function AdminLayout() {
-  const { isAdmin, adminProfile, adminLogout } = useData();
+  const { isAdmin, adminProfile, adminLogout, bookings, stats } = useData();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [prevPending, setPrevPending] = useState(0);
+  const [newBookingAlert, setNewBookingAlert] = useState(false);
+
+  // Track new pending bookings for notification badge
+  useEffect(() => {
+    const pending = stats?.pendingBookings || 0;
+    if (pending > prevPending && prevPending > 0) {
+      setNewBookingAlert(true);
+      setTimeout(() => setNewBookingAlert(false), 5000);
+    }
+    setPrevPending(pending);
+  }, [stats?.pendingBookings]);
 
   if (!isAdmin) {
     return <Navigate to="/admin/login" replace />;
@@ -85,6 +100,11 @@ export default function AdminLayout() {
             >
               <Icon className="w-5 h-5 shrink-0" />
               <span>{label}</span>
+              {label === "Bookings" && (stats?.pendingBookings || 0) > 0 && (
+                <span className="ml-auto bg-orange-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
+                  {stats.pendingBookings > 9 ? "9+" : stats.pendingBookings}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

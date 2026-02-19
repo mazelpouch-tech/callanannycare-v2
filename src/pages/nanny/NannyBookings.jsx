@@ -1,15 +1,18 @@
 import { useEffect, useState, useMemo } from "react";
 import {
   Search,
-  Filter,
   ChevronDown,
   ChevronUp,
   User,
   MapPin,
   Clock,
   Baby,
-  FileText,
   ClipboardList,
+  CheckCircle,
+  XCircle,
+  MessageCircle,
+  Phone,
+  Loader2,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { Fragment } from "react";
@@ -22,19 +25,41 @@ const statusColors = {
 };
 
 export default function NannyBookings() {
-  const { nannyBookings, fetchNannyBookings } = useData();
+  const { nannyBookings, fetchNannyBookings, updateBookingStatus } = useData();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
   const [expandedId, setExpandedId] = useState(null);
+  const [actionLoading, setActionLoading] = useState(null);
 
   useEffect(() => {
     fetchNannyBookings();
   }, [fetchNannyBookings]);
 
+  const handleAccept = async (id) => {
+    setActionLoading(id);
+    await updateBookingStatus(id, "confirmed");
+    await fetchNannyBookings();
+    setActionLoading(null);
+  };
+
+  const handleDecline = async (id) => {
+    setActionLoading(id);
+    await updateBookingStatus(id, "cancelled");
+    await fetchNannyBookings();
+    setActionLoading(null);
+  };
+
+  const openWhatsApp = (phone, clientName, date) => {
+    const text = encodeURIComponent(
+      `Hi ${clientName}, this is your nanny from call a nanny regarding your booking on ${date}. `
+    );
+    const num = phone?.replace(/\D/g, "");
+    window.open(`https://wa.me/${num}?text=${text}`, "_blank");
+  };
+
   const filtered = useMemo(() => {
     let result = [...nannyBookings];
-
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -44,19 +69,18 @@ export default function NannyBookings() {
           b.clientEmail?.toLowerCase().includes(q)
       );
     }
-
     if (statusFilter !== "all") {
       result = result.filter((b) => b.status === statusFilter);
     }
-
     result.sort((a, b) =>
       sortOrder === "newest"
         ? (b.date || "").localeCompare(a.date || "")
         : (a.date || "").localeCompare(b.date || "")
     );
-
     return result;
   }, [nannyBookings, search, statusFilter, sortOrder]);
+
+  const pendingCount = nannyBookings.filter((b) => b.status === "pending").length;
 
   return (
     <div className="space-y-6">
@@ -65,7 +89,9 @@ export default function NannyBookings() {
           My Bookings
         </h1>
         <p className="text-muted-foreground mt-1">
-          View all your past and upcoming bookings
+          {pendingCount > 0
+            ? `You have ${pendingCount} pending booking${pendingCount > 1 ? "s" : ""} to review`
+            : "View all your past and upcoming bookings"}
         </p>
       </div>
 
@@ -122,7 +148,7 @@ export default function NannyBookings() {
                     <th className="px-5 py-3 font-medium">Plan</th>
                     <th className="px-5 py-3 font-medium">Price</th>
                     <th className="px-5 py-3 font-medium">Status</th>
-                    <th className="px-5 py-3 font-medium w-10" />
+                    <th className="px-5 py-3 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -155,20 +181,64 @@ export default function NannyBookings() {
                           </span>
                         </td>
                         <td className="px-5 py-3">
-                          <button
-                            onClick={() =>
-                              setExpandedId(
-                                expandedId === booking.id ? null : booking.id
-                              )
-                            }
-                            className="p-1 rounded hover:bg-muted/50"
-                          >
-                            {expandedId === booking.id ? (
-                              <ChevronUp className="w-4 h-4" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4" />
+                          <div className="flex items-center gap-1.5">
+                            {/* Accept/Decline for pending */}
+                            {booking.status === "pending" && (
+                              <>
+                                <button
+                                  onClick={() => handleAccept(booking.id)}
+                                  disabled={actionLoading === booking.id}
+                                  className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
+                                  title="Accept booking"
+                                >
+                                  {actionLoading === booking.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <CheckCircle className="w-4 h-4" />
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => handleDecline(booking.id)}
+                                  disabled={actionLoading === booking.id}
+                                  className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                                  title="Decline booking"
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                </button>
+                              </>
                             )}
-                          </button>
+                            {/* WhatsApp parent */}
+                            {booking.clientPhone && (
+                              <button
+                                onClick={() =>
+                                  openWhatsApp(
+                                    booking.clientPhone,
+                                    booking.clientName,
+                                    booking.date
+                                  )
+                                }
+                                className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 transition-colors"
+                                title="WhatsApp client"
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                              </button>
+                            )}
+                            {/* Expand */}
+                            <button
+                              onClick={() =>
+                                setExpandedId(
+                                  expandedId === booking.id ? null : booking.id
+                                )
+                              }
+                              className="p-1.5 rounded hover:bg-muted/50"
+                            >
+                              {expandedId === booking.id ? (
+                                <ChevronUp className="w-4 h-4" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                       {expandedId === booking.id && (
@@ -247,14 +317,56 @@ export default function NannyBookings() {
                       </span>
                     </div>
                   </div>
-                  <button
-                    onClick={() =>
-                      setExpandedId(expandedId === booking.id ? null : booking.id)
-                    }
-                    className="text-xs text-accent mt-2 hover:underline"
-                  >
-                    {expandedId === booking.id ? "Hide details" : "Show details"}
-                  </button>
+
+                  {/* Action buttons for mobile */}
+                  {booking.status === "pending" && (
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => handleAccept(booking.id)}
+                        disabled={actionLoading === booking.id}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors disabled:opacity-50"
+                      >
+                        {actionLoading === booking.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-3.5 h-3.5" />
+                        )}
+                        Accept
+                      </button>
+                      <button
+                        onClick={() => handleDecline(booking.id)}
+                        disabled={actionLoading === booking.id}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50 text-red-700 text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-50"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        Decline
+                      </button>
+                    </div>
+                  )}
+
+                  {/* WhatsApp + details toggle */}
+                  <div className="flex items-center gap-2 mt-2">
+                    {booking.clientPhone && (
+                      <button
+                        onClick={() =>
+                          openWhatsApp(booking.clientPhone, booking.clientName, booking.date)
+                        }
+                        className="flex items-center gap-1 text-xs text-green-600 hover:underline"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        WhatsApp
+                      </button>
+                    )}
+                    <button
+                      onClick={() =>
+                        setExpandedId(expandedId === booking.id ? null : booking.id)
+                      }
+                      className="text-xs text-accent hover:underline"
+                    >
+                      {expandedId === booking.id ? "Hide details" : "Show details"}
+                    </button>
+                  </div>
+
                   {expandedId === booking.id && (
                     <div className="mt-3 pt-3 border-t border-border space-y-2 text-sm">
                       <p>

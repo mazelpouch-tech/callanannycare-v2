@@ -20,6 +20,9 @@ import {
   X,
   Loader2,
   FileText,
+  MessageCircle,
+  AlertTriangle,
+  Download,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -167,6 +170,70 @@ export default function AdminBookings() {
     });
   };
 
+  // WhatsApp helpers
+  const whatsAppParent = (phone, clientName, date) => {
+    const text = encodeURIComponent(
+      `Hi ${clientName}, this is call a nanny. Regarding your booking on ${date} — `
+    );
+    window.open(`https://wa.me/${phone?.replace(/\D/g, "")}?text=${text}`, "_blank");
+  };
+
+  const whatsAppNanny = (booking) => {
+    const nanny = nannies.find((n) => n.id === booking.nannyId);
+    if (!nanny?.email) return;
+    // We don't have nanny phone, so use the booking info
+    const text = encodeURIComponent(
+      `Hi ${nanny.name}, you have a booking with ${booking.clientName} on ${booking.date} at ${booking.hotel || "TBD"}. `
+    );
+    window.open(`https://wa.me/?text=${text}`, "_blank");
+  };
+
+  // Conflict detection
+  const getConflicts = (nannyId, date, startTime, endTime) => {
+    if (!nannyId || !date) return [];
+    return bookings.filter(
+      (b) =>
+        b.nannyId === Number(nannyId) &&
+        b.date === date &&
+        b.status !== "cancelled" &&
+        b.startTime &&
+        startTime &&
+        !(b.endTime && endTime && (endTime <= b.startTime || startTime >= b.endTime))
+    );
+  };
+
+  const conflicts = useMemo(() => {
+    if (!newBooking.nannyId || !newBooking.date) return [];
+    return getConflicts(newBooking.nannyId, newBooking.date, newBooking.startTime, newBooking.endTime);
+  }, [newBooking.nannyId, newBooking.date, newBooking.startTime, newBooking.endTime, bookings]);
+
+  // CSV export
+  const exportCSV = () => {
+    const headers = ["ID", "Client", "Email", "Phone", "Nanny", "Date", "Time", "Plan", "Price", "Status", "Hotel", "Notes"];
+    const rows = filteredBookings.map((b) => [
+      b.id,
+      b.clientName || "",
+      b.clientEmail || "",
+      b.clientPhone || "",
+      b.nannyName || "",
+      b.date || "",
+      `${b.startTime || ""}${b.endTime ? " - " + b.endTime : ""}`,
+      b.plan || "",
+      b.totalPrice || 0,
+      b.status || "",
+      b.hotel || "",
+      (b.notes || "").replace(/,/g, ";"),
+    ]);
+    const csv = [headers, ...rows].map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bookings-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const filteredBookings = useMemo(() => {
     let result = [...bookings];
 
@@ -236,13 +303,22 @@ export default function AdminBookings() {
             {filteredBookings.length} booking{filteredBookings.length !== 1 ? "s" : ""} found
           </p>
         </div>
-        <button
-          onClick={() => setShowNewBooking(true)}
-          className="flex items-center gap-2 gradient-warm text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity shadow-warm"
-        >
-          <Plus className="w-4 h-4" />
-          New Booking
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportCSV}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-border text-foreground hover:bg-muted transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Export CSV</span>
+          </button>
+          <button
+            onClick={() => setShowNewBooking(true)}
+            className="flex items-center gap-2 gradient-warm text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity shadow-warm"
+          >
+            <Plus className="w-4 h-4" />
+            New Booking
+          </button>
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -519,7 +595,7 @@ export default function AdminBookings() {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+                                  <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
                                   <div>
                                     <p className="text-xs text-muted-foreground">
                                       Notes
@@ -529,6 +605,25 @@ export default function AdminBookings() {
                                     </p>
                                   </div>
                                 </div>
+                              </div>
+                              {/* Quick actions */}
+                              <div className="flex gap-2 mt-3 pt-3 border-t border-border">
+                                {(booking.clientPhone || booking.phone) && (
+                                  <button
+                                    onClick={() => whatsAppParent(booking.clientPhone || booking.phone, booking.clientName, booking.date)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
+                                  >
+                                    <MessageCircle className="w-3.5 h-3.5" />
+                                    WhatsApp Parent
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => whatsAppNanny(booking)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                  WhatsApp Nanny
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -944,6 +1039,19 @@ export default function AdminBookings() {
                   className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition resize-none"
                 />
               </div>
+
+              {/* Conflict Warning */}
+              {conflicts.length > 0 && (
+                <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm text-orange-700">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-semibold">Scheduling conflict!</p>
+                    <p className="text-xs mt-0.5">
+                      {selectedNanny?.name || "This nanny"} already has {conflicts.length} booking{conflicts.length > 1 ? "s" : ""} on this date.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Price Summary */}
               {selectedNanny && newBookingHours > 0 && (

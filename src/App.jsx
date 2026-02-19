@@ -12,6 +12,7 @@ import Dashboard from './pages/admin/Dashboard'
 import AdminBookings from './pages/admin/AdminBookings'
 import AdminNannies from './pages/admin/AdminNannies'
 import AdminUsers from './pages/admin/AdminUsers'
+import AdminCalendar from './pages/admin/AdminCalendar'
 import NannyLogin from './pages/nanny/NannyLogin'
 import NannyRegister from './pages/nanny/NannyRegister'
 import NannyLayout from './pages/nanny/NannyLayout'
@@ -41,6 +42,7 @@ export default function App() {
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="bookings" element={<AdminBookings />} />
+        <Route path="calendar" element={<AdminCalendar />} />
         <Route path="nannies" element={<AdminNannies />} />
         <Route path="users" element={<AdminUsers />} />
       </Route>
