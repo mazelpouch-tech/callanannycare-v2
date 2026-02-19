@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   format,
   addMonths,
@@ -19,7 +19,6 @@ import {
   Check,
   Calendar,
   Clock,
-  MapPin,
   User,
   Mail,
   Phone,
@@ -34,10 +33,9 @@ import {
 import { useData } from "../context/DataContext";
 
 const STEPS = [
-  { number: 1, label: "Select Nanny" },
-  { number: 2, label: "Date & Time" },
-  { number: 3, label: "Your Details" },
-  { number: 4, label: "Review" },
+  { number: 1, label: "Date & Time" },
+  { number: 2, label: "Your Details" },
+  { number: 3, label: "Review" },
 ];
 
 const PLANS = [
@@ -48,13 +46,11 @@ const PLANS = [
 
 function generateTimeSlots() {
   const slots = [];
-  for (let h = 8; h <= 20; h++) {
-    const hour12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  for (let h = 0; h < 24; h++) {
+    const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
     const ampm = h >= 12 ? "PM" : "AM";
     slots.push({ value: `${h}:00`, label: `${hour12}:00 ${ampm}` });
-    if (h < 20) {
-      slots.push({ value: `${h}:30`, label: `${hour12}:30 ${ampm}` });
-    }
+    slots.push({ value: `${h}:30`, label: `${hour12}:30 ${ampm}` });
   }
   return slots;
 }
@@ -117,88 +113,7 @@ function ProgressBar({ currentStep }) {
   );
 }
 
-// --- Step 1: Select Nanny ---
-function StepSelectNanny({ nannies, selectedNannyId, onSelect, onNext }) {
-  return (
-    <div>
-      <h2 className="font-serif text-2xl sm:text-3xl font-bold text-foreground mb-2">
-        Select Your Nanny
-      </h2>
-      <p className="text-muted-foreground mb-6">
-        Choose from our trusted, background-checked nannies.
-      </p>
-
-      {nannies.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          No nannies are currently available. Please check back later.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {nannies.map((nanny) => {
-            const isSelected = selectedNannyId === nanny.id;
-            return (
-              <button
-                key={nanny.id}
-                type="button"
-                onClick={() => onSelect(nanny.id)}
-                className={`text-left p-4 rounded-xl bg-card transition-all duration-200 cursor-pointer hover:shadow-soft ${
-                  isSelected
-                    ? "border-2 border-primary shadow-warm"
-                    : "border border-border hover:border-primary/40"
-                }`}
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <img
-                    src={nanny.image}
-                    alt={nanny.name}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-foreground truncate">
-                      {nanny.name}
-                    </h3>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <MapPin className="w-3 h-3" />
-                      <span className="truncate">{nanny.location}</span>
-                    </div>
-                  </div>
-                  {isSelected && (
-                    <div className="gradient-warm rounded-full p-1">
-                      <Check className="w-3.5 h-3.5 text-white" />
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-1">
-                    <span className="text-yellow-500">&#9733;</span>
-                    <span className="font-medium text-foreground">{nanny.rating}</span>
-                  </div>
-                  <span className="font-semibold text-primary">
-                    {nanny.rate} MAD/hr
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="flex justify-end mt-8">
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={!selectedNannyId}
-          className="gradient-warm text-white font-semibold px-6 py-3 rounded-full hover:opacity-90 transition-opacity shadow-warm disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          Next
-          <ArrowRight className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// --- Step 2: Date & Time ---
+// --- Step 1: Date & Time ---
 function StepDateTime({
   selectedDate,
   onDateSelect,
@@ -409,15 +324,17 @@ function StepDateTime({
       </div>
 
       {/* Navigation */}
-      <div className="flex justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex items-center gap-2 px-5 py-3 rounded-full border border-border text-foreground font-semibold hover:bg-muted transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </button>
+      <div className={`flex ${onBack ? "justify-between" : "justify-end"}`}>
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex items-center gap-2 px-5 py-3 rounded-full border border-border text-foreground font-semibold hover:bg-muted transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+        )}
         <button
           type="button"
           onClick={onNext}
@@ -592,9 +509,8 @@ function StepDetails({ details, onChange, onBack, onNext }) {
   );
 }
 
-// --- Step 4: Review & Confirm ---
+// --- Step 3: Review & Confirm ---
 function StepReview({
-  nanny,
   selectedDate,
   startTime,
   endTime,
@@ -620,26 +536,15 @@ function StepReview({
       </p>
 
       <div className="bg-card rounded-xl border border-border p-5 sm:p-6 shadow-soft max-w-2xl">
-        {/* Nanny */}
-        <div className="flex items-center justify-between mb-5 pb-5 border-b border-border">
-          <div className="flex items-center gap-3">
-            <img
-              src={nanny.image}
-              alt={nanny.name}
-              className="w-12 h-12 rounded-full object-cover"
-            />
-            <div>
-              <h3 className="font-semibold text-foreground">{nanny.name}</h3>
-              <p className="text-sm text-muted-foreground">{nanny.location}</p>
-            </div>
+        {/* Nanny Assignment Info */}
+        <div className="flex items-center gap-3 mb-5 pb-5 border-b border-border">
+          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <User className="w-6 h-6 text-primary" />
           </div>
-          <button
-            type="button"
-            onClick={() => onEdit(1)}
-            className="text-sm text-primary font-semibold hover:underline"
-          >
-            Edit
-          </button>
+          <div>
+            <h3 className="font-semibold text-foreground">Nanny Assignment</h3>
+            <p className="text-sm text-muted-foreground">A nanny will be assigned automatically</p>
+          </div>
         </div>
 
         {/* Date & Time */}
@@ -651,7 +556,7 @@ function StepReview({
             </span>
             <button
               type="button"
-              onClick={() => onEdit(2)}
+              onClick={() => onEdit(1)}
               className="text-sm text-primary font-semibold hover:underline"
             >
               Edit
@@ -682,7 +587,7 @@ function StepReview({
             </span>
             <button
               type="button"
-              onClick={() => onEdit(3)}
+              onClick={() => onEdit(2)}
               className="text-sm text-primary font-semibold hover:underline"
             >
               Edit
@@ -723,7 +628,7 @@ function StepReview({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">
-              {nanny.rate} MAD x {hours} hr{hours !== 1 ? "s" : ""}
+              150 MAD x {hours} hr{hours !== 1 ? "s" : ""}
             </p>
             <p className="text-2xl font-bold text-foreground mt-1">
               {totalPrice} MAD
@@ -751,10 +656,10 @@ function StepReview({
 }
 
 // --- Success State ---
-function BookingSuccess({ onBookAnother, onGoHome, bookingData, nannyName }) {
+function BookingSuccess({ onBookAnother, onGoHome, bookingData }) {
   const whatsAppConfirm = () => {
     const msg = encodeURIComponent(
-      `Hi! I just booked a nanny session with call a nanny.\n\nNanny: ${nannyName}\nDate: ${bookingData.date}\nTime: ${bookingData.startTime}${bookingData.endTime ? ` - ${bookingData.endTime}` : ""}\nPlan: ${bookingData.plan}\n\nLooking forward to it!`
+      `Hi! I just booked a nanny session with call a nanny.\n\nDate: ${bookingData.date}\nTime: ${bookingData.startTime}${bookingData.endTime ? ` - ${bookingData.endTime}` : ""}\nPlan: ${bookingData.plan}\n\nLooking forward to it!`
     );
     window.open(`https://wa.me/212600000000?text=${msg}`, "_blank");
   };
@@ -825,23 +730,14 @@ function BookingSuccess({ onBookAnother, onGoHome, bookingData, nannyName }) {
 
 // --- Main Book Component ---
 export default function Book() {
-  const { nannies, addBooking } = useData();
-  const [searchParams] = useSearchParams();
+  const { addBooking } = useData();
   const navigate = useNavigate();
-
-  const availableNannies = useMemo(
-    () => nannies.filter((n) => n.available),
-    [nannies]
-  );
 
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
   // Step 1 state
-  const [selectedNannyId, setSelectedNannyId] = useState(null);
-
-  // Step 2 state
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState("hourly");
   const [startTime, setStartTime] = useState("");
@@ -858,22 +754,7 @@ export default function Book() {
     notes: "",
   });
 
-  // Pre-select nanny from URL param
-  useEffect(() => {
-    const nannyParam = searchParams.get("nanny");
-    if (nannyParam) {
-      const nannyId = Number(nannyParam);
-      const found = availableNannies.find((n) => n.id === nannyId);
-      if (found) {
-        setSelectedNannyId(nannyId);
-      }
-    }
-  }, [searchParams, availableNannies]);
-
-  const selectedNanny = useMemo(
-    () => availableNannies.find((n) => n.id === selectedNannyId),
-    [availableNannies, selectedNannyId]
-  );
+  const RATE = 150; // MAD per hour
 
   const hours = useMemo(() => {
     if (!startTime || !endTime) return 0;
@@ -881,12 +762,11 @@ export default function Book() {
   }, [startTime, endTime]);
 
   const totalPrice = useMemo(() => {
-    if (!selectedNanny) return 0;
-    return selectedNanny.rate * hours;
-  }, [selectedNanny, hours]);
+    return RATE * hours;
+  }, [hours]);
 
   const handleConfirm = () => {
-    if (!selectedNanny || !selectedDate) return;
+    if (!selectedDate) return;
 
     setIsSubmitting(true);
 
@@ -894,8 +774,6 @@ export default function Book() {
     const endLabel = TIME_SLOTS.find((s) => s.value === endTime)?.label || endTime;
 
     const bookingPayload = {
-      nannyId: selectedNanny.id,
-      nannyName: selectedNanny.name,
       date: format(selectedDate, "yyyy-MM-dd"),
       startTime: startLabel,
       endTime: endLabel,
@@ -923,7 +801,6 @@ export default function Book() {
 
   const handleBookAnother = () => {
     setStep(1);
-    setSelectedNannyId(null);
     setSelectedDate(null);
     setSelectedPlan("hourly");
     setStartTime("");
@@ -956,7 +833,6 @@ export default function Book() {
             onBookAnother={handleBookAnother}
             onGoHome={() => navigate("/")}
             bookingData={lastBookingData}
-            nannyName={selectedNanny?.name || ""}
           />
         </div>
       </div>
@@ -981,15 +857,6 @@ export default function Book() {
 
         {/* Steps */}
         {step === 1 && (
-          <StepSelectNanny
-            nannies={availableNannies}
-            selectedNannyId={selectedNannyId}
-            onSelect={setSelectedNannyId}
-            onNext={() => setStep(2)}
-          />
-        )}
-
-        {step === 2 && (
           <StepDateTime
             selectedDate={selectedDate}
             onDateSelect={setSelectedDate}
@@ -999,24 +866,22 @@ export default function Book() {
             onStartTimeChange={setStartTime}
             endTime={endTime}
             onEndTimeChange={setEndTime}
-            nannyRate={selectedNanny?.rate || 150}
+            nannyRate={RATE}
+            onNext={() => setStep(2)}
+          />
+        )}
+
+        {step === 2 && (
+          <StepDetails
+            details={details}
+            onChange={setDetails}
             onBack={() => setStep(1)}
             onNext={() => setStep(3)}
           />
         )}
 
         {step === 3 && (
-          <StepDetails
-            details={details}
-            onChange={setDetails}
-            onBack={() => setStep(2)}
-            onNext={() => setStep(4)}
-          />
-        )}
-
-        {step === 4 && selectedNanny && (
           <StepReview
-            nanny={selectedNanny}
             selectedDate={selectedDate}
             startTime={startTime}
             endTime={endTime}

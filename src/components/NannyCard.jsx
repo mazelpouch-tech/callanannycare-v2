@@ -99,7 +99,7 @@ export default function NannyCard({ nanny, showBookButton = true, onViewDetails 
           )}
           {showBookButton && available && (
             <Link
-              to={`/book?nanny=${id}`}
+              to="/book"
               className="gradient-warm text-white text-sm font-semibold px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
             >
               Book Now

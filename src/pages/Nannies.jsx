@@ -330,7 +330,7 @@ export default function Nannies() {
                 </div>
                 {selectedNanny.available && (
                   <Link
-                    to={`/book?nanny=${selectedNanny.id}`}
+                    to="/book"
                     onClick={() => setSelectedNanny(null)}
                     className="gradient-warm text-white font-semibold px-6 py-2.5 rounded-full hover:opacity-90 transition-opacity shadow-warm flex items-center gap-2"
                   >

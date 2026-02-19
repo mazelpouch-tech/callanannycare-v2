@@ -23,6 +23,7 @@ import {
   MessageCircle,
   AlertTriangle,
   Download,
+  Pencil,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -35,13 +36,11 @@ const PLANS = [
 
 function generateTimeSlots() {
   const slots = [];
-  for (let h = 8; h <= 20; h++) {
-    const hour12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  for (let h = 0; h < 24; h++) {
+    const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
     const ampm = h >= 12 ? "PM" : "AM";
     slots.push({ value: `${h}:00`, label: `${hour12}:00 ${ampm}` });
-    if (h < 20) {
-      slots.push({ value: `${h}:30`, label: `${hour12}:30 ${ampm}` });
-    }
+    slots.push({ value: `${h}:30`, label: `${hour12}:30 ${ampm}` });
   }
   return slots;
 }
@@ -70,7 +69,7 @@ const statusConfig = {
 const statusFilters = ["all", "pending", "confirmed", "completed", "cancelled"];
 
 export default function AdminBookings() {
-  const { bookings, nannies, addBooking, updateBookingStatus, deleteBooking } = useData();
+  const { bookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking } = useData();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -96,6 +95,111 @@ export default function AdminBookings() {
     notes: "",
     status: "confirmed",
   });
+
+  // Edit Booking Modal
+  const [showEditBooking, setShowEditBooking] = useState(false);
+  const [editBookingLoading, setEditBookingLoading] = useState(false);
+  const [editBookingData, setEditBookingData] = useState(null);
+
+  const openEditModal = (booking) => {
+    setEditBookingData({
+      id: booking.id,
+      nannyId: String(booking.nannyId || ""),
+      clientName: booking.clientName || booking.parentName || "",
+      clientEmail: booking.clientEmail || booking.email || "",
+      clientPhone: booking.clientPhone || booking.phone || "",
+      date: booking.date || "",
+      startTime: "",
+      endTime: "",
+      plan: booking.plan || "hourly",
+      hotel: booking.hotel || booking.location || "",
+      numChildren: String(booking.childrenCount || booking.numberOfChildren || "1"),
+      childrenAges: booking.childrenAges ? (Array.isArray(booking.childrenAges) ? booking.childrenAges.join(", ") : booking.childrenAges) : "",
+      notes: booking.notes || "",
+      status: booking.status || "pending",
+    });
+    setShowEditBooking(true);
+  };
+
+  const allActiveNannies = useMemo(
+    () => nannies.filter((n) => n.status === "active"),
+    [nannies]
+  );
+
+  const editSelectedNanny = useMemo(
+    () => nannies.find((n) => n.id === Number(editBookingData?.nannyId)),
+    [nannies, editBookingData?.nannyId]
+  );
+
+  const editBookingHours = useMemo(() => {
+    if (!editBookingData) return 0;
+    if (editBookingData.plan === "half-day") return 5;
+    if (editBookingData.plan === "full-day") return 10;
+    if (!editBookingData.startTime || !editBookingData.endTime) return 0;
+    const [sh, sm] = editBookingData.startTime.split(":").map(Number);
+    const [eh, em] = editBookingData.endTime.split(":").map(Number);
+    return Math.max(0, (eh + em / 60) - (sh + sm / 60));
+  }, [editBookingData]);
+
+  const editBookingPrice = useMemo(() => {
+    if (!editSelectedNanny) return 0;
+    return Math.round(editSelectedNanny.rate * editBookingHours);
+  }, [editSelectedNanny, editBookingHours]);
+
+  const editConflicts = useMemo(() => {
+    if (!editBookingData?.nannyId || !editBookingData?.date) return [];
+    return bookings.filter(
+      (b) =>
+        b.id !== editBookingData.id &&
+        b.nannyId === Number(editBookingData.nannyId) &&
+        b.date === editBookingData.date &&
+        b.status !== "cancelled" &&
+        b.startTime &&
+        editBookingData.startTime &&
+        !(b.endTime && editBookingData.endTime && (editBookingData.endTime <= b.startTime || editBookingData.startTime >= b.endTime))
+    );
+  }, [editBookingData, bookings]);
+
+  const handleEditBookingSubmit = async (e) => {
+    e.preventDefault();
+    if (!editBookingData) return;
+    setEditBookingLoading(true);
+
+    const startLabel = TIME_SLOTS.find((s) => s.value === editBookingData.startTime)?.label || editBookingData.startTime;
+    const endLabel = TIME_SLOTS.find((s) => s.value === editBookingData.endTime)?.label || editBookingData.endTime;
+
+    await updateBooking(editBookingData.id, {
+      nannyId: Number(editBookingData.nannyId),
+      nanny_id: Number(editBookingData.nannyId),
+      nannyName: editSelectedNanny?.name || "",
+      clientName: editBookingData.clientName,
+      client_name: editBookingData.clientName,
+      clientEmail: editBookingData.clientEmail,
+      client_email: editBookingData.clientEmail,
+      clientPhone: editBookingData.clientPhone,
+      client_phone: editBookingData.clientPhone,
+      hotel: editBookingData.hotel,
+      date: editBookingData.date,
+      startTime: startLabel,
+      start_time: startLabel,
+      endTime: endLabel,
+      end_time: endLabel,
+      time: `${startLabel} - ${endLabel}`,
+      plan: editBookingData.plan,
+      childrenCount: editBookingData.numChildren,
+      children_count: Number(editBookingData.numChildren),
+      childrenAges: editBookingData.childrenAges,
+      children_ages: editBookingData.childrenAges,
+      notes: editBookingData.notes,
+      totalPrice: editBookingPrice,
+      total_price: editBookingPrice,
+      status: editBookingData.status,
+    });
+
+    setEditBookingLoading(false);
+    setShowEditBooking(false);
+    setEditBookingData(null);
+  };
 
   const availableNannies = useMemo(
     () => nannies.filter((n) => n.available && n.status === "active"),
@@ -480,6 +584,15 @@ export default function AdminBookings() {
                                 )}
                               </button>
 
+                              {/* Edit */}
+                              <button
+                                onClick={() => openEditModal(booking)}
+                                className="p-1.5 rounded-lg text-primary hover:bg-primary/10 transition-colors"
+                                title="Edit booking"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+
                               {/* Confirm */}
                               {booking.status === "pending" && (
                                 <button
@@ -743,6 +856,13 @@ export default function AdminBookings() {
                           <Eye className="w-3.5 h-3.5" /> Details
                         </>
                       )}
+                    </button>
+
+                    <button
+                      onClick={() => openEditModal(booking)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5" /> Edit
                     </button>
 
                     {booking.status === "pending" && (
@@ -1087,6 +1207,293 @@ export default function AdminBookings() {
                     <>
                       <Plus className="w-4 h-4" />
                       Create Booking
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Edit Booking Modal ===== */}
+      {showEditBooking && editBookingData && (
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+          <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-2xl p-6 my-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-serif text-lg font-bold text-foreground">Edit Booking</h2>
+              <button
+                onClick={() => { setShowEditBooking(false); setEditBookingData(null); }}
+                className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditBookingSubmit} className="space-y-5">
+              {/* Nanny Selection */}
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                  <User className="w-3.5 h-3.5 text-muted-foreground" />
+                  Assign Nanny <span className="text-destructive">*</span>
+                </label>
+                <select
+                  value={editBookingData.nannyId}
+                  onChange={(e) => setEditBookingData({ ...editBookingData, nannyId: e.target.value })}
+                  required
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                >
+                  <option value="">Choose a nanny...</option>
+                  {allActiveNannies.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.name} — {n.rate} MAD/hr ({n.location})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Client Info Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <User className="w-3.5 h-3.5 text-muted-foreground" />
+                    Client Name <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editBookingData.clientName}
+                    onChange={(e) => setEditBookingData({ ...editBookingData, clientName: e.target.value })}
+                    placeholder="Full name"
+                    required
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={editBookingData.clientEmail}
+                    onChange={(e) => setEditBookingData({ ...editBookingData, clientEmail: e.target.value })}
+                    placeholder="client@email.com"
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={editBookingData.clientPhone}
+                    onChange={(e) => setEditBookingData({ ...editBookingData, clientPhone: e.target.value })}
+                    placeholder="+212 600 000 000"
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Hotel className="w-3.5 h-3.5 text-muted-foreground" />
+                    Hotel / Accommodation
+                  </label>
+                  <input
+                    type="text"
+                    value={editBookingData.hotel}
+                    onChange={(e) => setEditBookingData({ ...editBookingData, hotel: e.target.value })}
+                    placeholder="e.g. Royal Mansour"
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
+                </div>
+              </div>
+
+              {/* Date & Plan */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                    Date <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={editBookingData.date}
+                    onChange={(e) => setEditBookingData({ ...editBookingData, date: e.target.value })}
+                    required
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                    Plan <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    value={editBookingData.plan}
+                    onChange={(e) => setEditBookingData({ ...editBookingData, plan: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  >
+                    {PLANS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.label})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Time */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                    Start Time <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    value={editBookingData.startTime}
+                    onChange={(e) => setEditBookingData({ ...editBookingData, startTime: e.target.value })}
+                    required
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  >
+                    <option value="">Select time</option>
+                    {TIME_SLOTS.map((slot) => (
+                      <option key={`es-${slot.value}`} value={slot.value}>{slot.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                    End Time <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    value={editBookingData.endTime}
+                    onChange={(e) => setEditBookingData({ ...editBookingData, endTime: e.target.value })}
+                    required
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  >
+                    <option value="">Select time</option>
+                    {TIME_SLOTS.map((slot) => (
+                      <option key={`ee-${slot.value}`} value={slot.value}>{slot.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Children & Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Baby className="w-3.5 h-3.5 text-muted-foreground" />
+                    Children
+                  </label>
+                  <select
+                    value={editBookingData.numChildren}
+                    onChange={(e) => setEditBookingData({ ...editBookingData, numChildren: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  >
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Baby className="w-3.5 h-3.5 text-muted-foreground" />
+                    Ages
+                  </label>
+                  <input
+                    type="text"
+                    value={editBookingData.childrenAges}
+                    onChange={(e) => setEditBookingData({ ...editBookingData, childrenAges: e.target.value })}
+                    placeholder="e.g. 3, 5"
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Check className="w-3.5 h-3.5 text-muted-foreground" />
+                    Status
+                  </label>
+                  <select
+                    value={editBookingData.status}
+                    onChange={(e) => setEditBookingData({ ...editBookingData, status: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                  <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                  Notes <span className="text-xs text-muted-foreground">(optional)</span>
+                </label>
+                <textarea
+                  value={editBookingData.notes}
+                  onChange={(e) => setEditBookingData({ ...editBookingData, notes: e.target.value })}
+                  placeholder="Any special requests or notes..."
+                  rows={2}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition resize-none"
+                />
+              </div>
+
+              {/* Conflict Warning */}
+              {editConflicts.length > 0 && (
+                <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm text-orange-700">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-semibold">Scheduling conflict!</p>
+                    <p className="text-xs mt-0.5">
+                      {editSelectedNanny?.name || "This nanny"} already has {editConflicts.length} other booking{editConflicts.length > 1 ? "s" : ""} on this date.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Price Summary */}
+              {editSelectedNanny && editBookingHours > 0 && (
+                <div className="bg-muted/50 rounded-xl p-4 flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">{editSelectedNanny.name}</span>
+                    <span className="mx-1.5">·</span>
+                    {editSelectedNanny.rate} MAD/hr × {editBookingHours} hrs
+                  </div>
+                  <div className="text-lg font-bold text-foreground">
+                    {editBookingPrice.toLocaleString()} MAD
+                  </div>
+                </div>
+              )}
+
+              {/* Submit */}
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowEditBooking(false); setEditBookingData(null); }}
+                  className="flex-1 px-4 py-3 border border-border rounded-xl text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editBookingLoading || !editBookingData.nannyId || !editBookingData.date || !editBookingData.clientName || !editBookingData.startTime || !editBookingData.endTime}
+                  className="flex-1 gradient-warm text-white rounded-xl px-4 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {editBookingLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Save Changes
                     </>
                   )}
                 </button>
