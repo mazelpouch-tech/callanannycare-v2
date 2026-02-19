@@ -66,10 +66,18 @@ export default async function handler(req, res) {
       )
     `;
 
+    // Always update nanny credentials (safe to run multiple times)
+    await sql`UPDATE nannies SET email = 'fatima@callananny.ma', pin = '123456' WHERE name = 'Fatima Zahra' AND (email IS NULL OR email = '')`;
+    await sql`UPDATE nannies SET email = 'amina@callananny.ma', pin = '123456' WHERE name = 'Amina Benali' AND (email IS NULL OR email = '')`;
+    await sql`UPDATE nannies SET email = 'sara@callananny.ma', pin = '123456' WHERE name = 'Sara Tazi' AND (email IS NULL OR email = '')`;
+    await sql`UPDATE nannies SET email = 'khadija@callananny.ma', pin = '123456' WHERE name = 'Khadija Alami' AND (email IS NULL OR email = '')`;
+    await sql`UPDATE nannies SET email = 'nadia@callananny.ma', pin = '123456' WHERE name = 'Nadia Moussaoui' AND (email IS NULL OR email = '')`;
+    await sql`UPDATE nannies SET email = 'houda@callananny.ma', pin = '123456' WHERE name = 'Houda El Fassi' AND (email IS NULL OR email = '')`;
+
     // Check if nannies already seeded
     const existing = await sql`SELECT COUNT(*) as count FROM nannies`;
     if (parseInt(existing[0].count) > 0) {
-      return res.status(200).json({ message: 'Database already seeded', nannies: parseInt(existing[0].count) });
+      return res.status(200).json({ message: 'Database seeded with nanny portal credentials', nannies: parseInt(existing[0].count) });
     }
 
     // Seed nannies
@@ -82,14 +90,6 @@ export default async function handler(req, res) {
       ('Nadia Moussaoui', 'Amelkis, Marrakech', 4.6, 'Nadia specializes in caring for infants and has completed advanced training in newborn care. She is calm, patient, and incredibly nurturing.', '["Infant Specialist","Night Care","Sleep Training"]', '["Arabic","French"]', 150, 'https://images.unsplash.com/photo-1509967419530-da38b4704bc6?w=400&h=400&fit=crop&crop=face', '6 years', false),
       ('Houda El Fassi', 'Targa, Marrakech', 4.8, 'Houda is a multilingual nanny who loves introducing children to Moroccan culture through stories, songs, and creative play.', '["Cultural Activities","Storytelling","School-Age Children"]', '["Arabic","French","English","Italian"]', 150, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face', '7 years', true)
     `;
-
-    // Seed nanny login credentials
-    await sql`UPDATE nannies SET email = 'fatima@callananny.ma', pin = '123456' WHERE name = 'Fatima Zahra'`;
-    await sql`UPDATE nannies SET email = 'amina@callananny.ma', pin = '123456' WHERE name = 'Amina Benali'`;
-    await sql`UPDATE nannies SET email = 'sara@callananny.ma', pin = '123456' WHERE name = 'Sara Tazi'`;
-    await sql`UPDATE nannies SET email = 'khadija@callananny.ma', pin = '123456' WHERE name = 'Khadija Alami'`;
-    await sql`UPDATE nannies SET email = 'nadia@callananny.ma', pin = '123456' WHERE name = 'Nadia Moussaoui'`;
-    await sql`UPDATE nannies SET email = 'houda@callananny.ma', pin = '123456' WHERE name = 'Houda El Fassi'`;
 
     return res.status(200).json({ message: 'Database seeded successfully with 6 nannies and login credentials' });
   } catch (error) {
