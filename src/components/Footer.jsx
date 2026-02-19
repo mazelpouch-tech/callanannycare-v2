@@ -22,7 +22,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-8">
           {/* Brand Column */}
           <div className="space-y-4">
-            <h3 className="font-serif text-2xl font-bold">Call A Nanny</h3>
+            <h3 className="font-serif text-2xl font-bold">Call a Nanny</h3>
             <p className="text-background/70 text-sm leading-relaxed">
               Trusted childcare services in Marrakech
             </p>
@@ -105,7 +105,7 @@ export default function Footer() {
       {/* Bottom Bar */}
       <div className="border-t border-background/10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-background/50">
-          <p>&copy; {new Date().getFullYear()} Call A Nanny. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Call a Nanny. All rights reserved.</p>
           <p>Professional Childcare Services</p>
         </div>
       </div>
