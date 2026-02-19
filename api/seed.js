@@ -52,6 +52,16 @@ export default async function handler(req, res) {
     await sql`ALTER TABLE nannies ADD COLUMN IF NOT EXISTS email VARCHAR(255)`;
     await sql`ALTER TABLE nannies ADD COLUMN IF NOT EXISTS pin VARCHAR(6) DEFAULT ''`;
 
+    // Add invitation & access control columns
+    await sql`ALTER TABLE nannies ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'`;
+    await sql`ALTER TABLE nannies ADD COLUMN IF NOT EXISTS invite_token VARCHAR(64)`;
+    await sql`ALTER TABLE nannies ADD COLUMN IF NOT EXISTS invite_token_expires TIMESTAMP`;
+    await sql`ALTER TABLE nannies ADD COLUMN IF NOT EXISTS invited_at TIMESTAMP`;
+    await sql`ALTER TABLE nannies ADD COLUMN IF NOT EXISTS registered_at TIMESTAMP`;
+
+    // Backfill existing nannies to 'active'
+    await sql`UPDATE nannies SET status = 'active', registered_at = NOW() WHERE pin IS NOT NULL AND pin != '' AND status IS NULL`;
+
     // Create notifications table
     await sql`
       CREATE TABLE IF NOT EXISTS nanny_notifications (

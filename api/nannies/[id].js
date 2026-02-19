@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     }
     
     if (req.method === 'PUT') {
-      const { name, location, rating, bio, specialties, languages, rate, image, experience, available, email, pin } = req.body;
+      const { name, location, rating, bio, specialties, languages, rate, image, experience, available, email, pin, status } = req.body;
       const result = await sql`
         UPDATE nannies SET
           name = COALESCE(${name}, name),
@@ -32,6 +32,7 @@ export default async function handler(req, res) {
           available = COALESCE(${available}, available),
           email = COALESCE(${email}, email),
           pin = COALESCE(${pin}, pin),
+          status = COALESCE(${status}, status),
           updated_at = NOW()
         WHERE id = ${id}
         RETURNING *

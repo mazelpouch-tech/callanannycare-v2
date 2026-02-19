@@ -47,8 +47,17 @@ export default function NannyLogin() {
 
           {/* Error */}
           {error && (
-            <div className="mb-6 bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg border border-red-100">
-              {error}
+            <div className={`mb-6 text-sm px-4 py-3 rounded-lg border flex items-start gap-2 ${
+              error.includes("suspended")
+                ? "bg-red-50 text-red-700 border-red-200"
+                : error.includes("registration")
+                ? "bg-amber-50 text-amber-700 border-amber-200"
+                : "bg-red-50 text-red-600 border-red-100"
+            }`}>
+              <span className="mt-0.5 shrink-0">
+                {error.includes("suspended") ? "🚫" : error.includes("registration") ? "📧" : "⚠️"}
+              </span>
+              <span>{error}</span>
             </div>
           )}
 
@@ -106,11 +115,18 @@ export default function NannyLogin() {
             </button>
           </form>
 
-          <p className="text-center text-sm text-muted-foreground mt-6">
-            <Link to="/admin/login" className="text-primary hover:underline">
-              Looking for the admin panel?
-            </Link>
-          </p>
+          <div className="text-center text-sm text-muted-foreground mt-6 space-y-1">
+            <p>
+              <Link to="/nanny/register" className="text-accent hover:underline font-medium">
+                Have an invitation? Register here
+              </Link>
+            </p>
+            <p>
+              <Link to="/admin/login" className="text-primary hover:underline">
+                Looking for the admin panel?
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>

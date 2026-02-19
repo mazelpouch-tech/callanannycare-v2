@@ -10,6 +10,14 @@ import {
   Star,
   X,
   Save,
+  Send,
+  ShieldBan,
+  ShieldCheck,
+  Link2,
+  Copy,
+  Check,
+  RefreshCw,
+  UserPlus,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 
@@ -27,26 +35,45 @@ const emptyForm = {
   available: true,
 };
 
+const STATUS_BADGES = {
+  active: { label: "Active", bg: "bg-green-50", text: "text-green-700", border: "border-green-200" },
+  invited: { label: "Invited", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
+  blocked: { label: "Blocked", bg: "bg-red-50", text: "text-red-700", border: "border-red-200" },
+};
+
 export default function AdminNannies() {
-  const { nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability } =
-    useData();
+  const {
+    nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability,
+    inviteNanny, toggleNannyStatus, resendInvite,
+  } = useData();
 
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [editingNanny, setEditingNanny] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  // Invite modal state
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+  const [inviteLink, setInviteLink] = useState("");
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const filteredNannies = useMemo(() => {
     if (!search.trim()) return nannies;
     const query = search.toLowerCase();
     return nannies.filter(
       (n) =>
-        n.name.toLowerCase().includes(query) ||
-        n.location.toLowerCase().includes(query)
+        n.name?.toLowerCase().includes(query) ||
+        n.location?.toLowerCase().includes(query) ||
+        n.email?.toLowerCase().includes(query)
     );
   }, [nannies, search]);
 
+  // --- Add/Edit Modal ---
   const openAddModal = () => {
     setEditingNanny(null);
     setForm(emptyForm);
@@ -87,40 +114,106 @@ export default function AdminNannies() {
 
   const handleSave = (e) => {
     e.preventDefault();
-
     const nannyData = {
       name: form.name.trim(),
       location: form.location.trim(),
       rate: Number(form.rate) || 0,
       bio: form.bio.trim(),
-      languages: form.languages
-        .split(",")
-        .map((l) => l.trim())
-        .filter(Boolean),
+      languages: form.languages.split(",").map((l) => l.trim()).filter(Boolean),
       experience: form.experience.trim(),
-      specialties: form.specialties
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
+      specialties: form.specialties.split(",").map((s) => s.trim()).filter(Boolean),
       image: form.image.trim(),
       email: form.email.trim(),
       pin: form.pin.trim(),
       available: form.available,
       rating: editingNanny?.rating || 5.0,
     };
-
     if (editingNanny) {
       updateNanny(editingNanny.id, nannyData);
     } else {
       addNanny(nannyData);
     }
-
     closeModal();
   };
 
   const handleDelete = (id) => {
     deleteNanny(id);
     setDeleteConfirm(null);
+  };
+
+  // --- Invite Modal ---
+  const openInviteModal = () => {
+    setInviteName("");
+    setInviteEmail("");
+    setInviteError("");
+    setInviteLink("");
+    setLinkCopied(false);
+    setInviteModalOpen(true);
+  };
+
+  const closeInviteModal = () => {
+    setInviteModalOpen(false);
+    setInviteName("");
+    setInviteEmail("");
+    setInviteError("");
+    setInviteLink("");
+    setLinkCopied(false);
+  };
+
+  const handleInvite = async (e) => {
+    e.preventDefault();
+    setInviteError("");
+    setInviteLoading(true);
+    const result = await inviteNanny({ name: inviteName.trim(), email: inviteEmail.trim() });
+    if (result.success) {
+      setInviteLink(result.inviteLink);
+    } else {
+      setInviteError(result.error);
+    }
+    setInviteLoading(false);
+  };
+
+  const copyLink = async (link) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      // Fallback
+      const input = document.createElement("input");
+      input.value = link;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    }
+  };
+
+  // Resend invite handler
+  const [resendLoading, setResendLoading] = useState(null);
+  const [resendLink, setResendLink] = useState(null);
+
+  const handleResendInvite = async (nannyId) => {
+    setResendLoading(nannyId);
+    const result = await resendInvite(nannyId);
+    if (result.success) {
+      setResendLink({ id: nannyId, link: result.inviteLink });
+      try { await navigator.clipboard.writeText(result.inviteLink); } catch {}
+      setTimeout(() => setResendLink(null), 4000);
+    }
+    setResendLoading(null);
+  };
+
+  // Status badge helper
+  const renderStatusBadge = (status) => {
+    const badge = STATUS_BADGES[status] || STATUS_BADGES.active;
+    return (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}>
+        {badge.label}
+      </span>
+    );
   };
 
   return (
@@ -135,13 +228,22 @@ export default function AdminNannies() {
             {nannies.length} nann{nannies.length !== 1 ? "ies" : "y"} registered
           </p>
         </div>
-        <button
-          onClick={openAddModal}
-          className="gradient-warm text-white font-semibold px-5 py-2.5 rounded-xl shadow-warm hover:opacity-90 transition-all flex items-center gap-2 self-start sm:self-auto"
-        >
-          <Plus className="w-4.5 h-4.5" />
-          Add Nanny
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={openInviteModal}
+            className="bg-accent text-white font-semibold px-5 py-2.5 rounded-xl hover:opacity-90 transition-all flex items-center gap-2"
+          >
+            <Send className="w-4 h-4" />
+            Invite Nanny
+          </button>
+          <button
+            onClick={openAddModal}
+            className="gradient-warm text-white font-semibold px-5 py-2.5 rounded-xl shadow-warm hover:opacity-90 transition-all flex items-center gap-2"
+          >
+            <Plus className="w-4.5 h-4.5" />
+            Add Nanny
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -151,7 +253,7 @@ export default function AdminNannies() {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search nannies by name or location..."
+          placeholder="Search by name, location, or email..."
           className="w-full pl-10 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
         />
       </div>
@@ -164,7 +266,7 @@ export default function AdminNannies() {
           <p className="text-sm text-muted-foreground mt-1">
             {search
               ? "Try adjusting your search terms."
-              : "Add your first nanny to get started."}
+              : "Invite your first nanny to get started."}
           </p>
         </div>
       ) : (
@@ -185,10 +287,10 @@ export default function AdminNannies() {
                       Rate
                     </th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Rating
+                      Account
                     </th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Status
+                      Availability
                     </th>
                     <th className="text-right px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Actions
@@ -199,21 +301,27 @@ export default function AdminNannies() {
                   {filteredNannies.map((nanny) => (
                     <tr
                       key={nanny.id}
-                      className="hover:bg-muted/30 transition-colors"
+                      className={`hover:bg-muted/30 transition-colors ${nanny.status === "blocked" ? "opacity-60" : ""}`}
                     >
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <img
-                            src={nanny.image}
-                            alt={nanny.name}
-                            className="w-10 h-10 rounded-full object-cover ring-2 ring-border"
-                          />
+                          {nanny.image ? (
+                            <img
+                              src={nanny.image}
+                              alt={nanny.name}
+                              className="w-10 h-10 rounded-full object-cover ring-2 ring-border"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-border">
+                              <UserPlus className="w-5 h-5 text-primary/60" />
+                            </div>
+                          )}
                           <div>
                             <p className="font-medium text-foreground text-sm">
                               {nanny.name}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {nanny.experience} experience
+                              {nanny.email || "No email"}
                             </p>
                           </div>
                         </div>
@@ -221,49 +329,77 @@ export default function AdminNannies() {
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                           <MapPin className="w-3.5 h-3.5 shrink-0" />
-                          {nanny.location}
+                          {nanny.location || "—"}
                         </div>
                       </td>
                       <td className="px-5 py-4 text-sm font-medium text-foreground">
                         {nanny.rate} MAD/hr
                       </td>
                       <td className="px-5 py-4">
-                        <div className="flex items-center gap-1">
-                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                          <span className="text-sm font-medium text-foreground">
-                            {nanny.rating}
-                          </span>
+                        <div className="flex items-center gap-2">
+                          {renderStatusBadge(nanny.status || "active")}
+                          {resendLink?.id === nanny.id && (
+                            <span className="text-xs text-green-600 font-medium">Link copied!</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-5 py-4">
                         <button
                           onClick={() => toggleNannyAvailability(nanny.id)}
                           className="flex items-center gap-2 group"
-                          title={
-                            nanny.available
-                              ? "Click to mark unavailable"
-                              : "Click to mark available"
-                          }
+                          title={nanny.available ? "Click to mark unavailable" : "Click to mark available"}
                         >
                           {nanny.available ? (
                             <>
                               <ToggleRight className="w-7 h-7 text-accent" />
-                              <span className="text-xs font-semibold text-accent">
-                                Available
-                              </span>
+                              <span className="text-xs font-semibold text-accent">Available</span>
                             </>
                           ) : (
                             <>
                               <ToggleLeft className="w-7 h-7 text-muted-foreground" />
-                              <span className="text-xs font-semibold text-muted-foreground">
-                                Unavailable
-                              </span>
+                              <span className="text-xs font-semibold text-muted-foreground">Unavailable</span>
                             </>
                           )}
                         </button>
                       </td>
                       <td className="px-5 py-4">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-1">
+                          {/* Block / Unblock */}
+                          {nanny.status !== "invited" && (
+                            <button
+                              onClick={() => toggleNannyStatus(nanny.id)}
+                              className={`p-2 rounded-lg transition-colors ${
+                                nanny.status === "blocked"
+                                  ? "text-green-600 hover:bg-green-50"
+                                  : "text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                              }`}
+                              title={nanny.status === "blocked" ? "Unblock nanny" : "Block nanny"}
+                            >
+                              {nanny.status === "blocked" ? (
+                                <ShieldCheck className="w-4 h-4" />
+                              ) : (
+                                <ShieldBan className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
+
+                          {/* Resend Invite (invited only) */}
+                          {nanny.status === "invited" && (
+                            <button
+                              onClick={() => handleResendInvite(nanny.id)}
+                              disabled={resendLoading === nanny.id}
+                              className="p-2 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                              title="Resend invitation (copies new link)"
+                            >
+                              {resendLoading === nanny.id ? (
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Link2 className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
+
+                          {/* Edit */}
                           <button
                             onClick={() => openEditModal(nanny)}
                             className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
@@ -272,6 +408,7 @@ export default function AdminNannies() {
                             <Edit className="w-4 h-4" />
                           </button>
 
+                          {/* Delete */}
                           {deleteConfirm === nanny.id ? (
                             <div className="flex items-center gap-1">
                               <button
@@ -310,31 +447,32 @@ export default function AdminNannies() {
             {filteredNannies.map((nanny) => (
               <div
                 key={nanny.id}
-                className="bg-card rounded-xl border border-border shadow-soft overflow-hidden"
+                className={`bg-card rounded-xl border border-border shadow-soft overflow-hidden ${nanny.status === "blocked" ? "opacity-60" : ""}`}
               >
                 <div className="p-4 space-y-3">
                   {/* Nanny Header */}
                   <div className="flex items-start gap-3">
-                    <img
-                      src={nanny.image}
-                      alt={nanny.name}
-                      className="w-14 h-14 rounded-full object-cover ring-2 ring-border shrink-0"
-                    />
+                    {nanny.image ? (
+                      <img
+                        src={nanny.image}
+                        alt={nanny.name}
+                        className="w-14 h-14 rounded-full object-cover ring-2 ring-border shrink-0"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-border shrink-0">
+                        <UserPlus className="w-6 h-6 text-primary/60" />
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <h3 className="font-serif font-semibold text-foreground truncate">
                         {nanny.name}
                       </h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                         <MapPin className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{nanny.location}</span>
+                        <span className="truncate">{nanny.location || "—"}</span>
                       </div>
-                      <div className="flex items-center gap-3 mt-1">
-                        <div className="flex items-center gap-0.5">
-                          <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
-                          <span className="text-xs font-medium text-foreground">
-                            {nanny.rating}
-                          </span>
-                        </div>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        {renderStatusBadge(nanny.status || "active")}
                         <span className="text-xs font-medium text-foreground">
                           {nanny.rate} MAD/hr
                         </span>
@@ -343,26 +481,59 @@ export default function AdminNannies() {
                   </div>
 
                   {/* Availability Toggle */}
-                  <button
-                    onClick={() => toggleNannyAvailability(nanny.id)}
-                    className="flex items-center gap-2 w-full"
-                  >
-                    {nanny.available ? (
-                      <>
-                        <ToggleRight className="w-7 h-7 text-accent" />
-                        <span className="text-xs font-semibold text-accent">
-                          Available
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <ToggleLeft className="w-7 h-7 text-muted-foreground" />
-                        <span className="text-xs font-semibold text-muted-foreground">
-                          Unavailable
-                        </span>
-                      </>
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => toggleNannyAvailability(nanny.id)}
+                      className="flex items-center gap-2"
+                    >
+                      {nanny.available ? (
+                        <>
+                          <ToggleRight className="w-7 h-7 text-accent" />
+                          <span className="text-xs font-semibold text-accent">Available</span>
+                        </>
+                      ) : (
+                        <>
+                          <ToggleLeft className="w-7 h-7 text-muted-foreground" />
+                          <span className="text-xs font-semibold text-muted-foreground">Unavailable</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Block/Unblock on mobile */}
+                    {nanny.status !== "invited" && (
+                      <button
+                        onClick={() => toggleNannyStatus(nanny.id)}
+                        className={`p-1.5 rounded-lg text-xs font-medium flex items-center gap-1 ${
+                          nanny.status === "blocked"
+                            ? "text-green-600 bg-green-50"
+                            : "text-red-600 bg-red-50"
+                        }`}
+                      >
+                        {nanny.status === "blocked" ? (
+                          <><ShieldCheck className="w-3.5 h-3.5" /> Unblock</>
+                        ) : (
+                          <><ShieldBan className="w-3.5 h-3.5" /> Block</>
+                        )}
+                      </button>
                     )}
-                  </button>
+                    {nanny.status === "invited" && (
+                      <button
+                        onClick={() => handleResendInvite(nanny.id)}
+                        disabled={resendLoading === nanny.id}
+                        className="p-1.5 rounded-lg text-xs font-medium flex items-center gap-1 text-amber-600 bg-amber-50 disabled:opacity-50"
+                      >
+                        {resendLoading === nanny.id ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <><Link2 className="w-3.5 h-3.5" /> Resend</>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {resendLink?.id === nanny.id && (
+                    <p className="text-xs text-green-600 font-medium text-center">New invite link copied!</p>
+                  )}
                 </div>
 
                 {/* Card Actions */}
@@ -404,18 +575,145 @@ export default function AdminNannies() {
         </>
       )}
 
+      {/* Invite Nanny Modal */}
+      {inviteModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-foreground/30 backdrop-blur-sm"
+            onClick={closeInviteModal}
+          />
+          <div className="relative bg-card rounded-2xl border border-border shadow-warm w-full max-w-md">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h2 className="font-serif text-lg font-semibold text-foreground flex items-center gap-2">
+                <Send className="w-5 h-5 text-accent" />
+                Invite a Nanny
+              </h2>
+              <button
+                onClick={closeInviteModal}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {!inviteLink ? (
+                <>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Enter the nanny's name and email. We'll generate an invitation link you can share via WhatsApp, SMS, or email.
+                  </p>
+
+                  {inviteError && (
+                    <div className="mb-4 bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg border border-red-100">
+                      {inviteError}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleInvite} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">
+                        Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={inviteName}
+                        onChange={(e) => setInviteName(e.target.value)}
+                        required
+                        placeholder="e.g. Layla Mansouri"
+                        className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">
+                        Email *
+                      </label>
+                      <input
+                        type="email"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        required
+                        placeholder="layla@example.com"
+                        className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={inviteLoading || !inviteName.trim() || !inviteEmail.trim()}
+                      className="w-full bg-accent text-white font-semibold py-2.5 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {inviteLoading ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" />
+                          Generate Invitation
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <>
+                  {/* Success: show invite link */}
+                  <div className="text-center mb-4">
+                    <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-3">
+                      <Check className="w-6 h-6 text-green-500" />
+                    </div>
+                    <p className="font-medium text-foreground">Invitation Created!</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Share this link with <strong>{inviteName}</strong>
+                    </p>
+                  </div>
+
+                  <div className="bg-muted/50 rounded-xl p-3 mb-4">
+                    <p className="text-xs text-muted-foreground mb-1.5 font-medium">Invitation Link:</p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 text-xs text-foreground bg-background rounded-lg px-3 py-2 break-all border border-border">
+                        {inviteLink}
+                      </code>
+                      <button
+                        onClick={() => copyLink(inviteLink)}
+                        className={`p-2 rounded-lg transition-colors shrink-0 ${
+                          linkCopied
+                            ? "text-green-600 bg-green-50"
+                            : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                        }`}
+                        title="Copy link"
+                      >
+                        {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {linkCopied && (
+                      <p className="text-xs text-green-600 mt-1.5 font-medium">Copied to clipboard!</p>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-muted-foreground text-center mb-4">
+                    This link expires in 7 days. The nanny will set their own PIN and profile.
+                  </p>
+
+                  <button
+                    onClick={closeInviteModal}
+                    className="w-full bg-muted text-muted-foreground font-semibold py-2.5 rounded-xl hover:bg-muted/80 transition-all"
+                  >
+                    Done
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add / Edit Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          {/* Overlay */}
           <div
             className="absolute inset-0 bg-foreground/30 backdrop-blur-sm"
             onClick={closeModal}
           />
-
-          {/* Modal Content */}
           <div className="relative bg-card rounded-2xl border border-border shadow-warm w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card rounded-t-2xl z-10">
               <h2 className="font-serif text-lg font-semibold text-foreground">
                 {editingNanny ? "Edit Nanny" : "Add New Nanny"}
@@ -428,13 +726,10 @@ export default function AdminNannies() {
               </button>
             </div>
 
-            {/* Modal Form */}
             <form onSubmit={handleSave} className="p-6 space-y-4">
               {/* Name */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Name *
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Name *</label>
                 <input
                   type="text"
                   value={form.name}
@@ -447,9 +742,7 @@ export default function AdminNannies() {
 
               {/* Location */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Location *
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Location *</label>
                 <input
                   type="text"
                   value={form.location}
@@ -460,12 +753,10 @@ export default function AdminNannies() {
                 />
               </div>
 
-              {/* Rate and Experience Row */}
+              {/* Rate and Experience */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Rate (MAD/hr) *
-                  </label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Rate (MAD/hr) *</label>
                   <input
                     type="number"
                     value={form.rate}
@@ -477,15 +768,11 @@ export default function AdminNannies() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Experience
-                  </label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Experience</label>
                   <input
                     type="text"
                     value={form.experience}
-                    onChange={(e) =>
-                      handleFormChange("experience", e.target.value)
-                    }
+                    onChange={(e) => handleFormChange("experience", e.target.value)}
                     placeholder="e.g. 5 years"
                     className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
                   />
@@ -494,9 +781,7 @@ export default function AdminNannies() {
 
               {/* Bio */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Bio
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Bio</label>
                 <textarea
                   value={form.bio}
                   onChange={(e) => handleFormChange("bio", e.target.value)}
@@ -509,10 +794,7 @@ export default function AdminNannies() {
               {/* Languages */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Languages
-                  <span className="text-xs text-muted-foreground font-normal ml-1">
-                    (comma-separated)
-                  </span>
+                  Languages <span className="text-xs text-muted-foreground font-normal ml-1">(comma-separated)</span>
                 </label>
                 <input
                   type="text"
@@ -526,17 +808,12 @@ export default function AdminNannies() {
               {/* Specialties */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Specialties
-                  <span className="text-xs text-muted-foreground font-normal ml-1">
-                    (comma-separated)
-                  </span>
+                  Specialties <span className="text-xs text-muted-foreground font-normal ml-1">(comma-separated)</span>
                 </label>
                 <input
                   type="text"
                   value={form.specialties}
-                  onChange={(e) =>
-                    handleFormChange("specialties", e.target.value)
-                  }
+                  onChange={(e) => handleFormChange("specialties", e.target.value)}
                   placeholder="Infants, Toddlers, Creative Play"
                   className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
                 />
@@ -544,9 +821,7 @@ export default function AdminNannies() {
 
               {/* Image URL */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Image URL
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Image URL</label>
                 <input
                   type="url"
                   value={form.image}
@@ -561,48 +836,44 @@ export default function AdminNannies() {
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                   Nanny Portal Login
                 </p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={form.email}
-                      onChange={(e) => handleFormChange("email", e.target.value)}
-                      placeholder="nanny@callananny.ma"
-                      className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-                    />
+                {editingNanny?.status === "invited" ? (
+                  <p className="text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
+                    PIN will be set by the nanny during registration.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
+                      <input
+                        type="email"
+                        value={form.email}
+                        onChange={(e) => handleFormChange("email", e.target.value)}
+                        placeholder="nanny@callananny.ma"
+                        className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">PIN Code</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={form.pin}
+                        onChange={(e) => handleFormChange("pin", e.target.value.replace(/\D/g, ""))}
+                        placeholder="123456"
+                        className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all tracking-widest font-mono"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1.5">
-                      PIN Code
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={6}
-                      value={form.pin}
-                      onChange={(e) =>
-                        handleFormChange("pin", e.target.value.replace(/\D/g, ""))
-                      }
-                      placeholder="123456"
-                      className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all tracking-widest font-mono"
-                    />
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Available Toggle */}
               <div className="flex items-center justify-between py-2">
-                <label className="text-sm font-medium text-foreground">
-                  Available for bookings
-                </label>
+                <label className="text-sm font-medium text-foreground">Available for bookings</label>
                 <button
                   type="button"
-                  onClick={() =>
-                    handleFormChange("available", !form.available)
-                  }
+                  onClick={() => handleFormChange("available", !form.available)}
                   className="flex items-center gap-2"
                 >
                   {form.available ? (

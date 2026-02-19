@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigate, Outlet, NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -23,6 +23,13 @@ const sidebarLinks = [
 export default function NannyLayout() {
   const { isNanny, nannyProfile, nannyLogout, unreadNotifications } = useData();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Check if nanny has been blocked since login
+  useEffect(() => {
+    if (isNanny && nannyProfile?.status === "blocked") {
+      nannyLogout();
+    }
+  }, [isNanny, nannyProfile?.status, nannyLogout]);
 
   if (!isNanny) return <Navigate to="/nanny/login" replace />;
 

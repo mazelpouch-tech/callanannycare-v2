@@ -90,6 +90,7 @@ export function DataProvider({ children }) {
           // Normalize nanny data from DB (JSONB fields come as objects already)
           const normalizedNannies = apiNannies.map((n) => ({
             ...n,
+            status: n.status || "active",
             specialties: typeof n.specialties === "string" ? JSON.parse(n.specialties) : n.specialties || [],
             languages: typeof n.languages === "string" ? JSON.parse(n.languages) : n.languages || [],
           }));
@@ -360,13 +361,14 @@ export function DataProvider({ children }) {
       });
       if (result.success) {
         setIsNanny(true);
-        setNannyProfile(result.nanny);
-        saveToStorage(STORAGE_KEYS.nannyProfile, result.nanny);
+        setNannyProfile({ ...result.nanny, status: result.nanny.status || "active" });
+        saveToStorage(STORAGE_KEYS.nannyProfile, { ...result.nanny, status: result.nanny.status || "active" });
         return { success: true };
       }
       return { success: false, error: "Invalid email or PIN" };
-    } catch {
-      return { success: false, error: "Login failed. Please try again." };
+    } catch (err) {
+      // Pass through server error messages (blocked, invited, etc.)
+      return { success: false, error: err.message || "Login failed. Please try again." };
     }
   }, []);
 
@@ -480,6 +482,81 @@ export function DataProvider({ children }) {
     }
   }, [nannyProfile]);
 
+  // --- Nanny Invitation & Access Control ---
+
+  const inviteNanny = useCallback(async ({ name, email }) => {
+    try {
+      const result = await apiFetch("/nanny/invite", {
+        method: "POST",
+        body: JSON.stringify({ name, email }),
+      });
+      if (result.success) {
+        const newNanny = {
+          id: result.nanny.id,
+          name: result.nanny.name,
+          email: result.nanny.email,
+          status: "invited",
+          location: "",
+          rating: 4.8,
+          bio: "",
+          specialties: [],
+          languages: [],
+          rate: 150,
+          image: "",
+          experience: "",
+          available: false,
+          pin: "",
+        };
+        setNannies((prev) => {
+          const updated = [...prev, newNanny];
+          saveToStorage(STORAGE_KEYS.nannies, updated);
+          return updated;
+        });
+        return { success: true, inviteLink: result.inviteLink, nanny: newNanny };
+      }
+      return { success: false, error: result.error || "Failed to create invitation" };
+    } catch (err) {
+      return { success: false, error: err.message || "Failed to create invitation" };
+    }
+  }, []);
+
+  const toggleNannyStatus = useCallback(async (id) => {
+    const nanny = nannies.find((n) => n.id === id);
+    if (!nanny || nanny.status === "invited") return;
+
+    const newStatus = nanny.status === "active" ? "blocked" : "active";
+    try {
+      await apiFetch(`/nannies/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ status: newStatus }),
+      });
+    } catch {
+      console.warn("API status toggle failed, toggling locally");
+    }
+    setNannies((prev) => {
+      const updated = prev.map((n) =>
+        n.id === id ? { ...n, status: newStatus } : n
+      );
+      saveToStorage(STORAGE_KEYS.nannies, updated);
+      return updated;
+    });
+  }, [nannies]);
+
+  const resendInvite = useCallback(async (nannyId) => {
+    try {
+      const result = await apiFetch("/nanny/invite", {
+        method: "PUT",
+        body: JSON.stringify({ nannyId }),
+      });
+      if (result.success) {
+        return { success: true, inviteLink: result.inviteLink };
+      }
+      return { success: false, error: result.error || "Failed to resend invitation" };
+    } catch (err) {
+      return { success: false, error: err.message || "Failed to resend invitation" };
+    }
+  }, []);
+
   // --- Admin Auth ---
 
   const adminLogin = useCallback(async (email, password) => {
@@ -539,6 +616,9 @@ export function DataProvider({ children }) {
       updateNanny,
       deleteNanny,
       toggleNannyAvailability,
+      inviteNanny,
+      toggleNannyStatus,
+      resendInvite,
       bookings,
       addBooking,
       updateBooking,
@@ -565,7 +645,7 @@ export function DataProvider({ children }) {
       updateNannyProfile,
     }),
     [
-      nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability,
+      nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability, inviteNanny, toggleNannyStatus, resendInvite,
       bookings, addBooking, updateBooking, updateBookingStatus, deleteBooking,
       stats, isAdmin, adminLogin, adminLogout, loading,
       isNanny, nannyProfile, nannyBookings, nannyNotifications, nannyStats,

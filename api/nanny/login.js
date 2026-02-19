@@ -10,21 +10,30 @@ export default async function handler(req, res) {
   try {
     const sql = getDb();
     const { email, pin } = req.body;
-    
+
     if (!email || !pin) {
       return res.status(400).json({ error: 'Email and PIN are required' });
     }
 
     const result = await sql`
-      SELECT id, name, email, image, location, rating, experience, bio, specialties, languages, rate, available
+      SELECT id, name, email, image, location, rating, experience, bio, specialties, languages, rate, available, status
       FROM nannies WHERE email = ${email} AND pin = ${pin}
     `;
-    
+
     if (result.length === 0) {
       return res.status(401).json({ error: 'Invalid email or PIN' });
     }
 
     const nanny = result[0];
+
+    // Access control: block login for non-active nannies
+    if (nanny.status === 'blocked') {
+      return res.status(403).json({ error: 'Your account has been suspended. Please contact the admin.' });
+    }
+    if (nanny.status === 'invited') {
+      return res.status(403).json({ error: 'Please complete your registration using your invitation link.' });
+    }
+
     return res.status(200).json({
       success: true,
       nanny: {
@@ -35,6 +44,7 @@ export default async function handler(req, res) {
         location: nanny.location,
         rating: nanny.rating,
         experience: nanny.experience,
+        status: nanny.status || 'active',
       }
     });
   } catch (error) {
