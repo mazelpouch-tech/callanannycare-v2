@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   CalendarDays,
   Users,
+  ShieldCheck,
   LogOut,
   Menu,
   X,
@@ -15,10 +16,11 @@ const sidebarLinks = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/admin/bookings", label: "Bookings", icon: CalendarDays },
   { to: "/admin/nannies", label: "Nannies", icon: Users },
+  { to: "/admin/users", label: "Admin Users", icon: ShieldCheck },
 ];
 
 export default function AdminLayout() {
-  const { isAdmin, adminLogout } = useData();
+  const { isAdmin, adminProfile, adminLogout } = useData();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (!isAdmin) {
@@ -122,10 +124,12 @@ export default function AdminLayout() {
           {/* Admin badge */}
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 gradient-warm rounded-full flex items-center justify-center">
-              <span className="text-white text-xs font-bold">A</span>
+              <span className="text-white text-xs font-bold">
+                {adminProfile?.name?.charAt(0)?.toUpperCase() || "A"}
+              </span>
             </div>
             <span className="text-sm font-medium text-foreground hidden sm:inline">
-              Admin
+              {adminProfile?.name || "Admin"}
             </span>
           </div>
         </header>

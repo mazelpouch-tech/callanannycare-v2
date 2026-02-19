@@ -76,6 +76,33 @@ export default async function handler(req, res) {
       )
     `;
 
+    // Create admin_users table
+    await sql`
+      CREATE TABLE IF NOT EXISTS admin_users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(20) DEFAULT 'admin',
+        is_active BOOLEAN DEFAULT true,
+        last_login TIMESTAMP,
+        login_count INTEGER DEFAULT 0,
+        reset_token VARCHAR(64),
+        reset_token_expires TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+
+    // Seed default admin user if none exists
+    const adminExists = await sql`SELECT COUNT(*) as count FROM admin_users`;
+    if (parseInt(adminExists[0].count) === 0) {
+      await sql`
+        INSERT INTO admin_users (name, email, password, role, is_active)
+        VALUES ('Admin', 'admin@callananny.ma', 'admin123', 'super_admin', true)
+      `;
+    }
+
     // Always update nanny credentials (safe to run multiple times)
     await sql`UPDATE nannies SET email = 'fatima@callananny.ma', pin = '123456' WHERE name = 'Fatima Zahra' AND (email IS NULL OR email = '')`;
     await sql`UPDATE nannies SET email = 'amina@callananny.ma', pin = '123456' WHERE name = 'Amina Benali' AND (email IS NULL OR email = '')`;

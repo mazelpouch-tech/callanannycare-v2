@@ -10,6 +10,7 @@ import AdminLayout from './pages/admin/AdminLayout'
 import Dashboard from './pages/admin/Dashboard'
 import AdminBookings from './pages/admin/AdminBookings'
 import AdminNannies from './pages/admin/AdminNannies'
+import AdminUsers from './pages/admin/AdminUsers'
 import NannyLogin from './pages/nanny/NannyLogin'
 import NannyRegister from './pages/nanny/NannyRegister'
 import NannyLayout from './pages/nanny/NannyLayout'
@@ -37,6 +38,7 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="bookings" element={<AdminBookings />} />
         <Route path="nannies" element={<AdminNannies />} />
+        <Route path="users" element={<AdminUsers />} />
       </Route>
 
       {/* Nanny portal routes */}

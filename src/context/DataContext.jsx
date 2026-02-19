@@ -557,7 +557,21 @@ export function DataProvider({ children }) {
     }
   }, []);
 
-  // --- Admin Auth ---
+  // --- Admin Auth & User Management ---
+
+  const [adminProfile, setAdminProfile] = useState(() =>
+    loadFromStorage("callanannycare_admin_profile", null)
+  );
+  const [adminUsers, setAdminUsers] = useState([]);
+
+  // Persist admin profile
+  useEffect(() => {
+    if (adminProfile) {
+      saveToStorage("callanannycare_admin_profile", adminProfile);
+    } else {
+      localStorage.removeItem("callanannycare_admin_profile");
+    }
+  }, [adminProfile]);
 
   const adminLogin = useCallback(async (email, password) => {
     try {
@@ -567,21 +581,122 @@ export function DataProvider({ children }) {
       });
       if (result.success) {
         setIsAdmin(true);
+        setAdminProfile(result.admin);
         return { success: true };
       }
       return { success: false, error: "Invalid email or password" };
-    } catch {
-      // Fallback to local check
-      if (email === "admin@callananny.ma" && password === "admin123") {
-        setIsAdmin(true);
-        return { success: true };
-      }
-      return { success: false, error: "Invalid email or password" };
+    } catch (err) {
+      return { success: false, error: err.message || "Invalid email or password" };
     }
   }, []);
 
   const adminLogout = useCallback(() => {
     setIsAdmin(false);
+    setAdminProfile(null);
+    setAdminUsers([]);
+  }, []);
+
+  const fetchAdminUsers = useCallback(async () => {
+    try {
+      const data = await apiFetch("/admin/login");
+      setAdminUsers(data);
+      return data;
+    } catch {
+      console.warn("Failed to fetch admin users");
+      return [];
+    }
+  }, []);
+
+  const addAdminUser = useCallback(async ({ name, email, password }) => {
+    try {
+      const result = await apiFetch("/admin/login", {
+        method: "POST",
+        body: JSON.stringify({ action: "add_user", name, email, password }),
+      });
+      if (result.success) {
+        setAdminUsers((prev) => [...prev, result.admin]);
+        return { success: true, admin: result.admin };
+      }
+      return { success: false, error: result.error };
+    } catch (err) {
+      return { success: false, error: err.message || "Failed to add admin" };
+    }
+  }, []);
+
+  const updateAdminUser = useCallback(async (adminId, updates) => {
+    try {
+      const result = await apiFetch("/admin/login", {
+        method: "PUT",
+        body: JSON.stringify({ adminId, ...updates }),
+      });
+      if (result.success) {
+        setAdminUsers((prev) =>
+          prev.map((a) => (a.id === adminId ? result.admin : a))
+        );
+        return { success: true };
+      }
+      return { success: false, error: result.error };
+    } catch (err) {
+      return { success: false, error: err.message || "Failed to update admin" };
+    }
+  }, []);
+
+  const deleteAdminUser = useCallback(async (adminId) => {
+    try {
+      const result = await apiFetch("/admin/login", {
+        method: "DELETE",
+        body: JSON.stringify({ adminId }),
+      });
+      if (result.success) {
+        setAdminUsers((prev) => prev.filter((a) => a.id !== adminId));
+        return { success: true };
+      }
+      return { success: false, error: result.error };
+    } catch (err) {
+      return { success: false, error: err.message || "Failed to delete admin" };
+    }
+  }, []);
+
+  const changeAdminPassword = useCallback(async (adminId, currentPassword, newPassword) => {
+    try {
+      const result = await apiFetch("/admin/login", {
+        method: "POST",
+        body: JSON.stringify({ action: "change_password", adminId, currentPassword, newPassword }),
+      });
+      if (result.success) {
+        return { success: true };
+      }
+      return { success: false, error: result.error };
+    } catch (err) {
+      return { success: false, error: err.message || "Failed to change password" };
+    }
+  }, []);
+
+  const forgotAdminPassword = useCallback(async (email) => {
+    try {
+      const result = await apiFetch("/admin/login", {
+        method: "POST",
+        body: JSON.stringify({ action: "forgot_password", email }),
+      });
+      return { success: true, message: result.message, resetLink: result.resetLink };
+    } catch (err) {
+      return { success: false, error: err.message || "Failed to process request" };
+    }
+  }, []);
+
+  const resetAdminPassword = useCallback(async (resetToken, newPassword) => {
+    try {
+      const result = await apiFetch("/admin/login", {
+        method: "POST",
+        body: JSON.stringify({ action: "reset_password", resetToken, newPassword }),
+      });
+      if (result.success) {
+        return { success: true, message: result.message };
+      }
+      return { success: false, error: result.error };
+    } catch (err) {
+      return { success: false, error: err.message || "Failed to reset password" };
+    }
   }, []);
 
   // --- Computed Stats ---
@@ -626,8 +741,17 @@ export function DataProvider({ children }) {
       deleteBooking,
       stats,
       isAdmin,
+      adminProfile,
+      adminUsers,
       adminLogin,
       adminLogout,
+      fetchAdminUsers,
+      addAdminUser,
+      updateAdminUser,
+      deleteAdminUser,
+      changeAdminPassword,
+      forgotAdminPassword,
+      resetAdminPassword,
       loading,
       // Nanny portal
       isNanny,
@@ -647,7 +771,9 @@ export function DataProvider({ children }) {
     [
       nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability, inviteNanny, toggleNannyStatus, resendInvite,
       bookings, addBooking, updateBooking, updateBookingStatus, deleteBooking,
-      stats, isAdmin, adminLogin, adminLogout, loading,
+      stats, isAdmin, adminProfile, adminUsers, adminLogin, adminLogout,
+      fetchAdminUsers, addAdminUser, updateAdminUser, deleteAdminUser,
+      changeAdminPassword, forgotAdminPassword, resetAdminPassword, loading,
       isNanny, nannyProfile, nannyBookings, nannyNotifications, nannyStats,
       unreadNotifications, nannyLogin, nannyLogout, fetchNannyBookings,
       fetchNannyStats, fetchNannyNotifications, markNotificationsRead, updateNannyProfile,
