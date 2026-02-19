@@ -14,7 +14,7 @@ export default async function handler(req, res) {
       if (!nannyId) return res.status(400).json({ error: 'nannyId is required' });
 
       const result = await sql`
-        SELECT id, name, email, location, rating, bio, specialties, languages, rate, image, experience, available, created_at
+        SELECT id, name, email, location, rating, bio, specialties, languages, image, experience, available, created_at
         FROM nannies WHERE id = ${nannyId}
       `;
       if (result.length === 0) return res.status(404).json({ error: 'Nanny not found' });
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
           available = COALESCE(${available}, available),
           updated_at = NOW()
         WHERE id = ${nannyId}
-        RETURNING id, name, email, location, rating, bio, specialties, languages, rate, image, experience, available
+        RETURNING id, name, email, location, rating, bio, specialties, languages, image, experience, available
       `;
       if (result.length === 0) return res.status(404).json({ error: 'Nanny not found' });
       return res.status(200).json(result[0]);

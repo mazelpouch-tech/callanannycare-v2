@@ -214,16 +214,19 @@ export default function NannyProfile() {
                 <Clock className="w-4 h-4" />
                 {profile.experience}
               </span>
-              <span className="flex items-center gap-1.5">
-                <DollarSign className="w-4 h-4" />
-                {profile.rate} MAD/hr
+            </div>
+            {/* Nanny pay info */}
+            <div className="mt-3 flex items-start gap-2 text-xs bg-accent/5 border border-accent/20 rounded-lg px-3 py-2.5">
+              <DollarSign className="w-3.5 h-3.5 mt-0.5 shrink-0 text-accent" />
+              <span className="text-foreground/80">
+                <span className="font-semibold">Your pay:</span> 250 MAD/day (7h shift) · +100 MAD for evening bookings (after 7 PM)
               </span>
             </div>
             {/* Admin-controlled fields note */}
-            <div className="mt-3 flex items-start gap-2 text-xs text-muted-foreground/70 bg-muted/30 rounded-lg px-3 py-2">
+            <div className="mt-2 flex items-start gap-2 text-xs text-muted-foreground/70 bg-muted/30 rounded-lg px-3 py-2">
               <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
               <span>
-                Name, rate, location, rating, and experience are managed by the admin team.
+                Name, location, rating, and experience are managed by the admin team.
                 Contact them to request changes.
               </span>
             </div>

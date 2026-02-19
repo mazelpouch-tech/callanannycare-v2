@@ -146,7 +146,6 @@ export default function NannyBookings() {
                     <th className="px-5 py-3 font-medium">Date</th>
                     <th className="px-5 py-3 font-medium">Time</th>
                     <th className="px-5 py-3 font-medium">Plan</th>
-                    <th className="px-5 py-3 font-medium">Price</th>
                     <th className="px-5 py-3 font-medium">Status</th>
                     <th className="px-5 py-3 font-medium">Actions</th>
                   </tr>
@@ -167,9 +166,6 @@ export default function NannyBookings() {
                         </td>
                         <td className="px-5 py-3 text-sm capitalize">
                           {booking.plan}
-                        </td>
-                        <td className="px-5 py-3 text-sm font-medium text-foreground">
-                          {booking.totalPrice} MAD
                         </td>
                         <td className="px-5 py-3">
                           <span
@@ -243,7 +239,7 @@ export default function NannyBookings() {
                       </tr>
                       {expandedId === booking.id && (
                         <tr className="bg-muted/20">
-                          <td colSpan={7} className="px-5 py-4">
+                          <td colSpan={6} className="px-5 py-4">
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                               <div>
                                 <span className="text-muted-foreground">Email</span>
@@ -310,11 +306,8 @@ export default function NannyBookings() {
                         {booking.hotel}
                       </div>
                     )}
-                    <div className="flex items-center justify-between pt-1">
+                    <div className="pt-1">
                       <span className="capitalize">{booking.plan}</span>
-                      <span className="font-medium text-foreground">
-                        {booking.totalPrice} MAD
-                      </span>
                     </div>
                   </div>
 

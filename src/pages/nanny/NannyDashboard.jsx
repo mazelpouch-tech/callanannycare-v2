@@ -21,9 +21,24 @@ const statusColors = {
 
 const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-// Simple SVG bar chart for earnings
-function EarningsChart({ bookings }) {
-  const monthlyEarnings = useMemo(() => {
+// Helper: calculate nanny pay for a booking (250 MAD/day + 100 MAD if after 7 PM)
+function calcNannyPay(booking) {
+  if (booking.status === "cancelled") return 0;
+  let pay = 250;
+  // Check if evening booking (startTime after 7 PM / 19:00)
+  const st = booking.startTime || "";
+  const hour = parseInt(st.replace(/[^0-9]/g, "")) || 0;
+  const isPM = st.toLowerCase().includes("pm") || st.includes("PM");
+  // Handle "7:00 PM", "19:00", "8 PM" etc.
+  let hour24 = hour;
+  if (isPM && hour < 12) hour24 = hour + 12;
+  if (hour24 >= 19) pay += 100;
+  return pay;
+}
+
+// Simple bar chart for nanny pay
+function PayChart({ bookings }) {
+  const monthlyPay = useMemo(() => {
     const now = new Date();
     const months = [];
     for (let i = 5; i >= 0; i--) {
@@ -35,26 +50,26 @@ function EarningsChart({ bookings }) {
       });
     }
     bookings.forEach((b) => {
-      if (b.status === "cancelled" || !b.date || !b.totalPrice) return;
+      if (b.status === "cancelled" || !b.date) return;
       const monthKey = b.date.substring(0, 7);
       const month = months.find((m) => m.key === monthKey);
-      if (month) month.total += Number(b.totalPrice) || 0;
+      if (month) month.total += calcNannyPay(b);
     });
     return months;
   }, [bookings]);
 
-  const maxVal = Math.max(...monthlyEarnings.map((m) => m.total), 1);
+  const maxVal = Math.max(...monthlyPay.map((m) => m.total), 1);
 
   return (
     <div className="bg-card rounded-xl border border-border p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold text-foreground text-lg flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-primary" />
-          Earnings (6 months)
+          My Pay (6 months)
         </h2>
       </div>
       <div className="flex items-end gap-2 h-32">
-        {monthlyEarnings.map((month) => {
+        {monthlyPay.map((month) => {
           const heightPct = maxVal > 0 ? (month.total / maxVal) * 100 : 0;
           return (
             <div key={month.key} className="flex-1 flex flex-col items-center gap-1">
@@ -72,6 +87,9 @@ function EarningsChart({ bookings }) {
           );
         })}
       </div>
+      <p className="text-[10px] text-muted-foreground mt-3 text-center">
+        250 MAD/day · +100 MAD evening (after 7 PM)
+      </p>
     </div>
   );
 }
@@ -163,8 +181,10 @@ export default function NannyDashboard() {
       color: "text-accent",
     },
     {
-      label: "Earnings",
-      value: nannyStats?.totalEarnings ?? 0,
+      label: "My Pay",
+      value: nannyBookings
+        .filter((b) => b.status !== "cancelled")
+        .reduce((sum, b) => sum + calcNannyPay(b), 0),
       suffix: "MAD",
       icon: DollarSign,
       bg: "bg-orange-50",
@@ -216,8 +236,8 @@ export default function NannyDashboard() {
         })}
       </div>
 
-      {/* Earnings Chart */}
-      <EarningsChart bookings={nannyBookings} />
+      {/* Pay Chart */}
+      <PayChart bookings={nannyBookings} />
 
       {/* Upcoming Bookings */}
       <div className="bg-card rounded-xl border border-border">

@@ -238,12 +238,6 @@ export default function NannyCalendar() {
                       {booking.hotel}
                     </div>
                   )}
-
-                  {booking.totalPrice > 0 && (
-                    <p className="text-sm font-medium text-foreground">
-                      {booking.totalPrice} MAD
-                    </p>
-                  )}
                 </div>
               ))}
             </div>
