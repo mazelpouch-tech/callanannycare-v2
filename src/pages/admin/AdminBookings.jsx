@@ -16,9 +16,34 @@ import {
   Phone,
   Baby,
   Hotel,
+  Plus,
+  X,
+  Loader2,
+  FileText,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useData } from "../../context/DataContext";
+
+const PLANS = [
+  { id: "hourly", name: "Hourly", label: "Per Hour" },
+  { id: "half-day", name: "Half-Day", label: "5 Hours" },
+  { id: "full-day", name: "Full-Day", label: "10 Hours" },
+];
+
+function generateTimeSlots() {
+  const slots = [];
+  for (let h = 8; h <= 20; h++) {
+    const hour12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+    const ampm = h >= 12 ? "PM" : "AM";
+    slots.push({ value: `${h}:00`, label: `${hour12}:00 ${ampm}` });
+    if (h < 20) {
+      slots.push({ value: `${h}:30`, label: `${hour12}:30 ${ampm}` });
+    }
+  }
+  return slots;
+}
+
+const TIME_SLOTS = generateTimeSlots();
 
 const statusConfig = {
   pending: {
@@ -42,13 +67,105 @@ const statusConfig = {
 const statusFilters = ["all", "pending", "confirmed", "completed", "cancelled"];
 
 export default function AdminBookings() {
-  const { bookings, updateBookingStatus, deleteBooking } = useData();
+  const { bookings, nannies, addBooking, updateBookingStatus, deleteBooking } = useData();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
   const [expandedRow, setExpandedRow] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  // New Booking Modal
+  const [showNewBooking, setShowNewBooking] = useState(false);
+  const [newBookingLoading, setNewBookingLoading] = useState(false);
+  const [newBooking, setNewBooking] = useState({
+    nannyId: "",
+    clientName: "",
+    clientEmail: "",
+    clientPhone: "",
+    date: "",
+    startTime: "",
+    endTime: "",
+    plan: "hourly",
+    hotel: "",
+    numChildren: "1",
+    childrenAges: "",
+    notes: "",
+    status: "confirmed",
+  });
+
+  const availableNannies = useMemo(
+    () => nannies.filter((n) => n.available && n.status === "active"),
+    [nannies]
+  );
+
+  const selectedNanny = useMemo(
+    () => nannies.find((n) => n.id === Number(newBooking.nannyId)),
+    [nannies, newBooking.nannyId]
+  );
+
+  const newBookingHours = useMemo(() => {
+    if (newBooking.plan === "half-day") return 5;
+    if (newBooking.plan === "full-day") return 10;
+    if (!newBooking.startTime || !newBooking.endTime) return 0;
+    const [sh, sm] = newBooking.startTime.split(":").map(Number);
+    const [eh, em] = newBooking.endTime.split(":").map(Number);
+    return Math.max(0, (eh + em / 60) - (sh + sm / 60));
+  }, [newBooking.plan, newBooking.startTime, newBooking.endTime]);
+
+  const newBookingPrice = useMemo(() => {
+    if (!selectedNanny) return 0;
+    return Math.round(selectedNanny.rate * newBookingHours);
+  }, [selectedNanny, newBookingHours]);
+
+  const handleNewBookingSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedNanny || !newBooking.date || !newBooking.clientName) return;
+    setNewBookingLoading(true);
+
+    const startLabel = TIME_SLOTS.find((s) => s.value === newBooking.startTime)?.label || newBooking.startTime;
+    const endLabel = TIME_SLOTS.find((s) => s.value === newBooking.endTime)?.label || newBooking.endTime;
+
+    await addBooking({
+      nannyId: selectedNanny.id,
+      nannyName: selectedNanny.name,
+      date: newBooking.date,
+      startTime: startLabel,
+      endTime: endLabel,
+      time: `${startLabel} - ${endLabel}`,
+      plan: newBooking.plan,
+      hours: newBookingHours,
+      totalPrice: newBookingPrice,
+      clientName: newBooking.clientName,
+      clientEmail: newBooking.clientEmail,
+      clientPhone: newBooking.clientPhone,
+      hotel: newBooking.hotel,
+      accommodation: newBooking.hotel,
+      numChildren: newBooking.numChildren,
+      numberOfChildren: newBooking.numChildren,
+      childrenAges: newBooking.childrenAges,
+      notes: newBooking.notes,
+      status: newBooking.status,
+    });
+
+    setNewBookingLoading(false);
+    setShowNewBooking(false);
+    setNewBooking({
+      nannyId: "",
+      clientName: "",
+      clientEmail: "",
+      clientPhone: "",
+      date: "",
+      startTime: "",
+      endTime: "",
+      plan: "hourly",
+      hotel: "",
+      numChildren: "1",
+      childrenAges: "",
+      notes: "",
+      status: "confirmed",
+    });
+  };
 
   const filteredBookings = useMemo(() => {
     let result = [...bookings];
@@ -119,6 +236,13 @@ export default function AdminBookings() {
             {filteredBookings.length} booking{filteredBookings.length !== 1 ? "s" : ""} found
           </p>
         </div>
+        <button
+          onClick={() => setShowNewBooking(true)}
+          className="flex items-center gap-2 gradient-warm text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity shadow-warm"
+        >
+          <Plus className="w-4 h-4" />
+          New Booking
+        </button>
       </div>
 
       {/* Filter Bar */}
@@ -589,6 +713,279 @@ export default function AdminBookings() {
             })}
           </div>
         </>
+      )}
+
+      {/* ===== New Booking Modal ===== */}
+      {showNewBooking && (
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+          <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-2xl p-6 my-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-serif text-lg font-bold text-foreground">New Booking</h2>
+              <button
+                onClick={() => setShowNewBooking(false)}
+                className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleNewBookingSubmit} className="space-y-5">
+              {/* Nanny Selection */}
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                  <User className="w-3.5 h-3.5 text-muted-foreground" />
+                  Select Nanny <span className="text-destructive">*</span>
+                </label>
+                <select
+                  value={newBooking.nannyId}
+                  onChange={(e) => setNewBooking({ ...newBooking, nannyId: e.target.value })}
+                  required
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                >
+                  <option value="">Choose a nanny...</option>
+                  {availableNannies.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.name} — {n.rate} MAD/hr ({n.location})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Client Info Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <User className="w-3.5 h-3.5 text-muted-foreground" />
+                    Client Name <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newBooking.clientName}
+                    onChange={(e) => setNewBooking({ ...newBooking, clientName: e.target.value })}
+                    placeholder="Full name"
+                    required
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={newBooking.clientEmail}
+                    onChange={(e) => setNewBooking({ ...newBooking, clientEmail: e.target.value })}
+                    placeholder="client@email.com"
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={newBooking.clientPhone}
+                    onChange={(e) => setNewBooking({ ...newBooking, clientPhone: e.target.value })}
+                    placeholder="+212 600 000 000"
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Hotel className="w-3.5 h-3.5 text-muted-foreground" />
+                    Hotel / Accommodation
+                  </label>
+                  <input
+                    type="text"
+                    value={newBooking.hotel}
+                    onChange={(e) => setNewBooking({ ...newBooking, hotel: e.target.value })}
+                    placeholder="e.g. Royal Mansour"
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
+                </div>
+              </div>
+
+              {/* Date & Plan */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                    Date <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={newBooking.date}
+                    onChange={(e) => setNewBooking({ ...newBooking, date: e.target.value })}
+                    required
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                    Plan <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    value={newBooking.plan}
+                    onChange={(e) => setNewBooking({ ...newBooking, plan: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  >
+                    {PLANS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.label})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Time */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                    Start Time <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    value={newBooking.startTime}
+                    onChange={(e) => setNewBooking({ ...newBooking, startTime: e.target.value })}
+                    required
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  >
+                    <option value="">Select time</option>
+                    {TIME_SLOTS.map((slot) => (
+                      <option key={`s-${slot.value}`} value={slot.value}>{slot.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                    End Time <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    value={newBooking.endTime}
+                    onChange={(e) => setNewBooking({ ...newBooking, endTime: e.target.value })}
+                    required
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  >
+                    <option value="">Select time</option>
+                    {TIME_SLOTS.map((slot) => (
+                      <option key={`e-${slot.value}`} value={slot.value}>{slot.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Children & Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Baby className="w-3.5 h-3.5 text-muted-foreground" />
+                    Children
+                  </label>
+                  <select
+                    value={newBooking.numChildren}
+                    onChange={(e) => setNewBooking({ ...newBooking, numChildren: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  >
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Baby className="w-3.5 h-3.5 text-muted-foreground" />
+                    Ages
+                  </label>
+                  <input
+                    type="text"
+                    value={newBooking.childrenAges}
+                    onChange={(e) => setNewBooking({ ...newBooking, childrenAges: e.target.value })}
+                    placeholder="e.g. 3, 5"
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Check className="w-3.5 h-3.5 text-muted-foreground" />
+                    Status
+                  </label>
+                  <select
+                    value={newBooking.status}
+                    onChange={(e) => setNewBooking({ ...newBooking, status: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                  <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                  Notes <span className="text-xs text-muted-foreground">(optional)</span>
+                </label>
+                <textarea
+                  value={newBooking.notes}
+                  onChange={(e) => setNewBooking({ ...newBooking, notes: e.target.value })}
+                  placeholder="Any special requests or notes..."
+                  rows={2}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition resize-none"
+                />
+              </div>
+
+              {/* Price Summary */}
+              {selectedNanny && newBookingHours > 0 && (
+                <div className="bg-muted/50 rounded-xl p-4 flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">{selectedNanny.name}</span>
+                    <span className="mx-1.5">·</span>
+                    {selectedNanny.rate} MAD/hr × {newBookingHours} hrs
+                  </div>
+                  <div className="text-lg font-bold text-foreground">
+                    {newBookingPrice.toLocaleString()} MAD
+                  </div>
+                </div>
+              )}
+
+              {/* Submit */}
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewBooking(false)}
+                  className="flex-1 px-4 py-3 border border-border rounded-xl text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={newBookingLoading || !newBooking.nannyId || !newBooking.date || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime}
+                  className="flex-1 gradient-warm text-white rounded-xl px-4 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {newBookingLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      Create Booking
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
