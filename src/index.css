@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'DM Sans', sans-serif;
+  --font-serif: 'Playfair Display', serif;
+  --color-background: hsl(30 25% 97%);
+  --color-foreground: hsl(20 20% 15%);
+  --color-card: hsl(30 20% 95%);
+  --color-card-foreground: hsl(20 20% 15%);
+  --color-primary: hsl(14 60% 55%);
+  --color-primary-foreground: hsl(30 25% 97%);
+  --color-secondary: hsl(45 30% 90%);
+  --color-secondary-foreground: hsl(20 20% 20%);
+  --color-muted: hsl(30 15% 92%);
+  --color-muted-foreground: hsl(20 10% 45%);
+  --color-accent: hsl(150 25% 40%);
+  --color-accent-foreground: hsl(30 25% 97%);
+  --color-destructive: hsl(0 84.2% 60.2%);
+  --color-border: hsl(30 15% 88%);
+  --color-input: hsl(30 15% 88%);
+  --color-ring: hsl(14 60% 55%);
+  --radius: 0.75rem;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+.gradient-warm {
+  background: linear-gradient(135deg, hsl(14 60% 55%), hsl(25 70% 60%));
+}
+
+.gradient-sand {
+  background: linear-gradient(180deg, hsl(30 25% 97%), hsl(30 20% 93%));
+}
+
+.text-gradient-warm {
+  background: linear-gradient(135deg, hsl(14 60% 55%), hsl(25 70% 60%));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.shadow-warm {
+  box-shadow: 0 4px 20px -4px hsl(14 60% 55% / 0.2);
+}
+
+.shadow-soft {
+  box-shadow: 0 2px 12px -2px hsl(20 20% 15% / 0.08);
+}
