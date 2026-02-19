@@ -16,10 +16,10 @@ export default async function handler(req, res) {
     }
     
     if (req.method === 'POST') {
-      const { name, location, rating, bio, specialties, languages, rate, image, experience, available, email, pin } = req.body;
+      const { name, location, rating, bio, specialties, languages, rate, image, experience, available, email, pin, phone } = req.body;
       const result = await sql`
-        INSERT INTO nannies (name, location, rating, bio, specialties, languages, rate, image, experience, available, email, pin)
-        VALUES (${name}, ${location}, ${rating || 4.8}, ${bio}, ${JSON.stringify(specialties || [])}, ${JSON.stringify(languages || [])}, ${rate || 150}, ${image || ''}, ${experience || '1 year'}, ${available !== false}, ${email || null}, ${pin || ''})
+        INSERT INTO nannies (name, location, rating, bio, specialties, languages, rate, image, experience, available, email, pin, phone)
+        VALUES (${name}, ${location}, ${rating || 4.8}, ${bio}, ${JSON.stringify(specialties || [])}, ${JSON.stringify(languages || [])}, ${rate || 150}, ${image || ''}, ${experience || '1 year'}, ${available !== false}, ${email || null}, ${pin || ''}, ${phone || ''})
         RETURNING *
       `;
       return res.status(201).json(result[0]);

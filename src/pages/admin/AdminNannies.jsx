@@ -18,6 +18,7 @@ import {
   Check,
   RefreshCw,
   UserPlus,
+  Phone,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 
@@ -32,6 +33,7 @@ const emptyForm = {
   image: "",
   email: "",
   pin: "",
+  phone: "",
   available: true,
 };
 
@@ -97,6 +99,7 @@ export default function AdminNannies() {
       image: nanny.image || "",
       email: nanny.email || "",
       pin: nanny.pin || "",
+      phone: nanny.phone || "",
       available: nanny.available ?? true,
     });
     setModalOpen(true);
@@ -125,6 +128,7 @@ export default function AdminNannies() {
       image: form.image.trim(),
       email: form.email.trim(),
       pin: form.pin.trim(),
+      phone: form.phone.trim(),
       available: form.available,
       rating: editingNanny?.rating || 5.0,
     };
@@ -323,6 +327,11 @@ export default function AdminNannies() {
                             <p className="text-xs text-muted-foreground">
                               {nanny.email || "No email"}
                             </p>
+                            {nanny.phone && (
+                              <p className="text-xs text-muted-foreground">
+                                {nanny.phone}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -827,6 +836,18 @@ export default function AdminNannies() {
                   value={form.image}
                   onChange={(e) => handleFormChange("image", e.target.value)}
                   placeholder="https://example.com/photo.jpg"
+                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                />
+              </div>
+
+              {/* Phone Number */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Phone (+212)</label>
+                <input
+                  type="tel"
+                  value={form.phone}
+                  onChange={(e) => handleFormChange("phone", e.target.value)}
+                  placeholder="+212 6 XX XX XX XX"
                   className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
                 />
               </div>
