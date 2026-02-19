@@ -308,7 +308,7 @@ export default function ParentForm() {
 
   const handleWhatsApp = () => {
     const text = encodeURIComponent(buildSummary());
-    window.open(`https://wa.me/?text=${text}`, "_blank");
+    window.open(`https://wa.me/212656643375?text=${text}`, "_blank");
   };
 
   const handleNewForm = () => {

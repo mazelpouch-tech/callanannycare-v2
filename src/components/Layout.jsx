@@ -8,7 +8,7 @@ export default function Layout() {
     const msg = encodeURIComponent(
       "Hi! I'd like to book a nanny through call a nanny. Can you help me?"
     );
-    window.open(`https://wa.me/212600000000?text=${msg}`, "_blank");
+    window.open(`https://wa.me/212656643375?text=${msg}`, "_blank");
   };
 
   return (

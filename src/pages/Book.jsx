@@ -657,12 +657,20 @@ function StepReview({
 
 // --- Success State ---
 function BookingSuccess({ onBookAnother, onGoHome, bookingData }) {
-  const whatsAppConfirm = () => {
+  const buildWhatsAppUrl = () => {
     const msg = encodeURIComponent(
-      `Hi! I just booked a nanny session with call a nanny.\n\nDate: ${bookingData.date}\nTime: ${bookingData.startTime}${bookingData.endTime ? ` - ${bookingData.endTime}` : ""}\nPlan: ${bookingData.plan}\n\nLooking forward to it!`
+      `Hi! I just booked a nanny session with Call a Nanny.\n\nDate: ${bookingData.date}\nTime: ${bookingData.startTime}${bookingData.endTime ? ` - ${bookingData.endTime}` : ""}\nPlan: ${bookingData.plan}\n\nPlease fill out the child information form so we can prepare for a great experience:\nhttps://callananny.ma/parent-form\n\nLooking forward to it!`
     );
-    window.open(`https://wa.me/212600000000?text=${msg}`, "_blank");
+    return `https://wa.me/212656643375?text=${msg}`;
   };
+
+  // Auto-open WhatsApp with booking confirmation + child form link
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.open(buildWhatsAppUrl(), "_blank");
+    }, 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="flex flex-col items-center justify-center py-12 sm:py-20 text-center">
@@ -676,8 +684,8 @@ function BookingSuccess({ onBookAnother, onGoHome, bookingData }) {
         Booking Submitted!
       </h2>
       <p className="text-muted-foreground text-lg max-w-md mb-4">
-        We'll confirm your booking shortly. You'll receive a confirmation
-        with all the details.
+        We'll confirm your booking shortly. A WhatsApp message has been
+        opened with your booking details and the child info form link.
       </p>
 
       {/* Parent form CTA */}
@@ -701,11 +709,11 @@ function BookingSuccess({ onBookAnother, onGoHome, bookingData }) {
       <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
         <button
           type="button"
-          onClick={whatsAppConfirm}
+          onClick={() => window.open(buildWhatsAppUrl(), "_blank")}
           className="flex-1 bg-green-500 text-white font-semibold px-5 py-3 rounded-full hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
         >
           <MessageCircle className="w-4 h-4" />
-          Confirm via WhatsApp
+          Send via WhatsApp
         </button>
         <button
           type="button"
