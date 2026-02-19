@@ -2,9 +2,7 @@ import { useState, useCallback } from "react";
 import {
   Globe,
   Baby,
-  Heart,
   AlertTriangle,
-  Phone,
   FileText,
   CheckCircle,
   Copy,
@@ -13,8 +11,6 @@ import {
   ChevronUp,
   Shield,
   User,
-  Calendar,
-  Stethoscope,
   UtensilsCrossed,
   Pill,
   TreePine,
@@ -32,9 +28,7 @@ const T = {
     parentInfo: "Informations du Parent / Tuteur",
     childInfo: "Informations de l'Enfant",
     allergies: "Allergies",
-    medical: "Informations Medicales",
     specialNeeds: "Besoins Speciaux & Comportement",
-    emergency: "Contact d'Urgence",
     consent: "Consentement & Autorisation",
     // Parent fields
     parentName: "Nom complet du parent / tuteur",
@@ -59,17 +53,6 @@ const T = {
     noAllergies: "Aucune allergie connue",
     allergyReaction: "Reactions allergiques connues et traitement",
     allergyReactionPlaceholder: "Decrivez les reactions et le traitement a administrer...",
-    // Medical
-    medicalConditions: "Conditions medicales ou maladies chroniques",
-    medicalConditionsPlaceholder: "Ex: asthme, diabete, epilepsie...",
-    currentMedications: "Medicaments actuels",
-    currentMedicationsPlaceholder: "Nom du medicament, dosage, frequence...",
-    medicationAuth: "La nounou est-elle autorisee a administrer les medicaments ?",
-    yes: "Oui",
-    no: "Non",
-    lastDoctorVisit: "Derniere visite chez le medecin",
-    doctorName: "Nom du medecin traitant",
-    doctorPhone: "Telephone du medecin",
     // Special needs
     specialNeedsDesc: "Besoins speciaux ou handicap",
     specialNeedsPlaceholder: "Decrivez tout besoin particulier...",
@@ -81,21 +64,13 @@ const T = {
     favoriteActivitiesPlaceholder: "Ex: dessin, lecture, jeux de construction...",
     napSchedule: "Horaire de sieste / sommeil",
     napSchedulePlaceholder: "Ex: sieste de 13h a 15h, coucher a 20h...",
-    // Emergency
-    emergencyName: "Nom du contact d'urgence",
-    emergencyRelation: "Relation",
-    emergencyRelationPlaceholder: "Ex: grand-parent, oncle, ami...",
-    emergencyPhone: "Telephone d'urgence",
     // Consent
     consentText:
-      "J'autorise call a nanny a prendre soin de mon enfant selon les informations fournies ci-dessus. Je certifie que toutes les informations sont exactes et completes. J'autorise l'equipe a contacter les services d'urgence si necessaire.",
-    photoConsent: "J'autorise la prise de photos de mon enfant pendant les activites",
+      "J'autorise call a nanny a prendre soin de mon enfant selon les informations fournies ci-dessus. Je certifie que toutes les informations sont exactes et completes.",
     agreeTerms: "J'accepte les conditions generales de service",
     // Actions
     submit: "Soumettre le Formulaire",
     submitting: "Envoi en cours...",
-    required: "obligatoire",
-    optional: "optionnel",
     // Success
     successTitle: "Formulaire Soumis !",
     successMessage: "Merci ! Vos informations ont ete envoyees a notre equipe. Vous pouvez aussi copier le resume ou l'envoyer par WhatsApp.",
@@ -114,9 +89,7 @@ const T = {
     parentInfo: "Parent / Guardian Information",
     childInfo: "Child Information",
     allergies: "Allergies",
-    medical: "Medical Information",
     specialNeeds: "Special Needs & Behavior",
-    emergency: "Emergency Contact",
     consent: "Consent & Authorization",
     // Parent fields
     parentName: "Parent / Guardian full name",
@@ -141,17 +114,6 @@ const T = {
     noAllergies: "No known allergies",
     allergyReaction: "Known allergic reactions and treatment",
     allergyReactionPlaceholder: "Describe reactions and treatment to administer...",
-    // Medical
-    medicalConditions: "Medical conditions or chronic illnesses",
-    medicalConditionsPlaceholder: "e.g. asthma, diabetes, epilepsy...",
-    currentMedications: "Current medications",
-    currentMedicationsPlaceholder: "Medication name, dosage, frequency...",
-    medicationAuth: "Is the nanny authorized to administer medications?",
-    yes: "Yes",
-    no: "No",
-    lastDoctorVisit: "Last doctor visit",
-    doctorName: "Doctor's name",
-    doctorPhone: "Doctor's phone",
     // Special needs
     specialNeedsDesc: "Special needs or disabilities",
     specialNeedsPlaceholder: "Describe any special requirements...",
@@ -163,21 +125,13 @@ const T = {
     favoriteActivitiesPlaceholder: "e.g. drawing, reading, building blocks...",
     napSchedule: "Nap / sleep schedule",
     napSchedulePlaceholder: "e.g. nap 1-3 PM, bedtime at 8 PM...",
-    // Emergency
-    emergencyName: "Emergency contact name",
-    emergencyRelation: "Relationship",
-    emergencyRelationPlaceholder: "e.g. grandparent, uncle, friend...",
-    emergencyPhone: "Emergency phone",
     // Consent
     consentText:
-      "I authorize call a nanny to care for my child according to the information provided above. I certify that all information is accurate and complete. I authorize the team to contact emergency services if necessary.",
-    photoConsent: "I authorize photos of my child during activities",
+      "I authorize call a nanny to care for my child according to the information provided above. I certify that all information is accurate and complete.",
     agreeTerms: "I agree to the general terms of service",
     // Actions
     submit: "Submit Form",
     submitting: "Submitting...",
-    required: "required",
-    optional: "optional",
     // Success
     successTitle: "Form Submitted!",
     successMessage: "Thank you! Your information has been sent to our team. You can also copy the summary or send it via WhatsApp.",
@@ -253,21 +207,11 @@ export default function ParentForm() {
     environmentAllergies: "",
     noAllergies: false,
     allergyReaction: "",
-    medicalConditions: "",
-    currentMedications: "",
-    medicationAuth: "",
-    lastDoctorVisit: "",
-    doctorName: "",
-    doctorPhone: "",
     specialNeeds: "",
     behaviorNotes: "",
     dietaryRestrictions: "",
     favoriteActivities: "",
     napSchedule: "",
-    emergencyName: "",
-    emergencyRelation: "",
-    emergencyPhone: "",
-    photoConsent: false,
     agreeTerms: false,
   });
 
@@ -300,22 +244,12 @@ export default function ParentForm() {
       if (form.allergyReaction) lines.push(`Allergy reactions: ${form.allergyReaction}`);
     }
 
-    if (form.medicalConditions) lines.push(`Medical conditions: ${form.medicalConditions}`);
-    if (form.currentMedications) lines.push(`Medications: ${form.currentMedications}`);
-    if (form.medicationAuth) lines.push(`Medication auth: ${form.medicationAuth}`);
-    if (form.doctorName) lines.push(`Doctor: ${form.doctorName} (${form.doctorPhone || "N/A"})`);
-
     if (form.specialNeeds) lines.push(`Special needs: ${form.specialNeeds}`);
     if (form.behaviorNotes) lines.push(`Behavior: ${form.behaviorNotes}`);
     if (form.dietaryRestrictions) lines.push(`Diet: ${form.dietaryRestrictions}`);
     if (form.favoriteActivities) lines.push(`Activities: ${form.favoriteActivities}`);
     if (form.napSchedule) lines.push(`Nap/sleep: ${form.napSchedule}`);
 
-    lines.push(``);
-    lines.push(`Emergency: ${form.emergencyName} (${form.emergencyRelation}) - ${form.emergencyPhone}`);
-    lines.push(``);
-    lines.push(`Photo consent: ${form.photoConsent ? "Yes" : "No"}`);
-    lines.push(`Terms agreed: ${form.agreeTerms ? "Yes" : "No"}`);
     lines.push(``);
     lines.push(`--- call a nanny ---`);
     return lines.join("\n");
@@ -327,7 +261,6 @@ export default function ParentForm() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const summary = buildSummary();
       const res = await fetch("https://api.web3forms.com/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -335,7 +268,6 @@ export default function ParentForm() {
           access_key: WEB3FORMS_KEY,
           subject: `New Child Form: ${form.childFirstName} ${form.childLastName || ""} (${form.parentName})`,
           from_name: "call a nanny - Parent Form",
-          // Structured fields
           "Parent Name": form.parentName,
           "Parent Phone": form.parentPhone,
           "Parent Email": form.parentEmail || "N/A",
@@ -348,32 +280,20 @@ export default function ParentForm() {
           "Medicine Allergies": form.noAllergies ? "None" : (form.medicineAllergies || "N/A"),
           "Environment Allergies": form.noAllergies ? "None" : (form.environmentAllergies || "N/A"),
           "Allergy Reactions": form.noAllergies ? "None" : (form.allergyReaction || "N/A"),
-          "Medical Conditions": form.medicalConditions || "None",
-          "Current Medications": form.currentMedications || "None",
-          "Medication Authorization": form.medicationAuth || "N/A",
-          "Doctor Name": form.doctorName || "N/A",
-          "Doctor Phone": form.doctorPhone || "N/A",
           "Special Needs": form.specialNeeds || "None",
           "Behavior Notes": form.behaviorNotes || "N/A",
           "Dietary Restrictions": form.dietaryRestrictions || "None",
           "Favorite Activities": form.favoriteActivities || "N/A",
           "Nap Schedule": form.napSchedule || "N/A",
-          "Emergency Contact": form.emergencyName,
-          "Emergency Relation": form.emergencyRelation || "N/A",
-          "Emergency Phone": form.emergencyPhone,
-          "Photo Consent": form.photoConsent ? "Yes" : "No",
-          "Terms Agreed": form.agreeTerms ? "Yes" : "No",
         }),
       });
       const data = await res.json();
       if (data.success) {
         setSubmitted(true);
       } else {
-        // Still show success (form data visible via copy/WhatsApp)
         setSubmitted(true);
       }
     } catch {
-      // Still show success to the parent
       setSubmitted(true);
     } finally {
       setIsSubmitting(false);
@@ -407,21 +327,11 @@ export default function ParentForm() {
       environmentAllergies: "",
       noAllergies: false,
       allergyReaction: "",
-      medicalConditions: "",
-      currentMedications: "",
-      medicationAuth: "",
-      lastDoctorVisit: "",
-      doctorName: "",
-      doctorPhone: "",
       specialNeeds: "",
       behaviorNotes: "",
       dietaryRestrictions: "",
       favoriteActivities: "",
       napSchedule: "",
-      emergencyName: "",
-      emergencyRelation: "",
-      emergencyPhone: "",
-      photoConsent: false,
       agreeTerms: false,
     });
     setSubmitted(false);
@@ -434,8 +344,6 @@ export default function ParentForm() {
     form.parentPhone.trim() &&
     form.hotel.trim() &&
     form.childFirstName.trim() &&
-    form.emergencyName.trim() &&
-    form.emergencyPhone.trim() &&
     form.agreeTerms;
 
   // --- Success State ---
@@ -444,7 +352,6 @@ export default function ParentForm() {
     return (
       <div className="min-h-screen bg-background">
         <div className="mx-auto max-w-2xl px-4 sm:px-6 py-8 sm:py-12">
-          {/* Header */}
           <div className="text-center mb-8">
             <div className="relative inline-block mb-4">
               <div className="w-20 h-20 rounded-full gradient-warm flex items-center justify-center shadow-warm animate-bounce">
@@ -458,7 +365,6 @@ export default function ParentForm() {
             <p className="text-muted-foreground text-lg">{t.successMessage}</p>
           </div>
 
-          {/* Summary */}
           <div className="bg-card rounded-xl border border-border p-4 sm:p-5 mb-6 shadow-soft">
             <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
               <ClipboardList className="w-4 h-4 text-primary" />
@@ -469,7 +375,6 @@ export default function ParentForm() {
             </pre>
           </div>
 
-          {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               type="button"
@@ -516,7 +421,6 @@ export default function ParentForm() {
           </h1>
           <p className="text-muted-foreground">{t.subtitle}</p>
 
-          {/* Language Toggle */}
           <button
             type="button"
             onClick={() => setLang(lang === "fr" ? "en" : "fr")}
@@ -527,7 +431,6 @@ export default function ParentForm() {
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Parent Info */}
           <Section icon={User} title={t.parentInfo}>
@@ -675,72 +578,6 @@ export default function ParentForm() {
             )}
           </Section>
 
-          {/* Medical */}
-          <Section icon={Stethoscope} title={t.medical} defaultOpen={false}>
-            <Field label={t.medicalConditions}>
-              <textarea
-                value={form.medicalConditions}
-                onChange={set("medicalConditions")}
-                placeholder={t.medicalConditionsPlaceholder}
-                rows={3}
-                className={textareaClass}
-              />
-            </Field>
-            <Field label={t.currentMedications}>
-              <textarea
-                value={form.currentMedications}
-                onChange={set("currentMedications")}
-                placeholder={t.currentMedicationsPlaceholder}
-                rows={2}
-                className={textareaClass}
-              />
-            </Field>
-            <Field label={t.medicationAuth}>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="medicationAuth"
-                    value="yes"
-                    checked={form.medicationAuth === "yes"}
-                    onChange={set("medicationAuth")}
-                    className="w-4 h-4 text-primary focus:ring-primary"
-                  />
-                  <span className="text-sm text-foreground">{t.yes}</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="medicationAuth"
-                    value="no"
-                    checked={form.medicationAuth === "no"}
-                    onChange={set("medicationAuth")}
-                    className="w-4 h-4 text-primary focus:ring-primary"
-                  />
-                  <span className="text-sm text-foreground">{t.no}</span>
-                </label>
-              </div>
-            </Field>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label={t.doctorName}>
-                <input
-                  type="text"
-                  value={form.doctorName}
-                  onChange={set("doctorName")}
-                  className={inputClass}
-                />
-              </Field>
-              <Field label={t.doctorPhone}>
-                <input
-                  type="tel"
-                  value={form.doctorPhone}
-                  onChange={set("doctorPhone")}
-                  className={inputClass}
-                />
-              </Field>
-            </div>
-          </Section>
-
           {/* Special Needs */}
           <Section icon={Brain} title={t.specialNeeds} defaultOpen={false}>
             <Field label={t.specialNeedsDesc}>
@@ -790,54 +627,11 @@ export default function ParentForm() {
             </Field>
           </Section>
 
-          {/* Emergency Contact */}
-          <Section icon={Phone} title={t.emergency}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label={t.emergencyName} required>
-                <input
-                  type="text"
-                  value={form.emergencyName}
-                  onChange={set("emergencyName")}
-                  className={inputClass}
-                  required
-                />
-              </Field>
-              <Field label={t.emergencyRelation}>
-                <input
-                  type="text"
-                  value={form.emergencyRelation}
-                  onChange={set("emergencyRelation")}
-                  placeholder={t.emergencyRelationPlaceholder}
-                  className={inputClass}
-                />
-              </Field>
-            </div>
-            <Field label={t.emergencyPhone} required>
-              <input
-                type="tel"
-                value={form.emergencyPhone}
-                onChange={set("emergencyPhone")}
-                placeholder="+212 600 000 000"
-                className={inputClass}
-                required
-              />
-            </Field>
-          </Section>
-
           {/* Consent */}
           <Section icon={Shield} title={t.consent}>
             <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground leading-relaxed mb-4">
               {t.consentText}
             </div>
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.photoConsent}
-                onChange={set("photoConsent")}
-                className="w-4 h-4 rounded border-border text-primary focus:ring-primary mt-0.5"
-              />
-              <span className="text-sm text-foreground">{t.photoConsent}</span>
-            </label>
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -869,7 +663,6 @@ export default function ParentForm() {
           </button>
         </form>
 
-        {/* Footer */}
         <p className="text-center text-xs text-muted-foreground mt-8">
           call a nanny &mdash; Trusted Childcare in Marrakech
         </p>
