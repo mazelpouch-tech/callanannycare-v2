@@ -822,8 +822,8 @@ export default function Dashboard() {
                 <thead>
                   <tr className="border-b border-border">
                     <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Invoice #</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Client</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nanny</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Billed To</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Caregiver</th>
                     <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
                     <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hours</th>
                     <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</th>
@@ -840,7 +840,7 @@ export default function Dashboard() {
                         <p className="text-sm font-medium text-foreground">{inv.clientName || "N/A"}</p>
                         <p className="text-xs text-muted-foreground">{inv.clientEmail || ""}</p>
                       </td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">{inv.nannyName || "N/A"}</td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">{inv.nannyName || "Unassigned"}</td>
                       <td className="px-6 py-4">
                         <p className="text-sm text-muted-foreground">{formatDate(inv.date)}</p>
                         <p className="text-xs text-muted-foreground/70">{formatTime(inv.clockIn)} – {formatTime(inv.clockOut)}</p>
@@ -871,11 +871,14 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <p className="font-medium text-foreground text-sm">{inv.clientName || "N/A"}</p>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">Billed To</p>
+                      <p className="font-medium text-foreground text-sm">{inv.clientName || "N/A"}</p>
+                    </div>
                     <span className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()} MAD</span>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>{inv.nannyName || "N/A"}</span>
+                    <span>Caregiver: {inv.nannyName || "Unassigned"}</span>
                     <span>{formatDate(inv.date)}</span>
                     <span>{calcWorkedHours(inv.clockIn, inv.clockOut)}h</span>
                   </div>

@@ -177,7 +177,7 @@ export default function AdminInvoices() {
     setFormError("");
 
     if (!formData.clientName.trim() || !formData.clientEmail.trim()) {
-      setFormError("Client name and email are required");
+      setFormError("Parent name and email are required");
       return;
     }
     if (!formData.nannyId) {
@@ -261,7 +261,7 @@ export default function AdminInvoices() {
   };
 
   const exportCSV = () => {
-    const headers = ["Invoice #", "Client", "Email", "Phone", "Nanny", "Date", "Clock In", "Clock Out", "Hours", "Amount (MAD)"];
+    const headers = ["Invoice #", "Billed To (Parent)", "Email", "Phone", "Caregiver", "Date", "Clock In", "Clock Out", "Hours", "Amount (MAD)"];
     const rows = filteredInvoices.map((inv) => [
       `INV-${inv.id}`,
       inv.clientName || "",
@@ -296,7 +296,7 @@ export default function AdminInvoices() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="font-serif text-2xl lg:text-3xl font-bold text-foreground">Invoices</h1>
-          <p className="text-muted-foreground text-sm mt-1">{filteredInvoices.length} invoice{filteredInvoices.length !== 1 ? "s" : ""}</p>
+          <p className="text-muted-foreground text-sm mt-1">From Call a Nanny to parents · {filteredInvoices.length} invoice{filteredInvoices.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -361,7 +361,7 @@ export default function AdminInvoices() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by client, nanny, email, or invoice #..."
+            placeholder="Search by parent, caregiver, email, or invoice #..."
             className="w-full pl-9 pr-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
           />
         </div>
@@ -408,8 +408,8 @@ export default function AdminInvoices() {
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Invoice #</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Client</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nanny</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Billed To (Parent)</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Caregiver</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hours</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</th>
@@ -427,7 +427,7 @@ export default function AdminInvoices() {
                         <p className="text-sm font-medium text-foreground">{inv.clientName || "N/A"}</p>
                         <p className="text-xs text-muted-foreground">{inv.clientEmail || ""}</p>
                       </td>
-                      <td className="px-5 py-4 text-sm text-muted-foreground">{inv.nannyName || "N/A"}</td>
+                      <td className="px-5 py-4 text-sm text-muted-foreground">{inv.nannyName || "Unassigned"}</td>
                       <td className="px-5 py-4">
                         <p className="text-sm text-muted-foreground">{fmtDate(inv.date)}</p>
                         <p className="text-xs text-muted-foreground/70">{formatClockTime(inv.clockIn)} – {formatClockTime(inv.clockOut)}</p>
@@ -487,13 +487,14 @@ export default function AdminInvoices() {
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">Billed To</p>
                       <p className="font-medium text-foreground text-sm">{inv.clientName || "N/A"}</p>
                       <p className="text-xs text-muted-foreground">{inv.clientEmail || ""}</p>
                     </div>
                     <span className="text-sm font-bold text-foreground">{(inv.totalPrice || 0).toLocaleString()} MAD</span>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>{inv.nannyName || "N/A"}</span>
+                    <span>Caregiver: {inv.nannyName || "Unassigned"}</span>
                     <span>{fmtDate(inv.date)}</span>
                     <span>{formatClockTime(inv.clockIn)} – {formatClockTime(inv.clockOut)}</span>
                     <span>{calcWorkedHours(inv.clockIn, inv.clockOut)}h</span>
@@ -551,9 +552,9 @@ export default function AdminInvoices() {
                 </div>
               )}
 
-              {/* Nanny */}
+              {/* Caregiver */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Nanny *</label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Caregiver (Nanny) *</label>
                 <select
                   value={formData.nannyId}
                   onChange={(e) => updateField("nannyId", e.target.value)}
@@ -567,10 +568,10 @@ export default function AdminInvoices() {
                 </select>
               </div>
 
-              {/* Client Info */}
+              {/* Billed To (Parent) */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Client Name *</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Parent Name *</label>
                   <input
                     type="text"
                     value={formData.clientName}
@@ -580,7 +581,7 @@ export default function AdminInvoices() {
                   />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Client Email *</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Parent Email *</label>
                   <input
                     type="email"
                     value={formData.clientEmail}

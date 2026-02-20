@@ -20,8 +20,8 @@ const strings = {
     whatNextText: 'A qualified nanny will be assigned to your booking shortly. You will receive updates via WhatsApp or email.',
     contactUs: 'If you have any questions, contact us at',
     invoice: 'INVOICE',
-    invoiceGreeting: 'Here is your invoice for the childcare service provided.',
-    nannyName: 'Nanny',
+    invoiceGreeting: 'Please find below the invoice for the childcare service provided by Call a Nanny.',
+    caregiver: 'Caregiver',
     scheduledTime: 'Scheduled Time',
     actualTime: 'Actual Time',
     hoursWorked: 'Hours Worked',
@@ -32,11 +32,15 @@ const strings = {
     thankYouService: 'Thank you for choosing Call a Nanny!',
     paymentNote: 'Payment is due upon completion of service.',
     bookingDetails: 'Booking Details',
-    parentDetails: 'Parent Details',
+    billedTo: 'Billed To',
     name: 'Name',
     email: 'Email',
     phone: 'Phone',
     serviceDetails: 'Service Details',
+    from: 'From',
+    invoiceNumber: 'Invoice Number',
+    invoiceDate: 'Invoice Date',
+    issuedBy: 'Issued by',
   },
   fr: {
     confirmSubject: 'Confirmation de Réservation - Call a Nanny',
@@ -53,8 +57,8 @@ const strings = {
     whatNextText: 'Une nounou qualifiée sera assignée à votre réservation sous peu. Vous recevrez des mises à jour par WhatsApp ou email.',
     contactUs: 'Pour toute question, contactez-nous à',
     invoice: 'FACTURE',
-    invoiceGreeting: 'Voici votre facture pour le service de garde d\'enfants fourni.',
-    nannyName: 'Nounou',
+    invoiceGreeting: 'Veuillez trouver ci-dessous la facture pour le service de garde fourni par Call a Nanny.',
+    caregiver: 'Garde d\'enfants',
     scheduledTime: 'Horaire Prévu',
     actualTime: 'Horaire Réel',
     hoursWorked: 'Heures Travaillées',
@@ -65,11 +69,15 @@ const strings = {
     thankYouService: 'Merci d\'avoir choisi Call a Nanny !',
     paymentNote: 'Le paiement est dû à la fin du service.',
     bookingDetails: 'Détails de la Réservation',
-    parentDetails: 'Détails du Parent',
+    billedTo: 'Facturé à',
     name: 'Nom',
     email: 'Email',
     phone: 'Téléphone',
     serviceDetails: 'Détails du Service',
+    from: 'De',
+    invoiceNumber: 'Numéro de Facture',
+    invoiceDate: 'Date de Facture',
+    issuedBy: 'Émis par',
   },
 };
 
@@ -305,20 +313,47 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
   const clockInFormatted = formatClockTime(data.clockIn);
   const clockOutFormatted = formatClockTime(data.clockOut);
 
+  const invoiceDate = new Date().toLocaleDateString(locale === 'fr' ? 'fr-FR' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
   const content = `
     <!-- Invoice Badge -->
     <div style="text-align:center;margin-bottom:24px;">
       <span style="display:inline-block;background:linear-gradient(135deg,#f97316,#ec4899);color:#fff;font-size:13px;font-weight:700;letter-spacing:2px;padding:6px 20px;border-radius:20px;">${s.invoice}</span>
     </div>
 
+    <!-- From / To Section -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      <tr>
+        <td style="vertical-align:top;width:50%;padding-right:16px;">
+          <p style="margin:0 0 4px;color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">${s.from}</p>
+          <p style="margin:0;color:#1a1a1a;font-size:15px;font-weight:700;">Call a Nanny</p>
+          <p style="margin:2px 0 0;color:#666;font-size:13px;">Professional Childcare Services</p>
+          <p style="margin:2px 0 0;color:#666;font-size:13px;">Marrakech, Morocco</p>
+          <p style="margin:2px 0 0;color:#666;font-size:13px;">info@callanannycare.com</p>
+        </td>
+        <td style="vertical-align:top;width:50%;padding-left:16px;">
+          <p style="margin:0 0 4px;color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">${s.billedTo}</p>
+          <p style="margin:0;color:#1a1a1a;font-size:15px;font-weight:700;">${data.clientName}</p>
+          <p style="margin:2px 0 0;color:#666;font-size:13px;">${data.clientEmail}</p>
+          ${data.clientPhone ? `<p style="margin:2px 0 0;color:#666;font-size:13px;">${data.clientPhone}</p>` : ''}
+          ${data.hotel ? `<p style="margin:2px 0 0;color:#666;font-size:13px;">${data.hotel}</p>` : ''}
+        </td>
+      </tr>
+    </table>
+
+    <!-- Invoice Meta -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden;margin-bottom:24px;">
+      ${row(s.invoiceNumber, `INV-${data.bookingId}`)}
+      ${row(s.invoiceDate, invoiceDate)}
+    </table>
+
     <h2 style="margin:0 0 8px;color:#1a1a1a;font-size:22px;font-family:Georgia,'Times New Roman',serif;">${s.greeting} ${data.clientName},</h2>
     <p style="margin:0 0 24px;color:#666;font-size:15px;line-height:1.5;">${s.invoiceGreeting}</p>
 
     ${sectionTitle(s.serviceDetails)}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden;">
-      ${row(s.bookingRef, `#${data.bookingId}`)}
       ${row(s.dateOfService, data.date)}
-      ${row(s.nannyName, data.nannyName)}
+      ${row(s.caregiver, data.nannyName)}
       ${row(s.scheduledTime, data.startTime && data.endTime ? `${data.startTime} - ${data.endTime}` : data.startTime)}
       ${row(s.actualTime, `${clockInFormatted} - ${clockOutFormatted}`)}
       ${row(s.hoursWorked, `${actualHours} ${s.hours}`)}
@@ -330,16 +365,11 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
     <div style="margin:24px 0;padding:20px;background-color:#fff7ed;border-radius:12px;text-align:center;">
       <p style="margin:0 0 4px;color:#666;font-size:13px;text-transform:uppercase;letter-spacing:1px;">${s.totalAmount}</p>
       <p style="margin:0;color:#f97316;font-size:32px;font-weight:700;">${data.totalPrice} MAD</p>
+      <p style="margin:8px 0 0;color:#999;font-size:12px;">${s.paymentNote}</p>
     </div>
 
-    ${sectionTitle(s.parentDetails)}
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden;">
-      ${row(s.name, data.clientName)}
-      ${row(s.email, data.clientEmail)}
-      ${row(s.phone, data.clientPhone || 'N/A')}
-    </table>
-
-    <p style="margin:24px 0 0;color:#999;font-size:13px;text-align:center;">${s.thankYouService}</p>
+    <p style="margin:0 0 4px;color:#999;font-size:12px;text-align:center;font-style:italic;">${s.issuedBy}: Call a Nanny · callanannycare.com</p>
+    <p style="margin:12px 0 0;color:#999;font-size:13px;text-align:center;">${s.thankYouService}</p>
     <p style="margin:4px 0 0;color:#999;font-size:13px;text-align:center;">${s.contactUs} <a href="mailto:info@callanannycare.com" style="color:#f97316;">info@callanannycare.com</a></p>
   `;
 
