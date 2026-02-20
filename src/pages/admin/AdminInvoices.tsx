@@ -95,9 +95,11 @@ export default function AdminInvoices() {
       if (ms <= 0) return;
       const hours = ms / 3600000;
       let total = Math.round(hours * SERVICE_RATE);
-      // Add taxi fee if night hours (after 7 PM or before 7 AM)
+      // Add taxi fee if any part of the shift falls in night hours (7 PM – 7 AM)
       const inHour = inTime.getHours();
-      if (inHour >= 19 || inHour < 7) total += TAXI_FEE;
+      const outHour = outTime.getHours();
+      const touchesNight = inHour >= 19 || inHour < 7 || outHour >= 19 || outHour < 7 || hours > 12;
+      if (touchesNight) total += TAXI_FEE;
       setFormData((prev) => ({ ...prev, totalPrice: String(total) }));
     } catch {
       // skip
@@ -565,7 +567,8 @@ export default function AdminInvoices() {
         const hoursNum = inv.clockIn && inv.clockOut ? (new Date(inv.clockOut).getTime() - new Date(inv.clockIn).getTime()) / 3600000 : 0;
         const basePay = Math.round(hoursNum * SERVICE_RATE);
         const inHour = inv.clockIn ? new Date(inv.clockIn).getHours() : 0;
-        const hasTaxi = inHour >= 19 || inHour < 7;
+        const outHour = inv.clockOut ? new Date(inv.clockOut).getHours() : 0;
+        const hasTaxi = inHour >= 19 || inHour < 7 || outHour >= 19 || outHour < 7 || hoursNum > 12;
         return (
           <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-[8vh] overflow-y-auto">
             <div className="w-full max-w-lg bg-card rounded-2xl shadow-xl border border-border overflow-hidden">
@@ -805,7 +808,8 @@ export default function AdminInvoices() {
                   const hours = ms / 3600000;
                   const base = Math.round(hours * SERVICE_RATE);
                   const inHour = inT.getHours();
-                  const isNight = inHour >= 19 || inHour < 7;
+                  const outHour = outT.getHours();
+                  const isNight = inHour >= 19 || inHour < 7 || outHour >= 19 || outHour < 7 || hours > 12;
                   return (
                     <div className="bg-blue-50 text-blue-800 text-xs px-4 py-3 rounded-lg border border-blue-100 space-y-1">
                       <div className="flex items-center gap-1.5 font-semibold">
