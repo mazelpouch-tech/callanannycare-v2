@@ -331,6 +331,15 @@ export default function AdminNannies() {
                                 {nanny.phone}
                               </p>
                             )}
+                            <p className="text-xs mt-0.5">
+                              {nanny.status === "invited" ? (
+                                <span className="text-amber-500 italic">PIN: Pending</span>
+                              ) : nanny.pin ? (
+                                <span className="font-mono text-primary/70">PIN: {nanny.pin}</span>
+                              ) : (
+                                <span className="text-muted-foreground/50 italic">No PIN</span>
+                              )}
+                            </p>
                           </div>
                         </div>
                       </td>
@@ -485,6 +494,15 @@ export default function AdminNannies() {
                           {nanny.rate} MAD/hr
                         </span>
                       </div>
+                      <p className="text-xs mt-1">
+                        {nanny.status === "invited" ? (
+                          <span className="text-amber-500 italic">PIN: Pending</span>
+                        ) : nanny.pin ? (
+                          <span className="font-mono text-primary/70">PIN: {nanny.pin}</span>
+                        ) : (
+                          <span className="text-muted-foreground/50 italic">No PIN</span>
+                        )}
+                      </p>
                     </div>
                   </div>
 
