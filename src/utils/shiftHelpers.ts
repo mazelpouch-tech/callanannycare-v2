@@ -1,0 +1,79 @@
+import type { Booking, BookingStatus } from '../types';
+
+export const HOURLY_RATE = 250 / 7; // ~35.71 MAD/hr
+
+export const statusColors: Record<BookingStatus, string> = {
+  pending: 'bg-yellow-100 text-yellow-700',
+  confirmed: 'bg-green-100 text-green-700',
+  completed: 'bg-blue-100 text-blue-700',
+  cancelled: 'bg-red-100 text-red-700',
+};
+
+export function isToday(dateStr: string): boolean {
+  if (!dateStr) return false;
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  return dateStr === todayStr;
+}
+
+export function formatDuration(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+export function formatHoursWorked(clockIn: string, clockOut: string): string {
+  const ms = new Date(clockOut).getTime() - new Date(clockIn).getTime();
+  const hours = ms / 3600000;
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return `${h}h ${m}m`;
+}
+
+export function calcShiftPay(clockIn: string, clockOut: string): number {
+  const ms = new Date(clockOut).getTime() - new Date(clockIn).getTime();
+  const hours = ms / 3600000;
+  let pay = Math.round(hours * HOURLY_RATE);
+  const inHour = new Date(clockIn).getHours();
+  if (inHour >= 19) pay += 100;
+  return pay;
+}
+
+export function calcNannyPay(booking: Booking): number {
+  if (booking.status === 'cancelled') return 0;
+
+  if (booking.clockIn && booking.clockOut) {
+    const ms = new Date(booking.clockOut).getTime() - new Date(booking.clockIn).getTime();
+    const hours = ms / 3600000;
+    let pay = Math.round(hours * HOURLY_RATE);
+    const inHour = new Date(booking.clockIn).getHours();
+    if (inHour >= 19) pay += 100;
+    return pay;
+  }
+
+  let pay = 250;
+  const st = booking.startTime || '';
+  const hour = parseInt(st.replace(/[^0-9]/g, '')) || 0;
+  const isPM = st.toLowerCase().includes('pm');
+  let hour24 = hour;
+  if (isPM && hour < 12) hour24 = hour + 12;
+  if (hour24 >= 19) pay += 100;
+  return pay;
+}
+
+export function formatDate(dateStr: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+export function formatTime(timeStr: string): string {
+  if (!timeStr) return '';
+  const [h, m] = timeStr.split(':');
+  const hour = parseInt(h);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const h12 = hour % 12 || 12;
+  return `${h12}:${m} ${ampm}`;
+}
