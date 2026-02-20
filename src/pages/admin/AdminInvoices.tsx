@@ -15,18 +15,6 @@ const TAXI_FEE = 100;
 
 // ─── Helpers ────────────────────────────────────────────────
 
-function generateTimeSlots(): string[] {
-  const slots: string[] = [];
-  for (let h = 0; h <= 23; h++) {
-    for (let m = 0; m < 60; m += 30) {
-      slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
-    }
-  }
-  return slots;
-}
-
-const TIME_SLOTS = generateTimeSlots();
-
 function calcWorkedHours(clockIn: string | null, clockOut: string | null): string {
   if (!clockIn || !clockOut) return "—";
   const ms = new Date(clockOut).getTime() - new Date(clockIn).getTime();
@@ -57,8 +45,6 @@ interface InvoiceForm {
   clientPhone: string;
   hotel: string;
   date: string;
-  startTime: string;
-  endTime: string;
   clockIn: string;
   clockOut: string;
   childrenCount: string;
@@ -69,7 +55,7 @@ interface InvoiceForm {
 
 const emptyForm: InvoiceForm = {
   nannyId: "", clientName: "", clientEmail: "", clientPhone: "",
-  hotel: "", date: "", startTime: "08:00", endTime: "17:00",
+  hotel: "", date: "",
   clockIn: "", clockOut: "",
   childrenCount: "1", childrenAges: "", totalPrice: "", notes: "",
 };
@@ -185,8 +171,6 @@ export default function AdminInvoices() {
       clientPhone: inv.clientPhone || "",
       hotel: inv.hotel || "",
       date: inv.date || "",
-      startTime: inv.startTime || "08:00",
-      endTime: inv.endTime || "17:00",
       clockIn: inv.clockIn ? new Date(inv.clockIn).toISOString().slice(0, 16) : "",
       clockOut: inv.clockOut ? new Date(inv.clockOut).toISOString().slice(0, 16) : "",
       childrenCount: String(inv.childrenCount || 1),
@@ -233,8 +217,6 @@ export default function AdminInvoices() {
           clientPhone: formData.clientPhone.trim(),
           hotel: formData.hotel.trim(),
           date: formData.date,
-          startTime: formData.startTime,
-          endTime: formData.endTime,
           clockIn: new Date(formData.clockIn).toISOString(),
           clockOut: new Date(formData.clockOut).toISOString(),
           childrenCount: Number(formData.childrenCount) || 1,
@@ -252,8 +234,6 @@ export default function AdminInvoices() {
           clientPhone: formData.clientPhone.trim(),
           hotel: formData.hotel.trim(),
           date: formData.date,
-          startTime: formData.startTime,
-          endTime: formData.endTime,
           clockIn: new Date(formData.clockIn).toISOString(),
           clockOut: new Date(formData.clockOut).toISOString(),
           childrenCount: Number(formData.childrenCount) || 1,
@@ -438,7 +418,6 @@ export default function AdminInvoices() {
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Billed To (Parent)</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Caregiver</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hours</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
                     <th className="text-right px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
@@ -464,7 +443,6 @@ export default function AdminInvoices() {
                         <p className="text-sm text-muted-foreground">{fmtDate(inv.date)}</p>
                         <p className="text-xs text-muted-foreground/70">{formatClockTime(inv.clockIn)} – {formatClockTime(inv.clockOut)}</p>
                       </td>
-                      <td className="px-5 py-4 text-sm text-muted-foreground">{calcWorkedHours(inv.clockIn, inv.clockOut)}h</td>
                       <td className="px-5 py-4 text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()} MAD</td>
                       <td className="px-5 py-4">
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
@@ -534,7 +512,6 @@ export default function AdminInvoices() {
                     <span>Caregiver: {inv.nannyName || "Unassigned"}</span>
                     <span>{fmtDate(inv.date)}</span>
                     <span>{formatClockTime(inv.clockIn)} – {formatClockTime(inv.clockOut)}</span>
-                    <span>{calcWorkedHours(inv.clockIn, inv.clockOut)}h</span>
                   </div>
                   <div className="flex items-center gap-2 pt-1">
                     <button onClick={() => openEdit(inv)} className="flex items-center gap-1 text-xs font-medium text-primary bg-primary/10 px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors">
@@ -779,38 +756,16 @@ export default function AdminInvoices() {
                 </div>
               </div>
 
-              {/* Date & Times */}
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Date *</label>
-                  <input
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => updateField("date", e.target.value)}
-                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Start Time</label>
-                  <select
-                    value={formData.startTime}
-                    onChange={(e) => updateField("startTime", e.target.value)}
-                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                  >
-                    {TIME_SLOTS.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">End Time</label>
-                  <select
-                    value={formData.endTime}
-                    onChange={(e) => updateField("endTime", e.target.value)}
-                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                  >
-                    {TIME_SLOTS.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
+              {/* Date */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Date *</label>
+                <input
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => updateField("date", e.target.value)}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  required
+                />
               </div>
 
               {/* Clock In/Out */}
