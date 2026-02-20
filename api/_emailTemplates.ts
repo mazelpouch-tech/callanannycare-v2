@@ -193,6 +193,7 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData): Promis
   await resend.emails.send({
     from: fromAddress,
     to: data.clientEmail,
+    cc: ['info@callanannycare.com'],
     subject: s.confirmSubject,
     html: emailWrapper(content),
   });
