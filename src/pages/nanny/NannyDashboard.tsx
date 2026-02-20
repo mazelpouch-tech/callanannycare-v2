@@ -108,7 +108,7 @@ function PayChart({ bookings }: PayChartProps) {
         })}
       </div>
       <p className="text-[10px] text-muted-foreground mt-3 text-center">
-        250 MAD/7h ({Math.round(HOURLY_RATE)} MAD/hr) · +100 MAD evening (after 7 PM)
+        250 MAD/8h ({Math.round(HOURLY_RATE)} MAD/hr) · +100 MAD evening (after 7 PM)
       </p>
     </div>
   );

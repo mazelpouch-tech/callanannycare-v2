@@ -53,7 +53,7 @@ export function calcNannyPay(booking: Booking): number {
     return pay;
   }
 
-  let pay = Math.round(7 * HOURLY_RATE); // default 7h shift
+  let pay = Math.round(8 * HOURLY_RATE); // default 8h shift (250 MAD)
   const st = booking.startTime || '';
   const hour = parseInt(st.replace(/[^0-9]/g, '')) || 0;
   const isPM = st.toLowerCase().includes('pm');

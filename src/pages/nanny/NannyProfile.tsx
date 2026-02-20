@@ -220,7 +220,7 @@ export default function NannyProfile() {
             <div className="mt-3 flex items-start gap-2 text-xs bg-accent/5 border border-accent/20 rounded-lg px-3 py-2.5">
               <DollarSign className="w-3.5 h-3.5 mt-0.5 shrink-0 text-accent" />
               <span className="text-foreground/80">
-                <span className="font-semibold">Your pay:</span> 31.25 MAD/hr (219 MAD/7h shift) · +100 MAD for evening bookings (after 7 PM)
+                <span className="font-semibold">Your pay:</span> 31.25 MAD/hr (250 MAD/8h shift) · +100 MAD for evening bookings (after 7 PM)
               </span>
             </div>
             {/* Admin-controlled fields note */}
