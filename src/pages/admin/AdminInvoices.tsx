@@ -13,9 +13,9 @@ import type { Booking } from "@/types";
 const SERVICE_RATE = 150; // MAD/hr — client rate (same as booking page)
 const TAXI_FEE = 100;
 
-// 24h time slots from 00:00 to 23:30 (30-min steps)
+// 24h time slots from 07:00 to 23:30 (30-min steps)
 const TIME_SLOTS: string[] = [];
-for (let h = 0; h <= 23; h++) {
+for (let h = 7; h <= 23; h++) {
   TIME_SLOTS.push(`${String(h).padStart(2, "0")}:00`);
   TIME_SLOTS.push(`${String(h).padStart(2, "0")}:30`);
 }

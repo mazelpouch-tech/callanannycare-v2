@@ -13,9 +13,12 @@ import {
   PlayCircle,
   StopCircle,
   Timer,
+  Plus,
+  X,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { Fragment } from "react";
+import PhoneInput from "../../components/PhoneInput";
 import {
   statusColors,
   formatDuration,
@@ -24,7 +27,41 @@ import {
   isToday,
 } from "@/utils/shiftHelpers";
 
+// 24h time slots from 07:00 to 23:30 (30-min steps)
+const TIME_SLOTS: { value: string; label: string }[] = [];
+for (let h = 7; h <= 23; h++) {
+  const hh = String(h).padStart(2, "0");
+  TIME_SLOTS.push({ value: `${h}:00`, label: `${hh}h00` });
+  TIME_SLOTS.push({ value: `${h}:30`, label: `${hh}h30` });
+}
+
 interface LiveTimerProps { clockIn: string }
+
+interface BookingFormData {
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  hotel: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  numChildren: string;
+  childrenAges: string;
+  notes: string;
+}
+
+const emptyForm: BookingFormData = {
+  clientName: "",
+  clientEmail: "",
+  clientPhone: "",
+  hotel: "",
+  date: "",
+  startTime: "",
+  endTime: "",
+  numChildren: "1",
+  childrenAges: "",
+  notes: "",
+};
 
 // Live timer component
 function LiveTimer({ clockIn }: LiveTimerProps) {
@@ -45,12 +82,17 @@ function LiveTimer({ clockIn }: LiveTimerProps) {
 }
 
 export default function NannyBookings() {
-  const { nannyBookings, fetchNannyBookings, updateBookingStatus, clockInBooking, clockOutBooking } = useData();
+  const { nannyBookings, fetchNannyBookings, updateBookingStatus, clockInBooking, clockOutBooking, addBooking, nannyProfile } = useData();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
   const [expandedId, setExpandedId] = useState<number | string | null>(null);
   const [actionLoading, setActionLoading] = useState<number | string | null>(null);
+
+  // New booking form state
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState<BookingFormData>(emptyForm);
+  const [formLoading, setFormLoading] = useState(false);
 
   useEffect(() => {
     fetchNannyBookings();
@@ -98,6 +140,41 @@ export default function NannyBookings() {
     window.open(`https://wa.me/${num}?text=${text}`, "_blank");
   };
 
+  const handleFormChange = (field: keyof BookingFormData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleNewBooking = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.clientName || !formData.date || !formData.startTime) return;
+    setFormLoading(true);
+    try {
+      await addBooking({
+        nannyId: nannyProfile?.id ?? undefined,
+        nannyName: nannyProfile?.name ?? "",
+        clientName: formData.clientName,
+        clientEmail: formData.clientEmail,
+        clientPhone: formData.clientPhone,
+        hotel: formData.hotel,
+        date: formData.date,
+        startTime: formData.startTime,
+        endTime: formData.endTime,
+        plan: "hourly",
+        childrenCount: parseInt(formData.numChildren) || 1,
+        childrenAges: formData.childrenAges,
+        notes: formData.notes,
+        status: "confirmed",
+      });
+      setShowForm(false);
+      setFormData(emptyForm);
+      await fetchNannyBookings();
+    } catch {
+      // error handled by context
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
   const filtered = useMemo(() => {
     let result = [...nannyBookings];
     if (search) {
@@ -124,16 +201,191 @@ export default function NannyBookings() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-serif text-2xl sm:text-3xl font-bold text-foreground">
-          My Bookings
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          {pendingCount > 0
-            ? `You have ${pendingCount} pending booking${pendingCount > 1 ? "s" : ""} to review`
-            : "View all your past and upcoming bookings"}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-foreground">
+            My Bookings
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {pendingCount > 0
+              ? `You have ${pendingCount} pending booking${pendingCount > 1 ? "s" : ""} to review`
+              : "View all your past and upcoming bookings"}
+          </p>
+        </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="flex items-center gap-2 px-4 py-2.5 gradient-warm text-white text-sm font-medium rounded-lg shadow-warm hover:opacity-90 transition-opacity"
+        >
+          <Plus className="w-4 h-4" />
+          <span className="hidden sm:inline">New Booking</span>
+        </button>
       </div>
+
+      {/* New Booking Modal */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h2 className="font-serif text-xl font-bold text-foreground">New Booking</h2>
+              <button onClick={() => { setShowForm(false); setFormData(emptyForm); }} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleNewBooking} className="p-5 space-y-4">
+              {/* Client Name */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Client Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.clientName}
+                  onChange={(e) => handleFormChange("clientName", e.target.value)}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  placeholder="Parent's full name"
+                />
+              </div>
+
+              {/* Email + Phone */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={formData.clientEmail}
+                    onChange={(e) => handleFormChange("clientEmail", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    placeholder="parent@email.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Phone</label>
+                  <PhoneInput
+                    value={formData.clientPhone}
+                    onChange={(v) => handleFormChange("clientPhone", v)}
+                  />
+                </div>
+              </div>
+
+              {/* Hotel */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Hotel / Location</label>
+                <input
+                  type="text"
+                  value={formData.hotel}
+                  onChange={(e) => handleFormChange("hotel", e.target.value)}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  placeholder="Hotel name or address"
+                />
+              </div>
+
+              {/* Date */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={formData.date}
+                  onChange={(e) => handleFormChange("date", e.target.value)}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                />
+              </div>
+
+              {/* Start / End Time */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Start Time *</label>
+                  <div className="relative">
+                    <select
+                      required
+                      value={formData.startTime}
+                      onChange={(e) => handleFormChange("startTime", e.target.value)}
+                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 appearance-none"
+                    >
+                      <option value="">Select</option>
+                      {TIME_SLOTS.map((t) => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">End Time</label>
+                  <div className="relative">
+                    <select
+                      value={formData.endTime}
+                      onChange={(e) => handleFormChange("endTime", e.target.value)}
+                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 appearance-none"
+                    >
+                      <option value="">Select</option>
+                      {TIME_SLOTS.map((t) => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Children */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Children</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={formData.numChildren}
+                    onChange={(e) => handleFormChange("numChildren", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Ages</label>
+                  <input
+                    type="text"
+                    value={formData.childrenAges}
+                    onChange={(e) => handleFormChange("childrenAges", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    placeholder="e.g. 3, 5"
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Notes</label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => handleFormChange("notes", e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 resize-none"
+                  placeholder="Any special instructions..."
+                />
+              </div>
+
+              {/* Submit */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowForm(false); setFormData(emptyForm); }}
+                  className="flex-1 px-4 py-2.5 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={formLoading || !formData.clientName || !formData.date || !formData.startTime}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 gradient-warm text-white text-sm font-medium rounded-lg shadow-warm hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {formLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Create Booking
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Active Shift Banner */}
       {activeShift && (

@@ -62,18 +62,13 @@ interface NewBookingForm {
   status: string;
 }
 
-function generateTimeSlots() {
-  const slots = [];
-  for (let h = 0; h < 24; h++) {
-    const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-    const ampm = h >= 12 ? "PM" : "AM";
-    slots.push({ value: `${h}:00`, label: `${hour12}:00 ${ampm}` });
-    slots.push({ value: `${h}:30`, label: `${hour12}:30 ${ampm}` });
-  }
-  return slots;
+// 24h time slots from 07:00 to 23:30 (30-min steps)
+const TIME_SLOTS: { value: string; label: string }[] = [];
+for (let h = 7; h <= 23; h++) {
+  const hh = String(h).padStart(2, "0");
+  TIME_SLOTS.push({ value: `${h}:00`, label: `${hh}h00` });
+  TIME_SLOTS.push({ value: `${h}:30`, label: `${hh}h30` });
 }
-
-const TIME_SLOTS = generateTimeSlots();
 
 const statusConfig: Record<BookingStatus, { label: string; className: string }> = {
   pending: {
