@@ -89,35 +89,146 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      // Send invoice email when booking is completed with clock_out (nanny checkout)
-      if (status === 'completed' && clock_out && result[0] && result[0].client_email) {
+      // Send invoice when booking is completed with clock_out (nanny checkout)
+      if (status === 'completed' && clock_out && result[0]) {
+        // Query nanny name for the invoice
+        let invoiceNannyName = 'Your Nanny';
         try {
-          // Query nanny name for the invoice
           const nannyRows = await sql`
             SELECT name FROM nannies WHERE id = ${result[0].nanny_id}
           ` as { name: string }[];
-          const nannyName = nannyRows[0]?.name || 'Your Nanny';
+          invoiceNannyName = nannyRows[0]?.name || 'Your Nanny';
+        } catch { /* ignore */ }
 
-          const { sendInvoiceEmail } = await import('../_emailTemplates.js');
-          await sendInvoiceEmail({
-            bookingId: result[0].id,
-            clientName: result[0].client_name,
-            clientEmail: result[0].client_email,
-            clientPhone: result[0].client_phone,
-            hotel: result[0].hotel,
-            date: result[0].date,
-            startTime: result[0].start_time,
-            endTime: result[0].end_time,
-            clockIn: result[0].clock_in || clock_out,
-            clockOut: clock_out,
-            childrenCount: result[0].children_count,
-            childrenAges: result[0].children_ages,
-            totalPrice: result[0].total_price,
-            nannyName,
-            locale: result[0].locale || 'en',
-          });
-        } catch (invoiceError: unknown) {
-          console.error('Invoice email failed:', invoiceError);
+        const clockInTime = result[0].clock_in || clock_out;
+        const clockOutTime = clock_out;
+
+        // Calculate hours worked
+        let hoursWorked = '0';
+        try {
+          const diff = new Date(clockOutTime).getTime() - new Date(clockInTime).getTime();
+          hoursWorked = Math.max(0, diff / 3600000).toFixed(1);
+        } catch { /* ignore */ }
+
+        // 1. Send invoice email (if parent has email)
+        if (result[0].client_email) {
+          try {
+            const { sendInvoiceEmail } = await import('../_emailTemplates.js');
+            await sendInvoiceEmail({
+              bookingId: result[0].id,
+              clientName: result[0].client_name,
+              clientEmail: result[0].client_email,
+              clientPhone: result[0].client_phone,
+              hotel: result[0].hotel,
+              date: result[0].date,
+              startTime: result[0].start_time,
+              endTime: result[0].end_time,
+              clockIn: clockInTime,
+              clockOut: clockOutTime,
+              childrenCount: result[0].children_count,
+              childrenAges: result[0].children_ages,
+              totalPrice: result[0].total_price,
+              nannyName: invoiceNannyName,
+              locale: result[0].locale || 'en',
+            });
+          } catch (invoiceError: unknown) {
+            console.error('Invoice email failed:', invoiceError);
+          }
+        }
+
+        // 2. Send invoice via WhatsApp to parent (if phone is available)
+        const parentPhone = result[0].client_phone;
+        const WA_TOKEN = process.env.WHATSAPP_TOKEN;
+        const WA_PHONE_ID = process.env.WHATSAPP_PHONE_ID;
+
+        if (WA_TOKEN && WA_PHONE_ID && parentPhone) {
+          try {
+            // Format phone: ensure it starts with country code, strip spaces/dashes
+            let formattedPhone = parentPhone.replace(/[\s\-\(\)]/g, '');
+            if (formattedPhone.startsWith('0')) formattedPhone = '212' + formattedPhone.slice(1);
+            if (!formattedPhone.startsWith('+') && !formattedPhone.match(/^\d{10,}/)) formattedPhone = '+' + formattedPhone;
+            formattedPhone = formattedPhone.replace('+', '');
+
+            const clockInFmt = new Date(clockInTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const clockOutFmt = new Date(clockOutTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+            const waInvoice = [
+              '📄 *INVOICE — Call a Nanny*',
+              '',
+              `📋 *Invoice #:* INV-${result[0].id}`,
+              `👤 *Billed To:* ${result[0].client_name}`,
+              `👩‍👧 *Caregiver:* ${invoiceNannyName}`,
+              `📅 *Date:* ${result[0].date}`,
+              `🕐 *Time:* ${clockInFmt} – ${clockOutFmt}`,
+              `⏱ *Hours:* ${hoursWorked}h`,
+              `👶 *Children:* ${result[0].children_count || 1}`,
+              '',
+              `💰 *Total: ${result[0].total_price || 0} MAD*`,
+              '',
+              '_Thank you for choosing Call a Nanny!_',
+              '_Payment is due upon completion of service._',
+              '',
+              '📧 info@callanannycare.com',
+              '🌐 callanannycare.com',
+            ].join('\n');
+
+            await fetch(
+              `https://graph.facebook.com/v18.0/${WA_PHONE_ID}/messages`,
+              {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${WA_TOKEN}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  messaging_product: 'whatsapp',
+                  to: formattedPhone,
+                  type: 'text',
+                  text: { body: waInvoice },
+                }),
+              }
+            );
+          } catch (waError: unknown) {
+            console.error('WhatsApp invoice to parent failed:', waError);
+          }
+        }
+
+        // 3. Send invoice notification to business WhatsApp
+        const WA_BIZ_NUMBER = process.env.WHATSAPP_BUSINESS_NUMBER;
+        if (WA_TOKEN && WA_PHONE_ID && WA_BIZ_NUMBER) {
+          try {
+            const waBizMsg = [
+              '✅ *Shift Completed — Invoice Sent*',
+              '',
+              `📋 *Invoice #:* INV-${result[0].id}`,
+              `👤 *Parent:* ${result[0].client_name}`,
+              `👩‍👧 *Nanny:* ${invoiceNannyName}`,
+              `📅 *Date:* ${result[0].date}`,
+              `⏱ *Hours:* ${hoursWorked}h`,
+              `💰 *Amount:* ${result[0].total_price || 0} MAD`,
+              '',
+              `_Invoice sent to parent${result[0].client_email ? ' via email & WhatsApp' : parentPhone ? ' via WhatsApp' : ''}_`,
+            ].join('\n');
+
+            await fetch(
+              `https://graph.facebook.com/v18.0/${WA_PHONE_ID}/messages`,
+              {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${WA_TOKEN}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  messaging_product: 'whatsapp',
+                  to: WA_BIZ_NUMBER,
+                  type: 'text',
+                  text: { body: waBizMsg },
+                }),
+              }
+            );
+          } catch (waBizError: unknown) {
+            console.error('WhatsApp business notification failed:', waBizError);
+          }
         }
       }
 

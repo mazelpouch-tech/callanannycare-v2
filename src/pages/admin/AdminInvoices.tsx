@@ -12,7 +12,7 @@ import type { Booking } from "@/types";
 
 function generateTimeSlots(): string[] {
   const slots: string[] = [];
-  for (let h = 6; h <= 23; h++) {
+  for (let h = 0; h <= 23; h++) {
     for (let m = 0; m < 60; m += 30) {
       slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
     }
@@ -176,8 +176,8 @@ export default function AdminInvoices() {
     e.preventDefault();
     setFormError("");
 
-    if (!formData.clientName.trim() || !formData.clientEmail.trim()) {
-      setFormError("Parent name and email are required");
+    if (!formData.clientName.trim()) {
+      setFormError("Parent name is required");
       return;
     }
     if (!formData.nannyId) {
@@ -581,13 +581,13 @@ export default function AdminInvoices() {
                   />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Parent Email *</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Parent Email</label>
                   <input
                     type="email"
                     value={formData.clientEmail}
                     onChange={(e) => updateField("clientEmail", e.target.value)}
+                    placeholder="Optional"
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                    required
                   />
                 </div>
               </div>
