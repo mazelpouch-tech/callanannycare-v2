@@ -1140,8 +1140,9 @@ export default function Book() {
   }, [details.numChildren]);
 
   const RATE = 150; // MAD per hour
-  const TAXI_FEE = 100; // MAD flat fee for bookings starting at 7 PM or later
-  const EVENING_HOUR = 19; // 7 PM threshold
+  const TAXI_FEE = 100; // MAD flat fee for bookings in the 7 PM – 7 AM night window
+  const NIGHT_START = 19; // 7 PM
+  const NIGHT_END = 7;    // 7 AM
 
   const hours = useMemo(() => {
     if (!startTime || !endTime) return 0;
@@ -1149,10 +1150,13 @@ export default function Book() {
   }, [startTime, endTime]);
 
   const isEveningBooking = useMemo(() => {
-    if (!startTime) return false;
-    const hour = parseInt(startTime.split(":")[0], 10);
-    return hour >= EVENING_HOUR;
-  }, [startTime]);
+    if (!startTime || !endTime) return false;
+    const startHour = parseInt(startTime.split(":")[0], 10);
+    const endHour = parseInt(endTime.split(":")[0], 10);
+    const endMin = parseInt(endTime.split(":")[1], 10);
+    // Taxi fee if session ends after 7 PM or starts before 7 AM
+    return (endHour > NIGHT_START || (endHour === NIGHT_START && endMin > 0)) || startHour < NIGHT_END;
+  }, [startTime, endTime]);
 
   const taxiFeeTotal = useMemo(() => {
     return isEveningBooking ? TAXI_FEE * selectedDates.length : 0;

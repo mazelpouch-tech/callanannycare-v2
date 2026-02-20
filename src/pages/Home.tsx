@@ -305,6 +305,11 @@ export default function Home() {
               </div>
             ))}
           </div>
+
+          {/* Taxi fee note */}
+          <p className="text-center text-sm text-muted-foreground mt-6">
+            🚕 {t("home.pricingTaxiNote")}
+          </p>
         </div>
       </section>
 
