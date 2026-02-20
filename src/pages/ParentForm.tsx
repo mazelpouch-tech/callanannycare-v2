@@ -18,6 +18,7 @@ import {
   Brain,
   ClipboardList,
 } from "lucide-react";
+import PhoneInput from "../components/PhoneInput";
 
 const T = {
   fr: {
@@ -460,13 +461,10 @@ export default function ParentForm() {
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label={t.parentPhone} required>
-                <input
-                  type="tel"
+                <PhoneInput
                   value={form.parentPhone}
-                  onChange={set("parentPhone")}
-                  placeholder="+212 600 000 000"
+                  onChange={(val) => setForm((prev) => ({ ...prev, parentPhone: val }))}
                   className={inputClass}
-                  required
                 />
               </Field>
               <Field label={t.parentEmail}>

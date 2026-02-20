@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useData } from "../../context/DataContext";
+import PhoneInput from "../../components/PhoneInput";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
 
 interface EditBookingForm {
@@ -1012,11 +1013,9 @@ export default function AdminBookings() {
                     <Phone className="w-3.5 h-3.5 text-muted-foreground" />
                     Phone
                   </label>
-                  <input
-                    type="tel"
+                  <PhoneInput
                     value={newBooking.clientPhone}
-                    onChange={(e) => setNewBooking({ ...newBooking, clientPhone: e.target.value })}
-                    placeholder="+212 600 000 000"
+                    onChange={(val) => setNewBooking({ ...newBooking, clientPhone: val })}
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
                   />
                 </div>
@@ -1279,11 +1278,9 @@ export default function AdminBookings() {
                     <Phone className="w-3.5 h-3.5 text-muted-foreground" />
                     Phone
                   </label>
-                  <input
-                    type="tel"
+                  <PhoneInput
                     value={editBookingData.clientPhone}
-                    onChange={(e) => setEditBookingData({ ...editBookingData, clientPhone: e.target.value })}
-                    placeholder="+212 600 000 000"
+                    onChange={(val) => setEditBookingData({ ...editBookingData, clientPhone: val })}
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
                   />
                 </div>

@@ -4,6 +4,7 @@ import {
   UserCircle, Key, Loader2, CheckCircle, AlertCircle,
   FileText, ArrowRight, Camera, Phone, Calendar, X
 } from "lucide-react";
+import PhoneInput from "../../components/PhoneInput";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -369,13 +370,10 @@ export default function NannyRegister() {
                       Phone *
                     </span>
                   </label>
-                  <input
-                    type="tel"
+                  <PhoneInput
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(val) => setPhone(val)}
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-                    placeholder="+212 6XX XXX XXX"
-                    required
                   />
                 </div>
               </div>

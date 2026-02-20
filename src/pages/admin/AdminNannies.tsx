@@ -19,6 +19,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
+import PhoneInput from "../../components/PhoneInput";
 import type { Nanny, NannyStatus } from "@/types";
 
 const emptyForm = {
@@ -890,12 +891,10 @@ export default function AdminNannies() {
 
               {/* Phone Number */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Phone (+212)</label>
-                <input
-                  type="tel"
+                <label className="block text-sm font-medium text-foreground mb-1.5">Phone</label>
+                <PhoneInput
                   value={form.phone}
-                  onChange={(e) => handleFormChange("phone", e.target.value)}
-                  placeholder="+212 6 XX XX XX XX"
+                  onChange={(val) => handleFormChange("phone", val)}
                   className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
                 />
               </div>

@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { useData } from "../context/DataContext";
 import { useLanguage } from "../context/LanguageContext";
+import PhoneInput from "../components/PhoneInput";
 import type { BookingPlan } from "@/types";
 
 // ---- Interfaces ----
@@ -472,12 +473,9 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
             <Phone className="w-4 h-4 text-primary" />
             {t("book.phone")} <span className="text-destructive">*</span>
           </label>
-          <input
-            type="tel"
-            required
+          <PhoneInput
             value={details.phone}
-            onChange={handleChange("phone")}
-            placeholder="+212 600 000 000"
+            onChange={(val) => onChange({ ...details, phone: val })}
             className="w-full rounded-lg border border-border p-3 bg-card text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
         </div>

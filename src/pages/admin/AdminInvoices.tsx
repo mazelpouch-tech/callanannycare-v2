@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, subMonths } from "date-fns";
 import { useData } from "../../context/DataContext";
+import PhoneInput from "../../components/PhoneInput";
 import type { Booking } from "@/types";
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -595,11 +596,9 @@ export default function AdminInvoices() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Phone</label>
-                  <input
-                    type="tel"
+                  <PhoneInput
                     value={formData.clientPhone}
-                    onChange={(e) => updateField("clientPhone", e.target.value)}
-                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    onChange={(val) => updateField("clientPhone", val)}
                   />
                 </div>
                 <div>
