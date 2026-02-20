@@ -8,19 +8,22 @@ import {
   UserCircle,
   LogOut,
   Menu,
+  Globe,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
+import { useLanguage } from "../../context/LanguageContext";
 
 const sidebarLinks = [
-  { to: "/nanny", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/nanny/calendar", label: "Calendar", icon: CalendarDays },
-  { to: "/nanny/bookings", label: "My Bookings", icon: ClipboardList },
-  { to: "/nanny/notifications", label: "Notifications", icon: Bell },
-  { to: "/nanny/profile", label: "My Profile", icon: UserCircle },
+  { to: "/nanny", labelKey: "nanny.layout.dashboard", icon: LayoutDashboard, end: true },
+  { to: "/nanny/calendar", labelKey: "nanny.layout.calendar", icon: CalendarDays },
+  { to: "/nanny/bookings", labelKey: "nanny.layout.myBookings", icon: ClipboardList },
+  { to: "/nanny/notifications", labelKey: "nanny.layout.notifications", icon: Bell },
+  { to: "/nanny/profile", labelKey: "nanny.layout.myProfile", icon: UserCircle },
 ];
 
 export default function NannyLayout() {
   const { isNanny, nannyProfile, nannyLogout, unreadNotifications, fetchNannyNotifications } = useData();
+  const { t, locale, setLocale } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Check if nanny has been blocked since login
@@ -74,7 +77,7 @@ export default function NannyLayout() {
                 {nannyProfile?.name || "Nanny"}
               </h2>
               <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded-full font-medium">
-                Nanny Portal
+                {t("nanny.layout.nannyPortal")}
               </span>
             </div>
           </div>
@@ -99,7 +102,7 @@ export default function NannyLayout() {
                 }
               >
                 <Icon className="w-5 h-5 shrink-0" />
-                <span>{link.label}</span>
+                <span>{t(link.labelKey)}</span>
                 {link.icon === Bell && unreadNotifications > 0 && (
                   <span className="ml-auto bg-red-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full">
                     {unreadNotifications > 9 ? "9+" : unreadNotifications}
@@ -117,7 +120,7 @@ export default function NannyLayout() {
             className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-all w-full"
           >
             <LogOut className="w-5 h-5" />
-            <span>Sign Out</span>
+            <span>{t("nanny.layout.signOut")}</span>
           </button>
         </div>
       </aside>
@@ -134,6 +137,13 @@ export default function NannyLayout() {
           </button>
           <div className="flex-1" />
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setLocale(locale === "en" ? "fr" : "en")}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-muted/50 text-sm font-medium text-muted-foreground transition-colors"
+            >
+              <Globe className="w-4 h-4" />
+              {locale === "en" ? "FR" : "EN"}
+            </button>
             {unreadNotifications > 0 && (
               <NavLink
                 to="/nanny/notifications"

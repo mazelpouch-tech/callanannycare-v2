@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
-import { UserCircle, Mail, Key, ArrowRight, Loader2 } from "lucide-react";
+import { UserCircle, Mail, Key, ArrowRight, Loader2, Globe } from "lucide-react";
 import { useData } from "../../context/DataContext";
+import { useLanguage } from "../../context/LanguageContext";
 import { Link } from "react-router-dom";
 
 export default function NannyLogin() {
   const { isNanny, nannyLogin } = useData();
+  const { t, locale, setLocale } = useLanguage();
   const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
@@ -26,6 +28,17 @@ export default function NannyLogin() {
 
   return (
     <div className="min-h-screen gradient-sand flex items-center justify-center px-4">
+      {/* Language toggle */}
+      <div className="absolute top-4 right-4 z-10">
+        <button
+          onClick={() => setLocale(locale === "en" ? "fr" : "en")}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card/80 backdrop-blur border border-border text-sm font-medium text-muted-foreground hover:bg-card transition-colors shadow-sm"
+        >
+          <Globe className="w-4 h-4" />
+          {locale === "en" ? "FR" : "EN"}
+        </button>
+      </div>
+
       {/* Decorative background blurs */}
       <div className="absolute top-20 left-10 w-64 h-64 bg-accent/10 rounded-full blur-3xl" />
       <div className="absolute bottom-20 right-10 w-80 h-80 bg-primary/10 rounded-full blur-3xl" />
@@ -38,10 +51,10 @@ export default function NannyLogin() {
               <UserCircle className="w-8 h-8 text-white" />
             </div>
             <h1 className="font-serif text-2xl font-bold text-foreground">
-              Nanny Portal
+              {t("nanny.login.title")}
             </h1>
             <p className="text-muted-foreground mt-2">
-              Sign in to view your schedule and bookings
+              {t("nanny.login.subtitle")}
             </p>
           </div>
 
@@ -65,7 +78,7 @@ export default function NannyLogin() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Email
+                {t("nanny.login.email")}
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -82,7 +95,7 @@ export default function NannyLogin() {
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                PIN Code
+                {t("nanny.login.pinCode")}
               </label>
               <div className="relative">
                 <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -108,7 +121,7 @@ export default function NannyLogin() {
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
-                  Sign In
+                  {t("nanny.login.signIn")}
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -118,12 +131,12 @@ export default function NannyLogin() {
           <div className="text-center text-sm text-muted-foreground mt-6 space-y-1">
             <p>
               <Link to="/nanny/register" className="text-accent hover:underline font-medium">
-                Have an invitation? Register here
+                {t("nanny.login.registerLink")}
               </Link>
             </p>
             <p>
               <Link to="/admin/login" className="text-primary hover:underline">
-                Looking for the admin panel?
+                {t("nanny.login.adminLink")}
               </Link>
             </p>
           </div>

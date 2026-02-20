@@ -14,6 +14,7 @@ import {
 } from "date-fns";
 import { ChevronLeft, ChevronRight, MapPin, User, Clock } from "lucide-react";
 import { useData } from "../../context/DataContext";
+import { useLanguage } from "../../context/LanguageContext";
 import type { Booking, BookingStatus } from "@/types";
 
 const statusDot: Record<BookingStatus, string> = {
@@ -32,6 +33,7 @@ const statusColors: Record<BookingStatus, string> = {
 
 export default function NannyCalendar() {
   const { nannyBookings, fetchNannyBookings } = useData();
+  const { t } = useLanguage();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
@@ -62,16 +64,16 @@ export default function NannyCalendar() {
     return bookingsByDate[key] || [];
   }, [selectedDate, bookingsByDate]);
 
-  const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const weekDays = [t("shared.mon"), t("shared.tue"), t("shared.wed"), t("shared.thu"), t("shared.fri"), t("shared.sat"), t("shared.sun")];
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-serif text-2xl sm:text-3xl font-bold text-foreground">
-          My Calendar
+          {t("nanny.calendar.title")}
         </h1>
         <p className="text-muted-foreground mt-1">
-          View your bookings on the calendar
+          {t("nanny.calendar.subtitle")}
         </p>
       </div>
 
@@ -172,8 +174,8 @@ export default function NannyCalendar() {
             {Object.entries(statusDot).map(([status, color]) => (
               <div key={status} className="flex items-center gap-1.5">
                 <div className={`w-2.5 h-2.5 rounded-full ${color}`} />
-                <span className="text-xs text-muted-foreground capitalize">
-                  {status}
+                <span className="text-xs text-muted-foreground">
+                  {t(`shared.${status}`)}
                 </span>
               </div>
             ))}
@@ -186,23 +188,22 @@ export default function NannyCalendar() {
             <h3 className="font-semibold text-foreground">
               {selectedDate
                 ? format(selectedDate, "EEEE, MMMM d")
-                : "Select a day"}
+                : t("nanny.calendar.selectDay")}
             </h3>
             {selectedDate && (
               <p className="text-sm text-muted-foreground mt-0.5">
-                {selectedDayBookings.length} booking
-                {selectedDayBookings.length !== 1 ? "s" : ""}
+                {selectedDayBookings.length} {selectedDayBookings.length !== 1 ? t("nanny.calendar.bookingsLabel") : t("nanny.calendar.booking")}
               </p>
             )}
           </div>
 
           {!selectedDate ? (
             <div className="p-6 text-center text-muted-foreground text-sm">
-              Click a date to see bookings
+              {t("nanny.calendar.clickDate")}
             </div>
           ) : selectedDayBookings.length === 0 ? (
             <div className="p-6 text-center text-muted-foreground text-sm">
-              No bookings on this day
+              {t("nanny.calendar.noBookings")}
             </div>
           ) : (
             <div className="divide-y divide-border">

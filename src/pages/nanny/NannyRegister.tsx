@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import {
   UserCircle, Key, Loader2, CheckCircle, AlertCircle,
-  FileText, ArrowRight, Camera, Phone, Calendar, X
+  FileText, ArrowRight, Camera, Phone, Calendar, X, Globe
 } from "lucide-react";
 import PhoneInput from "../../components/PhoneInput";
+import { useLanguage } from "../../context/LanguageContext";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -46,6 +47,7 @@ function resizeImage(file: File): Promise<string> {
 }
 
 export default function NannyRegister() {
+  const { t, locale, setLocale } = useLanguage();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
 
@@ -97,11 +99,11 @@ export default function NannyRegister() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      setError("Please select an image file (JPG, PNG, etc.)");
+      setError(t("nanny.register.imageError"));
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      setError("Image too large. Max 10MB.");
+      setError(t("nanny.register.imageTooLarge"));
       return;
     }
     try {
@@ -109,7 +111,7 @@ export default function NannyRegister() {
       setPhoto(base64);
       setError("");
     } catch {
-      setError("Failed to process image. Try a different file.");
+      setError(t("nanny.register.imageProcessError"));
     }
   };
 
@@ -118,23 +120,23 @@ export default function NannyRegister() {
     setError("");
 
     if (!name.trim()) {
-      setError("Full name is required");
+      setError(t("nanny.register.nameRequired"));
       return;
     }
     if (!age.trim()) {
-      setError("Age is required");
+      setError(t("nanny.register.ageRequired"));
       return;
     }
     if (!phone.trim()) {
-      setError("Phone number is required");
+      setError(t("nanny.register.phoneRequired"));
       return;
     }
     if (pin.length < 4) {
-      setError("PIN must be at least 4 digits");
+      setError(t("nanny.register.pinMinLength"));
       return;
     }
     if (pin !== confirmPin) {
-      setError("PINs do not match");
+      setError(t("nanny.register.pinsMismatch"));
       return;
     }
 
@@ -160,10 +162,10 @@ export default function NannyRegister() {
       if (res.ok && data.success) {
         setStatus("success");
       } else {
-        setError(data.error || "Registration failed. Please try again.");
+        setError(data.error || t("nanny.register.registrationFailed"));
       }
     } catch {
-      setError("Network error. Please check your connection.");
+      setError(t("nanny.register.networkError"));
     }
     setSubmitting(false);
   };
@@ -174,7 +176,7 @@ export default function NannyRegister() {
       <div className="min-h-screen gradient-sand flex items-center justify-center px-4">
         <div className="text-center">
           <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Validating your invitation...</p>
+          <p className="text-muted-foreground">{t("nanny.register.validating")}</p>
         </div>
       </div>
     );
@@ -192,18 +194,18 @@ export default function NannyRegister() {
               <AlertCircle className="w-8 h-8 text-red-500" />
             </div>
             <h1 className="font-serif text-2xl font-bold text-foreground mb-2">
-              {status === "expired" ? "Invitation Expired" : "Invalid Invitation"}
+              {status === "expired" ? t("nanny.register.expiredTitle") : t("nanny.register.invalidTitle")}
             </h1>
             <p className="text-muted-foreground mb-6">
               {status === "expired"
-                ? "This invitation link has expired. Please contact the admin to request a new one."
-                : "This invitation link is invalid or has already been used."}
+                ? t("nanny.register.expiredMessage")
+                : t("nanny.register.invalidMessage")}
             </p>
             <Link
               to="/nanny/login"
               className="inline-flex items-center gap-2 text-primary hover:underline font-medium"
             >
-              Go to Nanny Login
+              {t("nanny.register.goToLogin")}
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -224,16 +226,16 @@ export default function NannyRegister() {
               <CheckCircle className="w-8 h-8 text-green-500" />
             </div>
             <h1 className="font-serif text-2xl font-bold text-foreground mb-2">
-              Registration Complete!
+              {t("nanny.register.successTitle")}
             </h1>
             <p className="text-muted-foreground mb-6">
-              Welcome to Call a Nanny! You can now sign in with your email and PIN.
+              {t("nanny.register.successMessage")}
             </p>
             <Link
               to="/nanny/login"
               className="inline-flex items-center gap-2 gradient-warm text-white rounded-lg px-6 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm"
             >
-              Sign In Now
+              {t("nanny.register.signInNow")}
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -245,6 +247,17 @@ export default function NannyRegister() {
   // Valid token — show registration form
   return (
     <div className="min-h-screen gradient-sand flex items-center justify-center px-4 py-8">
+      {/* Language toggle */}
+      <div className="absolute top-4 right-4 z-10">
+        <button
+          onClick={() => setLocale(locale === "en" ? "fr" : "en")}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card/80 backdrop-blur border border-border text-sm font-medium text-muted-foreground hover:bg-card transition-colors shadow-sm"
+        >
+          <Globe className="w-4 h-4" />
+          {locale === "en" ? "FR" : "EN"}
+        </button>
+      </div>
+
       <div className="absolute top-20 left-10 w-64 h-64 bg-accent/10 rounded-full blur-3xl" />
       <div className="absolute bottom-20 right-10 w-80 h-80 bg-primary/10 rounded-full blur-3xl" />
 
@@ -256,10 +269,10 @@ export default function NannyRegister() {
               <UserCircle className="w-8 h-8 text-white" />
             </div>
             <h1 className="font-serif text-2xl font-bold text-foreground">
-              Welcome to Call a Nanny!
+              {t("nanny.register.welcomeTitle")}
             </h1>
             <p className="text-muted-foreground mt-2">
-              Complete your profile to get started
+              {t("nanny.register.welcomeSubtitle")}
             </p>
             <p className="text-sm text-primary mt-1 font-medium">{nannyInfo?.email}</p>
           </div>
@@ -306,7 +319,7 @@ export default function NannyRegister() {
                     className="w-24 h-24 rounded-full bg-muted border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 hover:border-primary/40 hover:bg-primary/5 transition-colors"
                   >
                     <Camera className="w-6 h-6 text-muted-foreground" />
-                    <span className="text-[10px] text-muted-foreground font-medium">Add Photo</span>
+                    <span className="text-[10px] text-muted-foreground font-medium">{t("nanny.register.addPhoto")}</span>
                   </button>
                 )}
               </div>
@@ -316,7 +329,7 @@ export default function NannyRegister() {
                   onClick={() => fileInputRef.current?.click()}
                   className="mt-2 text-xs text-primary hover:underline font-medium"
                 >
-                  Change photo
+                  {t("nanny.register.changePhoto")}
                 </button>
               )}
             </div>
@@ -325,20 +338,20 @@ export default function NannyRegister() {
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <UserCircle className="w-4 h-4 text-accent" />
-                Personal Information
+                {t("nanny.register.personalInfo")}
               </h3>
 
               {/* Full Name */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Full Name *
+                  {t("nanny.register.fullName")} *
                 </label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-                  placeholder="Your full name"
+                  placeholder={t("nanny.register.yourFullName")}
                   required
                 />
               </div>
@@ -349,7 +362,7 @@ export default function NannyRegister() {
                   <label className="block text-sm font-medium text-foreground mb-1.5">
                     <span className="flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                      Age *
+                      {t("nanny.register.age")} *
                     </span>
                   </label>
                   <input
@@ -359,7 +372,7 @@ export default function NannyRegister() {
                     value={age}
                     onChange={(e) => setAge(e.target.value.replace(/\D/g, ""))}
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-                    placeholder="e.g. 28"
+                    placeholder={t("nanny.register.agePlaceholder")}
                     required
                   />
                 </div>
@@ -367,7 +380,7 @@ export default function NannyRegister() {
                   <label className="block text-sm font-medium text-foreground mb-1.5">
                     <span className="flex items-center gap-1.5">
                       <Phone className="w-3.5 h-3.5 text-muted-foreground" />
-                      Phone *
+                      {t("shared.phone")} *
                     </span>
                   </label>
                   <PhoneInput
@@ -383,7 +396,7 @@ export default function NannyRegister() {
                 <label className="block text-sm font-medium text-foreground mb-1.5">
                   <span className="flex items-center gap-1.5">
                     <FileText className="w-3.5 h-3.5 text-muted-foreground" />
-                    About You
+                    {t("nanny.register.aboutYou")}
                   </span>
                 </label>
                 <textarea
@@ -391,7 +404,7 @@ export default function NannyRegister() {
                   onChange={(e) => setBio(e.target.value)}
                   rows={3}
                   className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition resize-none text-sm"
-                  placeholder="Tell families about your experience and approach to childcare..."
+                  placeholder={t("nanny.register.aboutPlaceholder")}
                 />
               </div>
             </div>
@@ -400,14 +413,14 @@ export default function NannyRegister() {
             <div className="p-4 bg-amber-50/50 rounded-xl border border-amber-100">
               <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                 <Key className="w-4 h-4 text-primary" />
-                Create Your Login PIN
+                {t("nanny.register.createPin")}
               </h3>
               <p className="text-xs text-muted-foreground mb-3">
-                This PIN will be used to sign in to your nanny portal. Choose 4-6 digits.
+                {t("nanny.register.pinDescription")}
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-muted-foreground mb-1">PIN (4-6 digits)</label>
+                  <label className="block text-xs text-muted-foreground mb-1">{t("nanny.register.pinLabel")}</label>
                   <input
                     type="password"
                     inputMode="numeric"
@@ -420,7 +433,7 @@ export default function NannyRegister() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-muted-foreground mb-1">Confirm PIN</label>
+                  <label className="block text-xs text-muted-foreground mb-1">{t("nanny.register.confirmPin")}</label>
                   <input
                     type="password"
                     inputMode="numeric"
@@ -438,7 +451,7 @@ export default function NannyRegister() {
                 </div>
               </div>
               {confirmPin && confirmPin !== pin && (
-                <p className="text-xs text-red-500 mt-1">PINs do not match</p>
+                <p className="text-xs text-red-500 mt-1">{t("nanny.register.pinsMismatch")}</p>
               )}
             </div>
 
@@ -452,7 +465,7 @@ export default function NannyRegister() {
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
-                  Complete Registration
+                  {t("nanny.register.completeRegistration")}
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -460,9 +473,9 @@ export default function NannyRegister() {
           </form>
 
           <p className="text-center text-sm text-muted-foreground mt-6">
-            Already registered?{" "}
+            {t("nanny.register.alreadyRegistered")}{" "}
             <Link to="/nanny/login" className="text-primary hover:underline">
-              Sign in here
+              {t("nanny.register.signInHere")}
             </Link>
           </p>
         </div>

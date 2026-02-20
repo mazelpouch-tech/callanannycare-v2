@@ -7,7 +7,9 @@ import {
   BellOff,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { fr as frLocale } from "date-fns/locale";
 import { useData } from "../../context/DataContext";
+import { useLanguage } from "../../context/LanguageContext";
 
 const typeConfig = {
   new_booking: {
@@ -43,6 +45,7 @@ export default function NannyNotifications() {
     markNotificationsRead,
     unreadNotifications,
   } = useData();
+  const { t, locale } = useLanguage();
 
   useEffect(() => {
     fetchNannyNotifications();
@@ -66,14 +69,12 @@ export default function NannyNotifications() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-foreground">
-            Notifications
+            {t("nanny.notifications.title")}
           </h1>
           <p className="text-muted-foreground mt-1">
             {unreadNotifications > 0
-              ? `You have ${unreadNotifications} unread notification${
-                  unreadNotifications !== 1 ? "s" : ""
-                }`
-              : "You're all caught up"}
+              ? `${unreadNotifications} notification${unreadNotifications !== 1 ? "s" : ""}`
+              : t("nanny.notifications.allCaughtUp")}
           </p>
         </div>
         {unreadNotifications > 0 && (
@@ -81,7 +82,7 @@ export default function NannyNotifications() {
             onClick={handleMarkAllRead}
             className="text-sm text-accent hover:underline font-medium"
           >
-            Mark all as read
+            {t("nanny.notifications.markAllRead")}
           </button>
         )}
       </div>
@@ -90,9 +91,9 @@ export default function NannyNotifications() {
         {nannyNotifications.length === 0 ? (
           <div className="p-12 text-center text-muted-foreground">
             <BellOff className="w-12 h-12 mx-auto mb-4 opacity-30" />
-            <p className="text-lg font-medium mb-1">No notifications yet</p>
+            <p className="text-lg font-medium mb-1">{t("nanny.notifications.noNotifications")}</p>
             <p className="text-sm">
-              You'll be notified when you receive new bookings or updates.
+              {t("nanny.notifications.notifyHint")}
             </p>
           </div>
         ) : (
@@ -104,6 +105,7 @@ export default function NannyNotifications() {
                 try {
                   return formatDistanceToNow(new Date(notification.createdAt), {
                     addSuffix: true,
+                    locale: locale === "fr" ? frLocale : undefined,
                   });
                 } catch {
                   return "";

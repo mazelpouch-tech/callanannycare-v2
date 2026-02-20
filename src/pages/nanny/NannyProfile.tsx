@@ -20,10 +20,12 @@ import {
   EyeOff,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
+import { useLanguage } from "../../context/LanguageContext";
 import type { NannyProfile as NannyProfileType } from "@/types";
 
 export default function NannyProfile() {
   const { nannyProfile, updateNannyProfile } = useData();
+  const { t } = useLanguage();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -89,27 +91,27 @@ export default function NannyProfile() {
     const result = await updateNannyProfile(updates);
     setSaving(false);
     if (result?.success) {
-      setMessage("Profile updated successfully!");
+      setMessage(t("nanny.profile.updateSuccess"));
       setEditing(false);
       setFullProfile((prev) => prev ? ({ ...prev, ...updates }) : null);
       setTimeout(() => setMessage(""), 3000);
     } else {
-      setMessage("Failed to update profile. Please try again.");
+      setMessage(t("nanny.profile.updateFailed"));
     }
   };
 
   const handleChangePin = async () => {
     setPinMessage("");
     if (!pinForm.currentPin || !pinForm.newPin) {
-      setPinMessage("Please fill in all fields");
+      setPinMessage(t("nanny.profile.fillAllFields"));
       return;
     }
     if (pinForm.newPin.length < 4 || pinForm.newPin.length > 6) {
-      setPinMessage("New PIN must be 4-6 digits");
+      setPinMessage(t("nanny.profile.pinLength"));
       return;
     }
     if (pinForm.newPin !== pinForm.confirmPin) {
-      setPinMessage("New PINs do not match");
+      setPinMessage(t("nanny.profile.pinsMismatch"));
       return;
     }
     setPinSaving(true);
@@ -126,17 +128,17 @@ export default function NannyProfile() {
       });
       const data = await res.json();
       if (res.ok && data.success !== false) {
-        setPinMessage("PIN changed successfully!");
+        setPinMessage(t("nanny.profile.pinSuccess"));
         setTimeout(() => {
           setShowPinModal(false);
           setPinForm({ currentPin: "", newPin: "", confirmPin: "" });
           setPinMessage("");
         }, 1500);
       } else {
-        setPinMessage(data.error || "Failed to change PIN");
+        setPinMessage(data.error || t("nanny.profile.pinFailed"));
       }
     } catch {
-      setPinMessage("Failed to change PIN");
+      setPinMessage(t("nanny.profile.pinFailed"));
     }
     setPinSaving(false);
   };
@@ -157,10 +159,10 @@ export default function NannyProfile() {
     <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="font-serif text-2xl sm:text-3xl font-bold text-foreground">
-          My Profile
+          {t("nanny.profile.title")}
         </h1>
         <p className="text-muted-foreground mt-1">
-          View and manage your profile information
+          {t("nanny.profile.subtitle")}
         </p>
       </div>
 
@@ -220,15 +222,14 @@ export default function NannyProfile() {
             <div className="mt-3 flex items-start gap-2 text-xs bg-accent/5 border border-accent/20 rounded-lg px-3 py-2.5">
               <DollarSign className="w-3.5 h-3.5 mt-0.5 shrink-0 text-accent" />
               <span className="text-foreground/80">
-                <span className="font-semibold">Your pay:</span> 31.25 MAD/hr (250 MAD/8h shift) · +100 MAD for evening bookings (after 7 PM)
+                <span className="font-semibold">{t("nanny.profile.yourPay")}</span> {t("nanny.profile.payDetails")}
               </span>
             </div>
             {/* Admin-controlled fields note */}
             <div className="mt-2 flex items-start gap-2 text-xs text-muted-foreground/70 bg-muted/30 rounded-lg px-3 py-2">
               <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
               <span>
-                Name, location, rating, and experience are managed by the admin team.
-                Contact them to request changes.
+                {t("nanny.profile.adminNote")}
               </span>
             </div>
           </div>
@@ -243,15 +244,15 @@ export default function NannyProfile() {
               <Lock className="w-4.5 h-4.5 text-primary" />
             </div>
             <div>
-              <h3 className="font-semibold text-foreground text-sm">Login PIN</h3>
-              <p className="text-xs text-muted-foreground">Change your 4-6 digit login PIN</p>
+              <h3 className="font-semibold text-foreground text-sm">{t("nanny.profile.loginPin")}</h3>
+              <p className="text-xs text-muted-foreground">{t("nanny.profile.changePinDesc")}</p>
             </div>
           </div>
           <button
             onClick={() => setShowPinModal(true)}
             className="text-sm text-accent hover:underline font-medium"
           >
-            Change PIN
+            {t("nanny.profile.changePin")}
           </button>
         </div>
       </div>
@@ -259,20 +260,20 @@ export default function NannyProfile() {
       {/* Editable Section */}
       <div className="bg-card rounded-xl border border-border">
         <div className="p-5 border-b border-border flex items-center justify-between">
-          <h3 className="font-semibold text-foreground">Profile Details</h3>
+          <h3 className="font-semibold text-foreground">{t("nanny.profile.profileDetails")}</h3>
           {!editing ? (
             <button
               onClick={() => setEditing(true)}
               className="text-sm text-accent hover:underline font-medium"
             >
-              Edit Profile
+              {t("nanny.profile.editProfile")}
             </button>
           ) : (
             <button
               onClick={() => setEditing(false)}
               className="text-sm text-muted-foreground hover:underline"
             >
-              Cancel
+              {t("shared.cancel")}
             </button>
           )}
         </div>
@@ -281,7 +282,7 @@ export default function NannyProfile() {
           {/* Bio */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Bio
+              {t("nanny.profile.bio")}
             </label>
             {editing ? (
               <textarea
@@ -289,11 +290,11 @@ export default function NannyProfile() {
                 onChange={(e) => setForm({ ...form, bio: e.target.value })}
                 rows={4}
                 className="w-full px-4 py-3 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 resize-none"
-                placeholder="Tell parents about yourself..."
+                placeholder={t("nanny.profile.bioPlaceholder")}
               />
             ) : (
               <p className="text-sm text-muted-foreground leading-relaxed">
-                {profile.bio || "No bio set"}
+                {profile.bio || t("nanny.profile.noBio")}
               </p>
             )}
           </div>
@@ -302,7 +303,7 @@ export default function NannyProfile() {
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
               <Globe className="w-4 h-4 inline mr-1.5" />
-              Languages
+              {t("nanny.profile.languages")}
             </label>
             {editing ? (
               <input
@@ -312,7 +313,7 @@ export default function NannyProfile() {
                   setForm({ ...form, languages: e.target.value })
                 }
                 className="w-full px-4 py-3 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                placeholder="Arabic, French, English"
+                placeholder={t("nanny.profile.languagesPlaceholder")}
               />
             ) : (
               <div className="flex flex-wrap gap-2">
@@ -325,7 +326,7 @@ export default function NannyProfile() {
                   </span>
                 ))}
                 {languages.length === 0 && (
-                  <span className="text-sm text-muted-foreground">None set</span>
+                  <span className="text-sm text-muted-foreground">{t("nanny.profile.noneSet")}</span>
                 )}
               </div>
             )}
@@ -335,7 +336,7 @@ export default function NannyProfile() {
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
               <Award className="w-4 h-4 inline mr-1.5" />
-              Specialties
+              {t("nanny.profile.specialties")}
             </label>
             {editing ? (
               <input
@@ -345,7 +346,7 @@ export default function NannyProfile() {
                   setForm({ ...form, specialties: e.target.value })
                 }
                 className="w-full px-4 py-3 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                placeholder="Early Childhood, First Aid, Montessori"
+                placeholder={t("nanny.profile.specialtiesPlaceholder")}
               />
             ) : (
               <div className="flex flex-wrap gap-2">
@@ -358,7 +359,7 @@ export default function NannyProfile() {
                   </span>
                 ))}
                 {specialties.length === 0 && (
-                  <span className="text-sm text-muted-foreground">None set</span>
+                  <span className="text-sm text-muted-foreground">{t("nanny.profile.noneSet")}</span>
                 )}
               </div>
             )}
@@ -369,7 +370,7 @@ export default function NannyProfile() {
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
                 <Camera className="w-4 h-4 inline mr-1.5" />
-                Profile Image URL
+                {t("nanny.profile.imageUrl")}
               </label>
               <input
                 type="url"
@@ -385,12 +386,12 @@ export default function NannyProfile() {
           <div className="flex items-center justify-between py-2">
             <div>
               <p className="text-sm font-medium text-foreground">
-                Available for Bookings
+                {t("nanny.profile.availableForBookings")}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {form.available
-                  ? "You are visible to parents"
-                  : "You are hidden from parents"}
+                  ? t("nanny.profile.visibleToParents")
+                  : t("nanny.profile.hiddenFromParents")}
               </p>
             </div>
             <button
@@ -422,7 +423,7 @@ export default function NannyProfile() {
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  Save Changes
+                  {t("nanny.profile.saveChanges")}
                 </>
               )}
             </button>
@@ -435,7 +436,7 @@ export default function NannyProfile() {
         <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-sm p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-serif text-lg font-bold text-foreground">Change PIN</h2>
+              <h2 className="font-serif text-lg font-bold text-foreground">{t("nanny.profile.changePin")}</h2>
               <button
                 onClick={() => {
                   setShowPinModal(false);
@@ -463,7 +464,7 @@ export default function NannyProfile() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Current PIN
+                  {t("nanny.profile.currentPin")}
                 </label>
                 <div className="relative">
                   <input
@@ -472,7 +473,7 @@ export default function NannyProfile() {
                     onChange={(e) =>
                       setPinForm({ ...pinForm, currentPin: e.target.value.replace(/\D/g, "").slice(0, 6) })
                     }
-                    placeholder="Enter current PIN"
+                    placeholder={t("nanny.profile.currentPinPlaceholder")}
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
                   />
                   <button
@@ -486,7 +487,7 @@ export default function NannyProfile() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">
-                  New PIN (4-6 digits)
+                  {t("nanny.profile.newPin")}
                 </label>
                 <input
                   type={showPins ? "text" : "password"}
@@ -494,13 +495,13 @@ export default function NannyProfile() {
                   onChange={(e) =>
                     setPinForm({ ...pinForm, newPin: e.target.value.replace(/\D/g, "").slice(0, 6) })
                   }
-                  placeholder="Enter new PIN"
+                  placeholder={t("nanny.profile.newPinPlaceholder")}
                   className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Confirm New PIN
+                  {t("nanny.profile.confirmNewPin")}
                 </label>
                 <input
                   type={showPins ? "text" : "password"}
@@ -508,7 +509,7 @@ export default function NannyProfile() {
                   onChange={(e) =>
                     setPinForm({ ...pinForm, confirmPin: e.target.value.replace(/\D/g, "").slice(0, 6) })
                   }
-                  placeholder="Confirm new PIN"
+                  placeholder={t("nanny.profile.confirmPinPlaceholder")}
                   className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
                 />
               </div>
@@ -522,7 +523,7 @@ export default function NannyProfile() {
                 ) : (
                   <>
                     <Lock className="w-4 h-4" />
-                    Update PIN
+                    {t("nanny.profile.updatePin")}
                   </>
                 )}
               </button>

@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
+import { useLanguage } from "../../context/LanguageContext";
 import { Fragment } from "react";
 import PhoneInput from "../../components/PhoneInput";
 import {
@@ -83,6 +84,7 @@ function LiveTimer({ clockIn }: LiveTimerProps) {
 
 export default function NannyBookings() {
   const { nannyBookings, fetchNannyBookings, updateBookingStatus, clockInBooking, clockOutBooking, addBooking, nannyProfile } = useData();
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
@@ -204,12 +206,12 @@ export default function NannyBookings() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-foreground">
-            My Bookings
+            {t("nanny.bookings.title")}
           </h1>
           <p className="text-muted-foreground mt-1">
             {pendingCount > 0
-              ? `You have ${pendingCount} pending booking${pendingCount > 1 ? "s" : ""} to review`
-              : "View all your past and upcoming bookings"}
+              ? `${pendingCount} ${t("nanny.bookings.pendingReview")}`
+              : t("nanny.bookings.viewAllDesc")}
           </p>
         </div>
         <button
@@ -217,7 +219,7 @@ export default function NannyBookings() {
           className="flex items-center gap-2 px-4 py-2.5 gradient-warm text-white text-sm font-medium rounded-lg shadow-warm hover:opacity-90 transition-opacity"
         >
           <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">New Booking</span>
+          <span className="hidden sm:inline">{t("nanny.bookings.newBooking")}</span>
         </button>
       </div>
 
@@ -226,7 +228,7 @@ export default function NannyBookings() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-border">
-              <h2 className="font-serif text-xl font-bold text-foreground">New Booking</h2>
+              <h2 className="font-serif text-xl font-bold text-foreground">{t("nanny.bookings.newBooking")}</h2>
               <button onClick={() => { setShowForm(false); setFormData(emptyForm); }} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
                 <X className="w-5 h-5" />
               </button>
@@ -234,31 +236,31 @@ export default function NannyBookings() {
             <form onSubmit={handleNewBooking} className="p-5 space-y-4">
               {/* Client Name */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Client Name *</label>
+                <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.clientName")} *</label>
                 <input
                   type="text"
                   required
                   value={formData.clientName}
                   onChange={(e) => handleFormChange("clientName", e.target.value)}
                   className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                  placeholder="Parent's full name"
+                  placeholder={t("nanny.bookings.parentPlaceholder")}
                 />
               </div>
 
               {/* Email + Phone */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Email</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">{t("shared.email")}</label>
                   <input
                     type="email"
                     value={formData.clientEmail}
                     onChange={(e) => handleFormChange("clientEmail", e.target.value)}
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                    placeholder="parent@email.com"
+                    placeholder={t("nanny.bookings.emailPlaceholder")}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Phone</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">{t("shared.phone")}</label>
                   <PhoneInput
                     value={formData.clientPhone}
                     onChange={(v) => handleFormChange("clientPhone", v)}
@@ -268,19 +270,19 @@ export default function NannyBookings() {
 
               {/* Hotel */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Hotel / Location</label>
+                <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.hotelLocation")}</label>
                 <input
                   type="text"
                   value={formData.hotel}
                   onChange={(e) => handleFormChange("hotel", e.target.value)}
                   className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                  placeholder="Hotel name or address"
+                  placeholder={t("nanny.bookings.hotelPlaceholder")}
                 />
               </div>
 
               {/* Date */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Date *</label>
+                <label className="block text-sm font-medium text-foreground mb-1">{t("shared.date")} *</label>
                 <input
                   type="date"
                   required
@@ -293,7 +295,7 @@ export default function NannyBookings() {
               {/* Start / End Time */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Start Time *</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.startTime")} *</label>
                   <div className="relative">
                     <select
                       required
@@ -301,25 +303,25 @@ export default function NannyBookings() {
                       onChange={(e) => handleFormChange("startTime", e.target.value)}
                       className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 appearance-none"
                     >
-                      <option value="">Select</option>
-                      {TIME_SLOTS.map((t) => (
-                        <option key={t.value} value={t.value}>{t.label}</option>
+                      <option value="">{t("shared.select")}</option>
+                      {TIME_SLOTS.map((ts) => (
+                        <option key={ts.value} value={ts.value}>{ts.label}</option>
                       ))}
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">End Time</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.endTime")}</label>
                   <div className="relative">
                     <select
                       value={formData.endTime}
                       onChange={(e) => handleFormChange("endTime", e.target.value)}
                       className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 appearance-none"
                     >
-                      <option value="">Select</option>
-                      {TIME_SLOTS.map((t) => (
-                        <option key={t.value} value={t.value}>{t.label}</option>
+                      <option value="">{t("shared.select")}</option>
+                      {TIME_SLOTS.map((ts) => (
+                        <option key={ts.value} value={ts.value}>{ts.label}</option>
                       ))}
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
@@ -330,7 +332,7 @@ export default function NannyBookings() {
               {/* Children */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Children</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">{t("shared.children")}</label>
                   <input
                     type="number"
                     min={1}
@@ -341,26 +343,26 @@ export default function NannyBookings() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Ages</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.ages")}</label>
                   <input
                     type="text"
                     value={formData.childrenAges}
                     onChange={(e) => handleFormChange("childrenAges", e.target.value)}
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                    placeholder="e.g. 3, 5"
+                    placeholder={t("nanny.bookings.agesPlaceholder")}
                   />
                 </div>
               </div>
 
               {/* Notes */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Notes</label>
+                <label className="block text-sm font-medium text-foreground mb-1">{t("shared.notes")}</label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => handleFormChange("notes", e.target.value)}
                   rows={2}
                   className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 resize-none"
-                  placeholder="Any special instructions..."
+                  placeholder={t("nanny.bookings.notesPlaceholder")}
                 />
               </div>
 
@@ -371,7 +373,7 @@ export default function NannyBookings() {
                   onClick={() => { setShowForm(false); setFormData(emptyForm); }}
                   className="flex-1 px-4 py-2.5 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors"
                 >
-                  Cancel
+                  {t("shared.cancel")}
                 </button>
                 <button
                   type="submit"
@@ -379,7 +381,7 @@ export default function NannyBookings() {
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 gradient-warm text-white text-sm font-medium rounded-lg shadow-warm hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
                   {formLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Create Booking
+                  {t("nanny.bookings.createBooking")}
                 </button>
               </div>
             </form>
@@ -395,9 +397,9 @@ export default function NannyBookings() {
               <Timer className="w-5 h-5 text-green-700" />
             </div>
             <div>
-              <p className="font-semibold text-green-800">Active Shift</p>
+              <p className="font-semibold text-green-800">{t("nanny.bookings.activeShift")}</p>
               <p className="text-sm text-green-700">
-                {activeShift.clientName} · {activeShift.hotel || "No hotel"}
+                {activeShift.clientName} · {activeShift.hotel || t("shared.noHotel")}
               </p>
             </div>
           </div>
@@ -415,7 +417,7 @@ export default function NannyBookings() {
               ) : (
                 <StopCircle className="w-4 h-4" />
               )}
-              End Shift
+              {t("nanny.bookings.endShift")}
             </button>
           </div>
         </div>
@@ -429,7 +431,7 @@ export default function NannyBookings() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by client, hotel, or email..."
+            placeholder={t("nanny.bookings.searchPlaceholder")}
             className="w-full pl-10 pr-4 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
           />
         </div>
@@ -438,19 +440,19 @@ export default function NannyBookings() {
           onChange={(e) => setStatusFilter(e.target.value)}
           className="px-4 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
         >
-          <option value="all">All Statuses</option>
-          <option value="pending">Pending</option>
-          <option value="confirmed">Confirmed</option>
-          <option value="completed">Completed</option>
-          <option value="cancelled">Cancelled</option>
+          <option value="all">{t("shared.allStatuses")}</option>
+          <option value="pending">{t("shared.pending")}</option>
+          <option value="confirmed">{t("shared.confirmed")}</option>
+          <option value="completed">{t("shared.completed")}</option>
+          <option value="cancelled">{t("shared.cancelled")}</option>
         </select>
         <select
           value={sortOrder}
           onChange={(e) => setSortOrder(e.target.value)}
           className="px-4 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
         >
-          <option value="newest">Newest First</option>
-          <option value="oldest">Oldest First</option>
+          <option value="newest">{t("shared.newestFirst")}</option>
+          <option value="oldest">{t("shared.oldestFirst")}</option>
         </select>
       </div>
 
@@ -459,7 +461,7 @@ export default function NannyBookings() {
         {filtered.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground">
             <ClipboardList className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            <p>No bookings found</p>
+            <p>{t("nanny.bookings.noBookings")}</p>
           </div>
         ) : (
           <>
@@ -468,13 +470,13 @@ export default function NannyBookings() {
               <table className="w-full">
                 <thead>
                   <tr className="text-left text-sm text-muted-foreground border-b border-border">
-                    <th className="px-5 py-3 font-medium">Client</th>
-                    <th className="px-5 py-3 font-medium">Date</th>
-                    <th className="px-5 py-3 font-medium">Time</th>
-                    <th className="px-5 py-3 font-medium">Plan</th>
-                    <th className="px-5 py-3 font-medium">Status</th>
-                    <th className="px-5 py-3 font-medium">Shift</th>
-                    <th className="px-5 py-3 font-medium">Actions</th>
+                    <th className="px-5 py-3 font-medium">{t("shared.client")}</th>
+                    <th className="px-5 py-3 font-medium">{t("shared.date")}</th>
+                    <th className="px-5 py-3 font-medium">{t("shared.time")}</th>
+                    <th className="px-5 py-3 font-medium">{t("shared.plan")}</th>
+                    <th className="px-5 py-3 font-medium">{t("shared.status")}</th>
+                    <th className="px-5 py-3 font-medium">{t("nanny.bookings.shift")}</th>
+                    <th className="px-5 py-3 font-medium">{t("shared.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -563,7 +565,7 @@ export default function NannyBookings() {
                                 ) : (
                                   <PlayCircle className="w-3.5 h-3.5" />
                                 )}
-                                Start Shift
+                                {t("nanny.bookings.startShift")}
                               </button>
                             )}
                             {/* End Shift for active shift */}
@@ -579,7 +581,7 @@ export default function NannyBookings() {
                                 ) : (
                                   <StopCircle className="w-3.5 h-3.5" />
                                 )}
-                                End Shift
+                                {t("nanny.bookings.endShift")}
                               </button>
                             )}
                             {/* WhatsApp parent */}
@@ -621,19 +623,19 @@ export default function NannyBookings() {
                           <td colSpan={7} className="px-5 py-4">
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                               <div>
-                                <span className="text-muted-foreground">Email</span>
+                                <span className="text-muted-foreground">{t("shared.email")}</span>
                                 <p className="font-medium">{booking.clientEmail}</p>
                               </div>
                               <div>
-                                <span className="text-muted-foreground">Phone</span>
+                                <span className="text-muted-foreground">{t("shared.phone")}</span>
                                 <p className="font-medium">{booking.clientPhone || "—"}</p>
                               </div>
                               <div>
-                                <span className="text-muted-foreground">Hotel</span>
+                                <span className="text-muted-foreground">{t("shared.hotel")}</span>
                                 <p className="font-medium">{booking.hotel || "—"}</p>
                               </div>
                               <div>
-                                <span className="text-muted-foreground">Children</span>
+                                <span className="text-muted-foreground">{t("shared.children")}</span>
                                 <p className="font-medium">
                                   {booking.childrenCount || 1}
                                   {booking.childrenAges
@@ -643,19 +645,19 @@ export default function NannyBookings() {
                               </div>
                               {booking.clockIn && (
                                 <div>
-                                  <span className="text-muted-foreground">Clocked In</span>
+                                  <span className="text-muted-foreground">{t("nanny.bookings.clockedIn")}</span>
                                   <p className="font-medium">{new Date(booking.clockIn).toLocaleTimeString()}</p>
                                 </div>
                               )}
                               {booking.clockOut && (
                                 <div>
-                                  <span className="text-muted-foreground">Clocked Out</span>
+                                  <span className="text-muted-foreground">{t("nanny.bookings.clockedOut")}</span>
                                   <p className="font-medium">{new Date(booking.clockOut).toLocaleTimeString()}</p>
                                 </div>
                               )}
                               {booking.notes && (
                                 <div className="col-span-full">
-                                  <span className="text-muted-foreground">Notes</span>
+                                  <span className="text-muted-foreground">{t("shared.notes")}</span>
                                   <p className="font-medium">{booking.notes}</p>
                                 </div>
                               )}
@@ -716,7 +718,7 @@ export default function NannyBookings() {
                   {booking.clockIn && !booking.clockOut && booking.status !== "cancelled" && (
                     <div className="mt-2 flex items-center gap-2">
                       <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                      <span className="text-green-700 text-xs font-medium">Active:</span>
+                      <span className="text-green-700 text-xs font-medium">{t("nanny.bookings.active")}</span>
                       <LiveTimer clockIn={booking.clockIn!} />
                     </div>
                   )}
@@ -735,7 +737,7 @@ export default function NannyBookings() {
                           ) : (
                             <CheckCircle className="w-3.5 h-3.5" />
                           )}
-                          Accept
+                          {t("nanny.bookings.accept")}
                         </button>
                         <button
                           onClick={() => handleDecline(booking.id)}
@@ -743,7 +745,7 @@ export default function NannyBookings() {
                           className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50 text-red-700 text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-50"
                         >
                           <XCircle className="w-3.5 h-3.5" />
-                          Decline
+                          {t("nanny.bookings.decline")}
                         </button>
                       </>
                     )}
@@ -776,7 +778,7 @@ export default function NannyBookings() {
                         ) : (
                           <StopCircle className="w-4 h-4" />
                         )}
-                        End Shift
+                        {t("nanny.bookings.endShift")}
                       </button>
                     )}
                   </div>
@@ -800,22 +802,22 @@ export default function NannyBookings() {
                       }
                       className="text-xs text-accent hover:underline"
                     >
-                      {expandedId === booking.id ? "Hide details" : "Show details"}
+                      {expandedId === booking.id ? t("nanny.bookings.hideDetails") : t("nanny.bookings.showDetails")}
                     </button>
                   </div>
 
                   {expandedId === booking.id && (
                     <div className="mt-3 pt-3 border-t border-border space-y-2 text-sm">
                       <p>
-                        <span className="text-muted-foreground">Email:</span>{" "}
+                        <span className="text-muted-foreground">{t("shared.email")}:</span>{" "}
                         {booking.clientEmail}
                       </p>
                       <p>
-                        <span className="text-muted-foreground">Phone:</span>{" "}
+                        <span className="text-muted-foreground">{t("shared.phone")}:</span>{" "}
                         {booking.clientPhone || "—"}
                       </p>
                       <p>
-                        <span className="text-muted-foreground">Children:</span>{" "}
+                        <span className="text-muted-foreground">{t("shared.children")}:</span>{" "}
                         {booking.childrenCount || 1}
                         {booking.childrenAges
                           ? ` (ages: ${booking.childrenAges})`
@@ -823,19 +825,19 @@ export default function NannyBookings() {
                       </p>
                       {booking.clockIn && (
                         <p>
-                          <span className="text-muted-foreground">Clocked In:</span>{" "}
+                          <span className="text-muted-foreground">{t("nanny.bookings.clockedIn")}:</span>{" "}
                           {new Date(booking.clockIn).toLocaleTimeString()}
                         </p>
                       )}
                       {booking.clockOut && (
                         <p>
-                          <span className="text-muted-foreground">Clocked Out:</span>{" "}
+                          <span className="text-muted-foreground">{t("nanny.bookings.clockedOut")}:</span>{" "}
                           {new Date(booking.clockOut).toLocaleTimeString()}
                         </p>
                       )}
                       {booking.notes && (
                         <p>
-                          <span className="text-muted-foreground">Notes:</span>{" "}
+                          <span className="text-muted-foreground">{t("shared.notes")}:</span>{" "}
                           {booking.notes}
                         </p>
                       )}

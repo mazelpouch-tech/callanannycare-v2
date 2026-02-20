@@ -16,6 +16,7 @@ import {
   Coffee,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
+import { useLanguage } from "../../context/LanguageContext";
 import type { Booking } from "@/types";
 import {
   statusColors,
@@ -27,15 +28,17 @@ import {
   HOURLY_RATE,
 } from "@/utils/shiftHelpers";
 
-const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS_SHORT_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS_SHORT_FR = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
 
 interface LiveTimerProps { clockIn: string; large?: boolean }
-interface PayChartProps { bookings: Booking[] }
+interface PayChartProps { bookings: Booking[]; t: (key: string) => string; locale: string }
 interface MyShiftSectionProps {
   bookings: Booking[];
   clockInBooking: (id: number | string) => Promise<void>;
   clockOutBooking: (id: number | string) => Promise<void>;
   fetchNannyBookings: () => Promise<void>;
+  t: (key: string) => string;
 }
 
 // Live timer component
@@ -57,7 +60,8 @@ function LiveTimer({ clockIn, large }: LiveTimerProps) {
 }
 
 // Simple bar chart for nanny pay
-function PayChart({ bookings }: PayChartProps) {
+function PayChart({ bookings, t, locale }: PayChartProps) {
+  const MONTHS = locale === "fr" ? MONTHS_SHORT_FR : MONTHS_SHORT_EN;
   const monthlyPay = useMemo(() => {
     const now = new Date();
     const months: { key: string; label: string; total: number }[] = [];
@@ -65,7 +69,7 @@ function PayChart({ bookings }: PayChartProps) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       months.push({
         key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-        label: MONTHS_SHORT[d.getMonth()],
+        label: MONTHS[d.getMonth()],
         total: 0,
       });
     }
@@ -85,7 +89,7 @@ function PayChart({ bookings }: PayChartProps) {
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold text-foreground text-lg flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-primary" />
-          My Pay (6 months)
+          {t("nanny.dashboard.myPayChart")}
         </h2>
       </div>
       <div className="flex items-end gap-2 h-32">
@@ -108,7 +112,7 @@ function PayChart({ bookings }: PayChartProps) {
         })}
       </div>
       <p className="text-[10px] text-muted-foreground mt-3 text-center">
-        250 MAD/8h ({Math.round(HOURLY_RATE)} MAD/hr) · +100 MAD evening (after 7 PM)
+        {t("nanny.dashboard.payInfo").replace("{rate}", String(Math.round(HOURLY_RATE)))}
       </p>
     </div>
   );
@@ -143,7 +147,7 @@ function DashboardSkeleton() {
 
 // ─── My Shift Section (prominent, always visible) ────────────────
 
-function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyBookings }: MyShiftSectionProps) {
+function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyBookings, t }: MyShiftSectionProps) {
   const [actionLoading, setActionLoading] = useState(false);
 
   // Find active shift (clocked in, not clocked out)
@@ -185,17 +189,17 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
         <div className="flex items-center gap-2 mb-4">
           <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
           <h2 className="font-serif text-lg sm:text-xl font-bold text-green-800">
-            Shift in Progress
+            {t("nanny.dashboard.shiftInProgress")}
           </h2>
         </div>
 
         <div className="text-center py-4">
           <LiveTimer clockIn={activeShift.clockIn!} large />
           <p className="text-sm text-green-700 mt-2">
-            {activeShift.clientName} · {activeShift.hotel || "No hotel"} · {activeShift.plan}
+            {activeShift.clientName} · {activeShift.hotel || t("shared.noHotel")} · {activeShift.plan}
           </p>
           <p className="text-xs text-green-600 mt-1">
-            Started at {new Date(activeShift.clockIn!).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            {t("nanny.dashboard.startedAt")} {new Date(activeShift.clockIn!).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
           </p>
         </div>
 
@@ -209,7 +213,7 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
           ) : (
             <StopCircle className="w-6 h-6" />
           )}
-          End Shift
+          {t("nanny.dashboard.endShift")}
         </button>
       </div>
     );
@@ -222,7 +226,7 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
         <div className="flex items-center gap-2 mb-4">
           <Timer className="w-5 h-5 text-primary" />
           <h2 className="font-serif text-lg sm:text-xl font-bold text-foreground">
-            My Shift
+            {t("nanny.dashboard.myShift")}
           </h2>
         </div>
 
@@ -238,7 +242,7 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
                   </p>
                 </div>
                 <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-green-100 text-green-700">
-                  Confirmed
+                  {t("shared.confirmed")}
                 </span>
               </div>
 
@@ -252,7 +256,7 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
                 ) : (
                   <PlayCircle className="w-6 h-6" />
                 )}
-                Start Shift
+                {t("nanny.dashboard.startShift")}
               </button>
             </div>
           ))}
@@ -270,22 +274,22 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
         <div className="flex items-center gap-2 mb-4">
           <CheckCircle className="w-5 h-5 text-blue-600" />
           <h2 className="font-serif text-lg sm:text-xl font-bold text-blue-800">
-            Shift Completed Today
+            {t("nanny.dashboard.shiftCompletedToday")}
           </h2>
         </div>
 
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
             <p className="text-2xl font-bold text-blue-800">{todayCompleted.length}</p>
-            <p className="text-xs text-blue-600">Shift{todayCompleted.length > 1 ? "s" : ""}</p>
+            <p className="text-xs text-blue-600">{todayCompleted.length > 1 ? t("nanny.dashboard.shifts") : t("nanny.dashboard.shift")}</p>
           </div>
           <div>
             <p className="text-2xl font-bold text-blue-800">{formatHoursWorked(todayCompleted[0].clockIn!, todayCompleted[todayCompleted.length - 1].clockOut!)}</p>
-            <p className="text-xs text-blue-600">Hours</p>
+            <p className="text-xs text-blue-600">{t("nanny.dashboard.hoursLabel")}</p>
           </div>
           <div>
             <p className="text-2xl font-bold text-blue-800">{totalPayToday}</p>
-            <p className="text-xs text-blue-600">MAD earned</p>
+            <p className="text-xs text-blue-600">{t("nanny.dashboard.madEarned")}</p>
           </div>
         </div>
       </div>
@@ -298,14 +302,14 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
       <div className="flex items-center gap-2 mb-2">
         <Timer className="w-5 h-5 text-muted-foreground" />
         <h2 className="font-serif text-lg sm:text-xl font-bold text-foreground">
-          My Shift
+          {t("nanny.dashboard.myShift")}
         </h2>
       </div>
       <div className="text-center py-6">
         <Coffee className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
-        <p className="text-muted-foreground font-medium">No shifts scheduled today</p>
+        <p className="text-muted-foreground font-medium">{t("nanny.dashboard.noShiftsToday")}</p>
         <p className="text-sm text-muted-foreground/70 mt-1">
-          When you have a confirmed booking for today, you can start your shift here.
+          {t("nanny.dashboard.noShiftsHint")}
         </p>
       </div>
     </div>
@@ -324,6 +328,7 @@ export default function NannyDashboard() {
     clockInBooking,
     clockOutBooking,
   } = useData();
+  const { t, locale } = useLanguage();
 
   useEffect(() => {
     fetchNannyStats();
@@ -341,29 +346,29 @@ export default function NannyDashboard() {
 
   const statCards = [
     {
-      label: "Hours Worked",
+      label: t("nanny.dashboard.hoursWorked"),
       value: nannyStats?.totalHoursWorked ?? 0,
-      suffix: "hrs",
+      suffix: t("nanny.dashboard.hrs"),
       icon: Clock,
       bg: "bg-primary/10",
       color: "text-primary",
     },
     {
-      label: "Completed",
+      label: t("nanny.dashboard.completedLabel"),
       value: nannyStats?.completedBookings ?? 0,
       icon: CheckCircle,
       bg: "bg-blue-50",
       color: "text-blue-600",
     },
     {
-      label: "Upcoming",
+      label: t("nanny.dashboard.upcoming"),
       value: nannyStats?.upcomingBookings ?? 0,
       icon: CalendarDays,
       bg: "bg-accent/10",
       color: "text-accent",
     },
     {
-      label: "My Pay",
+      label: t("nanny.dashboard.myPay"),
       value: nannyBookings
         .filter((b) => b.status !== "cancelled")
         .reduce((sum, b) => sum + calcNannyPay(b), 0),
@@ -379,10 +384,10 @@ export default function NannyDashboard() {
       {/* Greeting */}
       <div>
         <h1 className="font-serif text-2xl sm:text-3xl font-bold text-foreground">
-          Welcome back, {nannyProfile?.name?.split(" ")[0] || "there"}
+          {t("nanny.dashboard.welcomeBack")} {nannyProfile?.name?.split(" ")[0] || ""}
         </h1>
         <p className="text-muted-foreground mt-1">
-          Here&apos;s your schedule overview.
+          {t("nanny.dashboard.scheduleOverview")}
         </p>
       </div>
 
@@ -392,6 +397,7 @@ export default function NannyDashboard() {
         clockInBooking={clockInBooking}
         clockOutBooking={clockOutBooking}
         fetchNannyBookings={fetchNannyBookings}
+        t={t}
       />
 
       {/* Stats Grid */}
@@ -427,26 +433,26 @@ export default function NannyDashboard() {
       </div>
 
       {/* Pay Chart */}
-      <PayChart bookings={nannyBookings} />
+      <PayChart bookings={nannyBookings} t={t} locale={locale} />
 
       {/* Upcoming Bookings */}
       <div className="bg-card rounded-xl border border-border">
         <div className="p-5 border-b border-border flex items-center justify-between">
           <h2 className="font-semibold text-foreground text-lg">
-            Upcoming Bookings
+            {t("nanny.dashboard.upcomingBookings")}
           </h2>
           <Link
             to="/nanny/bookings"
             className="text-sm text-accent hover:underline flex items-center gap-1"
           >
-            View all <ArrowRight className="w-3.5 h-3.5" />
+            {t("nanny.dashboard.viewAll")} <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
         {upcomingBookings.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground">
             <CalendarDays className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            <p>No upcoming bookings</p>
+            <p>{t("nanny.dashboard.noUpcoming")}</p>
           </div>
         ) : (
           <>
@@ -455,12 +461,12 @@ export default function NannyDashboard() {
               <table className="w-full">
                 <thead>
                   <tr className="text-left text-sm text-muted-foreground border-b border-border">
-                    <th className="px-5 py-3 font-medium">Client</th>
-                    <th className="px-5 py-3 font-medium">Date</th>
-                    <th className="px-5 py-3 font-medium">Time</th>
-                    <th className="px-5 py-3 font-medium">Plan</th>
-                    <th className="px-5 py-3 font-medium">Hotel</th>
-                    <th className="px-5 py-3 font-medium">Status</th>
+                    <th className="px-5 py-3 font-medium">{t("shared.client")}</th>
+                    <th className="px-5 py-3 font-medium">{t("shared.date")}</th>
+                    <th className="px-5 py-3 font-medium">{t("shared.time")}</th>
+                    <th className="px-5 py-3 font-medium">{t("shared.plan")}</th>
+                    <th className="px-5 py-3 font-medium">{t("shared.hotel")}</th>
+                    <th className="px-5 py-3 font-medium">{t("shared.status")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -557,9 +563,9 @@ export default function NannyDashboard() {
             <CalendarDays className="w-6 h-6 text-accent" />
           </div>
           <div>
-            <h3 className="font-semibold text-foreground">View Calendar</h3>
+            <h3 className="font-semibold text-foreground">{t("nanny.dashboard.viewCalendar")}</h3>
             <p className="text-sm text-muted-foreground">
-              See your full schedule
+              {t("nanny.dashboard.seeSchedule")}
             </p>
           </div>
           <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto" />
@@ -573,9 +579,9 @@ export default function NannyDashboard() {
             <CheckCircle className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold text-foreground">All Bookings</h3>
+            <h3 className="font-semibold text-foreground">{t("nanny.dashboard.allBookings")}</h3>
             <p className="text-sm text-muted-foreground">
-              View your booking history
+              {t("nanny.dashboard.viewHistory")}
             </p>
           </div>
           <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto" />
