@@ -128,27 +128,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      // Send booking confirmation email to parent (best-effort)
+      // Send email to parent (best-effort)
       if (result[0] && client_email) {
         try {
-          const { sendConfirmationEmail } = await import('./_emailTemplates.js');
-          await sendConfirmationEmail({
-            bookingId: result[0].id,
-            clientName: client_name,
-            clientEmail: client_email,
-            clientPhone: client_phone || '',
-            hotel: hotel || '',
-            date,
-            startTime: start_time,
-            endTime: end_time || '',
-            childrenCount: children_count || 1,
-            childrenAges: children_ages || '',
-            totalPrice: total_price || 0,
-            notes: notes || '',
-            locale: locale || 'en',
-          });
+          if (reqStatus === 'completed' && clock_out) {
+            // Invoice: send invoice email instead of booking confirmation
+            let invoiceNannyName = 'Your Nanny';
+            if (nanny_id) {
+              const nannyRows = await sql`SELECT name FROM nannies WHERE id = ${nanny_id}` as { name: string }[];
+              if (nannyRows.length > 0) invoiceNannyName = nannyRows[0].name;
+            }
+            const { sendInvoiceEmail } = await import('./_emailTemplates.js');
+            await sendInvoiceEmail({
+              bookingId: result[0].id,
+              clientName: client_name,
+              clientEmail: client_email,
+              clientPhone: client_phone || '',
+              hotel: hotel || '',
+              date,
+              startTime: start_time || '',
+              endTime: end_time || '',
+              clockIn: clock_in || clock_out,
+              clockOut: clock_out,
+              childrenCount: children_count || 1,
+              childrenAges: children_ages || '',
+              totalPrice: total_price || 0,
+              nannyName: invoiceNannyName,
+              locale: locale || 'en',
+            });
+          } else {
+            // Regular booking: send confirmation email
+            const { sendConfirmationEmail } = await import('./_emailTemplates.js');
+            await sendConfirmationEmail({
+              bookingId: result[0].id,
+              clientName: client_name,
+              clientEmail: client_email,
+              clientPhone: client_phone || '',
+              hotel: hotel || '',
+              date,
+              startTime: start_time,
+              endTime: end_time || '',
+              childrenCount: children_count || 1,
+              childrenAges: children_ages || '',
+              totalPrice: total_price || 0,
+              notes: notes || '',
+              locale: locale || 'en',
+            });
+          }
         } catch (emailError: unknown) {
-          console.error('Confirmation email failed:', emailError);
+          console.error('Email sending failed:', emailError);
         }
       }
 
