@@ -29,8 +29,9 @@ export default function AdminUsers() {
 
   // Add User Modal
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addForm, setAddForm] = useState({ name: "", email: "", password: "" });
+  const [addForm, setAddForm] = useState({ name: "", email: "" });
   const [addError, setAddError] = useState("");
+  const [addSuccess, setAddSuccess] = useState("");
   const [addLoading, setAddLoading] = useState(false);
 
   // Change Password Modal
@@ -61,19 +62,20 @@ export default function AdminUsers() {
     u.email.toLowerCase().includes(search.toLowerCase())
   );
 
-  // --- Add User ---
+  // --- Add User (invite by email) ---
   const handleAddUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setAddError("");
-    if (addForm.password.length < 6) {
-      setAddError("Password must be at least 6 characters");
-      return;
-    }
+    setAddSuccess("");
     setAddLoading(true);
     const result = await addAdminUser(addForm);
     if (result.success) {
-      setShowAddModal(false);
-      setAddForm({ name: "", email: "", password: "" });
+      setAddSuccess("Invitation sent! A registration email has been sent to " + addForm.email);
+      setAddForm({ name: "", email: "" });
+      setTimeout(() => {
+        setShowAddModal(false);
+        setAddSuccess("");
+      }, 3000);
     } else {
       setAddError(result.error);
     }
@@ -200,7 +202,7 @@ export default function AdminUsers() {
             className="flex items-center gap-2 gradient-warm text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity shadow-warm"
           >
             <UserPlus className="w-4 h-4" />
-            <span>Add Admin</span>
+            <span>Invite Admin</span>
           </button>
         </div>
       </div>
@@ -432,13 +434,16 @@ export default function AdminUsers() {
         })}
       </div>
 
-      {/* ===== Add Admin Modal ===== */}
+      {/* ===== Invite Admin Modal ===== */}
       {showAddModal && (
         <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="font-serif text-lg font-bold text-foreground">Add Admin User</h2>
-              <button onClick={() => { setShowAddModal(false); setAddError(""); }} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
+              <div>
+                <h2 className="font-serif text-lg font-bold text-foreground">Invite Admin</h2>
+                <p className="text-xs text-muted-foreground mt-1">A registration email will be sent to set their password</p>
+              </div>
+              <button onClick={() => { setShowAddModal(false); setAddError(""); setAddSuccess(""); }} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -450,64 +455,60 @@ export default function AdminUsers() {
               </div>
             )}
 
-            <form onSubmit={handleAddUser} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  <span className="flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-muted-foreground" />
-                    Full Name
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  value={addForm.name}
-                  onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-                  placeholder="e.g., Sarah Manager"
-                  required
-                />
+            {addSuccess && (
+              <div className="mb-4 bg-green-50 text-green-600 text-sm px-4 py-3 rounded-lg border border-green-100 flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>{addSuccess}</span>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  <span className="flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-muted-foreground" />
-                    Email Address
-                  </span>
-                </label>
-                <input
-                  type="email"
-                  value={addForm.email}
-                  onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-                  placeholder="sarah@callananny.ma"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  <span className="flex items-center gap-1.5">
-                    <Key className="w-3.5 h-3.5 text-muted-foreground" />
-                    Password (min 6 characters)
-                  </span>
-                </label>
-                <input
-                  type="password"
-                  value={addForm.password}
-                  onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-                  placeholder="Set a secure password"
-                  required
-                  minLength={6}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={addLoading}
-                className="w-full gradient-warm text-white rounded-lg px-4 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {addLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><UserPlus className="w-4 h-4" /> Add Admin</>}
-              </button>
-            </form>
+            )}
+
+            {!addSuccess && (
+              <form onSubmit={handleAddUser} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-muted-foreground" />
+                      Full Name
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    value={addForm.name}
+                    onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
+                    placeholder="e.g., Sarah Manager"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                      Email Address
+                    </span>
+                  </label>
+                  <input
+                    type="email"
+                    value={addForm.email}
+                    onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
+                    placeholder="sarah@callananny.ma"
+                    required
+                  />
+                </div>
+                <div className="bg-amber-50 text-amber-700 text-xs px-4 py-3 rounded-lg border border-amber-100 flex items-start gap-2">
+                  <Mail className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  <span>The admin will receive an email with a registration link to set their own password. The link expires in 24 hours.</span>
+                </div>
+                <button
+                  type="submit"
+                  disabled={addLoading}
+                  className="w-full gradient-warm text-white rounded-lg px-4 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {addLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Mail className="w-4 h-4" /> Send Invitation</>}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}

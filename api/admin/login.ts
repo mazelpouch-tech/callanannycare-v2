@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb } from '../_db.js';
 import crypto from 'crypto';
 import type { DbAdminUser } from '@/types';
+import { sendAdminInviteEmail } from '../_emailTemplates.js';
 
 interface AdminLoginBody {
   action?: string;
@@ -80,10 +81,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      // --- Add Admin User ---
+      // --- Add Admin User (invite via email) ---
       if (action === 'add_user') {
-        if (!name || !email || !password) {
-          return res.status(400).json({ error: 'Name, email, and password are required' });
+        if (!name || !email) {
+          return res.status(400).json({ error: 'Name and email are required' });
         }
 
         const existing = await sql`SELECT id FROM admin_users WHERE email = ${email}` as AdminIdRow[];
@@ -91,14 +92,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(409).json({ error: 'An admin with this email already exists' });
         }
 
+        // Generate a random temp password (admin will set their own via registration link)
+        const tempPassword = crypto.randomBytes(16).toString('hex');
+        // Generate registration token (24h expiry)
+        const registrationToken = crypto.randomBytes(32).toString('hex');
+        const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
         const created = await sql`
-          INSERT INTO admin_users (name, email, password, role, is_active)
-          VALUES (${name}, ${email}, ${password}, 'admin', true)
+          INSERT INTO admin_users (name, email, password, role, is_active, reset_token, reset_token_expires)
+          VALUES (${name}, ${email}, ${tempPassword}, 'admin', false, ${registrationToken}, ${tokenExpires.toISOString()})
           RETURNING id, name, email, role, is_active, created_at
         ` as DbAdminUser[];
 
+        // Send registration email
+        const host = req.headers.host || 'callanannycare.vercel.app';
+        const protocol = host.includes('localhost') ? 'http' : 'https';
+        const registrationLink = `${protocol}://${host}/admin/login?register=${registrationToken}`;
+
+        let emailSent = false;
+        try {
+          emailSent = await sendAdminInviteEmail({
+            adminName: name,
+            adminEmail: email,
+            registrationLink,
+          });
+        } catch (err) {
+          console.error('Failed to send admin invite email:', err);
+        }
+
         return res.status(201).json({
           success: true,
+          emailSent,
           admin: {
             id: created[0].id,
             name: created[0].name,
@@ -205,6 +229,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         `;
 
         return res.status(200).json({ success: true, message: 'Password has been reset successfully. You can now log in.' });
+      }
+
+      // --- Register Admin (complete registration from invite) ---
+      if (action === 'register_admin') {
+        if (!resetToken || !newPassword) {
+          return res.status(400).json({ error: 'Registration token and password are required' });
+        }
+
+        if (newPassword.length < 6) {
+          return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        }
+
+        // Find the invited (inactive) admin by token
+        const admin = await sql`
+          SELECT id, reset_token_expires
+          FROM admin_users
+          WHERE reset_token = ${resetToken} AND is_active = false
+        ` as AdminResetRow[];
+
+        if (admin.length === 0) {
+          return res.status(400).json({ error: 'Invalid or expired registration link' });
+        }
+
+        if (admin[0].reset_token_expires && new Date(admin[0].reset_token_expires) < new Date()) {
+          return res.status(400).json({ error: 'This registration link has expired. Please ask the admin to resend the invite.' });
+        }
+
+        // Set password, activate account, clear token
+        await sql`
+          UPDATE admin_users SET
+            password = ${newPassword},
+            is_active = true,
+            reset_token = NULL,
+            reset_token_expires = NULL,
+            updated_at = NOW()
+          WHERE id = ${admin[0].id}
+        `;
+
+        return res.status(200).json({ success: true, message: 'Registration complete! You can now sign in.' });
       }
 
       return res.status(400).json({ error: 'Unknown action' });

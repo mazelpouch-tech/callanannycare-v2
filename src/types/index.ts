@@ -270,12 +270,13 @@ export interface DataContextValue {
   adminLogin: (email: string, password: string) => Promise<ApiResult>;
   adminLogout: () => void;
   fetchAdminUsers: () => Promise<AdminUser[]>;
-  addAdminUser: (data: { name: string; email: string; password: string }) => Promise<ApiResult<{ admin: AdminUser }>>;
+  addAdminUser: (data: { name: string; email: string }) => Promise<ApiResult<{ admin: AdminUser }>>;
   updateAdminUser: (adminId: number, updates: Partial<AdminUser>) => Promise<ApiResult>;
   deleteAdminUser: (adminId: number) => Promise<ApiResult>;
   changeAdminPassword: (adminId: number, currentPassword: string, newPassword: string) => Promise<ApiResult>;
   forgotAdminPassword: (email: string) => Promise<ApiResult<{ message: string; resetLink?: string }>>;
   resetAdminPassword: (resetToken: string, newPassword: string) => Promise<ApiResult<{ message: string }>>;
+  registerAdmin: (registerToken: string, newPassword: string) => Promise<ApiResult<{ message: string }>>;
 
   loading: boolean;
 

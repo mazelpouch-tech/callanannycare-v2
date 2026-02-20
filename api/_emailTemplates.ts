@@ -258,6 +258,66 @@ export async function sendInviteEmail(data: InviteEmailData): Promise<boolean> {
 }
 
 // ============================================================
+// Admin Registration Invitation Email
+// ============================================================
+
+export interface AdminInviteEmailData {
+  adminName: string;
+  adminEmail: string;
+  registrationLink: string;
+}
+
+export async function sendAdminInviteEmail(data: AdminInviteEmailData): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log('RESEND_API_KEY not configured. Admin invite email skipped.');
+    return false;
+  }
+
+  const resend = new Resend(apiKey);
+
+  const content = `
+    <h2 style="margin:0 0 8px;color:#1a1a1a;font-size:22px;font-family:Georgia,'Times New Roman',serif;">Welcome, ${data.adminName}!</h2>
+    <p style="margin:0 0 24px;color:#666;font-size:16px;line-height:1.5;">You've been invited to join <strong>Call a Nanny</strong> as an administrator.</p>
+
+    <div style="margin:28px 0;padding:20px;background-color:#fff7ed;border-radius:12px;border-left:4px solid #f97316;">
+      <h3 style="margin:0 0 8px;color:#1a1a1a;font-size:15px;font-weight:600;">Complete Your Registration</h3>
+      <p style="margin:0;color:#666;font-size:14px;line-height:1.5;">Click the button below to set your password and activate your admin account. You'll be able to manage bookings, nannies, invoices, and more.</p>
+    </div>
+
+    <!-- CTA Button -->
+    <div style="text-align:center;margin:32px 0;">
+      <a href="${data.registrationLink}" style="display:inline-block;background:linear-gradient(135deg,#f97316,#ec4899);color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;padding:14px 32px;border-radius:50px;box-shadow:0 4px 14px rgba(249,115,22,0.3);">Set Your Password</a>
+    </div>
+
+    <p style="margin:0 0 4px;color:#999;font-size:13px;text-align:center;">Or copy and paste this link into your browser:</p>
+    <p style="margin:0 0 24px;color:#f97316;font-size:12px;text-align:center;word-break:break-all;">${data.registrationLink}</p>
+
+    <div style="margin:24px 0;padding:16px;background-color:#fafafa;border-radius:8px;text-align:center;">
+      <p style="margin:0;color:#999;font-size:13px;">Your login email: <strong style="color:#1a1a1a;">${data.adminEmail}</strong></p>
+      <p style="margin:8px 0 0;color:#999;font-size:13px;">⏳ This link expires in <strong>24 hours</strong>.</p>
+    </div>
+
+    <p style="margin:0;color:#999;font-size:13px;text-align:center;">If you have any questions, contact us at <a href="mailto:info@callanannycare.com" style="color:#f97316;">info@callanannycare.com</a></p>
+  `;
+
+  const fromAddress = process.env.RESEND_FROM_EMAIL || 'Call a Nanny <onboarding@resend.dev>';
+
+  try {
+    await resend.emails.send({
+      from: fromAddress,
+      to: data.adminEmail,
+      subject: "You're invited as Admin - Call a Nanny",
+      html: emailWrapper(content),
+    });
+    return true;
+  } catch (err) {
+    console.error('Failed to send admin invite email:', err);
+    return false;
+  }
+}
+
+// ============================================================
 // Invoice Email
 // ============================================================
 

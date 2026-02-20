@@ -753,11 +753,11 @@ export function DataProvider({ children }: DataProviderProps) {
     }
   }, []);
 
-  const addAdminUser = useCallback(async ({ name, email, password }: { name: string; email: string; password: string }) => {
+  const addAdminUser = useCallback(async ({ name, email }: { name: string; email: string }) => {
     try {
       const result = await apiFetch<ApiResult<{ admin: AdminUser }>>("/admin/login", {
         method: "POST",
-        body: JSON.stringify({ action: "add_user", name, email, password }),
+        body: JSON.stringify({ action: "add_user", name, email }),
       });
       if (result.success) {
         setAdminUsers((prev) => [...prev, result.admin]);
@@ -851,6 +851,22 @@ export function DataProvider({ children }: DataProviderProps) {
     }
   }, []);
 
+  const registerAdmin = useCallback(async (registerToken: string, newPassword: string) => {
+    try {
+      const result = await apiFetch<ApiResult<{ message: string }>>("/admin/login", {
+        method: "POST",
+        body: JSON.stringify({ action: "register_admin", resetToken: registerToken, newPassword }),
+      });
+      if (result.success) {
+        return { success: true as const, message: result.message };
+      }
+      return { success: false as const, error: result.error };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return { success: false as const, error: message || "Failed to complete registration" };
+    }
+  }, []);
+
   // --- Computed Stats ---
 
   const stats: DashboardStats = useMemo(() => {
@@ -907,6 +923,7 @@ export function DataProvider({ children }: DataProviderProps) {
       changeAdminPassword,
       forgotAdminPassword,
       resetAdminPassword,
+      registerAdmin,
       loading,
       // Nanny portal
       isNanny,
@@ -928,7 +945,7 @@ export function DataProvider({ children }: DataProviderProps) {
       bookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking, resendInvoice,
       stats, isAdmin, adminProfile, adminUsers, adminLogin, adminLogout,
       fetchAdminUsers, addAdminUser, updateAdminUser, deleteAdminUser,
-      changeAdminPassword, forgotAdminPassword, resetAdminPassword, loading,
+      changeAdminPassword, forgotAdminPassword, resetAdminPassword, registerAdmin, loading,
       isNanny, nannyProfile, nannyBookings, nannyNotifications, nannyStats,
       unreadNotifications, nannyLogin, nannyLogout, fetchNannyBookings,
       fetchNannyStats, fetchNannyNotifications, markNotificationsRead, updateNannyProfile,
