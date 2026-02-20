@@ -79,10 +79,7 @@ interface ChildInfo {
   childGender: string;
   allergies: string;
   noAllergies: boolean;
-  comments: string;
-  dietaryRestrictions: string;
-  favoriteActivities: string;
-  napSchedule: string;
+  specialInstructions: string;
 }
 
 interface StepChildInfoProps {
@@ -90,6 +87,8 @@ interface StepChildInfoProps {
   onChange: (info: ChildInfo[]) => void;
   agreeTerms: boolean;
   onAgreeTermsChange: (val: boolean) => void;
+  wantUpdates: boolean;
+  onWantUpdatesChange: (val: boolean) => void;
   onBack: () => void;
   onNext: () => void;
 }
@@ -140,10 +139,7 @@ const EMPTY_CHILD: ChildInfo = {
   childGender: "",
   allergies: "",
   noAllergies: false,
-  comments: "",
-  dietaryRestrictions: "",
-  favoriteActivities: "",
-  napSchedule: "",
+  specialInstructions: "",
 };
 
 function generateTimeSlots() {
@@ -551,7 +547,7 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
 }
 
 // --- Step 3: Child Info (multi-child support) ---
-function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange, onBack, onNext }: StepChildInfoProps) {
+function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange, wantUpdates, onWantUpdatesChange, onBack, onNext }: StepChildInfoProps) {
   const [activeChild, setActiveChild] = useState(0);
 
   // Clamp activeChild if childrenInfo shrinks
@@ -685,61 +681,23 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
         </div>
       </div>
 
-      {/* Additional Info — combined comments, dietary, activities, nap */}
+      {/* Special Instructions */}
       <div className="bg-card rounded-xl border border-border p-4 sm:p-5 shadow-soft">
         <h3 className="flex items-center gap-2 font-semibold text-foreground mb-4">
           <FileText className="w-4 h-4 text-primary" />
-          Additional Information
+          Special Instructions
         </h3>
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-semibold text-foreground mb-1.5 block">
-              Special Needs, Behavior & Other Notes
-            </label>
-            <textarea
-              value={child.comments}
-              onChange={updateChild(index, "comments")}
-              placeholder="e.g. special needs, fears, routines, sleep habits, comfort methods..."
-              rows={4}
-              className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-foreground mb-1.5 block">
-              Dietary Restrictions
-            </label>
-            <input
-              type="text"
-              value={child.dietaryRestrictions}
-              onChange={updateChild(index, "dietaryRestrictions")}
-              placeholder="e.g. vegetarian, halal, sugar-free..."
-              className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-foreground mb-1.5 block">
-              Favorite Activities
-            </label>
-            <input
-              type="text"
-              value={child.favoriteActivities}
-              onChange={updateChild(index, "favoriteActivities")}
-              placeholder="e.g. drawing, reading, building blocks..."
-              className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-foreground mb-1.5 block">
-              Nap / Sleep Schedule
-            </label>
-            <input
-              type="text"
-              value={child.napSchedule}
-              onChange={updateChild(index, "napSchedule")}
-              placeholder="e.g. nap 1-3 PM, bedtime at 8 PM..."
-              className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-          </div>
+        <div>
+          <label className="text-sm font-semibold text-foreground mb-1.5 block">
+            Anything the nanny should know?
+          </label>
+          <textarea
+            value={child.specialInstructions}
+            onChange={updateChild(index, "specialInstructions")}
+            placeholder="e.g. dietary restrictions, nap schedule, fears, comfort methods, favorite activities, special needs..."
+            rows={4}
+            className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+          />
         </div>
       </div>
     </div>
@@ -787,17 +745,30 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
         <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground leading-relaxed mb-4">
           I authorize Call a Nanny to care for my child{childrenInfo.length > 1 ? "ren" : ""} according to the information provided above. I certify that all information is accurate and complete.
         </div>
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={agreeTerms}
-            onChange={(e) => onAgreeTermsChange(e.target.checked)}
-            className="w-4 h-4 rounded border-border text-primary focus:ring-primary mt-0.5"
-          />
-          <span className="text-sm text-foreground">
-            I agree to the general terms of service <span className="text-destructive">*</span>
-          </span>
-        </label>
+        <div className="space-y-3">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={agreeTerms}
+              onChange={(e) => onAgreeTermsChange(e.target.checked)}
+              className="w-4 h-4 rounded border-border text-primary focus:ring-primary mt-0.5"
+            />
+            <span className="text-sm text-foreground">
+              I agree to the general terms of service <span className="text-destructive">*</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={wantUpdates}
+              onChange={(e) => onWantUpdatesChange(e.target.checked)}
+              className="w-4 h-4 rounded border-border text-primary focus:ring-primary mt-0.5"
+            />
+            <span className="text-sm text-foreground">
+              I would like the nanny to send me regular updates with photos and videos of my child{childrenInfo.length > 1 ? "ren" : ""}
+            </span>
+          </label>
+        </div>
       </div>
 
       {/* Navigation */}
@@ -987,16 +958,10 @@ function StepReview({
                       <span className="text-foreground font-medium">Allergies:</span>{" "}
                       {allergiesSummary}
                     </p>
-                    {child.comments && (
+                    {child.specialInstructions && (
                       <p>
-                        <span className="text-foreground font-medium">Notes:</span>{" "}
-                        {child.comments}
-                      </p>
-                    )}
-                    {child.dietaryRestrictions && (
-                      <p>
-                        <span className="text-foreground font-medium">Diet:</span>{" "}
-                        {child.dietaryRestrictions}
+                        <span className="text-foreground font-medium">Special Instructions:</span>{" "}
+                        {child.specialInstructions}
                       </p>
                     )}
                   </div>
@@ -1129,6 +1094,7 @@ export default function Book() {
   // Step 3 state — array of children
   const [childrenInfo, setChildrenInfo] = useState<ChildInfo[]>([{ ...EMPTY_CHILD }]);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [wantUpdates, setWantUpdates] = useState(false);
 
   // Sync childrenInfo array length with numChildren
   useEffect(() => {
@@ -1191,11 +1157,9 @@ export default function Book() {
       } else if (child.allergies) {
         childSummaryParts.push(`${prefix}Allergies: ${child.allergies}`);
       }
-      if (child.comments) childSummaryParts.push(`${prefix}Notes: ${child.comments}`);
-      if (child.dietaryRestrictions) childSummaryParts.push(`${prefix}Diet: ${child.dietaryRestrictions}`);
-      if (child.favoriteActivities) childSummaryParts.push(`${prefix}Activities: ${child.favoriteActivities}`);
-      if (child.napSchedule) childSummaryParts.push(`${prefix}Nap/sleep: ${child.napSchedule}`);
+      if (child.specialInstructions) childSummaryParts.push(`${prefix}Special instructions: ${child.specialInstructions}`);
     });
+    childSummaryParts.push(`Photo/video updates: ${wantUpdates ? "Yes" : "No"}`);
 
     const enrichedNotes = [details.notes, "--- CHILD INFO ---", ...childSummaryParts].filter(Boolean).join("\n");
 
@@ -1240,10 +1204,7 @@ export default function Book() {
           childFields[`Child${label} Age`] = child.childAge || "N/A";
           childFields[`Child${label} Gender`] = child.childGender || "N/A";
           childFields[`Child${label} Allergies`] = child.noAllergies ? "None" : (child.allergies || "N/A");
-          childFields[`Child${label} Notes`] = child.comments || "N/A";
-          childFields[`Child${label} Diet`] = child.dietaryRestrictions || "None";
-          childFields[`Child${label} Activities`] = child.favoriteActivities || "N/A";
-          childFields[`Child${label} Nap Schedule`] = child.napSchedule || "N/A";
+          childFields[`Child${label} Special Instructions`] = child.specialInstructions || "N/A";
         });
 
         await fetch("https://api.web3forms.com/submit", {
@@ -1261,6 +1222,7 @@ export default function Book() {
             "Booking Time": `${startLabel} - ${endLabel}`,
             "Total Price": `${totalPrice} MAD`,
             "Number of Children": details.numChildren,
+            "Photo/Video Updates": wantUpdates ? "Yes" : "No",
             ...childFields,
           }),
         });
@@ -1308,6 +1270,7 @@ export default function Book() {
     });
     setChildrenInfo([{ ...EMPTY_CHILD }]);
     setAgreeTerms(false);
+    setWantUpdates(false);
     setIsSuccess(false);
   };
 
@@ -1379,6 +1342,8 @@ export default function Book() {
             onChange={setChildrenInfo}
             agreeTerms={agreeTerms}
             onAgreeTermsChange={setAgreeTerms}
+            wantUpdates={wantUpdates}
+            onWantUpdatesChange={setWantUpdates}
             onBack={() => setStep(2)}
             onNext={() => setStep(4)}
           />
