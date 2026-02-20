@@ -2,12 +2,13 @@ import { Outlet } from "react-router-dom";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 import { MessageCircle } from "lucide-react";
+import { useLanguage } from "../context/LanguageContext";
 
 export default function Layout() {
+  const { t } = useLanguage();
+
   const openWhatsApp = () => {
-    const msg = encodeURIComponent(
-      "Hi! I'd like to book a nanny through call a nanny. Can you help me?"
-    );
+    const msg = encodeURIComponent(t("layout.whatsappMessage"));
     window.open(`https://wa.me/212656643375?text=${msg}`, "_blank");
   };
 
@@ -27,7 +28,7 @@ export default function Layout() {
       >
         <MessageCircle className="w-7 h-7 group-hover:scale-110 transition-transform" />
         <span className="absolute right-full mr-3 bg-card text-foreground text-sm font-medium px-3 py-1.5 rounded-lg shadow-soft border border-border whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-          Book via WhatsApp
+          {t("layout.whatsappTooltip")}
         </span>
       </button>
     </div>

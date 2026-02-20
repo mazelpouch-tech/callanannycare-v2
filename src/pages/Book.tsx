@@ -13,6 +13,7 @@ import {
   isBefore,
   startOfDay,
 } from "date-fns";
+import { fr } from "date-fns/locale";
 import {
   ChevronLeft,
   ChevronRight,
@@ -35,6 +36,7 @@ import {
   Info,
 } from "lucide-react";
 import { useData } from "../context/DataContext";
+import { useLanguage } from "../context/LanguageContext";
 import type { BookingPlan } from "@/types";
 
 // ---- Interfaces ----
@@ -124,13 +126,6 @@ interface BookingSuccessProps {
 
 // ---- Constants ----
 
-const STEPS = [
-  { number: 1, label: "Date & Time" },
-  { number: 2, label: "Your Details" },
-  { number: 3, label: "Child Info" },
-  { number: 4, label: "Review" },
-];
-
 const EMPTY_CHILD: ChildInfo = {
   childFirstName: "",
   childLastName: "",
@@ -168,6 +163,15 @@ function calculateHours(startTime: string, endTime: string) {
 
 // --- Progress Bar ---
 function ProgressBar({ currentStep }: ProgressBarProps) {
+  const { t } = useLanguage();
+
+  const STEPS = [
+    { number: 1, label: t("book.stepDateTime") },
+    { number: 2, label: t("book.stepDetails") },
+    { number: 3, label: t("book.stepChildInfo") },
+    { number: 4, label: t("book.stepReview") },
+  ];
+
   return (
     <div className="w-full mb-8 md:mb-12">
       <div className="flex items-center justify-between max-w-2xl mx-auto">
@@ -223,6 +227,9 @@ function StepDateTime({
   onBack,
   onNext,
 }: StepDateTimeProps) {
+  const { t, locale } = useLanguage();
+  const dateFnsLocale = locale === "fr" ? fr : undefined;
+
   const [currentMonth, setCurrentMonth] = useState(
     selectedDates.length > 0 ? startOfMonth(selectedDates[0]) : startOfMonth(new Date())
   );
@@ -236,13 +243,17 @@ function StepDateTime({
 
   const isValid = selectedDates.length > 0 && startTime && endTime;
 
+  const dayHeaders = locale === "fr"
+    ? ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"]
+    : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
   return (
     <div>
       <h2 className="font-serif text-2xl sm:text-3xl font-bold text-foreground mb-2">
-        Choose Date & Time
+        {t("book.chooseDateTitle")}
       </h2>
       <p className="text-muted-foreground mb-6">
-        Pick your preferred dates and time slot.
+        {t("book.chooseDateSubtitle")}
       </p>
 
       {/* Calendar */}
@@ -256,7 +267,7 @@ function StepDateTime({
             <ChevronLeft className="w-5 h-5" />
           </button>
           <h3 className="font-serif font-bold text-lg text-foreground">
-            {format(currentMonth, "MMMM yyyy")}
+            {format(currentMonth, "MMMM yyyy", { locale: dateFnsLocale })}
           </h3>
           <button
             type="button"
@@ -268,7 +279,7 @@ function StepDateTime({
         </div>
 
         <div className="grid grid-cols-7 gap-1 mb-2">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+          {dayHeaders.map((d) => (
             <div
               key={d}
               className="text-center text-xs font-semibold text-muted-foreground py-2"
@@ -319,7 +330,7 @@ function StepDateTime({
               key={d.toISOString()}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium"
             >
-              {format(d, "EEE, MMM d")}
+              {format(d, "EEE, MMM d", { locale: dateFnsLocale })}
               <button
                 type="button"
                 onClick={() => onDateRemove(d)}
@@ -337,14 +348,14 @@ function StepDateTime({
         <div>
           <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
             <Clock className="w-4 h-4 text-primary" />
-            Start Time
+            {t("book.startTime")}
           </label>
           <select
             value={startTime}
             onChange={(e) => onStartTimeChange(e.target.value)}
             className="w-full rounded-lg border border-border bg-card p-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
-            <option value="">Select start time</option>
+            <option value="">{t("book.selectStartTime")}</option>
             {TIME_SLOTS.map((slot) => (
               <option key={`start-${slot.value}`} value={slot.value}>
                 {slot.label}
@@ -355,14 +366,14 @@ function StepDateTime({
         <div>
           <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
             <Clock className="w-4 h-4 text-primary" />
-            End Time
+            {t("book.endTime")}
           </label>
           <select
             value={endTime}
             onChange={(e) => onEndTimeChange(e.target.value)}
             className="w-full rounded-lg border border-border bg-card p-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
-            <option value="">Select end time</option>
+            <option value="">{t("book.selectEndTime")}</option>
             {TIME_SLOTS.map((slot) => (
               <option key={`end-${slot.value}`} value={slot.value}>
                 {slot.label}
@@ -381,7 +392,7 @@ function StepDateTime({
             className="flex items-center gap-2 px-5 py-3 rounded-full border border-border text-foreground font-semibold hover:bg-muted transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back
+            {t("common.back")}
           </button>
         )}
         <button
@@ -390,7 +401,7 @@ function StepDateTime({
           disabled={!isValid}
           className="gradient-warm text-white font-semibold px-6 py-3 rounded-full hover:opacity-90 transition-opacity shadow-warm disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
         >
-          Next
+          {t("common.next")}
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>
@@ -400,6 +411,8 @@ function StepDateTime({
 
 // --- Step 2: Your Details ---
 function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
+  const { t } = useLanguage();
+
   const handleChange = (field: keyof BookingDetails) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     onChange({ ...details, [field]: e.target.value });
   };
@@ -413,10 +426,10 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
   return (
     <div>
       <h2 className="font-serif text-2xl sm:text-3xl font-bold text-foreground mb-2">
-        Your Details
+        {t("book.yourDetailsTitle")}
       </h2>
       <p className="text-muted-foreground mb-6">
-        Tell us about yourself so we can prepare for your booking.
+        {t("book.yourDetailsSubtitle")}
       </p>
 
       <div className="space-y-4 max-w-xl">
@@ -424,14 +437,13 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
         <div>
           <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-1.5">
             <User className="w-4 h-4 text-primary" />
-            Full Name <span className="text-destructive">*</span>
+            {t("book.fullName")} <span className="text-destructive">*</span>
           </label>
           <input
             type="text"
             required
             value={details.fullName}
             onChange={handleChange("fullName")}
-            placeholder="Your full name"
             className="w-full rounded-lg border border-border p-3 bg-card text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
         </div>
@@ -440,7 +452,7 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
         <div>
           <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-1.5">
             <Mail className="w-4 h-4 text-primary" />
-            Email <span className="text-destructive">*</span>
+            {t("book.email")} <span className="text-destructive">*</span>
           </label>
           <input
             type="email"
@@ -456,7 +468,7 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
         <div>
           <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-1.5">
             <Phone className="w-4 h-4 text-primary" />
-            Phone <span className="text-destructive">*</span>
+            {t("book.phone")} <span className="text-destructive">*</span>
           </label>
           <input
             type="tel"
@@ -472,14 +484,14 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
         <div>
           <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-1.5">
             <Hotel className="w-4 h-4 text-primary" />
-            Hotel / Accommodation <span className="text-destructive">*</span>
+            {t("book.hotelAccommodation")} <span className="text-destructive">*</span>
           </label>
           <input
             type="text"
             required
             value={details.accommodation}
             onChange={handleChange("accommodation")}
-            placeholder="e.g. Riad Yasmine, Royal Mansour"
+            placeholder={t("book.hotelPlaceholder")}
             className="w-full rounded-lg border border-border p-3 bg-card text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
         </div>
@@ -488,7 +500,7 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
         <div>
           <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-1.5">
             <Baby className="w-4 h-4 text-primary" />
-            Number of Children
+            {t("book.numChildren")}
           </label>
           <select
             value={details.numChildren}
@@ -501,7 +513,7 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
           <div className="mt-2.5 flex items-start gap-2.5 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
             <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
-              Maximum 2 children per booking and they must be siblings. For non-sibling children, please create a separate booking.
+              {t("book.siblingsNotice")}
             </p>
           </div>
         </div>
@@ -510,12 +522,12 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
         <div>
           <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-1.5">
             <FileText className="w-4 h-4 text-primary" />
-            Special Notes <span className="text-muted-foreground text-xs">(optional)</span>
+            {t("book.specialNotes")} <span className="text-muted-foreground text-xs">({t("book.optional")})</span>
           </label>
           <textarea
             value={details.notes}
             onChange={handleChange("notes")}
-            placeholder="Any preferences or special requests..."
+            placeholder={t("book.specialNotesPlaceholder")}
             rows={3}
             className="w-full rounded-lg border border-border p-3 bg-card text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
           />
@@ -530,7 +542,7 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
           className="flex items-center gap-2 px-5 py-3 rounded-full border border-border text-foreground font-semibold hover:bg-muted transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back
+          {t("common.back")}
         </button>
         <button
           type="button"
@@ -538,7 +550,7 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
           disabled={!isValid}
           className="gradient-warm text-white font-semibold px-6 py-3 rounded-full hover:opacity-90 transition-opacity shadow-warm disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
         >
-          Next
+          {t("common.next")}
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>
@@ -548,7 +560,9 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
 
 // --- Step 3: Child Info (multi-child support) ---
 function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange, wantUpdates, onWantUpdatesChange, onBack, onNext }: StepChildInfoProps) {
+  const { t } = useLanguage();
   const [activeChild, setActiveChild] = useState(0);
+  const isPlural = childrenInfo.length > 1;
 
   // Clamp activeChild if childrenInfo shrinks
   useEffect(() => {
@@ -575,32 +589,30 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
       <div className="bg-card rounded-xl border border-border p-4 sm:p-5 shadow-soft">
         <h3 className="flex items-center gap-2 font-semibold text-foreground mb-4">
           <Baby className="w-4 h-4 text-primary" />
-          {childrenInfo.length > 1 ? `Child ${index + 1} Details` : "Child Details"}
+          {isPlural ? `${t("book.childDetails")} ${index + 1}` : t("book.childDetails")}
         </h3>
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-1.5">
-                First Name <span className="text-destructive">*</span>
+                {t("book.firstName")} <span className="text-destructive">*</span>
               </label>
               <input
                 type="text"
                 required
                 value={child.childFirstName}
                 onChange={updateChild(index, "childFirstName")}
-                placeholder="Child's first name"
                 className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
             </div>
             <div>
               <label className="text-sm font-semibold text-foreground mb-1.5 block">
-                Last Name
+                {t("book.lastName")}
               </label>
               <input
                 type="text"
                 value={child.childLastName}
                 onChange={updateChild(index, "childLastName")}
-                placeholder="Child's last name"
                 className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
             </div>
@@ -608,7 +620,7 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="text-sm font-semibold text-foreground mb-1.5 block">
-                Date of Birth
+                {t("book.dateOfBirth")}
               </label>
               <input
                 type="date"
@@ -619,19 +631,19 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
             </div>
             <div>
               <label className="text-sm font-semibold text-foreground mb-1.5 block">
-                Age
+                {t("book.age")}
               </label>
               <input
                 type="text"
                 value={child.childAge}
                 onChange={updateChild(index, "childAge")}
-                placeholder="e.g. 3 years"
+                placeholder={t("book.agePlaceholder")}
                 className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
             </div>
             <div>
               <label className="text-sm font-semibold text-foreground mb-1.5 block">
-                Gender
+                {t("book.gender")}
               </label>
               <select
                 value={child.childGender}
@@ -639,8 +651,8 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
                 className="w-full rounded-lg border border-border p-3 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
               >
                 <option value="">--</option>
-                <option value="boy">Boy</option>
-                <option value="girl">Girl</option>
+                <option value="boy">{t("book.boy")}</option>
+                <option value="girl">{t("book.girl")}</option>
               </select>
             </div>
           </div>
@@ -651,7 +663,7 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
       <div className="bg-card rounded-xl border border-border p-4 sm:p-5 shadow-soft">
         <h3 className="flex items-center gap-2 font-semibold text-foreground mb-4">
           <AlertTriangle className="w-4 h-4 text-primary" />
-          Allergies
+          {t("book.allergiesTitle")}
         </h3>
         <div className="space-y-4">
           <label className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 cursor-pointer">
@@ -661,18 +673,18 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
               onChange={updateChild(index, "noAllergies")}
               className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
             />
-            <span className="text-sm font-medium text-foreground">No known allergies</span>
+            <span className="text-sm font-medium text-foreground">{t("book.noKnownAllergies")}</span>
           </label>
 
           {!child.noAllergies && (
             <div>
               <label className="text-sm font-semibold text-foreground mb-1.5 block">
-                Any allergies we need to know about?
+                {t("book.allergiesQuestion")}
               </label>
               <textarea
                 value={child.allergies}
                 onChange={updateChild(index, "allergies")}
-                placeholder="e.g. peanuts, milk, penicillin, pollen, dust mites..."
+                placeholder={t("book.allergiesPlaceholder")}
                 rows={3}
                 className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
               />
@@ -685,16 +697,16 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
       <div className="bg-card rounded-xl border border-border p-4 sm:p-5 shadow-soft">
         <h3 className="flex items-center gap-2 font-semibold text-foreground mb-4">
           <FileText className="w-4 h-4 text-primary" />
-          Special Instructions
+          {t("book.specialInstructionsTitle")}
         </h3>
         <div>
           <label className="text-sm font-semibold text-foreground mb-1.5 block">
-            Anything the nanny should know?
+            {t("book.specialInstructionsQuestion")}
           </label>
           <textarea
             value={child.specialInstructions}
             onChange={updateChild(index, "specialInstructions")}
-            placeholder="e.g. dietary restrictions, nap schedule, fears, comfort methods, favorite activities, special needs..."
+            placeholder={t("book.specialInstructionsPlaceholder")}
             rows={4}
             className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
           />
@@ -706,14 +718,14 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
   return (
     <div>
       <h2 className="font-serif text-2xl sm:text-3xl font-bold text-foreground mb-2">
-        Child Information
+        {t("book.childInfoTitle")}
       </h2>
       <p className="text-muted-foreground mb-6">
-        Tell us about your child{childrenInfo.length > 1 ? "ren" : ""} so our nanny can provide the best care.
+        {isPlural ? t("book.childInfoSubtitlePlural") : t("book.childInfoSubtitle")}
       </p>
 
       {/* Child Tabs (only when more than 1 child) */}
-      {childrenInfo.length > 1 && (
+      {isPlural && (
         <div className="flex gap-2 mb-6">
           {childrenInfo.map((child, i) => (
             <button
@@ -726,7 +738,7 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
             >
-              Child {i + 1}
+              {t("book.childDetails")} {i + 1}
               {child.childFirstName ? `: ${child.childFirstName}` : ""}
             </button>
           ))}
@@ -740,10 +752,10 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
       <div className="bg-card rounded-xl border border-border p-4 sm:p-5 shadow-soft max-w-xl mt-6">
         <h3 className="flex items-center gap-2 font-semibold text-foreground mb-4">
           <Shield className="w-4 h-4 text-primary" />
-          Consent & Authorization
+          {t("book.consentTitle")}
         </h3>
         <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground leading-relaxed mb-4">
-          I authorize Call a Nanny to care for my child{childrenInfo.length > 1 ? "ren" : ""} according to the information provided above. I certify that all information is accurate and complete.
+          {isPlural ? t("book.consentTextPlural") : t("book.consentText")}
         </div>
         <div className="space-y-3">
           <label className="flex items-start gap-3 cursor-pointer">
@@ -754,7 +766,7 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
               className="w-4 h-4 rounded border-border text-primary focus:ring-primary mt-0.5"
             />
             <span className="text-sm text-foreground">
-              I agree to the general terms of service <span className="text-destructive">*</span>
+              {t("book.agreeTerms")} <span className="text-destructive">*</span>
             </span>
           </label>
           <label className="flex items-start gap-3 cursor-pointer">
@@ -765,7 +777,7 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
               className="w-4 h-4 rounded border-border text-primary focus:ring-primary mt-0.5"
             />
             <span className="text-sm text-foreground">
-              I would like the nanny to send me regular updates with photos and videos of my child{childrenInfo.length > 1 ? "ren" : ""}
+              {isPlural ? t("book.wantUpdatesPlural") : t("book.wantUpdates")}
             </span>
           </label>
         </div>
@@ -779,7 +791,7 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
           className="flex items-center gap-2 px-5 py-3 rounded-full border border-border text-foreground font-semibold hover:bg-muted transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back
+          {t("common.back")}
         </button>
         <button
           type="button"
@@ -787,7 +799,7 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
           disabled={!isValid}
           className="gradient-warm text-white font-semibold px-6 py-3 rounded-full hover:opacity-90 transition-opacity shadow-warm disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
         >
-          Next
+          {t("common.next")}
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>
@@ -809,16 +821,20 @@ function StepReview({
   onConfirm,
   isSubmitting,
 }: StepReviewProps) {
+  const { t, locale } = useLanguage();
+  const dateFnsLocale = locale === "fr" ? fr : undefined;
+  const isPlural = childrenInfo.length > 1;
+
   const startLabel = TIME_SLOTS.find((s) => s.value === startTime)?.label || startTime;
   const endLabel = TIME_SLOTS.find((s) => s.value === endTime)?.label || endTime;
 
   return (
     <div>
       <h2 className="font-serif text-2xl sm:text-3xl font-bold text-foreground mb-2">
-        Review & Confirm
+        {t("book.reviewTitle")}
       </h2>
       <p className="text-muted-foreground mb-6">
-        Please review your booking details before confirming.
+        {t("book.reviewSubtitle")}
       </p>
 
       <div className="bg-card rounded-xl border border-border p-5 sm:p-6 shadow-soft max-w-2xl">
@@ -828,8 +844,8 @@ function StepReview({
             <User className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold text-foreground">Nanny Assignment</h3>
-            <p className="text-sm text-muted-foreground">A nanny will be assigned automatically</p>
+            <h3 className="font-semibold text-foreground">{t("book.nannyAssignment")}</h3>
+            <p className="text-sm text-muted-foreground">{t("book.nannyAutoAssign")}</p>
           </div>
         </div>
 
@@ -838,27 +854,27 @@ function StepReview({
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Calendar className="w-4 h-4 text-primary" />
-              Date & Time
+              {t("book.dateTime")}
             </span>
             <button
               type="button"
               onClick={() => onEdit(1)}
               className="text-sm text-primary font-semibold hover:underline"
             >
-              Edit
+              {t("common.edit")}
             </button>
           </div>
           <div className="space-y-1 text-sm text-muted-foreground">
             <div>
-              <span className="text-foreground font-medium">Dates:</span>
+              <span className="text-foreground font-medium">{t("book.dates")}:</span>
               <ul className="ml-4 mt-1 space-y-0.5">
                 {selectedDates.map((d) => (
-                  <li key={d.toISOString()}>{format(d, "EEEE, MMMM d, yyyy")}</li>
+                  <li key={d.toISOString()}>{format(d, "EEEE, MMMM d, yyyy", { locale: dateFnsLocale })}</li>
                 ))}
               </ul>
             </div>
             <p className="mt-2">
-              <span className="text-foreground font-medium">Time:</span>{" "}
+              <span className="text-foreground font-medium">{t("book.time")}:</span>{" "}
               {startLabel} - {endLabel}
             </p>
           </div>
@@ -869,40 +885,40 @@ function StepReview({
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-semibold text-foreground flex items-center gap-2">
               <User className="w-4 h-4 text-primary" />
-              Your Details
+              {t("book.yourDetails")}
             </span>
             <button
               type="button"
               onClick={() => onEdit(2)}
               className="text-sm text-primary font-semibold hover:underline"
             >
-              Edit
+              {t("common.edit")}
             </button>
           </div>
           <div className="space-y-1 text-sm text-muted-foreground">
             <p>
-              <span className="text-foreground font-medium">Name:</span>{" "}
+              <span className="text-foreground font-medium">{t("book.name")}:</span>{" "}
               {details.fullName}
             </p>
             <p>
-              <span className="text-foreground font-medium">Email:</span>{" "}
+              <span className="text-foreground font-medium">{t("book.email")}:</span>{" "}
               {details.email}
             </p>
             <p>
-              <span className="text-foreground font-medium">Phone:</span>{" "}
+              <span className="text-foreground font-medium">{t("book.phone")}:</span>{" "}
               {details.phone}
             </p>
             <p>
-              <span className="text-foreground font-medium">Accommodation:</span>{" "}
+              <span className="text-foreground font-medium">{t("book.accommodation")}:</span>{" "}
               {details.accommodation}
             </p>
             <p>
-              <span className="text-foreground font-medium">Children:</span>{" "}
+              <span className="text-foreground font-medium">{t("book.children")}:</span>{" "}
               {details.numChildren}
             </p>
             {details.notes && (
               <p>
-                <span className="text-foreground font-medium">Notes:</span>{" "}
+                <span className="text-foreground font-medium">{t("book.notes")}:</span>{" "}
                 {details.notes}
               </p>
             )}
@@ -914,14 +930,14 @@ function StepReview({
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Baby className="w-4 h-4 text-primary" />
-              Child{childrenInfo.length > 1 ? "ren" : ""} Info
+              {isPlural ? t("book.childrenInfo") : t("book.childInfo")}
             </span>
             <button
               type="button"
               onClick={() => onEdit(3)}
               className="text-sm text-primary font-semibold hover:underline"
             >
-              Edit
+              {t("common.edit")}
             </button>
           </div>
           <div className="space-y-4">
@@ -931,36 +947,36 @@ function StepReview({
                 : child.allergies || "Not specified";
 
               return (
-                <div key={i} className={childrenInfo.length > 1 ? "pl-3 border-l-2 border-primary/20" : ""}>
-                  {childrenInfo.length > 1 && (
+                <div key={i} className={isPlural ? "pl-3 border-l-2 border-primary/20" : ""}>
+                  {isPlural && (
                     <p className="text-xs font-bold text-primary uppercase tracking-wide mb-1">
-                      Child {i + 1}
+                      {t("book.childDetails")} {i + 1}
                     </p>
                   )}
                   <div className="space-y-1 text-sm text-muted-foreground">
                     <p>
-                      <span className="text-foreground font-medium">Name:</span>{" "}
+                      <span className="text-foreground font-medium">{t("book.name")}:</span>{" "}
                       {child.childFirstName} {child.childLastName}
                     </p>
                     {(child.childAge || child.childDob) && (
                       <p>
-                        <span className="text-foreground font-medium">Age / DOB:</span>{" "}
+                        <span className="text-foreground font-medium">{t("book.age")} / {t("book.dateOfBirth")}:</span>{" "}
                         {child.childAge}{child.childAge && child.childDob ? " / " : ""}{child.childDob}
                       </p>
                     )}
                     {child.childGender && (
                       <p>
-                        <span className="text-foreground font-medium">Gender:</span>{" "}
-                        {child.childGender === "boy" ? "Boy" : "Girl"}
+                        <span className="text-foreground font-medium">{t("book.gender")}:</span>{" "}
+                        {child.childGender === "boy" ? t("book.boy") : t("book.girl")}
                       </p>
                     )}
                     <p>
-                      <span className="text-foreground font-medium">Allergies:</span>{" "}
+                      <span className="text-foreground font-medium">{t("book.allergies")}:</span>{" "}
                       {allergiesSummary}
                     </p>
                     {child.specialInstructions && (
                       <p>
-                        <span className="text-foreground font-medium">Special Instructions:</span>{" "}
+                        <span className="text-foreground font-medium">{t("book.specialInstructions")}:</span>{" "}
                         {child.specialInstructions}
                       </p>
                     )}
@@ -988,11 +1004,11 @@ function StepReview({
             className="gradient-warm text-white font-bold px-8 py-3.5 rounded-full hover:opacity-90 transition-opacity shadow-warm text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isSubmitting ? (
-              <span className="animate-pulse">Submitting...</span>
+              <span className="animate-pulse">{t("common.submitting")}</span>
             ) : (
               <>
                 <CheckCircle className="w-5 h-5" />
-                Confirm Booking
+                {t("book.confirmBooking")}
               </>
             )}
           </button>
@@ -1004,6 +1020,8 @@ function StepReview({
 
 // --- Success State ---
 function BookingSuccess({ onBookAnother, onGoHome, bookingData }: BookingSuccessProps) {
+  const { t } = useLanguage();
+
   const buildWhatsAppUrl = () => {
     const datesText = bookingData?.dates?.map((d) => d).join(", ") ?? "";
     const msg = encodeURIComponent(
@@ -1030,11 +1048,10 @@ function BookingSuccess({ onBookAnother, onGoHome, bookingData }: BookingSuccess
         <div className="absolute inset-0 w-20 h-20 rounded-full gradient-warm opacity-30 animate-ping" />
       </div>
       <h2 className="font-serif text-3xl sm:text-4xl font-bold text-foreground mb-3">
-        Booking Submitted!
+        {t("book.successTitle")}
       </h2>
       <p className="text-muted-foreground text-lg max-w-md mb-8">
-        We&apos;ll confirm your booking shortly. A WhatsApp message has been
-        opened with your booking details.
+        {t("book.successMessage")}
       </p>
 
       <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
@@ -1044,7 +1061,7 @@ function BookingSuccess({ onBookAnother, onGoHome, bookingData }: BookingSuccess
           className="flex-1 bg-green-500 text-white font-semibold px-5 py-3 rounded-full hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
         >
           <MessageCircle className="w-4 h-4" />
-          Send via WhatsApp
+          {t("book.sendWhatsApp")}
         </button>
         <button
           type="button"
@@ -1052,7 +1069,7 @@ function BookingSuccess({ onBookAnother, onGoHome, bookingData }: BookingSuccess
           className="flex-1 gradient-warm text-white font-semibold px-5 py-3 rounded-full hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2"
         >
           <Calendar className="w-4 h-4" />
-          Book Another
+          {t("book.bookAnother")}
         </button>
       </div>
       <button
@@ -1061,7 +1078,7 @@ function BookingSuccess({ onBookAnother, onGoHome, bookingData }: BookingSuccess
         className="mt-3 px-6 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5"
       >
         <ArrowLeft className="w-3.5 h-3.5" />
-        Back to Home
+        {t("book.backToHome")}
       </button>
     </div>
   );
@@ -1070,6 +1087,7 @@ function BookingSuccess({ onBookAnother, onGoHome, bookingData }: BookingSuccess
 // --- Main Book Component ---
 export default function Book() {
   const { addBooking } = useData();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
@@ -1133,7 +1151,7 @@ export default function Book() {
     setSelectedDates((prev) => prev.filter((d) => !isSameDay(d, date)));
   };
 
-  const WEB3FORMS_KEY = "YOUR_ACCESS_KEY_HERE";
+  const WEB3FORMS_KEY = import.meta.env.VITE_WEB3FORMS_KEY || "";
 
   const handleConfirm = async () => {
     if (selectedDates.length === 0) return;
@@ -1193,42 +1211,62 @@ export default function Book() {
         await addBooking(bookingPayload);
       }
 
-      // Send child info to Web3Forms once after all bookings
-      try {
-        // Build child fields for Web3Forms
-        const childFields: Record<string, string> = {};
-        childrenInfo.forEach((child, idx) => {
-          const label = childrenInfo.length > 1 ? ` ${idx + 1}` : "";
-          childFields[`Child${label} Name`] = `${child.childFirstName} ${child.childLastName || ""}`.trim();
-          childFields[`Child${label} DOB`] = child.childDob || "N/A";
-          childFields[`Child${label} Age`] = child.childAge || "N/A";
-          childFields[`Child${label} Gender`] = child.childGender || "N/A";
-          childFields[`Child${label} Allergies`] = child.noAllergies ? "None" : (child.allergies || "N/A");
-          childFields[`Child${label} Special Instructions`] = child.specialInstructions || "N/A";
-        });
+      // Send booking info to Web3Forms (email to info@callanannycare.com)
+      if (WEB3FORMS_KEY) {
+        try {
+          const childFields: Record<string, string> = {};
+          childrenInfo.forEach((child, idx) => {
+            const label = childrenInfo.length > 1 ? ` ${idx + 1}` : "";
+            childFields[`Child${label} Name`] = `${child.childFirstName} ${child.childLastName || ""}`.trim();
+            childFields[`Child${label} DOB`] = child.childDob || "N/A";
+            childFields[`Child${label} Age`] = child.childAge || "N/A";
+            childFields[`Child${label} Gender`] = child.childGender || "N/A";
+            childFields[`Child${label} Allergies`] = child.noAllergies ? "None" : (child.allergies || "N/A");
+            childFields[`Child${label} Special Instructions`] = child.specialInstructions || "N/A";
+          });
 
-        await fetch("https://api.web3forms.com/submit", {
+          await fetch("https://api.web3forms.com/submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              access_key: WEB3FORMS_KEY,
+              subject: `New Booking: ${allChildNames} (${details.fullName})`,
+              from_name: "Call a Nanny - Booking Form",
+              "Parent Name": details.fullName,
+              "Parent Phone": details.phone,
+              "Parent Email": details.email,
+              "Hotel / Address": details.accommodation,
+              "Booking Dates": selectedDates.map((d) => format(d, "yyyy-MM-dd")).join(", "),
+              "Booking Time": `${startLabel} - ${endLabel}`,
+              "Total Price": `${totalPrice} MAD`,
+              "Number of Children": details.numChildren,
+              "Photo/Video Updates": wantUpdates ? "Yes" : "No",
+              ...childFields,
+            }),
+          });
+        } catch {
+          console.warn("Web3Forms submission failed, booking still saved.");
+        }
+      }
+
+      // Send WhatsApp notification to business
+      try {
+        await fetch("/api/notify-booking", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            access_key: WEB3FORMS_KEY,
-            subject: `Booking Child Info: ${allChildNames} (${details.fullName})`,
-            from_name: "Call a Nanny - Booking Form",
-            "Parent Name": details.fullName,
-            "Parent Phone": details.phone,
-            "Parent Email": details.email,
-            "Hotel / Address": details.accommodation,
-            "Booking Dates": selectedDates.map((d) => format(d, "yyyy-MM-dd")).join(", "),
-            "Booking Time": `${startLabel} - ${endLabel}`,
-            "Total Price": `${totalPrice} MAD`,
-            "Number of Children": details.numChildren,
-            "Photo/Video Updates": wantUpdates ? "Yes" : "No",
-            ...childFields,
+            clientName: details.fullName,
+            clientPhone: details.phone,
+            hotel: details.accommodation,
+            dates: selectedDates.map((d) => format(d, "yyyy-MM-dd")),
+            time: `${startLabel} - ${endLabel}`,
+            childrenCount: Number(details.numChildren),
+            childNames: allChildNames,
+            totalPrice,
           }),
         });
       } catch {
-        // Web3Forms send is best-effort; don't block booking success
-        console.warn("Web3Forms submission failed, booking still saved.");
+        console.warn("WhatsApp notification failed, booking still saved.");
       }
 
       const lastBooking: LastBookingData = {
@@ -1302,10 +1340,10 @@ export default function Book() {
         {/* Header */}
         <div className="text-center mb-6">
           <h1 className="font-serif text-3xl sm:text-4xl font-bold text-foreground">
-            Book a Nanny
+            {t("book.title")}
           </h1>
           <p className="text-muted-foreground mt-2">
-            Secure, trusted childcare for your stay in Marrakech.
+            {t("book.subtitle")}
           </p>
         </div>
 

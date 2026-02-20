@@ -1,21 +1,24 @@
 import { Link } from "react-router-dom";
 import { Mail, Phone, MapPin, Heart } from "lucide-react";
-
-const quickLinks = [
-  { label: "Home", to: "/" },
-  { label: "Our Nannies", to: "/nannies" },
-  { label: "How It Works", to: "/how-it-works" },
-  { label: "Book a Nanny", to: "/book" },
-];
-
-const services = [
-  "Hourly Care",
-  "Half-Day Care",
-  "Full-Day Care",
-  "Hotel Babysitting",
-];
+import { useLanguage } from "../context/LanguageContext";
 
 export default function Footer() {
+  const { t } = useLanguage();
+
+  const quickLinks = [
+    { label: t("footer.home"), to: "/" },
+    { label: t("footer.ourNannies"), to: "/nannies" },
+    { label: t("footer.howItWorks"), to: "/how-it-works" },
+    { label: t("footer.bookANanny"), to: "/book" },
+  ];
+
+  const services = [
+    t("footer.hourlyCare"),
+    t("footer.hotelBabysitting"),
+    t("footer.eventChildcare"),
+    t("footer.regularCare"),
+  ];
+
   return (
     <footer className="bg-foreground text-background">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
@@ -24,21 +27,21 @@ export default function Footer() {
           <div className="space-y-4">
             <h3 className="font-serif text-2xl font-bold">call a nanny</h3>
             <p className="text-background/70 text-sm leading-relaxed">
-              Trusted childcare services in Marrakech
+              {t("footer.description")}
             </p>
             <div className="flex items-center gap-1 text-sm text-background/50">
-              Made with <Heart className="w-4 h-4 text-primary fill-primary" /> in Marrakech
+              {t("footer.madeWith")} <Heart className="w-4 h-4 text-primary fill-primary" /> {t("footer.inMarrakech")}
             </div>
           </div>
 
           {/* Quick Links */}
           <div>
             <h4 className="font-semibold text-sm uppercase tracking-wider mb-4 text-background/90">
-              Quick Links
+              {t("footer.quickLinks")}
             </h4>
             <ul className="space-y-3">
               {quickLinks.map((link) => (
-                <li key={link.label}>
+                <li key={link.to}>
                   <Link
                     to={link.to}
                     className="text-background/70 hover:text-background text-sm transition-colors"
@@ -53,7 +56,7 @@ export default function Footer() {
           {/* Services */}
           <div>
             <h4 className="font-semibold text-sm uppercase tracking-wider mb-4 text-background/90">
-              Services
+              {t("footer.services")}
             </h4>
             <ul className="space-y-3">
               {services.map((service) => (
@@ -70,7 +73,7 @@ export default function Footer() {
           {/* Contact */}
           <div>
             <h4 className="font-semibold text-sm uppercase tracking-wider mb-4 text-background/90">
-              Contact
+              {t("footer.contact")}
             </h4>
             <ul className="space-y-3">
               <li>
@@ -105,8 +108,8 @@ export default function Footer() {
       {/* Bottom Bar */}
       <div className="border-t border-background/10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-background/50">
-          <p>&copy; {new Date().getFullYear()} call a nanny. All rights reserved.</p>
-          <p>Professional Childcare Services</p>
+          <p>&copy; {new Date().getFullYear()} call a nanny. {t("footer.allRights")}</p>
+          <p>{t("footer.professionalChildcare")}</p>
         </div>
       </div>
     </footer>

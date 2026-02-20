@@ -9,58 +9,7 @@ import {
   HelpCircle,
   CheckCircle,
 } from "lucide-react";
-
-const steps = [
-  {
-    number: 1,
-    title: "Browse & Choose",
-    icon: Search,
-    description:
-      "Browse verified nannies in your area of Marrakech. View profiles, ratings, and specialties.",
-  },
-  {
-    number: 2,
-    title: "Book Your Session",
-    icon: Calendar,
-    description:
-      "Select your dates, time, and preferred nanny. Book multiple days at once.",
-  },
-  {
-    number: 3,
-    title: "Enjoy Peace of Mind",
-    icon: Heart,
-    description:
-      "Enjoy peace of mind with trusted childcare. Rate your experience.",
-  },
-];
-
-const faqs = [
-  {
-    question: "How are nannies verified?",
-    answer:
-      "All our nannies undergo thorough background checks, provide verified certifications in childcare and first aid, and supply professional references that we personally contact. We also conduct in-person interviews to ensure the highest standard of care for your children.",
-  },
-  {
-    question: "Can I book same-day?",
-    answer:
-      "Yes, same-day bookings are available subject to nanny availability. We recommend booking as early as possible to secure your preferred nanny, but our platform is designed to accommodate last-minute needs whenever possible.",
-  },
-  {
-    question: "What if I need to cancel?",
-    answer:
-      "We offer free cancellation up to 24 hours before your scheduled session. Cancellations made within 24 hours may be subject to a cancellation fee. You can manage your bookings easily through your account.",
-  },
-  {
-    question: "Do nannies come to our hotel?",
-    answer:
-      "Yes, our nannies provide in-home and in-hotel childcare services anywhere in Marrakech. Whether you are staying at a riad, hotel, or private villa, our nannies will come directly to your location for your convenience.",
-  },
-  {
-    question: "What ages do you cover?",
-    answer:
-      "Our nannies are experienced with children aged 0 to 12 years. Each nanny has specialties listed on their profile, so you can find the best match for your child's age group and specific needs.",
-  },
-];
+import { useLanguage } from "../context/LanguageContext";
 
 interface FAQItemProps {
   faq: { question: string; answer: string };
@@ -97,16 +46,62 @@ function FAQItem({ faq }: FAQItemProps) {
 }
 
 export default function HowItWorks() {
+  const { t } = useLanguage();
+
+  const steps = [
+    {
+      number: 1,
+      title: t("howItWorks.step1Title"),
+      icon: Search,
+      description: t("howItWorks.step1Desc"),
+    },
+    {
+      number: 2,
+      title: t("howItWorks.step2Title"),
+      icon: Calendar,
+      description: t("howItWorks.step2Desc"),
+    },
+    {
+      number: 3,
+      title: t("howItWorks.step3Title"),
+      icon: Heart,
+      description: t("howItWorks.step3Desc"),
+    },
+  ];
+
+  const faqs = [
+    {
+      question: t("howItWorks.faq1Q"),
+      answer: t("howItWorks.faq1A"),
+    },
+    {
+      question: t("howItWorks.faq2Q"),
+      answer: t("howItWorks.faq2A"),
+    },
+    {
+      question: t("howItWorks.faq3Q"),
+      answer: t("howItWorks.faq3A"),
+    },
+    {
+      question: t("howItWorks.faq4Q"),
+      answer: t("howItWorks.faq4A"),
+    },
+    {
+      question: t("howItWorks.faq5Q"),
+      answer: t("howItWorks.faq5A"),
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-background">
       {/* Hero */}
       <section className="gradient-warm py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">
-            How It Works
+            {t("howItWorks.title")}
           </h1>
           <p className="text-white/80 text-lg max-w-2xl mx-auto">
-            Booking a nanny in Marrakech has never been easier
+            {t("howItWorks.subtitle")}
           </p>
         </div>
       </section>
@@ -153,11 +148,11 @@ export default function HowItWorks() {
             <div className="flex items-center justify-center gap-2 mb-4">
               <CheckCircle className="w-6 h-6 text-primary" />
               <span className="text-sm font-medium text-primary uppercase tracking-wider">
-                FAQ
+                {t("howItWorks.faqLabel")}
               </span>
             </div>
             <h2 className="font-serif text-2xl sm:text-3xl font-bold text-foreground">
-              Frequently Asked Questions
+              {t("howItWorks.faqTitle")}
             </h2>
           </div>
 
@@ -173,17 +168,17 @@ export default function HowItWorks() {
       <section className="py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="font-serif text-2xl sm:text-3xl font-bold text-foreground mb-4">
-            Ready to Book?
+            {t("howItWorks.ctaTitle")}
           </h2>
           <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
-            Find the perfect nanny for your family in Marrakech today.
+            {t("howItWorks.ctaSubtitle")}
           </p>
           <Link
             to="/book"
             className="inline-flex items-center gap-2 gradient-warm text-white font-semibold px-8 py-3.5 rounded-full hover:opacity-90 transition-opacity shadow-warm text-lg"
           >
             <Calendar className="w-5 h-5" />
-            Book a Nanny
+            {t("common.bookANanny")}
           </Link>
         </div>
       </section>

@@ -11,11 +11,13 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useData } from "../context/DataContext";
+import { useLanguage } from "../context/LanguageContext";
 import type { Nanny } from "../types";
 import NannyCard from "../components/NannyCard";
 
 export default function Nannies() {
   const { nannies } = useData();
+  const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [availability, setAvailability] = useState("all");
   const [sortBy, setSortBy] = useState("rating");
@@ -89,10 +91,10 @@ export default function Nannies() {
       <section className="gradient-warm py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">
-            Our Verified Nannies
+            {t("nannies.title")}
           </h1>
           <p className="text-white/80 text-lg max-w-2xl mx-auto">
-            Browse our verified nannies in Marrakech. Filter by language, specialty, or availability.
+            {t("nannies.subtitle")}
           </p>
         </div>
       </section>
@@ -103,7 +105,7 @@ export default function Nannies() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2 text-muted-foreground">
               <SlidersHorizontal className="w-5 h-5" />
-              <span className="text-sm font-medium">Filter & Sort</span>
+              <span className="text-sm font-medium">{t("nannies.filterSort")}</span>
               {activeFilterCount > 0 && (
                 <span className="bg-primary text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full">
                   {activeFilterCount}
@@ -119,7 +121,7 @@ export default function Nannies() {
                 }}
                 className="text-xs text-primary hover:underline font-medium"
               >
-                Clear all
+                {t("nannies.clearAll")}
               </button>
             )}
           </div>
@@ -130,7 +132,7 @@ export default function Nannies() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Name, location, specialty..."
+                placeholder={t("nannies.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
@@ -145,8 +147,8 @@ export default function Nannies() {
                 onChange={(e) => setAvailability(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
               >
-                <option value="all">All Nannies</option>
-                <option value="available">Available Only</option>
+                <option value="all">{t("nannies.allNannies")}</option>
+                <option value="available">{t("nannies.availableOnly")}</option>
               </select>
             </div>
 
@@ -158,7 +160,7 @@ export default function Nannies() {
                 onChange={(e) => setLanguageFilter(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
               >
-                <option value="all">All Languages</option>
+                <option value="all">{t("nannies.allLanguages")}</option>
                 {allLanguages.map((lang) => (
                   <option key={lang} value={lang}>{lang}</option>
                 ))}
@@ -173,11 +175,11 @@ export default function Nannies() {
                 onChange={(e) => setSortBy(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors cursor-pointer"
               >
-                <option value="rating">Sort by Rating</option>
-                <option value="name">Sort by Name</option>
-                <option value="experience">Sort by Experience</option>
-                <option value="price-low">Price: Low to High</option>
-                <option value="price-high">Price: High to Low</option>
+                <option value="rating">{t("nannies.sortByRating")}</option>
+                <option value="name">{t("nannies.sortByName")}</option>
+                <option value="experience">{t("nannies.sortByExperience")}</option>
+                <option value="price-low">{t("nannies.priceLowHigh")}</option>
+                <option value="price-high">{t("nannies.priceHighLow")}</option>
               </select>
             </div>
           </div>
@@ -187,7 +189,7 @@ export default function Nannies() {
       {/* Results count */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6">
         <p className="text-sm text-muted-foreground">
-          {filteredNannies.length} nann{filteredNannies.length !== 1 ? "ies" : "y"} found
+          {filteredNannies.length} {filteredNannies.length !== 1 ? t("nannies.nanniesPlural") : t("nannies.nanny")} {t("nannies.found")}
         </p>
       </section>
 
@@ -207,10 +209,10 @@ export default function Nannies() {
           <div className="text-center py-20">
             <Search className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">
-              No nannies found
+              {t("nannies.noResults")}
             </h3>
             <p className="text-muted-foreground text-sm max-w-md mx-auto">
-              Try adjusting your search or filter criteria to find available nannies.
+              {t("nannies.noResultsHint")}
             </p>
           </div>
         )}
@@ -249,7 +251,7 @@ export default function Nannies() {
               )}
               {!selectedNanny.available && (
                 <span className="absolute top-4 left-4 bg-muted text-muted-foreground text-xs font-semibold px-3 py-1 rounded-full">
-                  Currently Unavailable
+                  {t("nannies.currentlyUnavailable")}
                 </span>
               )}
             </div>
@@ -271,7 +273,7 @@ export default function Nannies() {
                   </div>
                   {selectedNanny.experience && (
                     <span className="text-sm text-muted-foreground">
-                      {selectedNanny.experience} experience
+                      {selectedNanny.experience} {t("nannies.experience")}
                     </span>
                   )}
                 </div>
@@ -280,7 +282,7 @@ export default function Nannies() {
               {/* Bio */}
               {selectedNanny.bio && (
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-1.5">About</h3>
+                  <h3 className="text-sm font-semibold text-foreground mb-1.5">{t("nannies.about")}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {selectedNanny.bio}
                   </p>
@@ -290,7 +292,7 @@ export default function Nannies() {
               {/* Specialties */}
               {selectedNanny.specialties?.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-2">Specialties</h3>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">{t("nannies.specialties")}</h3>
                   <div className="flex flex-wrap gap-1.5">
                     {selectedNanny.specialties.map((s) => (
                       <span
@@ -307,7 +309,7 @@ export default function Nannies() {
               {/* Languages */}
               {selectedNanny.languages?.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-2">Languages</h3>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">{t("nannies.languages")}</h3>
                   <div className="flex flex-wrap gap-1.5">
                     {selectedNanny.languages.map((l) => (
                       <span
@@ -324,9 +326,9 @@ export default function Nannies() {
               {/* Rate & Book */}
               <div className="flex items-center justify-between pt-4 border-t border-border">
                 <div>
-                  <p className="text-sm text-muted-foreground">Hourly Rate</p>
+                  <p className="text-sm text-muted-foreground">{t("nannies.hourlyRate")}</p>
                   <p className="text-2xl font-bold text-foreground">
-                    {selectedNanny.rate} <span className="text-sm font-normal text-muted-foreground">MAD/hr</span>
+                    {selectedNanny.rate} <span className="text-sm font-normal text-muted-foreground">{t("common.madPerHour")}</span>
                   </p>
                 </div>
                 {selectedNanny.available && (
@@ -335,7 +337,7 @@ export default function Nannies() {
                     onClick={() => setSelectedNanny(null)}
                     className="gradient-warm text-white font-semibold px-6 py-2.5 rounded-full hover:opacity-90 transition-opacity shadow-warm flex items-center gap-2"
                   >
-                    Book Now
+                    {t("common.bookNow")}
                     <ArrowRight className="w-4 h-4" />
                   </Link>
                 )}

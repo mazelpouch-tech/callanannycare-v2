@@ -1,21 +1,18 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Phone } from "lucide-react";
-
-interface NavLink {
-  label: string;
-  to: string;
-}
-
-const navLinks: NavLink[] = [
-  { label: "How It Works", to: "/how-it-works" },
-  { label: "Our Nannies", to: "/nannies" },
-  { label: "Pricing", to: "/#pricing" },
-];
+import { Menu, X, Phone, Globe } from "lucide-react";
+import { useLanguage } from "../context/LanguageContext";
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
   const location = useLocation();
+  const { t, locale, setLocale } = useLanguage();
+
+  const navLinks = [
+    { label: t("nav.howItWorks"), to: "/how-it-works" },
+    { label: t("nav.ourNannies"), to: "/nannies" },
+    { label: t("nav.pricing"), to: "/#pricing" },
+  ];
 
   const handlePricingClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (location.pathname === "/") {
@@ -26,6 +23,10 @@ export default function Navbar() {
       }
       setMobileOpen(false);
     }
+  };
+
+  const toggleLanguage = () => {
+    setLocale(locale === "en" ? "fr" : "en");
   };
 
   return (
@@ -44,7 +45,7 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-8">
             {navLinks.map((link) => (
               <Link
-                key={link.label}
+                key={link.to}
                 to={link.to}
                 onClick={link.to === "/#pricing" ? handlePricingClick : undefined}
                 className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
@@ -52,12 +53,23 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
+
+            {/* Language Switcher */}
+            <button
+              onClick={toggleLanguage}
+              className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-muted"
+              aria-label="Switch language"
+            >
+              <Globe className="w-4 h-4" />
+              {t("common.switchLang")}
+            </button>
+
             <Link
               to="/book"
               className="gradient-warm text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:opacity-90 transition-opacity shadow-warm flex items-center gap-2"
             >
               <Phone className="w-4 h-4" />
-              Book Now
+              {t("common.bookNow")}
             </Link>
           </div>
 
@@ -102,7 +114,7 @@ export default function Navbar() {
         <div className="flex flex-col p-4 gap-1">
           {navLinks.map((link) => (
             <Link
-              key={link.label}
+              key={link.to}
               to={link.to}
               onClick={(e) => {
                 if (link.to === "/#pricing") handlePricingClick(e);
@@ -114,6 +126,18 @@ export default function Navbar() {
             </Link>
           ))}
 
+          {/* Mobile Language Switcher */}
+          <button
+            onClick={() => {
+              toggleLanguage();
+              setMobileOpen(false);
+            }}
+            className="text-foreground hover:text-primary font-medium py-3 px-3 rounded-lg hover:bg-muted transition-colors flex items-center gap-2 text-left"
+          >
+            <Globe className="w-4 h-4" />
+            {locale === "en" ? "Fran\u00e7ais" : "English"}
+          </button>
+
           <div className="mt-4 pt-4 border-t border-border">
             <Link
               to="/book"
@@ -121,7 +145,7 @@ export default function Navbar() {
               className="gradient-warm text-white font-semibold py-3 px-5 rounded-full hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2"
             >
               <Phone className="w-4 h-4" />
-              Book Now
+              {t("common.bookNow")}
             </Link>
           </div>
         </div>

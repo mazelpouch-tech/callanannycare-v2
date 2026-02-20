@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { MapPin, Star, Clock, Globe, Eye } from "lucide-react";
 import type { Nanny } from "../types";
+import { useLanguage } from "../context/LanguageContext";
 
 interface NannyCardProps {
   nanny: Nanny;
@@ -10,6 +11,7 @@ interface NannyCardProps {
 
 export default function NannyCard({ nanny, showBookButton = true, onViewDetails }: NannyCardProps) {
   const { name, location, rate, rating, bio, available, languages, specialties, image } = nanny;
+  const { t } = useLanguage();
 
   return (
     <div
@@ -20,7 +22,7 @@ export default function NannyCard({ nanny, showBookButton = true, onViewDetails 
       {/* Unavailable Badge */}
       {!available && (
         <span className="absolute top-3 right-3 bg-muted text-muted-foreground text-xs font-semibold px-2.5 py-1 rounded-full">
-          Unavailable
+          {t("nannyCard.unavailable")}
         </span>
       )}
 
@@ -70,7 +72,7 @@ export default function NannyCard({ nanny, showBookButton = true, onViewDetails 
           ))}
           {specialties.length > 3 && (
             <span className="text-xs text-muted-foreground py-1">
-              +{specialties.length - 3} more
+              +{specialties.length - 3} {t("nannyCard.more")}
             </span>
           )}
         </div>
@@ -101,7 +103,7 @@ export default function NannyCard({ nanny, showBookButton = true, onViewDetails 
               className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
             >
               <Eye className="w-3.5 h-3.5" />
-              Details
+              {t("nannyCard.details")}
             </button>
           )}
           {showBookButton && available && (
@@ -109,7 +111,7 @@ export default function NannyCard({ nanny, showBookButton = true, onViewDetails 
               to="/book"
               className="gradient-warm text-white text-sm font-semibold px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
             >
-              Book Now
+              {t("common.bookNow")}
             </Link>
           )}
         </div>

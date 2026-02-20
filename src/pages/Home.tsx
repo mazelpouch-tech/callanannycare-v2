@@ -12,48 +12,47 @@ import {
 import { useData } from "../context/DataContext";
 import { pricingPlans } from "../data/initialData";
 import NannyCard from "../components/NannyCard";
-
-const features = [
-  {
-    icon: Shield,
-    title: "Verified Nannies",
-    description:
-      "Every nanny is background-checked and certified for your peace of mind.",
-  },
-  {
-    icon: Clock,
-    title: "Flexible Scheduling",
-    description:
-      "Book by the hour \u2014 flexible scheduling to fit your needs.",
-  },
-  {
-    icon: Star,
-    title: "Trusted Care",
-    description:
-      "Rated and reviewed by Marrakech families just like yours.",
-  },
-];
-
-const steps = [
-  {
-    number: 1,
-    title: "Browse Nannies",
-    description: "Browse verified nannies in your area of Marrakech.",
-  },
-  {
-    number: 2,
-    title: "Book a Session",
-    description: "Select your date, time, and preferred nanny.",
-  },
-  {
-    number: 3,
-    title: "Enjoy Peace of Mind",
-    description: "Enjoy peace of mind with trusted childcare.",
-  },
-];
+import { useLanguage } from "../context/LanguageContext";
 
 export default function Home() {
   const { nannies } = useData();
+  const { t } = useLanguage();
+
+  const features = [
+    {
+      icon: Shield,
+      title: t("home.featureVerifiedTitle"),
+      description: t("home.featureVerifiedDesc"),
+    },
+    {
+      icon: Clock,
+      title: t("home.featureFlexibleTitle"),
+      description: t("home.featureFlexibleDesc"),
+    },
+    {
+      icon: Star,
+      title: t("home.featureTrustedTitle"),
+      description: t("home.featureTrustedDesc"),
+    },
+  ];
+
+  const steps = [
+    {
+      number: 1,
+      title: t("home.step1Title"),
+      description: t("home.step1Desc"),
+    },
+    {
+      number: 2,
+      title: t("home.step2Title"),
+      description: t("home.step2Desc"),
+    },
+    {
+      number: 3,
+      title: t("home.step3Title"),
+      description: t("home.step3Desc"),
+    },
+  ];
 
   const featuredNannies = nannies.filter((n) => n.available).slice(0, 3);
 
@@ -66,13 +65,12 @@ export default function Home() {
             {/* Text Column */}
             <div className="text-center lg:text-left">
               <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-tight">
-                Trusted Childcare in{" "}
-                <span className="text-gradient-warm">Marrakech</span>
+                {t("home.heroTitle")}{" "}
+                <span className="text-gradient-warm">{t("home.heroHighlight")}</span>
               </h1>
 
               <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-                Connect with verified, caring nannies for your little ones. Book in
-                minutes, relax for hours.
+                {t("home.heroSubtitle")}
               </p>
 
               <div className="mt-10 flex flex-col sm:flex-row items-center lg:items-start justify-center lg:justify-start gap-4">
@@ -80,14 +78,14 @@ export default function Home() {
                   to="/book"
                   className="gradient-warm text-white rounded-full px-8 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center gap-2"
                 >
-                  Book a Nanny
+                  {t("common.bookANanny")}
                   <ArrowRight className="w-4 h-4" />
                 </Link>
                 <Link
                   to="/nannies"
                   className="border border-primary text-primary rounded-full px-8 py-3 font-semibold hover:bg-primary/5 transition-colors flex items-center gap-2"
                 >
-                  Browse Nannies
+                  {t("common.browseNannies")}
                   <ChevronRight className="w-4 h-4" />
                 </Link>
               </div>
@@ -100,7 +98,7 @@ export default function Home() {
                   </div>
                   <div className="text-left">
                     <p className="text-xl font-bold text-foreground">50+</p>
-                    <p className="text-sm text-muted-foreground">Verified Nannies</p>
+                    <p className="text-sm text-muted-foreground">{t("home.verifiedNannies")}</p>
                   </div>
                 </div>
 
@@ -112,7 +110,7 @@ export default function Home() {
                   </div>
                   <div className="text-left">
                     <p className="text-xl font-bold text-foreground">1000+</p>
-                    <p className="text-sm text-muted-foreground">Happy Families</p>
+                    <p className="text-sm text-muted-foreground">{t("home.happyFamilies")}</p>
                   </div>
                 </div>
 
@@ -124,7 +122,7 @@ export default function Home() {
                   </div>
                   <div className="text-left">
                     <p className="text-xl font-bold text-foreground">4.9</p>
-                    <p className="text-sm text-muted-foreground">Average Rating</p>
+                    <p className="text-sm text-muted-foreground">{t("home.averageRating")}</p>
                   </div>
                 </div>
               </div>
@@ -152,10 +150,10 @@ export default function Home() {
         <div className="mx-auto max-w-7xl">
           <div className="text-center mb-14">
             <h2 className="font-serif text-3xl sm:text-4xl font-bold text-foreground">
-              Why Choose call a nanny?
+              {t("home.whyChoose")}
             </h2>
             <p className="mt-4 text-muted-foreground text-lg max-w-xl mx-auto">
-              We make finding trusted childcare in Marrakech simple and stress-free.
+              {t("home.whyChooseSubtitle")}
             </p>
           </div>
 
@@ -188,7 +186,7 @@ export default function Home() {
         <div className="mx-auto max-w-7xl">
           <div className="text-center mb-14">
             <h2 className="font-serif text-3xl sm:text-4xl font-bold text-foreground">
-              Booking a nanny in Marrakech has never been easier
+              {t("home.howItWorksTitle")}
             </h2>
           </div>
 
@@ -215,10 +213,10 @@ export default function Home() {
         <div className="mx-auto max-w-7xl">
           <div className="text-center mb-14">
             <h2 className="font-serif text-3xl sm:text-4xl font-bold text-foreground">
-              Our Top Nannies
+              {t("home.topNannies")}
             </h2>
             <p className="mt-4 text-muted-foreground text-lg max-w-xl mx-auto">
-              Meet some of our most loved and highly rated nannies in Marrakech.
+              {t("home.topNanniesSubtitle")}
             </p>
           </div>
 
@@ -233,7 +231,7 @@ export default function Home() {
               to="/nannies"
               className="border border-primary text-primary rounded-full px-8 py-3 font-semibold hover:bg-primary/5 transition-colors inline-flex items-center gap-2"
             >
-              Browse All Nannies
+              {t("home.browseAll")}
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -245,7 +243,7 @@ export default function Home() {
         <div className="mx-auto max-w-7xl">
           <div className="text-center mb-14">
             <h2 className="font-serif text-3xl sm:text-4xl font-bold text-foreground">
-              Choose the plan that fits your family's needs
+              {t("home.pricingTitle")}
             </h2>
           </div>
 
@@ -262,7 +260,7 @@ export default function Home() {
                 {plan.highlight && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                     <span className="gradient-warm text-white text-sm font-semibold px-4 py-1.5 rounded-full">
-                      Most Popular
+                      {t("home.mostPopular")}
                     </span>
                   </div>
                 )}
@@ -300,7 +298,7 @@ export default function Home() {
                         : "border border-primary text-primary hover:bg-primary/5"
                     }`}
                   >
-                    Book Now
+                    {t("common.bookNow")}
                     <ArrowRight className="w-4 h-4" />
                   </Link>
                 </div>
@@ -314,17 +312,16 @@ export default function Home() {
       <section className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-3xl text-center">
           <h2 className="font-serif text-3xl sm:text-4xl font-bold text-foreground mb-6">
-            Ready to Find Your Perfect Nanny?
+            {t("home.ctaTitle")}
           </h2>
           <p className="text-lg text-muted-foreground mb-10 max-w-xl mx-auto leading-relaxed">
-            Join hundreds of Marrakech families who trust call a nanny for
-            reliable childcare.
+            {t("home.ctaSubtitle")}
           </p>
           <Link
             to="/book"
             className="gradient-warm text-white rounded-full px-10 py-4 font-semibold text-lg hover:opacity-90 transition-opacity shadow-warm inline-flex items-center gap-2"
           >
-            Book Now
+            {t("common.bookNow")}
             <ArrowRight className="w-5 h-5" />
           </Link>
         </div>
