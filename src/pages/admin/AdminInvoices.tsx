@@ -85,12 +85,21 @@ export default function AdminInvoices() {
   // View invoice
   const [viewInvoice, setViewInvoice] = useState<Booking | null>(null);
 
+  // Helper: combine date + time strings into a Date object
+  const buildDateTime = (date: string, time: string): Date | null => {
+    if (!date || !time) return null;
+    return new Date(`${date}T${time}`);
+  };
+
   // Auto-calculate total when clock times change
   useEffect(() => {
-    if (!formData.clockIn || !formData.clockOut) return;
+    if (!formData.date || !formData.clockIn || !formData.clockOut) return;
     try {
-      const inTime = new Date(formData.clockIn);
-      const outTime = new Date(formData.clockOut);
+      const inTime = buildDateTime(formData.date, formData.clockIn);
+      const outTime = buildDateTime(formData.date, formData.clockOut);
+      if (!inTime || !outTime) return;
+      // If clock-out is earlier than clock-in, assume it's the next day
+      if (outTime <= inTime) outTime.setDate(outTime.getDate() + 1);
       const ms = outTime.getTime() - inTime.getTime();
       if (ms <= 0) return;
       const hours = ms / 3600000;
@@ -104,7 +113,7 @@ export default function AdminInvoices() {
     } catch {
       // skip
     }
-  }, [formData.clockIn, formData.clockOut]);
+  }, [formData.date, formData.clockIn, formData.clockOut]);
 
   // ── Derived Data ──
 
@@ -176,6 +185,17 @@ export default function AdminInvoices() {
   };
 
   const openEdit = (inv: Booking) => {
+    // Extract date from clockIn or fall back to inv.date
+    const editDate = inv.clockIn
+      ? new Date(inv.clockIn).toISOString().slice(0, 10)
+      : inv.date || "";
+    // Extract time-only (HH:mm) from clockIn/clockOut
+    const editClockIn = inv.clockIn
+      ? new Date(inv.clockIn).toTimeString().slice(0, 5)
+      : "";
+    const editClockOut = inv.clockOut
+      ? new Date(inv.clockOut).toTimeString().slice(0, 5)
+      : "";
     setFormData({
       id: inv.id,
       nannyId: String(inv.nannyId || ""),
@@ -183,9 +203,9 @@ export default function AdminInvoices() {
       clientEmail: inv.clientEmail || "",
       clientPhone: inv.clientPhone || "",
       hotel: inv.hotel || "",
-      date: inv.date || "",
-      clockIn: inv.clockIn ? new Date(inv.clockIn).toISOString().slice(0, 16) : "",
-      clockOut: inv.clockOut ? new Date(inv.clockOut).toISOString().slice(0, 16) : "",
+      date: editDate,
+      clockIn: editClockIn,
+      clockOut: editClockOut,
       childrenCount: String(inv.childrenCount || 1),
       childrenAges: inv.childrenAges || "",
       totalPrice: String(inv.totalPrice || 0),
@@ -208,6 +228,10 @@ export default function AdminInvoices() {
       setFormError("Please select a nanny");
       return;
     }
+    if (!formData.date) {
+      setFormError("Date is required");
+      return;
+    }
     if (!formData.clockIn || !formData.clockOut) {
       setFormError("Clock-in and clock-out are required");
       return;
@@ -220,43 +244,33 @@ export default function AdminInvoices() {
     setFormLoading(true);
     try {
       const nanny = nannies.find((n) => n.id === Number(formData.nannyId));
-      // Auto-derive date from clockIn
-      const derivedDate = formData.clockIn ? new Date(formData.clockIn).toISOString().slice(0, 10) : "";
+      // Combine date + time into full ISO strings
+      const clockInDate = buildDateTime(formData.date, formData.clockIn)!;
+      const clockOutDate = buildDateTime(formData.date, formData.clockOut)!;
+      // If clock-out is earlier than clock-in, assume next day
+      if (clockOutDate <= clockInDate) clockOutDate.setDate(clockOutDate.getDate() + 1);
+
+      const payload = {
+        nannyId: Number(formData.nannyId),
+        nannyName: nanny?.name || "",
+        clientName: formData.clientName.trim(),
+        clientEmail: formData.clientEmail.trim(),
+        clientPhone: formData.clientPhone.trim(),
+        hotel: formData.hotel.trim(),
+        date: formData.date,
+        clockIn: clockInDate.toISOString(),
+        clockOut: clockOutDate.toISOString(),
+        childrenCount: Number(formData.childrenCount) || 1,
+        childrenAges: formData.childrenAges.trim(),
+        totalPrice: Number(formData.totalPrice),
+        notes: formData.notes.trim(),
+        status: "completed" as const,
+      };
 
       if (isEditing && formData.id) {
-        await updateBooking(formData.id, {
-          nannyId: Number(formData.nannyId),
-          nannyName: nanny?.name || "",
-          clientName: formData.clientName.trim(),
-          clientEmail: formData.clientEmail.trim(),
-          clientPhone: formData.clientPhone.trim(),
-          hotel: formData.hotel.trim(),
-          date: derivedDate,
-          clockIn: new Date(formData.clockIn).toISOString(),
-          clockOut: new Date(formData.clockOut).toISOString(),
-          childrenCount: Number(formData.childrenCount) || 1,
-          childrenAges: formData.childrenAges.trim(),
-          totalPrice: Number(formData.totalPrice),
-          notes: formData.notes.trim(),
-          status: "completed",
-        });
+        await updateBooking(formData.id, payload);
       } else {
-        await addBooking({
-          nannyId: Number(formData.nannyId),
-          nannyName: nanny?.name || "",
-          clientName: formData.clientName.trim(),
-          clientEmail: formData.clientEmail.trim(),
-          clientPhone: formData.clientPhone.trim(),
-          hotel: formData.hotel.trim(),
-          date: derivedDate,
-          clockIn: new Date(formData.clockIn).toISOString(),
-          clockOut: new Date(formData.clockOut).toISOString(),
-          childrenCount: Number(formData.childrenCount) || 1,
-          childrenAges: formData.childrenAges.trim(),
-          totalPrice: Number(formData.totalPrice),
-          notes: formData.notes.trim(),
-          status: "completed",
-        });
+        await addBooking(payload);
       }
       setShowModal(false);
     } catch {
@@ -776,12 +790,24 @@ export default function AdminInvoices() {
                 </div>
               </div>
 
+              {/* Date */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Date *</label>
+                <input
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => updateField("date", e.target.value)}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  required
+                />
+              </div>
+
               {/* Clock In/Out */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Clock In *</label>
                   <input
-                    type="datetime-local"
+                    type="time"
                     value={formData.clockIn}
                     onChange={(e) => updateField("clockIn", e.target.value)}
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
@@ -791,7 +817,7 @@ export default function AdminInvoices() {
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Clock Out *</label>
                   <input
-                    type="datetime-local"
+                    type="time"
                     value={formData.clockOut}
                     onChange={(e) => updateField("clockOut", e.target.value)}
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
@@ -801,10 +827,12 @@ export default function AdminInvoices() {
               </div>
 
               {/* Auto-calc breakdown */}
-              {formData.clockIn && formData.clockOut && (() => {
+              {formData.date && formData.clockIn && formData.clockOut && (() => {
                 try {
-                  const inT = new Date(formData.clockIn);
-                  const outT = new Date(formData.clockOut);
+                  const inT = buildDateTime(formData.date, formData.clockIn);
+                  const outT = buildDateTime(formData.date, formData.clockOut);
+                  if (!inT || !outT) return null;
+                  if (outT <= inT) outT.setDate(outT.getDate() + 1);
                   const ms = outT.getTime() - inT.getTime();
                   if (ms <= 0) return null;
                   const hours = ms / 3600000;
