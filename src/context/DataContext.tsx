@@ -271,7 +271,7 @@ export function DataProvider({ children }: DataProviderProps) {
             client_phone: booking.clientPhone || "",
             hotel: booking.hotel || "",
             date: booking.date,
-            start_time: booking.startTime,
+            start_time: booking.startTime || "",
             end_time: booking.endTime || "",
             plan: booking.plan || "hourly",
             children_count: booking.childrenCount || 1,
@@ -319,7 +319,7 @@ export function DataProvider({ children }: DataProviderProps) {
           ...booking,
           id: crypto.randomUUID(),
           nannyName: nanny ? nanny.name : booking.nannyName || "Unknown",
-          status: "pending",
+          status: booking.status || "pending",
           createdAt: new Date().toISOString(),
         } as Booking;
         setBookings((prev) => {
