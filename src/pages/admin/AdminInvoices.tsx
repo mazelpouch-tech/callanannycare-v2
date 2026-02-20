@@ -1,13 +1,17 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Search, Trash2, ChevronDown,
   Plus, X, Loader2,
   FileText, Pencil, Send, Download, DollarSign, CheckCircle, AlertCircle,
+  Clock, User, Phone, Mail, Hotel, Baby, Calculator, Car,
 } from "lucide-react";
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, subMonths } from "date-fns";
 import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
 import type { Booking } from "@/types";
+
+const HOURLY_RATE = 31.25;
+const TAXI_FEE = 100;
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -91,6 +95,28 @@ export default function AdminInvoices() {
   const [deleteConfirm, setDeleteConfirm] = useState<number | string | null>(null);
   const [resendingId, setResendingId] = useState<number | string | null>(null);
   const [resendSuccess, setResendSuccess] = useState<number | string | null>(null);
+
+  // View invoice
+  const [viewInvoice, setViewInvoice] = useState<Booking | null>(null);
+
+  // Auto-calculate total when clock times change
+  useEffect(() => {
+    if (!formData.clockIn || !formData.clockOut) return;
+    try {
+      const inTime = new Date(formData.clockIn);
+      const outTime = new Date(formData.clockOut);
+      const ms = outTime.getTime() - inTime.getTime();
+      if (ms <= 0) return;
+      const hours = ms / 3600000;
+      let total = Math.round(hours * HOURLY_RATE);
+      // Add taxi fee if after 7 PM
+      const inHour = inTime.getHours();
+      if (inHour >= 19) total += TAXI_FEE;
+      setFormData((prev) => ({ ...prev, totalPrice: String(total) }));
+    } catch {
+      // skip
+    }
+  }, [formData.clockIn, formData.clockOut]);
 
   // ── Derived Data ──
 
@@ -422,7 +448,12 @@ export default function AdminInvoices() {
                   {filteredInvoices.map((inv) => (
                     <tr key={inv.id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-5 py-4">
-                        <span className="text-sm font-mono font-medium text-primary">#INV-{inv.id}</span>
+                        <button
+                          onClick={() => setViewInvoice(inv)}
+                          className="text-sm font-mono font-medium text-primary hover:underline hover:text-primary/80 transition-colors cursor-pointer"
+                        >
+                          #INV-{inv.id}
+                        </button>
                       </td>
                       <td className="px-5 py-4">
                         <p className="text-sm font-medium text-foreground">{inv.clientName || "N/A"}</p>
@@ -480,7 +511,12 @@ export default function AdminInvoices() {
               {filteredInvoices.map((inv) => (
                 <div key={inv.id} className="px-5 py-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-mono font-medium text-primary">#INV-{inv.id}</span>
+                    <button
+                      onClick={() => setViewInvoice(inv)}
+                      className="text-sm font-mono font-medium text-primary hover:underline cursor-pointer"
+                    >
+                      #INV-{inv.id}
+                    </button>
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
                       <CheckCircle className="w-2.5 h-2.5" />
                       Sent
@@ -529,6 +565,137 @@ export default function AdminInvoices() {
           </>
         )}
       </div>
+
+      {/* ── View Invoice Modal ── */}
+      {viewInvoice && (() => {
+        const inv = viewInvoice;
+        const hours = calcWorkedHours(inv.clockIn, inv.clockOut);
+        const hoursNum = inv.clockIn && inv.clockOut ? (new Date(inv.clockOut).getTime() - new Date(inv.clockIn).getTime()) / 3600000 : 0;
+        const basePay = Math.round(hoursNum * HOURLY_RATE);
+        const inHour = inv.clockIn ? new Date(inv.clockIn).getHours() : 0;
+        const hasTaxi = inHour >= 19;
+        return (
+          <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-[8vh] overflow-y-auto">
+            <div className="w-full max-w-lg bg-card rounded-2xl shadow-xl border border-border overflow-hidden">
+              {/* Header */}
+              <div className="gradient-warm px-6 py-5 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-white/70 text-xs font-semibold uppercase tracking-wider">Invoice</p>
+                    <h2 className="text-2xl font-serif font-bold">#INV-{inv.id}</h2>
+                  </div>
+                  <button onClick={() => setViewInvoice(null)} className="p-1.5 rounded-lg hover:bg-white/20 text-white/80 transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <p className="text-white/70 text-xs mt-1">{inv.date ? fmtDate(inv.date) : "N/A"}</p>
+              </div>
+
+              <div className="p-6 space-y-5">
+                {/* From / To */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold mb-1">From</p>
+                    <p className="text-sm font-semibold text-foreground">Call a Nanny</p>
+                    <p className="text-xs text-muted-foreground">Professional Childcare</p>
+                    <p className="text-xs text-muted-foreground">Marrakech, Morocco</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold mb-1">Billed To</p>
+                    <p className="text-sm font-semibold text-foreground">{inv.clientName || "N/A"}</p>
+                    {inv.clientEmail && <p className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="w-3 h-3" />{inv.clientEmail}</p>}
+                    {inv.clientPhone && <p className="text-xs text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" />{inv.clientPhone}</p>}
+                    {inv.hotel && <p className="text-xs text-muted-foreground flex items-center gap-1"><Hotel className="w-3 h-3" />{inv.hotel}</p>}
+                  </div>
+                </div>
+
+                {/* Service Details */}
+                <div className="border border-border rounded-xl overflow-hidden">
+                  <div className="bg-muted/30 px-4 py-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Service Details</p>
+                  </div>
+                  <div className="divide-y divide-border">
+                    <div className="flex justify-between px-4 py-2.5">
+                      <span className="text-sm text-muted-foreground flex items-center gap-1.5"><User className="w-3.5 h-3.5" />Caregiver</span>
+                      <span className="text-sm font-medium text-foreground">{inv.nannyName || "Unassigned"}</span>
+                    </div>
+                    <div className="flex justify-between px-4 py-2.5">
+                      <span className="text-sm text-muted-foreground flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />Clock In</span>
+                      <span className="text-sm font-medium text-foreground">{formatClockTime(inv.clockIn)}</span>
+                    </div>
+                    <div className="flex justify-between px-4 py-2.5">
+                      <span className="text-sm text-muted-foreground flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />Clock Out</span>
+                      <span className="text-sm font-medium text-foreground">{formatClockTime(inv.clockOut)}</span>
+                    </div>
+                    <div className="flex justify-between px-4 py-2.5">
+                      <span className="text-sm text-muted-foreground">Hours Worked</span>
+                      <span className="text-sm font-medium text-foreground">{hours}h</span>
+                    </div>
+                    <div className="flex justify-between px-4 py-2.5">
+                      <span className="text-sm text-muted-foreground flex items-center gap-1.5"><Baby className="w-3.5 h-3.5" />Children</span>
+                      <span className="text-sm font-medium text-foreground">{inv.childrenCount || 1}{inv.childrenAges ? ` (${inv.childrenAges})` : ""}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Price Breakdown */}
+                <div className="border border-border rounded-xl overflow-hidden">
+                  <div className="bg-muted/30 px-4 py-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Price Breakdown</p>
+                  </div>
+                  <div className="divide-y divide-border">
+                    <div className="flex justify-between px-4 py-2.5">
+                      <span className="text-sm text-muted-foreground">{hours}h × {HOURLY_RATE} MAD/hr</span>
+                      <span className="text-sm font-medium text-foreground">{basePay} MAD</span>
+                    </div>
+                    {hasTaxi && (
+                      <div className="flex justify-between px-4 py-2.5">
+                        <span className="text-sm text-amber-700 flex items-center gap-1.5"><Car className="w-3.5 h-3.5" />Taxi fee (after 7 PM)</span>
+                        <span className="text-sm font-medium text-amber-700">+{TAXI_FEE} MAD</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Total */}
+                <div className="bg-gradient-to-r from-orange-50 to-pink-50 rounded-xl p-5 text-center">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total Amount</p>
+                  <p className="text-3xl font-bold text-foreground">{(inv.totalPrice || 0).toLocaleString()} <span className="text-lg text-muted-foreground">MAD</span></p>
+                </div>
+
+                {inv.notes && (
+                  <div className="bg-muted/30 rounded-lg px-4 py-3">
+                    <p className="text-xs font-semibold text-muted-foreground mb-1">Notes</p>
+                    <p className="text-sm text-foreground">{inv.notes}</p>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={() => { openEdit(inv); setViewInvoice(null); }}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium text-primary border border-primary/30 rounded-xl hover:bg-primary/10 transition-colors"
+                  >
+                    <Pencil className="w-4 h-4" /> Edit
+                  </button>
+                  <button
+                    onClick={() => { handleResend(inv.id); }}
+                    disabled={resendingId === inv.id}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium text-white gradient-warm rounded-xl hover:opacity-90 transition-opacity shadow-warm disabled:opacity-50"
+                  >
+                    {resendingId === inv.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    {resendSuccess === inv.id ? "Sent!" : "Resend Invoice"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="px-6 py-3 border-t border-border text-center">
+                <p className="text-[10px] text-muted-foreground">Issued by Call a Nanny · callanannycare.com</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Create / Edit Modal ── */}
       {showModal && (
@@ -670,6 +837,41 @@ export default function AdminInvoices() {
                 </div>
               </div>
 
+              {/* Auto-calc breakdown */}
+              {formData.clockIn && formData.clockOut && (() => {
+                try {
+                  const inT = new Date(formData.clockIn);
+                  const outT = new Date(formData.clockOut);
+                  const ms = outT.getTime() - inT.getTime();
+                  if (ms <= 0) return null;
+                  const hours = ms / 3600000;
+                  const base = Math.round(hours * HOURLY_RATE);
+                  const isEvening = inT.getHours() >= 19;
+                  return (
+                    <div className="bg-blue-50 text-blue-800 text-xs px-4 py-3 rounded-lg border border-blue-100 space-y-1">
+                      <div className="flex items-center gap-1.5 font-semibold">
+                        <Calculator className="w-3.5 h-3.5" />
+                        Auto-calculated breakdown
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>{hours.toFixed(1)}h × {HOURLY_RATE} MAD/hr</span>
+                        <span className="font-medium">{base} MAD</span>
+                      </div>
+                      {isEvening && (
+                        <div className="flex items-center justify-between text-amber-700">
+                          <span className="flex items-center gap-1"><Car className="w-3 h-3" /> Taxi fee (after 7 PM)</span>
+                          <span className="font-medium">+{TAXI_FEE} MAD</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between font-bold border-t border-blue-200 pt-1 mt-1">
+                        <span>Total</span>
+                        <span>{isEvening ? base + TAXI_FEE : base} MAD</span>
+                      </div>
+                    </div>
+                  );
+                } catch { return null; }
+              })()}
+
               {/* Children & Price */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
@@ -698,7 +900,7 @@ export default function AdminInvoices() {
                   <input
                     type="number"
                     min={0}
-                    step={50}
+                    step={0.01}
                     value={formData.totalPrice}
                     onChange={(e) => updateField("totalPrice", e.target.value)}
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary font-semibold"
