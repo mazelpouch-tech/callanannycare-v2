@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import {
   UserCircle, Key, Loader2, CheckCircle, AlertCircle,
-  MapPin, Clock, Globe, Star, Image, FileText, ArrowRight
+  FileText, ArrowRight, Camera, Phone, Calendar, X
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -16,6 +16,34 @@ interface InviteInfo {
 
 type RegisterStatus = "loading" | "valid" | "expired" | "invalid" | "success";
 
+/** Resize an image file to max 200×200 JPEG, return base64 data URL */
+function resizeImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX = 200;
+        let w = img.width;
+        let h = img.height;
+        if (w > h) { h = Math.round((h * MAX) / w); w = MAX; }
+        else { w = Math.round((w * MAX) / h); h = MAX; }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("Canvas not supported")); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.7));
+      };
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.src = reader.result as string;
+    };
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function NannyRegister() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
@@ -25,14 +53,16 @@ export default function NannyRegister() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Form fields
+  const [name, setName] = useState("");
+  const [age, setAge] = useState("");
+  const [phone, setPhone] = useState("");
+  const [bio, setBio] = useState("");
+  const [photo, setPhoto] = useState<string>(""); // base64 data URL
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
-  const [bio, setBio] = useState("");
-  const [languages, setLanguages] = useState("");
-  const [specialties, setSpecialties] = useState("");
-  const [location, setLocation] = useState("Marrakech");
-  const [experience, setExperience] = useState("");
-  const [image, setImage] = useState("");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Validate token on mount
   useEffect(() => {
@@ -47,6 +77,7 @@ export default function NannyRegister() {
         const data = await res.json();
         if (res.ok && data.success) {
           setNannyInfo(data);
+          setName(data.name || "");
           setStatus("valid");
         } else if (data.error?.includes("expired")) {
           setStatus("expired");
@@ -61,10 +92,42 @@ export default function NannyRegister() {
     validateToken();
   }, [token]);
 
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Please select an image file (JPG, PNG, etc.)");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Image too large. Max 10MB.");
+      return;
+    }
+    try {
+      const base64 = await resizeImage(file);
+      setPhoto(base64);
+      setError("");
+    } catch {
+      setError("Failed to process image. Try a different file.");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
 
+    if (!name.trim()) {
+      setError("Full name is required");
+      return;
+    }
+    if (!age.trim()) {
+      setError("Age is required");
+      return;
+    }
+    if (!phone.trim()) {
+      setError("Phone number is required");
+      return;
+    }
     if (pin.length < 4) {
       setError("PIN must be at least 4 digits");
       return;
@@ -79,12 +142,11 @@ export default function NannyRegister() {
       const body = {
         token,
         pin,
-        bio: bio || undefined,
-        languages: languages ? languages.split(",").map((l) => l.trim()).filter(Boolean) : undefined,
-        specialties: specialties ? specialties.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
-        location: location || undefined,
-        experience: experience || undefined,
-        image: image || undefined,
+        name: name.trim(),
+        age: age.trim(),
+        phone: phone.trim(),
+        bio: bio.trim() || undefined,
+        image: photo || undefined,
       };
 
       const res = await fetch(`${API}/api/nanny/invite`, {
@@ -164,7 +226,7 @@ export default function NannyRegister() {
               Registration Complete!
             </h1>
             <p className="text-muted-foreground mb-6">
-              Welcome to call a nanny! You can now sign in with your email and PIN.
+              Welcome to Call a Nanny! You can now sign in with your email and PIN.
             </p>
             <Link
               to="/nanny/login"
@@ -193,10 +255,10 @@ export default function NannyRegister() {
               <UserCircle className="w-8 h-8 text-white" />
             </div>
             <h1 className="font-serif text-2xl font-bold text-foreground">
-              Welcome, {nannyInfo?.name}!
+              Welcome to Call a Nanny!
             </h1>
             <p className="text-muted-foreground mt-2">
-              Complete your registration to join call a nanny
+              Complete your profile to get started
             </p>
             <p className="text-sm text-primary mt-1 font-medium">{nannyInfo?.email}</p>
           </div>
@@ -211,12 +273,140 @@ export default function NannyRegister() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Photo Upload */}
+            <div className="flex flex-col items-center">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                className="hidden"
+              />
+              <div className="relative group">
+                {photo ? (
+                  <div className="relative">
+                    <img
+                      src={photo}
+                      alt="Profile"
+                      className="w-24 h-24 rounded-full object-cover ring-4 ring-primary/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPhoto("")}
+                      className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-md"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-24 h-24 rounded-full bg-muted border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 hover:border-primary/40 hover:bg-primary/5 transition-colors"
+                  >
+                    <Camera className="w-6 h-6 text-muted-foreground" />
+                    <span className="text-[10px] text-muted-foreground font-medium">Add Photo</span>
+                  </button>
+                )}
+              </div>
+              {photo && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="mt-2 text-xs text-primary hover:underline font-medium"
+                >
+                  Change photo
+                </button>
+              )}
+            </div>
+
+            {/* Personal Info Section */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <UserCircle className="w-4 h-4 text-accent" />
+                Personal Information
+              </h3>
+
+              {/* Full Name */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
+                  placeholder="Your full name"
+                  required
+                />
+              </div>
+
+              {/* Age and Phone */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                      Age *
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={3}
+                    value={age}
+                    onChange={(e) => setAge(e.target.value.replace(/\D/g, ""))}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
+                    placeholder="e.g. 28"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                      Phone *
+                    </span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
+                    placeholder="+212 6XX XXX XXX"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Bio */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                    About You
+                  </span>
+                </label>
+                <textarea
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition resize-none text-sm"
+                  placeholder="Tell families about your experience and approach to childcare..."
+                />
+              </div>
+            </div>
+
             {/* PIN Section */}
             <div className="p-4 bg-amber-50/50 rounded-xl border border-amber-100">
               <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                 <Key className="w-4 h-4 text-primary" />
-                Set Your PIN Code
+                Create Your Login PIN
               </h3>
+              <p className="text-xs text-muted-foreground mb-3">
+                This PIN will be used to sign in to your nanny portal. Choose 4-6 digits.
+              </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-muted-foreground mb-1">PIN (4-6 digits)</label>
@@ -254,115 +444,10 @@ export default function NannyRegister() {
               )}
             </div>
 
-            {/* Profile Section */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <FileText className="w-4 h-4 text-accent" />
-                Your Profile
-              </h3>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  <span className="flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-muted-foreground" />
-                    About You
-                  </span>
-                </label>
-                <textarea
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition resize-none text-sm"
-                  placeholder="Tell families about your experience and approach to childcare..."
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    <span className="flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
-                      Location
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-                    placeholder="e.g., Gueliz, Marrakech"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                      Experience
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={experience}
-                    onChange={(e) => setExperience(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-                    placeholder="e.g., 3 years"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  <span className="flex items-center gap-1.5">
-                    <Globe className="w-3.5 h-3.5 text-muted-foreground" />
-                    Languages
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  value={languages}
-                  onChange={(e) => setLanguages(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-                  placeholder="Arabic, French, English (comma-separated)"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  <span className="flex items-center gap-1.5">
-                    <Star className="w-3.5 h-3.5 text-muted-foreground" />
-                    Specialties
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  value={specialties}
-                  onChange={(e) => setSpecialties(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-                  placeholder="Toddler Care, First Aid (comma-separated)"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  <span className="flex items-center gap-1.5">
-                    <Image className="w-3.5 h-3.5 text-muted-foreground" />
-                    Profile Photo URL
-                  </span>
-                </label>
-                <input
-                  type="url"
-                  value={image}
-                  onChange={(e) => setImage(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
-                  placeholder="https://example.com/your-photo.jpg"
-                />
-              </div>
-            </div>
-
             {/* Submit */}
             <button
               type="submit"
-              disabled={submitting || pin.length < 4 || pin !== confirmPin}
+              disabled={submitting || !name.trim() || !age.trim() || !phone.trim() || pin.length < 4 || pin !== confirmPin}
               className="w-full gradient-warm text-white rounded-lg px-6 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? (

@@ -17,6 +17,7 @@ export const nannies: Nanny[] = [
     email: null,
     pin: '',
     phone: '',
+    age: null,
     status: 'active' as const,
   },
   {
@@ -35,6 +36,7 @@ export const nannies: Nanny[] = [
     email: null,
     pin: '',
     phone: '',
+    age: null,
     status: 'active' as const,
   },
   {
@@ -53,6 +55,7 @@ export const nannies: Nanny[] = [
     email: null,
     pin: '',
     phone: '',
+    age: null,
     status: 'active' as const,
   },
   {
@@ -71,6 +74,7 @@ export const nannies: Nanny[] = [
     email: null,
     pin: '',
     phone: '',
+    age: null,
     status: 'active' as const,
   },
   {
@@ -89,6 +93,7 @@ export const nannies: Nanny[] = [
     email: null,
     pin: '',
     phone: '',
+    age: null,
     status: 'active' as const,
   },
   {
@@ -107,6 +112,7 @@ export const nannies: Nanny[] = [
     email: null,
     pin: '',
     phone: '',
+    age: null,
     status: 'active' as const,
   },
 ];

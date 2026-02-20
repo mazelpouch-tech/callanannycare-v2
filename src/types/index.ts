@@ -28,6 +28,7 @@ export interface DbNanny {
   email: string | null;
   pin: string;
   phone: string;
+  age: string | null;
   status: NannyStatus;
   invite_token: string | null;
   invite_token_expires: string | null;
@@ -114,6 +115,7 @@ export interface Nanny {
   email: string | null;
   pin: string;
   phone: string;
+  age: string | null;
   status: NannyStatus;
 }
 
@@ -186,6 +188,7 @@ export interface NannyProfile {
   rate: number;
   available: boolean;
   phone: string;
+  age: string | null;
 }
 
 export interface NannyStats {
@@ -232,8 +235,8 @@ export type ApiResult<T = void> =
 
 export interface NannyLoginResponse { nanny: DbNanny }
 export interface AdminLoginResponse { admin: DbAdminUser; token?: string }
-export interface InviteResponse { inviteLink: string; nanny: { id: number; name: string; email: string } }
-export interface ResendInviteResponse { inviteLink: string }
+export interface InviteResponse { inviteLink: string; emailSent: boolean; nanny: { id: number; name: string; email: string } }
+export interface ResendInviteResponse { inviteLink: string; emailSent: boolean }
 export interface ProfileUpdateResponse { nanny: DbNanny }
 
 // ============================================================

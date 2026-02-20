@@ -191,6 +191,65 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData): Promis
 }
 
 // ============================================================
+// Invite Email
+// ============================================================
+
+export interface InviteEmailData {
+  nannyName: string;
+  nannyEmail: string;
+  inviteLink: string;
+}
+
+export async function sendInviteEmail(data: InviteEmailData): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log('RESEND_API_KEY not configured. Invite email skipped.');
+    return false;
+  }
+
+  const resend = new Resend(apiKey);
+
+  const content = `
+    <h2 style="margin:0 0 8px;color:#1a1a1a;font-size:22px;font-family:Georgia,'Times New Roman',serif;">Hello ${data.nannyName},</h2>
+    <p style="margin:0 0 24px;color:#666;font-size:16px;line-height:1.5;">You've been invited to join <strong>Call a Nanny</strong> — Marrakech's trusted childcare service!</p>
+
+    <div style="margin:28px 0;padding:20px;background-color:#fff7ed;border-radius:12px;border-left:4px solid #f97316;">
+      <h3 style="margin:0 0 8px;color:#1a1a1a;font-size:15px;font-weight:600;">What to do next</h3>
+      <p style="margin:0;color:#666;font-size:14px;line-height:1.5;">Click the button below to create your profile and set up your login. You'll need to fill in your details and create a PIN code to access the nanny portal.</p>
+    </div>
+
+    <!-- CTA Button -->
+    <div style="text-align:center;margin:32px 0;">
+      <a href="${data.inviteLink}" style="display:inline-block;background:linear-gradient(135deg,#f97316,#ec4899);color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;padding:14px 32px;border-radius:50px;box-shadow:0 4px 14px rgba(249,115,22,0.3);">Complete Your Registration</a>
+    </div>
+
+    <p style="margin:0 0 4px;color:#999;font-size:13px;text-align:center;">Or copy and paste this link into your browser:</p>
+    <p style="margin:0 0 24px;color:#f97316;font-size:12px;text-align:center;word-break:break-all;">${data.inviteLink}</p>
+
+    <div style="margin:24px 0;padding:16px;background-color:#fafafa;border-radius:8px;text-align:center;">
+      <p style="margin:0;color:#999;font-size:13px;">⏳ This invitation link expires in <strong>7 days</strong>.</p>
+    </div>
+
+    <p style="margin:0;color:#999;font-size:13px;text-align:center;">If you have any questions, contact us at <a href="mailto:info@callanannycare.com" style="color:#f97316;">info@callanannycare.com</a></p>
+  `;
+
+  const fromAddress = process.env.RESEND_FROM_EMAIL || 'Call a Nanny <onboarding@resend.dev>';
+
+  try {
+    await resend.emails.send({
+      from: fromAddress,
+      to: data.nannyEmail,
+      subject: "You're invited to join Call a Nanny!",
+      html: emailWrapper(content),
+    });
+    return true;
+  } catch (err) {
+    console.error('Failed to send invite email:', err);
+    return false;
+  }
+}
+
+// ============================================================
 // Invoice Email
 // ============================================================
 

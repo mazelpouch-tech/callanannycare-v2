@@ -61,7 +61,9 @@ export default function AdminNannies() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState("");
   const [inviteLink, setInviteLink] = useState("");
+  const [inviteEmailSent, setInviteEmailSent] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [showManualLink, setShowManualLink] = useState(false);
 
   const filteredNannies = useMemo(() => {
     if (!search.trim()) return nannies;
@@ -150,7 +152,9 @@ export default function AdminNannies() {
     setInviteEmail("");
     setInviteError("");
     setInviteLink("");
+    setInviteEmailSent(false);
     setLinkCopied(false);
+    setShowManualLink(false);
     setInviteModalOpen(true);
   };
 
@@ -160,7 +164,9 @@ export default function AdminNannies() {
     setInviteEmail("");
     setInviteError("");
     setInviteLink("");
+    setInviteEmailSent(false);
     setLinkCopied(false);
+    setShowManualLink(false);
   };
 
   const handleInvite = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -170,6 +176,7 @@ export default function AdminNannies() {
     const result = await inviteNanny({ name: inviteName.trim(), email: inviteEmail.trim() });
     if (result.success) {
       setInviteLink(result.inviteLink);
+      setInviteEmailSent(result.emailSent ?? false);
     } else {
       setInviteError(result.error);
     }
@@ -202,8 +209,9 @@ export default function AdminNannies() {
     setResendLoading(nannyId);
     const result = await resendInvite(nannyId);
     if (result.success) {
-      setResendLink({ id: nannyId, link: result.inviteLink });
-      try { await navigator.clipboard.writeText(result.inviteLink); } catch {}
+      const sent = (result as { emailSent?: boolean }).emailSent;
+      setResendLink({ id: nannyId, link: sent ? 'email_sent' : result.inviteLink });
+      if (!sent) { try { await navigator.clipboard.writeText(result.inviteLink); } catch {} }
       setTimeout(() => setResendLink(null), 4000);
     }
     setResendLoading(null);
@@ -356,7 +364,7 @@ export default function AdminNannies() {
                         <div className="flex items-center gap-2">
                           {renderStatusBadge(nanny.status || "active")}
                           {resendLink?.id === nanny.id && (
-                            <span className="text-xs text-green-600 font-medium">Link copied!</span>
+                            <span className="text-xs text-green-600 font-medium">{resendLink?.link === 'email_sent' ? 'Invite re-sent!' : 'Link copied!'}</span>
                           )}
                         </div>
                       </td>
@@ -558,7 +566,7 @@ export default function AdminNannies() {
                   </div>
 
                   {resendLink?.id === nanny.id && (
-                    <p className="text-xs text-green-600 font-medium text-center">New invite link copied!</p>
+                    <p className="text-xs text-green-600 font-medium text-center">{resendLink?.link === 'email_sent' ? 'Invite email re-sent!' : 'New invite link copied!'}</p>
                   )}
                 </div>
 
@@ -627,7 +635,7 @@ export default function AdminNannies() {
               {!inviteLink ? (
                 <>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Enter the nanny's name and email. We'll generate an invitation link you can share via WhatsApp, SMS, or email.
+                    Enter the nanny's name and email. An invitation email will be sent automatically with a registration link.
                   </p>
 
                   {inviteError && (
@@ -673,7 +681,7 @@ export default function AdminNannies() {
                       ) : (
                         <>
                           <Send className="w-4 h-4" />
-                          Generate Invitation
+                          Send Invitation
                         </>
                       )}
                     </button>
@@ -681,43 +689,66 @@ export default function AdminNannies() {
                 </>
               ) : (
                 <>
-                  {/* Success: show invite link */}
+                  {/* Success */}
                   <div className="text-center mb-4">
                     <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-3">
                       <Check className="w-6 h-6 text-green-500" />
                     </div>
-                    <p className="font-medium text-foreground">Invitation Created!</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Share this link with <strong>{inviteName}</strong>
-                    </p>
-                  </div>
-
-                  <div className="bg-muted/50 rounded-xl p-3 mb-4">
-                    <p className="text-xs text-muted-foreground mb-1.5 font-medium">Invitation Link:</p>
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 text-xs text-foreground bg-background rounded-lg px-3 py-2 break-all border border-border">
-                        {inviteLink}
-                      </code>
-                      <button
-                        onClick={() => copyLink(inviteLink)}
-                        className={`p-2 rounded-lg transition-colors shrink-0 ${
-                          linkCopied
-                            ? "text-green-600 bg-green-50"
-                            : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-                        }`}
-                        title="Copy link"
-                      >
-                        {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    {linkCopied && (
-                      <p className="text-xs text-green-600 mt-1.5 font-medium">Copied to clipboard!</p>
+                    {inviteEmailSent ? (
+                      <>
+                        <p className="font-medium text-foreground">Invitation Sent!</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          An email has been sent to <strong>{inviteEmail}</strong> with a registration link.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-medium text-foreground">Invitation Created!</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Email could not be sent. Share the link below with <strong>{inviteName}</strong>.
+                        </p>
+                      </>
                     )}
                   </div>
 
                   <p className="text-xs text-muted-foreground text-center mb-4">
-                    This link expires in 7 days. The nanny will set their own PIN and profile.
+                    This link expires in 7 days. The nanny will fill in their profile and create a PIN to log in.
                   </p>
+
+                  {/* Collapsible manual link */}
+                  <div className="mb-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowManualLink(!showManualLink)}
+                      className="text-xs text-primary hover:underline font-medium flex items-center gap-1 mx-auto"
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                      {showManualLink ? "Hide link" : "Copy link manually"}
+                    </button>
+                    {showManualLink && (
+                      <div className="bg-muted/50 rounded-xl p-3 mt-2">
+                        <div className="flex items-center gap-2">
+                          <code className="flex-1 text-xs text-foreground bg-background rounded-lg px-3 py-2 break-all border border-border">
+                            {inviteLink}
+                          </code>
+                          <button
+                            onClick={() => copyLink(inviteLink)}
+                            className={`p-2 rounded-lg transition-colors shrink-0 ${
+                              linkCopied
+                                ? "text-green-600 bg-green-50"
+                                : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                            }`}
+                            title="Copy link"
+                          >
+                            {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        {linkCopied && (
+                          <p className="text-xs text-green-600 mt-1.5 font-medium">Copied to clipboard!</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
                   <button
                     onClick={closeInviteModal}

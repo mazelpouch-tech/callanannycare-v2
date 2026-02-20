@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb } from '../_db.js';
 import crypto from 'crypto';
 import type { DbNanny } from '@/types';
+import { sendInviteEmail } from '../_emailTemplates.js';
 
 interface InviteCreateBody {
   name: string;
@@ -15,6 +16,9 @@ interface InviteResendBody {
 interface InviteRegisterBody {
   token: string;
   pin: string;
+  name?: string;
+  age?: string;
+  phone?: string;
   bio?: string;
   languages?: string[];
   specialties?: string[];
@@ -84,9 +88,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const protocol = host.includes('localhost') ? 'http' : 'https';
       const inviteLink = `${protocol}://${host}/nanny/register?token=${inviteToken}`;
 
+      // Send invite email (best-effort)
+      let emailSent = false;
+      try {
+        emailSent = await sendInviteEmail({
+          nannyName: name,
+          nannyEmail: email,
+          inviteLink,
+        });
+      } catch (err) {
+        console.error('Failed to send invite email:', err);
+      }
+
       return res.status(201).json({
         success: true,
         inviteLink,
+        emailSent,
         nanny: { id: nanny.id, name: nanny.name, email: nanny.email, status: nanny.status }
       });
     }
@@ -122,16 +139,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const protocol = host.includes('localhost') ? 'http' : 'https';
       const inviteLink = `${protocol}://${host}/nanny/register?token=${inviteToken}`;
 
+      // Re-send invite email (best-effort)
+      let emailSent = false;
+      try {
+        emailSent = await sendInviteEmail({
+          nannyName: existing[0].name,
+          nannyEmail: existing[0].email!,
+          inviteLink,
+        });
+      } catch (err) {
+        console.error('Failed to resend invite email:', err);
+      }
+
       return res.status(200).json({
         success: true,
         inviteLink,
+        emailSent,
         nanny: { id: existing[0].id, name: existing[0].name, email: existing[0].email }
       });
     }
 
     // PATCH: Complete registration (nanny sets PIN + profile)
     if (req.method === 'PATCH') {
-      const { token, pin, bio, languages, specialties, image, location, experience } = req.body as InviteRegisterBody;
+      const { token, pin, name, age, phone, bio, languages, specialties, image, location, experience } = req.body as InviteRegisterBody;
 
       if (!token) {
         return res.status(400).json({ error: 'Invitation token is required' });
@@ -158,6 +188,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const updated = await sql`
         UPDATE nannies SET
           pin = ${pin},
+          name = COALESCE(${name || null}, name),
+          age = COALESCE(${age || null}, age),
+          phone = COALESCE(${phone || null}, phone),
           bio = COALESCE(${bio || null}, bio),
           languages = COALESCE(${languages ? JSON.stringify(languages) : null}, languages),
           specialties = COALESCE(${specialties ? JSON.stringify(specialties) : null}, specialties),

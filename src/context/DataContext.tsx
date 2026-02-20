@@ -447,6 +447,7 @@ export function DataProvider({ children }: DataProviderProps) {
           rate: n.rate,
           available: n.available,
           phone: n.phone,
+          age: n.age ?? null,
         };
         setIsNanny(true);
         setNannyProfile(profile);
@@ -567,6 +568,7 @@ export function DataProvider({ children }: DataProviderProps) {
         rate: result.rate,
         available: result.available,
         phone: result.phone,
+        age: result.age ?? null,
         specialties: typeof result.specialties === "string" ? JSON.parse(result.specialties) : result.specialties || [],
         languages: typeof result.languages === "string" ? JSON.parse(result.languages) : result.languages || [],
       };
@@ -598,6 +600,7 @@ export function DataProvider({ children }: DataProviderProps) {
           name: result.nanny.name,
           email: result.nanny.email,
           phone: '',
+          age: null,
           status: "invited",
           location: "",
           rating: 4.8,
@@ -615,7 +618,7 @@ export function DataProvider({ children }: DataProviderProps) {
           saveToStorage(STORAGE_KEYS.nannies, updated);
           return updated;
         });
-        return { success: true as const, inviteLink: result.inviteLink, nanny: result.nanny };
+        return { success: true as const, inviteLink: result.inviteLink, emailSent: result.emailSent ?? false, nanny: result.nanny };
       }
       return { success: false as const, error: result.error || "Failed to create invitation" };
     } catch (err: unknown) {
@@ -653,7 +656,7 @@ export function DataProvider({ children }: DataProviderProps) {
         body: JSON.stringify({ nannyId }),
       });
       if (result.success) {
-        return { success: true as const, inviteLink: result.inviteLink as string };
+        return { success: true as const, inviteLink: result.inviteLink as string, emailSent: result.emailSent ?? false };
       }
       return { success: false as const, error: result.error || "Failed to resend invitation" };
     } catch (err: unknown) {

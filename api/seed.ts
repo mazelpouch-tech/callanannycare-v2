@@ -68,6 +68,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Backfill existing nannies to 'active'
     await sql`UPDATE nannies SET status = 'active', registered_at = NOW() WHERE pin IS NOT NULL AND pin != '' AND status IS NULL`;
 
+    // Add age column and widen image to TEXT for base64 photos
+    await sql`ALTER TABLE nannies ADD COLUMN IF NOT EXISTS age VARCHAR(10)`;
+    await sql`ALTER TABLE nannies ALTER COLUMN image TYPE TEXT`;
+
     // Add clock in/out columns to bookings
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS clock_in TIMESTAMPTZ`;
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS clock_out TIMESTAMPTZ`;
