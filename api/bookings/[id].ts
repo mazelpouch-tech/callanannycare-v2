@@ -113,7 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             childrenAges: result[0].children_ages,
             totalPrice: result[0].total_price,
             nannyName,
-            locale: (result[0] as Record<string, unknown>).locale as string || 'en',
+            locale: result[0].locale || 'en',
           });
         } catch (invoiceError: unknown) {
           console.error('Invoice email failed:', invoiceError);
