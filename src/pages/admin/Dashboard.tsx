@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import {
   CalendarDays, Clock, DollarSign, ArrowRight,
   Eye, TrendingUp, Users, Activity, Star,
-  ArrowUpRight, ArrowDownRight, Timer,
+  ArrowUpRight, ArrowDownRight, Timer, FileText, CheckCircle,
 } from "lucide-react";
 import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, subDays, isAfter } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -566,6 +566,32 @@ export default function Dashboard() {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
 
+  // ── Invoices (completed bookings with clock data) ──
+  const allInvoices = useMemo(() => {
+    return bookings
+      .filter((b) => b.status === "completed" && b.clockOut)
+      .sort((a, b) => new Date(b.clockOut!).getTime() - new Date(a.clockOut!).getTime());
+  }, [bookings]);
+
+  const recentInvoices = allInvoices.slice(0, 10);
+  const totalInvoiced = allInvoices.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+
+  const calcWorkedHours = (clockIn: string | null, clockOut: string | null): string => {
+    if (!clockIn || !clockOut) return "—";
+    const ms = new Date(clockOut).getTime() - new Date(clockIn).getTime();
+    const hours = Math.max(0, ms / 3600000);
+    return hours.toFixed(1);
+  };
+
+  const formatTime = (isoStr: string | null): string => {
+    if (!isoStr) return "—";
+    try {
+      return format(new Date(isoStr), "HH:mm");
+    } catch {
+      return "—";
+    }
+  };
+
   const activeNannies = nannies.filter((n) => n.status === "active" && n.available).length;
   const avgBookingValue = stats.totalBookings > 0 ? Math.round(stats.totalRevenue / Math.max(bookings.filter((b) => b.status === "confirmed" || b.status === "completed").length, 1)) : 0;
 
@@ -764,6 +790,105 @@ export default function Dashboard() {
 
       {/* ── Nanny Hours Report ── */}
       <NannyHoursReport bookings={bookings} nannies={nannies} />
+
+      {/* ── Invoices Section ── */}
+      <div className="bg-card rounded-xl border border-border shadow-soft">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h2 className="font-serif text-base font-semibold text-foreground flex items-center gap-2">
+            <FileText className="w-4 h-4 text-primary" />
+            Invoices
+          </h2>
+          {allInvoices.length > 0 && (
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span>{allInvoices.length} invoice{allInvoices.length !== 1 ? "s" : ""}</span>
+              <span className="font-semibold text-foreground">{totalInvoiced.toLocaleString()} MAD</span>
+            </div>
+          )}
+        </div>
+
+        {recentInvoices.length === 0 ? (
+          <div className="px-6 py-10 text-center">
+            <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground font-medium">No invoices yet</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">
+              Invoices are automatically generated and sent to parents when a nanny ends her shift.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Invoice #</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Client</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nanny</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hours</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {recentInvoices.map((inv) => (
+                    <tr key={inv.id} className="hover:bg-muted/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <span className="text-sm font-mono font-medium text-primary">#INV-{inv.id}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-medium text-foreground">{inv.clientName || "N/A"}</p>
+                        <p className="text-xs text-muted-foreground">{inv.clientEmail || ""}</p>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">{inv.nannyName || "N/A"}</td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm text-muted-foreground">{formatDate(inv.date)}</p>
+                        <p className="text-xs text-muted-foreground/70">{formatTime(inv.clockIn)} – {formatTime(inv.clockOut)}</p>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">{calcWorkedHours(inv.clockIn, inv.clockOut)}h</td>
+                      <td className="px-6 py-4 text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()} MAD</td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                          <CheckCircle className="w-3 h-3" />
+                          Sent
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden divide-y divide-border">
+              {recentInvoices.map((inv) => (
+                <div key={inv.id} className="px-5 py-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-mono font-medium text-primary">#INV-{inv.id}</span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
+                      <CheckCircle className="w-2.5 h-2.5" />
+                      Sent
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-foreground text-sm">{inv.clientName || "N/A"}</p>
+                    <span className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()} MAD</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{inv.nannyName || "N/A"}</span>
+                    <span>{formatDate(inv.date)}</span>
+                    <span>{calcWorkedHours(inv.clockIn, inv.clockOut)}h</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="px-6 py-3 border-t border-border text-[10px] text-muted-foreground">
+              Invoices are auto-sent to parents when the nanny ends her shift. Showing last {recentInvoices.length} of {allInvoices.length}.
+            </div>
+          </>
+        )}
+      </div>
 
       {/* ── Recent Bookings Table ── */}
       <div className="bg-card rounded-xl border border-border shadow-soft">
