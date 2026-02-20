@@ -84,7 +84,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ` as DbNanny[];
 
       const nanny = result[0];
-      const host = req.headers.host || 'dazzling-bouman.vercel.app';
+      const host = req.headers.host || 'callanannycare.vercel.app';
       const protocol = host.includes('localhost') ? 'http' : 'https';
       const inviteLink = `${protocol}://${host}/nanny/register?token=${inviteToken}`;
 
@@ -135,7 +135,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         WHERE id = ${nannyId}
       `;
 
-      const host = req.headers.host || 'dazzling-bouman.vercel.app';
+      const host = req.headers.host || 'callanannycare.vercel.app';
       const protocol = host.includes('localhost') ? 'http' : 'https';
       const inviteLink = `${protocol}://${host}/nanny/register?token=${inviteToken}`;
 

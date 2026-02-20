@@ -160,7 +160,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           WHERE id = ${admin[0].id}
         `;
 
-        const host = req.headers.host || 'dazzling-bouman.vercel.app';
+        const host = req.headers.host || 'callanannycare.vercel.app';
         const protocol = host.includes('localhost') ? 'http' : 'https';
         const resetLink = `${protocol}://${host}/admin/login?reset=${resetTokenValue}`;
 
