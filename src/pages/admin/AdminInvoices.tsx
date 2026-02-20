@@ -13,6 +13,13 @@ import type { Booking } from "@/types";
 const SERVICE_RATE = 150; // MAD/hr — client rate (same as booking page)
 const TAXI_FEE = 100;
 
+// 24h time slots from 13:00 to 23:00 (30-min steps)
+const TIME_SLOTS: string[] = [];
+for (let h = 13; h <= 23; h++) {
+  TIME_SLOTS.push(`${String(h).padStart(2, "0")}:00`);
+  if (h < 23) TIME_SLOTS.push(`${String(h).padStart(2, "0")}:30`);
+}
+
 // ─── Helpers ────────────────────────────────────────────────
 
 function calcWorkedHours(clockIn: string | null, clockOut: string | null): string {
@@ -806,23 +813,37 @@ export default function AdminInvoices() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Clock In *</label>
-                  <input
-                    type="time"
-                    value={formData.clockIn}
-                    onChange={(e) => updateField("clockIn", e.target.value)}
-                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                    required
-                  />
+                  <div className="relative">
+                    <select
+                      value={formData.clockIn}
+                      onChange={(e) => updateField("clockIn", e.target.value)}
+                      className="w-full appearance-none px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary cursor-pointer"
+                      required
+                    >
+                      <option value="">Select...</option>
+                      {TIME_SLOTS.map((t) => (
+                        <option key={t} value={t}>{t.replace(":", "h")}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">Clock Out *</label>
-                  <input
-                    type="time"
-                    value={formData.clockOut}
-                    onChange={(e) => updateField("clockOut", e.target.value)}
-                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                    required
-                  />
+                  <div className="relative">
+                    <select
+                      value={formData.clockOut}
+                      onChange={(e) => updateField("clockOut", e.target.value)}
+                      className="w-full appearance-none px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary cursor-pointer"
+                      required
+                    >
+                      <option value="">Select...</option>
+                      {TIME_SLOTS.map((t) => (
+                        <option key={t} value={t}>{t.replace(":", "h")}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                  </div>
                 </div>
               </div>
 
