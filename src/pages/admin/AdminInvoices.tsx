@@ -10,7 +10,7 @@ import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
 import type { Booking } from "@/types";
 
-const HOURLY_RATE = 31.25;
+const SERVICE_RATE = 150; // MAD/hr — client rate (same as booking page)
 const TAXI_FEE = 100;
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -108,7 +108,7 @@ export default function AdminInvoices() {
       const ms = outTime.getTime() - inTime.getTime();
       if (ms <= 0) return;
       const hours = ms / 3600000;
-      let total = Math.round(hours * HOURLY_RATE);
+      let total = Math.round(hours * SERVICE_RATE);
       // Add taxi fee if after 7 PM
       const inHour = inTime.getHours();
       if (inHour >= 19) total += TAXI_FEE;
@@ -571,7 +571,7 @@ export default function AdminInvoices() {
         const inv = viewInvoice;
         const hours = calcWorkedHours(inv.clockIn, inv.clockOut);
         const hoursNum = inv.clockIn && inv.clockOut ? (new Date(inv.clockOut).getTime() - new Date(inv.clockIn).getTime()) / 3600000 : 0;
-        const basePay = Math.round(hoursNum * HOURLY_RATE);
+        const basePay = Math.round(hoursNum * SERVICE_RATE);
         const inHour = inv.clockIn ? new Date(inv.clockIn).getHours() : 0;
         const hasTaxi = inHour >= 19;
         return (
@@ -645,7 +645,7 @@ export default function AdminInvoices() {
                   </div>
                   <div className="divide-y divide-border">
                     <div className="flex justify-between px-4 py-2.5">
-                      <span className="text-sm text-muted-foreground">{hours}h × {HOURLY_RATE} MAD/hr</span>
+                      <span className="text-sm text-muted-foreground">{hours}h × {SERVICE_RATE} MAD/hr</span>
                       <span className="text-sm font-medium text-foreground">{basePay} MAD</span>
                     </div>
                     {hasTaxi && (
@@ -845,7 +845,7 @@ export default function AdminInvoices() {
                   const ms = outT.getTime() - inT.getTime();
                   if (ms <= 0) return null;
                   const hours = ms / 3600000;
-                  const base = Math.round(hours * HOURLY_RATE);
+                  const base = Math.round(hours * SERVICE_RATE);
                   const isEvening = inT.getHours() >= 19;
                   return (
                     <div className="bg-blue-50 text-blue-800 text-xs px-4 py-3 rounded-lg border border-blue-100 space-y-1">
@@ -854,7 +854,7 @@ export default function AdminInvoices() {
                         Auto-calculated breakdown
                       </div>
                       <div className="flex items-center justify-between">
-                        <span>{hours.toFixed(1)}h × {HOURLY_RATE} MAD/hr</span>
+                        <span>{hours.toFixed(1)}h × {SERVICE_RATE} MAD/hr</span>
                         <span className="font-medium">{base} MAD</span>
                       </div>
                       {isEvening && (
