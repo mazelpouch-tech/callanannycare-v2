@@ -740,6 +740,7 @@ export default function AdminInvoices() {
                     value={formData.clientName}
                     onChange={(e) => updateField("clientName", e.target.value)}
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    autoComplete="name"
                     required
                   />
                 </div>
@@ -751,6 +752,7 @@ export default function AdminInvoices() {
                     onChange={(e) => updateField("clientEmail", e.target.value)}
                     placeholder="Optional"
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    autoComplete="email"
                   />
                 </div>
               </div>

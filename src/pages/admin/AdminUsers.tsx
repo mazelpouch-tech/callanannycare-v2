@@ -477,6 +477,9 @@ export default function AdminUsers() {
                     onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
                     placeholder="e.g., Sarah Manager"
+                    autoComplete="name"
+                    autoCorrect="off"
+                    spellCheck={false}
                     required
                   />
                 </div>
@@ -493,6 +496,9 @@ export default function AdminUsers() {
                     onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
                     placeholder="sarah@callananny.ma"
+                    autoComplete="email"
+                    autoCorrect="off"
+                    spellCheck={false}
                     required
                   />
                 </div>
