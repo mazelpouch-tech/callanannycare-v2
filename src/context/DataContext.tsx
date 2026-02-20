@@ -279,6 +279,9 @@ export function DataProvider({ children }: DataProviderProps) {
             notes: booking.notes || "",
             total_price: booking.totalPrice || 0,
             locale: meta?.locale || "en",
+            status: booking.status || undefined,
+            clock_in: booking.clockIn || null,
+            clock_out: booking.clockOut || null,
           }),
         });
 
@@ -354,10 +357,28 @@ export function DataProvider({ children }: DataProviderProps) {
   }, []);
 
   const updateBooking = useCallback(async (id: number | string, updates: Partial<Booking>): Promise<void> => {
+    // Map camelCase to snake_case for API
+    const apiBody: Record<string, unknown> = {};
+    if (updates.nannyId !== undefined) apiBody.nanny_id = updates.nannyId;
+    if (updates.clientName !== undefined) apiBody.client_name = updates.clientName;
+    if (updates.clientEmail !== undefined) apiBody.client_email = updates.clientEmail;
+    if (updates.clientPhone !== undefined) apiBody.client_phone = updates.clientPhone;
+    if (updates.hotel !== undefined) apiBody.hotel = updates.hotel;
+    if (updates.date !== undefined) apiBody.date = updates.date;
+    if (updates.startTime !== undefined) apiBody.start_time = updates.startTime;
+    if (updates.endTime !== undefined) apiBody.end_time = updates.endTime;
+    if (updates.plan !== undefined) apiBody.plan = updates.plan;
+    if (updates.childrenCount !== undefined) apiBody.children_count = updates.childrenCount;
+    if (updates.childrenAges !== undefined) apiBody.children_ages = updates.childrenAges;
+    if (updates.notes !== undefined) apiBody.notes = updates.notes;
+    if (updates.totalPrice !== undefined) apiBody.total_price = updates.totalPrice;
+    if (updates.status !== undefined) apiBody.status = updates.status;
+    if (updates.clockIn !== undefined) apiBody.clock_in = updates.clockIn;
+    if (updates.clockOut !== undefined) apiBody.clock_out = updates.clockOut;
     try {
       await apiFetch(`/bookings/${id}`, {
         method: "PUT",
-        body: JSON.stringify(updates),
+        body: JSON.stringify(apiBody),
       });
     } catch {
       console.warn("API update failed, updating locally");
@@ -419,6 +440,13 @@ export function DataProvider({ children }: DataProviderProps) {
       const updated = prev.filter((b) => b.id !== id);
       saveToStorage(STORAGE_KEYS.bookings, updated);
       return updated;
+    });
+  }, []);
+
+  const resendInvoice = useCallback(async (id: number | string): Promise<void> => {
+    await apiFetch(`/bookings/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ resend_invoice: true }),
     });
   }, []);
 
@@ -865,6 +893,7 @@ export function DataProvider({ children }: DataProviderProps) {
       clockInBooking,
       clockOutBooking,
       deleteBooking,
+      resendInvoice,
       stats,
       isAdmin,
       adminProfile,
@@ -896,7 +925,7 @@ export function DataProvider({ children }: DataProviderProps) {
     }),
     [
       nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability, inviteNanny, toggleNannyStatus, resendInvite,
-      bookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking,
+      bookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking, resendInvoice,
       stats, isAdmin, adminProfile, adminUsers, adminLogin, adminLogout,
       fetchAdminUsers, addAdminUser, updateAdminUser, deleteAdminUser,
       changeAdminPassword, forgotAdminPassword, resetAdminPassword, loading,

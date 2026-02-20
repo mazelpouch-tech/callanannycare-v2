@@ -1,0 +1,751 @@
+import { useState, useMemo } from "react";
+import {
+  Search, Trash2, ChevronDown,
+  Plus, X, Loader2,
+  FileText, Pencil, Send, Download, DollarSign, CheckCircle, AlertCircle,
+} from "lucide-react";
+import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, subMonths } from "date-fns";
+import { useData } from "../../context/DataContext";
+import type { Booking } from "@/types";
+
+// ─── Helpers ────────────────────────────────────────────────
+
+function generateTimeSlots(): string[] {
+  const slots: string[] = [];
+  for (let h = 6; h <= 23; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      slots.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    }
+  }
+  return slots;
+}
+
+const TIME_SLOTS = generateTimeSlots();
+
+function calcWorkedHours(clockIn: string | null, clockOut: string | null): string {
+  if (!clockIn || !clockOut) return "—";
+  const ms = new Date(clockOut).getTime() - new Date(clockIn).getTime();
+  const hours = Math.max(0, ms / 3600000);
+  return hours.toFixed(1);
+}
+
+function formatClockTime(iso: string | null): string {
+  if (!iso) return "—";
+  try {
+    return format(new Date(iso), "HH:mm");
+  } catch {
+    return "—";
+  }
+}
+
+function fmtDate(dateStr: string): string {
+  try { return format(parseISO(dateStr), "MMM dd, yyyy"); } catch { return dateStr || "N/A"; }
+}
+
+// ─── Default Form ───────────────────────────────────────────
+
+interface InvoiceForm {
+  id?: number | string;
+  nannyId: string;
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  hotel: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  clockIn: string;
+  clockOut: string;
+  childrenCount: string;
+  childrenAges: string;
+  totalPrice: string;
+  notes: string;
+}
+
+const emptyForm: InvoiceForm = {
+  nannyId: "", clientName: "", clientEmail: "", clientPhone: "",
+  hotel: "", date: "", startTime: "08:00", endTime: "17:00",
+  clockIn: "", clockOut: "",
+  childrenCount: "1", childrenAges: "", totalPrice: "", notes: "",
+};
+
+// ─── Main Component ─────────────────────────────────────────
+
+export default function AdminInvoices() {
+  const { bookings, nannies, addBooking, updateBooking, deleteBooking, resendInvoice } = useData();
+
+  // Filters
+  const [search, setSearch] = useState("");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [dateFilter, setDateFilter] = useState<"all" | "this-month" | "last-month">("all");
+
+  // Modal
+  const [showModal, setShowModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState<InvoiceForm>(emptyForm);
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  // Actions
+  const [deleteConfirm, setDeleteConfirm] = useState<number | string | null>(null);
+  const [resendingId, setResendingId] = useState<number | string | null>(null);
+  const [resendSuccess, setResendSuccess] = useState<number | string | null>(null);
+
+  // ── Derived Data ──
+
+  const invoices = useMemo(() => {
+    return bookings
+      .filter((b) => b.status === "completed" && b.clockOut)
+      .sort((a, b) => {
+        const da = new Date(a.clockOut!).getTime();
+        const db = new Date(b.clockOut!).getTime();
+        return sortOrder === "newest" ? db - da : da - db;
+      });
+  }, [bookings, sortOrder]);
+
+  const filteredInvoices = useMemo(() => {
+    let result = [...invoices];
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (b) =>
+          (b.clientName || "").toLowerCase().includes(q) ||
+          (b.nannyName || "").toLowerCase().includes(q) ||
+          (b.clientEmail || "").toLowerCase().includes(q) ||
+          String(b.id).includes(q)
+      );
+    }
+    const now = new Date();
+    if (dateFilter === "this-month") {
+      const s = startOfMonth(now), e = endOfMonth(now);
+      result = result.filter((b) => {
+        try { return isWithinInterval(parseISO(b.date), { start: s, end: e }); } catch { return false; }
+      });
+    } else if (dateFilter === "last-month") {
+      const prev = subMonths(now, 1);
+      const s = startOfMonth(prev), e = endOfMonth(prev);
+      result = result.filter((b) => {
+        try { return isWithinInterval(parseISO(b.date), { start: s, end: e }); } catch { return false; }
+      });
+    }
+    return result;
+  }, [invoices, search, dateFilter]);
+
+  const totalAmount = filteredInvoices.reduce((s, b) => s + (b.totalPrice || 0), 0);
+  const thisMonthAmount = useMemo(() => {
+    const now = new Date();
+    const s = startOfMonth(now), e = endOfMonth(now);
+    return invoices
+      .filter((b) => { try { return isWithinInterval(parseISO(b.date), { start: s, end: e }); } catch { return false; } })
+      .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+  }, [invoices]);
+
+  // ── Handlers ──
+
+  const openCreate = () => {
+    setFormData(emptyForm);
+    setIsEditing(false);
+    setFormError("");
+    setShowModal(true);
+  };
+
+  const openEdit = (inv: Booking) => {
+    setFormData({
+      id: inv.id,
+      nannyId: String(inv.nannyId || ""),
+      clientName: inv.clientName || "",
+      clientEmail: inv.clientEmail || "",
+      clientPhone: inv.clientPhone || "",
+      hotel: inv.hotel || "",
+      date: inv.date || "",
+      startTime: inv.startTime || "08:00",
+      endTime: inv.endTime || "17:00",
+      clockIn: inv.clockIn ? new Date(inv.clockIn).toISOString().slice(0, 16) : "",
+      clockOut: inv.clockOut ? new Date(inv.clockOut).toISOString().slice(0, 16) : "",
+      childrenCount: String(inv.childrenCount || 1),
+      childrenAges: inv.childrenAges || "",
+      totalPrice: String(inv.totalPrice || 0),
+      notes: inv.notes || "",
+    });
+    setIsEditing(true);
+    setFormError("");
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setFormError("");
+
+    if (!formData.clientName.trim() || !formData.clientEmail.trim()) {
+      setFormError("Client name and email are required");
+      return;
+    }
+    if (!formData.nannyId) {
+      setFormError("Please select a nanny");
+      return;
+    }
+    if (!formData.date || !formData.clockIn || !formData.clockOut) {
+      setFormError("Date, clock-in, and clock-out are required");
+      return;
+    }
+    if (!formData.totalPrice || Number(formData.totalPrice) <= 0) {
+      setFormError("Total price must be greater than 0");
+      return;
+    }
+
+    setFormLoading(true);
+    try {
+      const nanny = nannies.find((n) => n.id === Number(formData.nannyId));
+
+      if (isEditing && formData.id) {
+        await updateBooking(formData.id, {
+          nannyId: Number(formData.nannyId),
+          nannyName: nanny?.name || "",
+          clientName: formData.clientName.trim(),
+          clientEmail: formData.clientEmail.trim(),
+          clientPhone: formData.clientPhone.trim(),
+          hotel: formData.hotel.trim(),
+          date: formData.date,
+          startTime: formData.startTime,
+          endTime: formData.endTime,
+          clockIn: new Date(formData.clockIn).toISOString(),
+          clockOut: new Date(formData.clockOut).toISOString(),
+          childrenCount: Number(formData.childrenCount) || 1,
+          childrenAges: formData.childrenAges.trim(),
+          totalPrice: Number(formData.totalPrice),
+          notes: formData.notes.trim(),
+          status: "completed",
+        });
+      } else {
+        await addBooking({
+          nannyId: Number(formData.nannyId),
+          nannyName: nanny?.name || "",
+          clientName: formData.clientName.trim(),
+          clientEmail: formData.clientEmail.trim(),
+          clientPhone: formData.clientPhone.trim(),
+          hotel: formData.hotel.trim(),
+          date: formData.date,
+          startTime: formData.startTime,
+          endTime: formData.endTime,
+          clockIn: new Date(formData.clockIn).toISOString(),
+          clockOut: new Date(formData.clockOut).toISOString(),
+          childrenCount: Number(formData.childrenCount) || 1,
+          childrenAges: formData.childrenAges.trim(),
+          totalPrice: Number(formData.totalPrice),
+          notes: formData.notes.trim(),
+          status: "completed",
+        });
+      }
+      setShowModal(false);
+    } catch {
+      setFormError("Failed to save invoice. Please try again.");
+    }
+    setFormLoading(false);
+  };
+
+  const handleDelete = async (id: number | string) => {
+    await deleteBooking(id);
+    setDeleteConfirm(null);
+  };
+
+  const handleResend = async (id: number | string) => {
+    setResendingId(id);
+    try {
+      await resendInvoice(id);
+      setResendSuccess(id);
+      setTimeout(() => setResendSuccess(null), 3000);
+    } catch {
+      // silent fail
+    }
+    setResendingId(null);
+  };
+
+  const exportCSV = () => {
+    const headers = ["Invoice #", "Client", "Email", "Phone", "Nanny", "Date", "Clock In", "Clock Out", "Hours", "Amount (MAD)"];
+    const rows = filteredInvoices.map((inv) => [
+      `INV-${inv.id}`,
+      inv.clientName || "",
+      inv.clientEmail || "",
+      inv.clientPhone || "",
+      inv.nannyName || "",
+      inv.date || "",
+      inv.clockIn ? formatClockTime(inv.clockIn) : "",
+      inv.clockOut ? formatClockTime(inv.clockOut) : "",
+      calcWorkedHours(inv.clockIn, inv.clockOut),
+      String(inv.totalPrice || 0),
+    ]);
+    const csv = [headers, ...rows].map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `invoices-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const updateField = (field: keyof InvoiceForm, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const activeNannies = nannies.filter((n) => n.status === "active");
+
+  return (
+    <div className="space-y-6">
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="font-serif text-2xl lg:text-3xl font-bold text-foreground">Invoices</h1>
+          <p className="text-muted-foreground text-sm mt-1">{filteredInvoices.length} invoice{filteredInvoices.length !== 1 ? "s" : ""}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportCSV}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-border rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export CSV
+          </button>
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-1.5 gradient-warm text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity shadow-warm"
+          >
+            <Plus className="w-4 h-4" />
+            Create Invoice
+          </button>
+        </div>
+      </div>
+
+      {/* ── Summary Stats ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-card rounded-xl border border-border p-4 shadow-soft">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+              <FileText className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-foreground">{invoices.length}</p>
+              <p className="text-xs text-muted-foreground">Total Invoices</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-card rounded-xl border border-border p-4 shadow-soft">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
+              <DollarSign className="w-5 h-5 text-green-700" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-foreground">{totalAmount.toLocaleString()} <span className="text-sm font-medium text-muted-foreground">MAD</span></p>
+              <p className="text-xs text-muted-foreground">Total Invoiced</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-card rounded-xl border border-border p-4 shadow-soft">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+              <DollarSign className="w-5 h-5 text-blue-700" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-foreground">{thisMonthAmount.toLocaleString()} <span className="text-sm font-medium text-muted-foreground">MAD</span></p>
+              <p className="text-xs text-muted-foreground">This Month</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Filters ── */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by client, nanny, email, or invoice #..."
+            className="w-full pl-9 pr-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+          />
+        </div>
+        <div className="relative">
+          <select
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value as typeof dateFilter)}
+            className="appearance-none pl-3 pr-8 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 text-foreground cursor-pointer"
+          >
+            <option value="all">All Time</option>
+            <option value="this-month">This Month</option>
+            <option value="last-month">Last Month</option>
+          </select>
+          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+        </div>
+        <div className="relative">
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as typeof sortOrder)}
+            className="appearance-none pl-3 pr-8 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 text-foreground cursor-pointer"
+          >
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+          </select>
+          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+        </div>
+      </div>
+
+      {/* ── Invoice Table ── */}
+      <div className="bg-card rounded-xl border border-border shadow-soft">
+        {filteredInvoices.length === 0 ? (
+          <div className="px-6 py-12 text-center">
+            <FileText className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground font-medium">No invoices found</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">
+              {search || dateFilter !== "all" ? "Try adjusting your filters." : "Create your first invoice or complete a booking with clock data."}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Invoice #</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Client</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nanny</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hours</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredInvoices.map((inv) => (
+                    <tr key={inv.id} className="hover:bg-muted/50 transition-colors">
+                      <td className="px-5 py-4">
+                        <span className="text-sm font-mono font-medium text-primary">#INV-{inv.id}</span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <p className="text-sm font-medium text-foreground">{inv.clientName || "N/A"}</p>
+                        <p className="text-xs text-muted-foreground">{inv.clientEmail || ""}</p>
+                      </td>
+                      <td className="px-5 py-4 text-sm text-muted-foreground">{inv.nannyName || "N/A"}</td>
+                      <td className="px-5 py-4">
+                        <p className="text-sm text-muted-foreground">{fmtDate(inv.date)}</p>
+                        <p className="text-xs text-muted-foreground/70">{formatClockTime(inv.clockIn)} – {formatClockTime(inv.clockOut)}</p>
+                      </td>
+                      <td className="px-5 py-4 text-sm text-muted-foreground">{calcWorkedHours(inv.clockIn, inv.clockOut)}h</td>
+                      <td className="px-5 py-4 text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()} MAD</td>
+                      <td className="px-5 py-4">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                          <CheckCircle className="w-3 h-3" />
+                          Sent
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => openEdit(inv)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors" title="Edit">
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleResend(inv.id)}
+                            disabled={resendingId === inv.id}
+                            className="p-1.5 rounded-lg text-muted-foreground hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-50"
+                            title="Resend Invoice"
+                          >
+                            {resendingId === inv.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                          </button>
+                          {resendSuccess === inv.id && (
+                            <span className="text-[10px] text-green-600 font-semibold">Sent!</span>
+                          )}
+                          {deleteConfirm === inv.id ? (
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => handleDelete(inv.id)} className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded-lg hover:bg-red-100">Yes</button>
+                              <button onClick={() => setDeleteConfirm(null)} className="text-xs font-semibold text-muted-foreground bg-muted px-2 py-1 rounded-lg hover:bg-muted/80">No</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => setDeleteConfirm(inv.id)} className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="lg:hidden divide-y divide-border">
+              {filteredInvoices.map((inv) => (
+                <div key={inv.id} className="px-5 py-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-mono font-medium text-primary">#INV-{inv.id}</span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
+                      <CheckCircle className="w-2.5 h-2.5" />
+                      Sent
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-foreground text-sm">{inv.clientName || "N/A"}</p>
+                      <p className="text-xs text-muted-foreground">{inv.clientEmail || ""}</p>
+                    </div>
+                    <span className="text-sm font-bold text-foreground">{(inv.totalPrice || 0).toLocaleString()} MAD</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{inv.nannyName || "N/A"}</span>
+                    <span>{fmtDate(inv.date)}</span>
+                    <span>{formatClockTime(inv.clockIn)} – {formatClockTime(inv.clockOut)}</span>
+                    <span>{calcWorkedHours(inv.clockIn, inv.clockOut)}h</span>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button onClick={() => openEdit(inv)} className="flex items-center gap-1 text-xs font-medium text-primary bg-primary/10 px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors">
+                      <Pencil className="w-3 h-3" /> Edit
+                    </button>
+                    <button
+                      onClick={() => handleResend(inv.id)}
+                      disabled={resendingId === inv.id}
+                      className="flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+                    >
+                      {resendingId === inv.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                      {resendSuccess === inv.id ? "Sent!" : "Resend"}
+                    </button>
+                    {deleteConfirm === inv.id ? (
+                      <div className="flex items-center gap-1 ml-auto">
+                        <button onClick={() => handleDelete(inv.id)} className="text-xs font-semibold text-red-600 bg-red-50 px-2.5 py-1.5 rounded-lg">Delete</button>
+                        <button onClick={() => setDeleteConfirm(null)} className="text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1.5 rounded-lg">Cancel</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setDeleteConfirm(inv.id)} className="flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors ml-auto">
+                        <Trash2 className="w-3 h-3" /> Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── Create / Edit Modal ── */}
+      {showModal && (
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-[10vh] overflow-y-auto">
+          <div className="w-full max-w-lg bg-card rounded-2xl shadow-xl border border-border">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h2 className="font-serif text-lg font-semibold text-foreground">
+                {isEditing ? "Edit Invoice" : "Create Invoice"}
+              </h2>
+              <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {formError && (
+                <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg border border-red-100 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
+              {/* Nanny */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Nanny *</label>
+                <select
+                  value={formData.nannyId}
+                  onChange={(e) => updateField("nannyId", e.target.value)}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  required
+                >
+                  <option value="">Select nanny...</option>
+                  {activeNannies.map((n) => (
+                    <option key={n.id} value={n.id}>{n.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Client Info */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Client Name *</label>
+                  <input
+                    type="text"
+                    value={formData.clientName}
+                    onChange={(e) => updateField("clientName", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    required
+                  />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Client Email *</label>
+                  <input
+                    type="email"
+                    value={formData.clientEmail}
+                    onChange={(e) => updateField("clientEmail", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Phone</label>
+                  <input
+                    type="tel"
+                    value={formData.clientPhone}
+                    onChange={(e) => updateField("clientPhone", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Hotel</label>
+                  <input
+                    type="text"
+                    value={formData.hotel}
+                    onChange={(e) => updateField("hotel", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              {/* Date & Times */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Date *</label>
+                  <input
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => updateField("date", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Start Time</label>
+                  <select
+                    value={formData.startTime}
+                    onChange={(e) => updateField("startTime", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  >
+                    {TIME_SLOTS.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">End Time</label>
+                  <select
+                    value={formData.endTime}
+                    onChange={(e) => updateField("endTime", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  >
+                    {TIME_SLOTS.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Clock In/Out */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Clock In *</label>
+                  <input
+                    type="datetime-local"
+                    value={formData.clockIn}
+                    onChange={(e) => updateField("clockIn", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Clock Out *</label>
+                  <input
+                    type="datetime-local"
+                    value={formData.clockOut}
+                    onChange={(e) => updateField("clockOut", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Children & Price */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Children</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={formData.childrenCount}
+                    onChange={(e) => updateField("childrenCount", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Ages</label>
+                  <input
+                    type="text"
+                    value={formData.childrenAges}
+                    onChange={(e) => updateField("childrenAges", e.target.value)}
+                    placeholder="e.g. 3, 5"
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Total (MAD) *</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={50}
+                    value={formData.totalPrice}
+                    onChange={(e) => updateField("totalPrice", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary font-semibold"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Notes</label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => updateField("notes", e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
+                />
+              </div>
+
+              {/* Submit */}
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={formLoading}
+                  className="flex-1 gradient-warm text-white font-semibold py-2.5 rounded-xl hover:opacity-90 transition-all shadow-warm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {formLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4" />
+                      {isEditing ? "Update Invoice" : "Create Invoice"}
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2.5 text-sm font-medium text-muted-foreground border border-border rounded-xl hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

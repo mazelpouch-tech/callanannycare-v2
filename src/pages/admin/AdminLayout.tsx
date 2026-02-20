@@ -7,6 +7,7 @@ import {
   Users,
   ShieldCheck,
   QrCode,
+  FileText,
   LogOut,
   Menu,
   X,
@@ -25,6 +26,7 @@ interface SidebarLink {
 const sidebarLinks: SidebarLink[] = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/admin/bookings", label: "Bookings", icon: CalendarDays },
+  { to: "/admin/invoices", label: "Invoices", icon: FileText },
   { to: "/admin/calendar", label: "Calendar", icon: CalendarRange },
   { to: "/admin/nannies", label: "Nannies", icon: Users },
   { to: "/admin/users", label: "Admin Users", icon: ShieldCheck },
