@@ -61,12 +61,6 @@ interface NewBookingForm {
   status: string;
 }
 
-const PLANS = [
-  { id: "hourly", name: "Hourly", label: "Per Hour" },
-  { id: "half-day", name: "Half-Day", label: "5 Hours" },
-  { id: "full-day", name: "Full-Day", label: "10 Hours" },
-];
-
 function generateTimeSlots() {
   const slots = [];
   for (let h = 0; h < 24; h++) {
@@ -144,7 +138,7 @@ export default function AdminBookings() {
       date: booking.date || "",
       startTime: "",
       endTime: "",
-      plan: booking.plan || "hourly",
+      plan: "hourly",
       hotel: booking.hotel || "",
       numChildren: String(booking.childrenCount || "1"),
       childrenAges: booking.childrenAges || "",
@@ -166,8 +160,6 @@ export default function AdminBookings() {
 
   const editBookingHours = useMemo(() => {
     if (!editBookingData) return 0;
-    if (editBookingData.plan === "half-day") return 5;
-    if (editBookingData.plan === "full-day") return 10;
     if (!editBookingData.startTime || !editBookingData.endTime) return 0;
     const [sh, sm] = editBookingData.startTime.split(":").map(Number);
     const [eh, em] = editBookingData.endTime.split(":").map(Number);
@@ -235,13 +227,11 @@ export default function AdminBookings() {
   );
 
   const newBookingHours = useMemo(() => {
-    if (newBooking.plan === "half-day") return 5;
-    if (newBooking.plan === "full-day") return 10;
     if (!newBooking.startTime || !newBooking.endTime) return 0;
     const [sh, sm] = newBooking.startTime.split(":").map(Number);
     const [eh, em] = newBooking.endTime.split(":").map(Number);
     return Math.max(0, (eh + em / 60) - (sh + sm / 60));
-  }, [newBooking.plan, newBooking.startTime, newBooking.endTime]);
+  }, [newBooking.startTime, newBooking.endTime]);
 
   const newBookingPrice = useMemo(() => {
     if (!selectedNanny) return 0;
@@ -1045,38 +1035,19 @@ export default function AdminBookings() {
                 </div>
               </div>
 
-              {/* Date & Plan */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                    Date <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={newBooking.date}
-                    onChange={(e) => setNewBooking({ ...newBooking, date: e.target.value })}
-                    required
-                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
-                  />
-                </div>
-                <div>
-                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                    Plan <span className="text-destructive">*</span>
-                  </label>
-                  <select
-                    value={newBooking.plan}
-                    onChange={(e) => setNewBooking({ ...newBooking, plan: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
-                  >
-                    {PLANS.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.label})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* Date */}
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                  Date <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={newBooking.date}
+                  onChange={(e) => setNewBooking({ ...newBooking, date: e.target.value })}
+                  required
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                />
               </div>
 
               {/* Time */}
@@ -1331,38 +1302,19 @@ export default function AdminBookings() {
                 </div>
               </div>
 
-              {/* Date & Plan */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                    Date <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={editBookingData.date}
-                    onChange={(e) => setEditBookingData({ ...editBookingData, date: e.target.value })}
-                    required
-                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
-                  />
-                </div>
-                <div>
-                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                    Plan <span className="text-destructive">*</span>
-                  </label>
-                  <select
-                    value={editBookingData.plan}
-                    onChange={(e) => setEditBookingData({ ...editBookingData, plan: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
-                  >
-                    {PLANS.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.label})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* Date */}
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                  Date <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={editBookingData.date}
+                  onChange={(e) => setEditBookingData({ ...editBookingData, date: e.target.value })}
+                  required
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                />
               </div>
 
               {/* Time */}

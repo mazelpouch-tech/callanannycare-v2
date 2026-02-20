@@ -433,10 +433,6 @@ const STATUS_COLORS: Record<BookingStatus, string> = {
 
 const PLAN_COLORS = {
   hourly: "#cd6845",
-  half_day: "#4a9e6e",
-  full_day: "#4a7fbf",
-  overnight: "#9b6cc4",
-  weekly: "#d4873c",
 };
 
 // ─── Main Dashboard ──────────────────────────────────────────────
@@ -478,24 +474,6 @@ export default function Dashboard() {
       }).length;
       return { label: format(monthDate, "MMM"), value: count };
     });
-  }, [bookings]);
-
-  // ── Revenue by plan ──
-  const revenueByPlan = useMemo(() => {
-    const planMap: Record<string, number> = {};
-    bookings
-      .filter((b) => b.status === "confirmed" || b.status === "completed")
-      .forEach((b) => {
-        const plan = b.plan || "hourly";
-        planMap[plan] = (planMap[plan] || 0) + (b.totalPrice || 0);
-      });
-    return Object.entries(planMap)
-      .map(([plan, value]) => ({
-        label: plan.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        value,
-        color: PLAN_COLORS[plan as keyof typeof PLAN_COLORS] || "#8b7d72",
-      }))
-      .sort((a, b) => b.value - a.value);
   }, [bookings]);
 
   // ── Status distribution ──
@@ -740,31 +718,24 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Revenue by Plan */}
+        {/* Total Revenue */}
         <div className="bg-card rounded-xl border border-border shadow-soft p-5">
           <div className="mb-4">
-            <h3 className="font-serif text-base font-semibold text-foreground">Revenue by Plan</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Breakdown by booking type</p>
+            <h3 className="font-serif text-base font-semibold text-foreground">Total Revenue</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">All bookings (hourly plan)</p>
           </div>
-          {revenueByPlan.length > 0 ? (
-            <>
-              <DonutChart
-                segments={revenueByPlan}
-                centerValue={`${(stats.totalRevenue / 1000).toFixed(1)}k`}
-                centerLabel="MAD"
-              />
-              <div className="mt-4 space-y-2">
-                {revenueByPlan.map((seg) => (
-                  <div key={seg.label} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: seg.color }} />
-                      <span className="text-muted-foreground">{seg.label}</span>
-                    </div>
-                    <span className="font-semibold text-foreground">{seg.value.toLocaleString()} MAD</span>
-                  </div>
-                ))}
+          {stats.totalRevenue > 0 ? (
+            <div className="flex flex-col items-center justify-center py-6">
+              <div className="w-28 h-28 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <DollarSign className="w-10 h-10 text-primary" />
               </div>
-            </>
+              <p className="text-3xl font-bold text-foreground">{stats.totalRevenue.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground mt-1">MAD</p>
+              <div className="mt-4 flex items-center gap-2 text-xs">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLAN_COLORS.hourly }} />
+                <span className="text-muted-foreground">Hourly Plan</span>
+              </div>
+            </div>
           ) : (
             <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
               No revenue data yet

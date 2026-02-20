@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   format,
   addMonths,
@@ -29,26 +29,27 @@ import {
   ArrowRight,
   CheckCircle,
   MessageCircle,
+  X,
+  AlertTriangle,
+  Shield,
 } from "lucide-react";
 import { useData } from "../context/DataContext";
 import type { BookingPlan } from "@/types";
 
-// ---- Prop / State interfaces ----
+// ---- Interfaces ----
 
 interface ProgressBarProps {
   currentStep: number;
 }
 
 interface StepDateTimeProps {
-  selectedDate: Date | null;
-  onDateSelect: (date: Date | null) => void;
-  selectedPlan: string;
-  onPlanSelect: (plan: string) => void;
+  selectedDates: Date[];
+  onDateToggle: (date: Date) => void;
+  onDateRemove: (date: Date) => void;
   startTime: string;
   onStartTimeChange: (time: string) => void;
   endTime: string;
   onEndTimeChange: (time: string) => void;
-  nannyRate: number;
   onBack?: () => void;
   onNext: () => void;
 }
@@ -70,26 +71,53 @@ interface StepDetailsProps {
   onNext: () => void;
 }
 
+interface ChildInfo {
+  childFirstName: string;
+  childLastName: string;
+  childDob: string;
+  childAge: string;
+  childGender: string;
+  foodAllergies: string;
+  medicineAllergies: string;
+  environmentAllergies: string;
+  noAllergies: boolean;
+  allergyReaction: string;
+  specialNeeds: string;
+  behaviorNotes: string;
+  dietaryRestrictions: string;
+  favoriteActivities: string;
+  napSchedule: string;
+  agreeTerms: boolean;
+}
+
+interface StepChildInfoProps {
+  childInfo: ChildInfo;
+  onChange: (info: ChildInfo) => void;
+  onBack: () => void;
+  onNext: () => void;
+}
+
 interface StepReviewProps {
-  selectedDate: Date | null;
+  selectedDates: Date[];
   startTime: string;
   endTime: string;
-  selectedPlan: string;
   details: BookingDetails;
+  childInfo: ChildInfo;
   totalPrice: number;
   hours: number;
+  dateCount: number;
   onEdit: (step: number) => void;
   onConfirm: () => void;
   isSubmitting: boolean;
 }
 
 interface LastBookingData extends BookingDetails {
-  date: string;
+  dates: string[];
   startTime: string;
   endTime: string;
-  plan: string;
   totalPrice: number;
   status: string;
+  childName: string;
 }
 
 interface BookingSuccessProps {
@@ -98,16 +126,13 @@ interface BookingSuccessProps {
   bookingData: LastBookingData | null;
 }
 
+// ---- Constants ----
+
 const STEPS = [
   { number: 1, label: "Date & Time" },
   { number: 2, label: "Your Details" },
-  { number: 3, label: "Review" },
-];
-
-const PLANS = [
-  { id: "hourly", name: "Hourly", hours: null, label: "Per Hour" },
-  { id: "half-day", name: "Half-Day", hours: 5, label: "5 Hours" },
-  { id: "full-day", name: "Full-Day", hours: 10, label: "10 Hours" },
+  { number: 3, label: "Child Info" },
+  { number: 4, label: "Review" },
 ];
 
 function generateTimeSlots() {
@@ -181,20 +206,18 @@ function ProgressBar({ currentStep }: ProgressBarProps) {
 
 // --- Step 1: Date & Time ---
 function StepDateTime({
-  selectedDate,
-  onDateSelect,
-  selectedPlan,
-  onPlanSelect,
+  selectedDates,
+  onDateToggle,
+  onDateRemove,
   startTime,
   onStartTimeChange,
   endTime,
   onEndTimeChange,
-  nannyRate,
   onBack,
   onNext,
 }: StepDateTimeProps) {
   const [currentMonth, setCurrentMonth] = useState(
-    selectedDate ? startOfMonth(selectedDate) : startOfMonth(new Date())
+    selectedDates.length > 0 ? startOfMonth(selectedDates[0]) : startOfMonth(new Date())
   );
 
   const monthStart = startOfMonth(currentMonth);
@@ -204,25 +227,7 @@ function StepDateTime({
 
   const todayDate = startOfDay(new Date());
 
-  // Auto-adjust end time for half-day and full-day
-  useEffect(() => {
-    if (!startTime) return;
-    if (selectedPlan === "half-day") {
-      const start = parseTimeValue(startTime);
-      const endVal = Math.min(start + 5, 20);
-      const endH = Math.floor(endVal);
-      const endM = (endVal % 1) * 60;
-      onEndTimeChange(`${endH}:${endM === 0 ? "00" : "30"}`);
-    } else if (selectedPlan === "full-day") {
-      const start = parseTimeValue(startTime);
-      const endVal = Math.min(start + 10, 20);
-      const endH = Math.floor(endVal);
-      const endM = (endVal % 1) * 60;
-      onEndTimeChange(`${endH}:${endM === 0 ? "00" : "30"}`);
-    }
-  }, [selectedPlan, startTime, onEndTimeChange]);
-
-  const isValid = selectedDate && selectedPlan && startTime && endTime;
+  const isValid = selectedDates.length > 0 && startTime && endTime;
 
   return (
     <div>
@@ -230,7 +235,7 @@ function StepDateTime({
         Choose Date & Time
       </h2>
       <p className="text-muted-foreground mb-6">
-        Pick your preferred date, plan, and time slot.
+        Pick your preferred dates and time slot.
       </p>
 
       {/* Calendar */}
@@ -273,7 +278,7 @@ function StepDateTime({
           {days.map((day) => {
             const isPast = isBefore(day, todayDate);
             const isCurrentMonth = isSameMonth(day, currentMonth);
-            const isSelectedDay = selectedDate && isSameDay(day, selectedDate);
+            const isSelectedDay = selectedDates.some((d) => isSameDay(day, d));
             const isTodayDay = isToday(day);
 
             return (
@@ -281,7 +286,7 @@ function StepDateTime({
                 key={day.toISOString()}
                 type="button"
                 disabled={isPast || !isCurrentMonth}
-                onClick={() => onDateSelect(day)}
+                onClick={() => onDateToggle(day)}
                 className={`aspect-square flex items-center justify-center text-sm rounded-full transition-all duration-200 ${
                   isSelectedDay
                     ? "gradient-warm text-white font-bold shadow-warm"
@@ -299,46 +304,26 @@ function StepDateTime({
         </div>
       </div>
 
-      {/* Plan Selector */}
-      <div className="mb-6">
-        <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
-          <Calendar className="w-4 h-4 text-primary" />
-          Select Plan
-        </label>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {PLANS.map((plan) => {
-            const isActive = selectedPlan === plan.id;
-            const price =
-              plan.id === "hourly"
-                ? nannyRate
-                : plan.id === "half-day"
-                ? nannyRate * 5
-                : nannyRate * 10;
-            return (
+      {/* Selected Date Chips */}
+      {selectedDates.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-6">
+          {selectedDates.map((d) => (
+            <span
+              key={d.toISOString()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium"
+            >
+              {format(d, "EEE, MMM d")}
               <button
-                key={plan.id}
                 type="button"
-                onClick={() => onPlanSelect(plan.id)}
-                className={`p-4 rounded-xl text-center transition-all duration-200 cursor-pointer ${
-                  isActive
-                    ? "gradient-warm text-white shadow-warm"
-                    : "bg-card border border-border hover:border-primary/40 hover:shadow-soft"
-                }`}
+                onClick={() => onDateRemove(d)}
+                className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
               >
-                <div className={`font-bold text-lg ${isActive ? "text-white" : "text-foreground"}`}>
-                  {plan.name}
-                </div>
-                <div className={`text-sm mt-1 ${isActive ? "text-white/80" : "text-muted-foreground"}`}>
-                  {plan.label}
-                </div>
-                <div className={`font-bold text-lg mt-2 ${isActive ? "text-white" : "text-primary"}`}>
-                  {price} MAD
-                </div>
+                <X className="w-3.5 h-3.5" />
               </button>
-            );
-          })}
+            </span>
+          ))}
         </div>
-      </div>
+      )}
 
       {/* Time Selectors */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
@@ -368,8 +353,7 @@ function StepDateTime({
           <select
             value={endTime}
             onChange={(e) => onEndTimeChange(e.target.value)}
-            disabled={selectedPlan === "half-day" || selectedPlan === "full-day"}
-            className="w-full rounded-lg border border-border bg-card p-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full rounded-lg border border-border bg-card p-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
             <option value="">Select end time</option>
             {TIME_SLOTS.map((slot) => (
@@ -407,7 +391,7 @@ function StepDateTime({
   );
 }
 
-// --- Step 3: Your Details ---
+// --- Step 2: Your Details ---
 function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
   const handleChange = (field: keyof BookingDetails) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     onChange({ ...details, [field]: e.target.value });
@@ -567,22 +551,315 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
   );
 }
 
-// --- Step 3: Review & Confirm ---
+// --- Step 3: Child Info ---
+function StepChildInfo({ childInfo, onChange, onBack, onNext }: StepChildInfoProps) {
+  const handleChange = (field: keyof ChildInfo) => (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const target = e.target as HTMLInputElement;
+    const val = target.type === "checkbox" ? target.checked : target.value;
+    onChange({ ...childInfo, [field]: val });
+  };
+
+  const isValid = childInfo.childFirstName.trim() && childInfo.agreeTerms;
+
+  return (
+    <div>
+      <h2 className="font-serif text-2xl sm:text-3xl font-bold text-foreground mb-2">
+        Child Information
+      </h2>
+      <p className="text-muted-foreground mb-6">
+        Tell us about your child so our nanny can provide the best care.
+      </p>
+
+      <div className="space-y-6 max-w-xl">
+        {/* Child Basic Info */}
+        <div className="bg-card rounded-xl border border-border p-4 sm:p-5 shadow-soft">
+          <h3 className="flex items-center gap-2 font-semibold text-foreground mb-4">
+            <Baby className="w-4 h-4 text-primary" />
+            Child Details
+          </h3>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-1.5">
+                  First Name <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={childInfo.childFirstName}
+                  onChange={handleChange("childFirstName")}
+                  placeholder="Child's first name"
+                  className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-foreground mb-1.5 block">
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  value={childInfo.childLastName}
+                  onChange={handleChange("childLastName")}
+                  placeholder="Child's last name"
+                  className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="text-sm font-semibold text-foreground mb-1.5 block">
+                  Date of Birth
+                </label>
+                <input
+                  type="date"
+                  value={childInfo.childDob}
+                  onChange={handleChange("childDob")}
+                  className="w-full rounded-lg border border-border p-3 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-foreground mb-1.5 block">
+                  Age
+                </label>
+                <input
+                  type="text"
+                  value={childInfo.childAge}
+                  onChange={handleChange("childAge")}
+                  placeholder="e.g. 3 years"
+                  className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-foreground mb-1.5 block">
+                  Gender
+                </label>
+                <select
+                  value={childInfo.childGender}
+                  onChange={handleChange("childGender")}
+                  className="w-full rounded-lg border border-border p-3 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                >
+                  <option value="">--</option>
+                  <option value="boy">Boy</option>
+                  <option value="girl">Girl</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Allergies */}
+        <div className="bg-card rounded-xl border border-border p-4 sm:p-5 shadow-soft">
+          <h3 className="flex items-center gap-2 font-semibold text-foreground mb-4">
+            <AlertTriangle className="w-4 h-4 text-primary" />
+            Allergies
+          </h3>
+          <div className="space-y-4">
+            <label className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={childInfo.noAllergies}
+                onChange={handleChange("noAllergies")}
+                className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
+              />
+              <span className="text-sm font-medium text-foreground">No known allergies</span>
+            </label>
+
+            {!childInfo.noAllergies && (
+              <>
+                <div>
+                  <label className="text-sm font-semibold text-foreground mb-1.5 block">
+                    Food Allergies
+                  </label>
+                  <input
+                    type="text"
+                    value={childInfo.foodAllergies}
+                    onChange={handleChange("foodAllergies")}
+                    placeholder="e.g. peanuts, milk, gluten, seafood..."
+                    className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-foreground mb-1.5 block">
+                    Medicine Allergies
+                  </label>
+                  <input
+                    type="text"
+                    value={childInfo.medicineAllergies}
+                    onChange={handleChange("medicineAllergies")}
+                    placeholder="e.g. penicillin, ibuprofen..."
+                    className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-foreground mb-1.5 block">
+                    Environmental Allergies
+                  </label>
+                  <input
+                    type="text"
+                    value={childInfo.environmentAllergies}
+                    onChange={handleChange("environmentAllergies")}
+                    placeholder="e.g. pollen, dust mites, animals..."
+                    className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-foreground mb-1.5 block">
+                    Known Allergic Reactions & Treatment
+                  </label>
+                  <textarea
+                    value={childInfo.allergyReaction}
+                    onChange={handleChange("allergyReaction")}
+                    placeholder="Describe reactions and treatment to administer..."
+                    rows={3}
+                    className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Special Needs & Behavior */}
+        <div className="bg-card rounded-xl border border-border p-4 sm:p-5 shadow-soft">
+          <h3 className="flex items-center gap-2 font-semibold text-foreground mb-4">
+            <FileText className="w-4 h-4 text-primary" />
+            Special Needs & Behavior
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-semibold text-foreground mb-1.5 block">
+                Special Needs or Disabilities
+              </label>
+              <textarea
+                value={childInfo.specialNeeds}
+                onChange={handleChange("specialNeeds")}
+                placeholder="Describe any special requirements..."
+                rows={3}
+                className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-foreground mb-1.5 block">
+                Behavior Notes
+              </label>
+              <textarea
+                value={childInfo.behaviorNotes}
+                onChange={handleChange("behaviorNotes")}
+                placeholder="e.g. fears, routines, sleep habits, comfort methods..."
+                rows={3}
+                className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-foreground mb-1.5 block">
+                Dietary Restrictions
+              </label>
+              <input
+                type="text"
+                value={childInfo.dietaryRestrictions}
+                onChange={handleChange("dietaryRestrictions")}
+                placeholder="e.g. vegetarian, halal, sugar-free..."
+                className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-foreground mb-1.5 block">
+                Favorite Activities
+              </label>
+              <input
+                type="text"
+                value={childInfo.favoriteActivities}
+                onChange={handleChange("favoriteActivities")}
+                placeholder="e.g. drawing, reading, building blocks..."
+                className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-foreground mb-1.5 block">
+                Nap / Sleep Schedule
+              </label>
+              <input
+                type="text"
+                value={childInfo.napSchedule}
+                onChange={handleChange("napSchedule")}
+                placeholder="e.g. nap 1-3 PM, bedtime at 8 PM..."
+                className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Consent */}
+        <div className="bg-card rounded-xl border border-border p-4 sm:p-5 shadow-soft">
+          <h3 className="flex items-center gap-2 font-semibold text-foreground mb-4">
+            <Shield className="w-4 h-4 text-primary" />
+            Consent & Authorization
+          </h3>
+          <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground leading-relaxed mb-4">
+            I authorize Call a Nanny to care for my child according to the information provided above. I certify that all information is accurate and complete.
+          </div>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={childInfo.agreeTerms}
+              onChange={handleChange("agreeTerms")}
+              className="w-4 h-4 rounded border-border text-primary focus:ring-primary mt-0.5"
+            />
+            <span className="text-sm text-foreground">
+              I agree to the general terms of service <span className="text-destructive">*</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div className="flex justify-between mt-8">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-2 px-5 py-3 rounded-full border border-border text-foreground font-semibold hover:bg-muted transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </button>
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={!isValid}
+          className="gradient-warm text-white font-semibold px-6 py-3 rounded-full hover:opacity-90 transition-opacity shadow-warm disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          Next
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// --- Step 4: Review & Confirm ---
 function StepReview({
-  selectedDate,
+  selectedDates,
   startTime,
   endTime,
-  selectedPlan,
   details,
+  childInfo,
   totalPrice,
   hours,
+  dateCount,
   onEdit,
   onConfirm,
   isSubmitting,
 }: StepReviewProps) {
   const startLabel = TIME_SLOTS.find((s) => s.value === startTime)?.label || startTime;
   const endLabel = TIME_SLOTS.find((s) => s.value === endTime)?.label || endTime;
-  const planLabel = PLANS.find((p) => p.id === selectedPlan)?.name || selectedPlan;
+
+  const allergiesSummary = childInfo.noAllergies
+    ? "None"
+    : [childInfo.foodAllergies, childInfo.medicineAllergies, childInfo.environmentAllergies]
+        .filter(Boolean)
+        .join(", ") || "Not specified";
 
   return (
     <div>
@@ -621,17 +898,17 @@ function StepReview({
             </button>
           </div>
           <div className="space-y-1 text-sm text-muted-foreground">
-            <p>
-              <span className="text-foreground font-medium">Date:</span>{" "}
-              {selectedDate ? format(selectedDate, "EEEE, MMMM d, yyyy") : "—"}
-            </p>
-            <p>
+            <div>
+              <span className="text-foreground font-medium">Dates:</span>
+              <ul className="ml-4 mt-1 space-y-0.5">
+                {selectedDates.map((d) => (
+                  <li key={d.toISOString()}>{format(d, "EEEE, MMMM d, yyyy")}</li>
+                ))}
+              </ul>
+            </div>
+            <p className="mt-2">
               <span className="text-foreground font-medium">Time:</span>{" "}
               {startLabel} - {endLabel}
-            </p>
-            <p>
-              <span className="text-foreground font-medium">Plan:</span>{" "}
-              {planLabel}
             </p>
           </div>
         </div>
@@ -682,11 +959,56 @@ function StepReview({
           </div>
         </div>
 
+        {/* Child Info */}
+        <div className="mb-5 pb-5 border-b border-border">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Baby className="w-4 h-4 text-primary" />
+              Child Info
+            </span>
+            <button
+              type="button"
+              onClick={() => onEdit(3)}
+              className="text-sm text-primary font-semibold hover:underline"
+            >
+              Edit
+            </button>
+          </div>
+          <div className="space-y-1 text-sm text-muted-foreground">
+            <p>
+              <span className="text-foreground font-medium">Child:</span>{" "}
+              {childInfo.childFirstName} {childInfo.childLastName}
+            </p>
+            {(childInfo.childAge || childInfo.childDob) && (
+              <p>
+                <span className="text-foreground font-medium">Age / DOB:</span>{" "}
+                {childInfo.childAge}{childInfo.childAge && childInfo.childDob ? " / " : ""}{childInfo.childDob}
+              </p>
+            )}
+            {childInfo.childGender && (
+              <p>
+                <span className="text-foreground font-medium">Gender:</span>{" "}
+                {childInfo.childGender === "boy" ? "Boy" : "Girl"}
+              </p>
+            )}
+            <p>
+              <span className="text-foreground font-medium">Allergies:</span>{" "}
+              {allergiesSummary}
+            </p>
+            {childInfo.specialNeeds && (
+              <p>
+                <span className="text-foreground font-medium">Special Needs:</span>{" "}
+                {childInfo.specialNeeds}
+              </p>
+            )}
+          </div>
+        </div>
+
         {/* Total */}
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">
-              150 MAD x {hours} hr{hours !== 1 ? "s" : ""}
+              150 MAD &times; {hours} hr{hours !== 1 ? "s" : ""} &times; {dateCount} date{dateCount !== 1 ? "s" : ""}
             </p>
             <p className="text-2xl font-bold text-foreground mt-1">
               {totalPrice} MAD
@@ -716,18 +1038,20 @@ function StepReview({
 // --- Success State ---
 function BookingSuccess({ onBookAnother, onGoHome, bookingData }: BookingSuccessProps) {
   const buildWhatsAppUrl = () => {
+    const datesText = bookingData?.dates?.map((d) => d).join(", ") ?? "";
     const msg = encodeURIComponent(
-      `Hi! I just booked a nanny session with Call a Nanny.\n\nDate: ${bookingData?.date ?? ""}\nTime: ${bookingData?.startTime ?? ""}${bookingData?.endTime ? ` - ${bookingData.endTime}` : ""}\nPlan: ${bookingData?.plan ?? ""}\n\nPlease fill out the child information form so we can prepare for a great experience:\nhttps://callananny.ma/parent-form\n\nLooking forward to it!`
+      `Hi! I just booked a nanny session with Call a Nanny.\n\nDates: ${datesText}\nTime: ${bookingData?.startTime ?? ""}${bookingData?.endTime ? ` - ${bookingData.endTime}` : ""}\nChild: ${bookingData?.childName ?? ""}\n\nLooking forward to it!`
     );
     return `https://wa.me/212656643375?text=${msg}`;
   };
 
-  // Auto-open WhatsApp with booking confirmation + child form link
+  // Auto-open WhatsApp with booking confirmation
   useEffect(() => {
     const timer = setTimeout(() => {
       window.open(buildWhatsAppUrl(), "_blank");
     }, 800);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -741,28 +1065,10 @@ function BookingSuccess({ onBookAnother, onGoHome, bookingData }: BookingSuccess
       <h2 className="font-serif text-3xl sm:text-4xl font-bold text-foreground mb-3">
         Booking Submitted!
       </h2>
-      <p className="text-muted-foreground text-lg max-w-md mb-4">
-        We'll confirm your booking shortly. A WhatsApp message has been
-        opened with your booking details and the child info form link.
+      <p className="text-muted-foreground text-lg max-w-md mb-8">
+        We&apos;ll confirm your booking shortly. A WhatsApp message has been
+        opened with your booking details.
       </p>
-
-      {/* Parent form CTA */}
-      <div className="bg-accent/5 border border-accent/20 rounded-xl p-5 max-w-md mb-8 w-full">
-        <p className="text-sm font-semibold text-foreground mb-1.5">
-          One more step!
-        </p>
-        <p className="text-sm text-muted-foreground mb-3">
-          Please fill out the child information form so your nanny can prepare
-          for a great experience.
-        </p>
-        <Link
-          to="/parent-form"
-          className="bg-accent text-white font-semibold px-5 py-2.5 rounded-lg hover:opacity-90 transition-opacity inline-flex items-center gap-2 text-sm"
-        >
-          <FileText className="w-4 h-4" />
-          Fill Child Info Form
-        </Link>
-      </div>
 
       <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
         <button
@@ -804,13 +1110,12 @@ export default function Book() {
   const [isSuccess, setIsSuccess] = useState(false);
 
   // Step 1 state
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState("hourly");
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
 
-  // Step 3 state
-  const [details, setDetails] = useState({
+  // Step 2 state
+  const [details, setDetails] = useState<BookingDetails>({
     fullName: "",
     email: "",
     phone: "",
@@ -818,6 +1123,26 @@ export default function Book() {
     numChildren: "1",
     childrenAges: "",
     notes: "",
+  });
+
+  // Step 3 state
+  const [childInfo, setChildInfo] = useState<ChildInfo>({
+    childFirstName: "",
+    childLastName: "",
+    childDob: "",
+    childAge: "",
+    childGender: "",
+    foodAllergies: "",
+    medicineAllergies: "",
+    environmentAllergies: "",
+    noAllergies: false,
+    allergyReaction: "",
+    specialNeeds: "",
+    behaviorNotes: "",
+    dietaryRestrictions: "",
+    favoriteActivities: "",
+    napSchedule: "",
+    agreeTerms: false,
   });
 
   const RATE = 150; // MAD per hour
@@ -828,65 +1153,145 @@ export default function Book() {
   }, [startTime, endTime]);
 
   const totalPrice = useMemo(() => {
-    return RATE * hours;
-  }, [hours]);
+    return RATE * hours * selectedDates.length;
+  }, [hours, selectedDates.length]);
 
-  const handleConfirm = () => {
-    if (!selectedDate) return;
+  const toggleDate = (date: Date) => {
+    setSelectedDates((prev) => {
+      const exists = prev.some((d) => isSameDay(d, date));
+      if (exists) {
+        return prev.filter((d) => !isSameDay(d, date));
+      }
+      return [...prev, date].sort((a, b) => a.getTime() - b.getTime());
+    });
+  };
+
+  const removeDate = (date: Date) => {
+    setSelectedDates((prev) => prev.filter((d) => !isSameDay(d, date)));
+  };
+
+  const WEB3FORMS_KEY = "YOUR_ACCESS_KEY_HERE";
+
+  const handleConfirm = async () => {
+    if (selectedDates.length === 0) return;
 
     setIsSubmitting(true);
 
     const startLabel = TIME_SLOTS.find((s) => s.value === startTime)?.label || startTime;
     const endLabel = TIME_SLOTS.find((s) => s.value === endTime)?.label || endTime;
+    const perDatePrice = RATE * hours;
 
-    const bookingPayload = {
-      date: format(selectedDate, "yyyy-MM-dd"),
-      startTime: startLabel,
-      endTime: endLabel,
-      plan: selectedPlan as BookingPlan,
-      totalPrice,
-      clientName: details.fullName,
-      clientEmail: details.email,
-      clientPhone: details.phone,
-      hotel: details.accommodation,
-      childrenCount: Number(details.numChildren),
-      childrenAges: details.childrenAges,
-      notes: details.notes,
-      nannyId: null,
-      nannyName: "",
-      nannyImage: "",
-      status: "pending" as const,
-    };
+    // Build child info summary for notes
+    const childSummaryParts: string[] = [];
+    childSummaryParts.push(`Child: ${childInfo.childFirstName} ${childInfo.childLastName}`.trim());
+    if (childInfo.childAge) childSummaryParts.push(`Age: ${childInfo.childAge}`);
+    if (childInfo.childDob) childSummaryParts.push(`DOB: ${childInfo.childDob}`);
+    if (childInfo.childGender) childSummaryParts.push(`Gender: ${childInfo.childGender}`);
+    if (childInfo.noAllergies) {
+      childSummaryParts.push("Allergies: None");
+    } else {
+      if (childInfo.foodAllergies) childSummaryParts.push(`Food allergies: ${childInfo.foodAllergies}`);
+      if (childInfo.medicineAllergies) childSummaryParts.push(`Medicine allergies: ${childInfo.medicineAllergies}`);
+      if (childInfo.environmentAllergies) childSummaryParts.push(`Environment allergies: ${childInfo.environmentAllergies}`);
+      if (childInfo.allergyReaction) childSummaryParts.push(`Allergy reactions: ${childInfo.allergyReaction}`);
+    }
+    if (childInfo.specialNeeds) childSummaryParts.push(`Special needs: ${childInfo.specialNeeds}`);
+    if (childInfo.behaviorNotes) childSummaryParts.push(`Behavior: ${childInfo.behaviorNotes}`);
+    if (childInfo.dietaryRestrictions) childSummaryParts.push(`Diet: ${childInfo.dietaryRestrictions}`);
+    if (childInfo.favoriteActivities) childSummaryParts.push(`Activities: ${childInfo.favoriteActivities}`);
+    if (childInfo.napSchedule) childSummaryParts.push(`Nap/sleep: ${childInfo.napSchedule}`);
 
-    const lastBooking: LastBookingData = {
-      date: format(selectedDate, "yyyy-MM-dd"),
-      startTime: startLabel,
-      endTime: endLabel,
-      plan: selectedPlan,
-      totalPrice,
-      fullName: details.fullName,
-      email: details.email,
-      phone: details.phone,
-      accommodation: details.accommodation,
-      numChildren: details.numChildren,
-      childrenAges: details.childrenAges,
-      notes: details.notes,
-      status: "pending",
-    };
+    const enrichedNotes = [details.notes, "--- CHILD INFO ---", ...childSummaryParts].filter(Boolean).join("\n");
 
-    // Simulate brief delay
-    setTimeout(() => {
-      addBooking(bookingPayload);
+    try {
+      // Loop through each selected date and create a booking
+      for (const date of selectedDates) {
+        const bookingPayload = {
+          date: format(date, "yyyy-MM-dd"),
+          startTime: startLabel,
+          endTime: endLabel,
+          plan: "hourly" as BookingPlan,
+          totalPrice: perDatePrice,
+          clientName: details.fullName,
+          clientEmail: details.email,
+          clientPhone: details.phone,
+          hotel: details.accommodation,
+          childrenCount: Number(details.numChildren),
+          childrenAges: details.childrenAges,
+          notes: enrichedNotes,
+          nannyId: null,
+          nannyName: "",
+          nannyImage: "",
+          status: "pending" as const,
+        };
+
+        await addBooking(bookingPayload);
+      }
+
+      // Send child info to Web3Forms once after all bookings
+      try {
+        await fetch("https://api.web3forms.com/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            access_key: WEB3FORMS_KEY,
+            subject: `Booking Child Info: ${childInfo.childFirstName} ${childInfo.childLastName || ""} (${details.fullName})`,
+            from_name: "Call a Nanny - Booking Form",
+            "Parent Name": details.fullName,
+            "Parent Phone": details.phone,
+            "Parent Email": details.email,
+            "Hotel / Address": details.accommodation,
+            "Booking Dates": selectedDates.map((d) => format(d, "yyyy-MM-dd")).join(", "),
+            "Booking Time": `${startLabel} - ${endLabel}`,
+            "Total Price": `${totalPrice} MAD`,
+            "Child Name": `${childInfo.childFirstName} ${childInfo.childLastName || ""}`.trim(),
+            "Child DOB": childInfo.childDob || "N/A",
+            "Child Age": childInfo.childAge || "N/A",
+            "Child Gender": childInfo.childGender || "N/A",
+            "Food Allergies": childInfo.noAllergies ? "None" : (childInfo.foodAllergies || "N/A"),
+            "Medicine Allergies": childInfo.noAllergies ? "None" : (childInfo.medicineAllergies || "N/A"),
+            "Environment Allergies": childInfo.noAllergies ? "None" : (childInfo.environmentAllergies || "N/A"),
+            "Allergy Reactions": childInfo.noAllergies ? "None" : (childInfo.allergyReaction || "N/A"),
+            "Special Needs": childInfo.specialNeeds || "None",
+            "Behavior Notes": childInfo.behaviorNotes || "N/A",
+            "Dietary Restrictions": childInfo.dietaryRestrictions || "None",
+            "Favorite Activities": childInfo.favoriteActivities || "N/A",
+            "Nap Schedule": childInfo.napSchedule || "N/A",
+          }),
+        });
+      } catch {
+        // Web3Forms send is best-effort; don't block booking success
+        console.warn("Web3Forms submission failed, booking still saved.");
+      }
+
+      const lastBooking: LastBookingData = {
+        dates: selectedDates.map((d) => format(d, "yyyy-MM-dd")),
+        startTime: startLabel,
+        endTime: endLabel,
+        totalPrice,
+        fullName: details.fullName,
+        email: details.email,
+        phone: details.phone,
+        accommodation: details.accommodation,
+        numChildren: details.numChildren,
+        childrenAges: details.childrenAges,
+        notes: details.notes,
+        status: "pending",
+        childName: `${childInfo.childFirstName} ${childInfo.childLastName || ""}`.trim(),
+      };
+
       setLastBookingData(lastBooking);
       setIsSubmitting(false);
       setIsSuccess(true);
-    }, 600);
+    } catch (err) {
+      console.error("Booking failed:", err);
+      setIsSubmitting(false);
+    }
   };
 
   const handleBookAnother = () => {
     setStep(1);
-    setSelectedDate(null);
-    setSelectedPlan("hourly");
+    setSelectedDates([]);
     setStartTime("");
     setEndTime("");
     setDetails({
@@ -897,6 +1302,24 @@ export default function Book() {
       numChildren: "1",
       childrenAges: "",
       notes: "",
+    });
+    setChildInfo({
+      childFirstName: "",
+      childLastName: "",
+      childDob: "",
+      childAge: "",
+      childGender: "",
+      foodAllergies: "",
+      medicineAllergies: "",
+      environmentAllergies: "",
+      noAllergies: false,
+      allergyReaction: "",
+      specialNeeds: "",
+      behaviorNotes: "",
+      dietaryRestrictions: "",
+      favoriteActivities: "",
+      napSchedule: "",
+      agreeTerms: false,
     });
     setIsSuccess(false);
   };
@@ -942,15 +1365,13 @@ export default function Book() {
         {/* Steps */}
         {step === 1 && (
           <StepDateTime
-            selectedDate={selectedDate}
-            onDateSelect={setSelectedDate}
-            selectedPlan={selectedPlan}
-            onPlanSelect={setSelectedPlan}
+            selectedDates={selectedDates}
+            onDateToggle={toggleDate}
+            onDateRemove={removeDate}
             startTime={startTime}
             onStartTimeChange={setStartTime}
             endTime={endTime}
             onEndTimeChange={setEndTime}
-            nannyRate={RATE}
             onBack={undefined}
             onNext={() => setStep(2)}
           />
@@ -966,14 +1387,24 @@ export default function Book() {
         )}
 
         {step === 3 && (
+          <StepChildInfo
+            childInfo={childInfo}
+            onChange={setChildInfo}
+            onBack={() => setStep(2)}
+            onNext={() => setStep(4)}
+          />
+        )}
+
+        {step === 4 && (
           <StepReview
-            selectedDate={selectedDate}
+            selectedDates={selectedDates}
             startTime={startTime}
             endTime={endTime}
-            selectedPlan={selectedPlan}
             details={details}
+            childInfo={childInfo}
             totalPrice={totalPrice}
             hours={hours}
+            dateCount={selectedDates.length}
             onEdit={(s: number) => setStep(s)}
             onConfirm={handleConfirm}
             isSubmitting={isSubmitting}

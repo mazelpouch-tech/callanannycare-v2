@@ -24,7 +24,7 @@ const features = [
     icon: Clock,
     title: "Flexible Scheduling",
     description:
-      "Book by the hour, half-day, or full-day \u2014 whatever fits your needs.",
+      "Book by the hour \u2014 flexible scheduling to fit your needs.",
   },
   {
     icon: Star,

@@ -119,40 +119,12 @@ export const pricingPlans: PricingPlan[] = [
     unit: "hr",
     duration: "1hr",
     features: [
-      "Minimum 2 hours",
+      "Flexible hours",
       "Background-checked nanny",
       "Same-day booking available",
-      "In-app messaging",
-    ],
-    highlight: false,
-  },
-  {
-    id: "half-day",
-    name: "Half-Day",
-    price: 600,
-    unit: "5hrs",
-    duration: "5hrs",
-    features: [
-      "5 consecutive hours",
-      "Priority nanny matching",
-      "Activity report included",
-      "Snack preparation",
+      "Book multiple dates at once",
     ],
     highlight: true,
-  },
-  {
-    id: "full-day",
-    name: "Full-Day",
-    price: 1000,
-    unit: "10hrs",
-    duration: "10hrs",
-    features: [
-      "10 consecutive hours",
-      "Premium nanny selection",
-      "Detailed daily report",
-      "Meal preparation included",
-    ],
-    highlight: false,
   },
 ];
 

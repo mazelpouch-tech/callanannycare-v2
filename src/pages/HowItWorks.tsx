@@ -23,7 +23,7 @@ const steps = [
     title: "Book Your Session",
     icon: Calendar,
     description:
-      "Select your date, time, and preferred nanny. Choose hourly, half-day, or full-day.",
+      "Select your dates, time, and preferred nanny. Book multiple days at once.",
   },
   {
     number: 3,
