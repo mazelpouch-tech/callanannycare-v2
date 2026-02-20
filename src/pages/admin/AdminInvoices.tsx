@@ -95,9 +95,9 @@ export default function AdminInvoices() {
       if (ms <= 0) return;
       const hours = ms / 3600000;
       let total = Math.round(hours * SERVICE_RATE);
-      // Add taxi fee if after 7 PM
+      // Add taxi fee if night hours (after 7 PM or before 7 AM)
       const inHour = inTime.getHours();
-      if (inHour >= 19) total += TAXI_FEE;
+      if (inHour >= 19 || inHour < 7) total += TAXI_FEE;
       setFormData((prev) => ({ ...prev, totalPrice: String(total) }));
     } catch {
       // skip
@@ -565,7 +565,7 @@ export default function AdminInvoices() {
         const hoursNum = inv.clockIn && inv.clockOut ? (new Date(inv.clockOut).getTime() - new Date(inv.clockIn).getTime()) / 3600000 : 0;
         const basePay = Math.round(hoursNum * SERVICE_RATE);
         const inHour = inv.clockIn ? new Date(inv.clockIn).getHours() : 0;
-        const hasTaxi = inHour >= 19;
+        const hasTaxi = inHour >= 19 || inHour < 7;
         return (
           <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-[8vh] overflow-y-auto">
             <div className="w-full max-w-lg bg-card rounded-2xl shadow-xl border border-border overflow-hidden">
@@ -642,7 +642,7 @@ export default function AdminInvoices() {
                     </div>
                     {hasTaxi && (
                       <div className="flex justify-between px-4 py-2.5">
-                        <span className="text-sm text-amber-700 flex items-center gap-1.5"><Car className="w-3.5 h-3.5" />Taxi fee (after 7 PM)</span>
+                        <span className="text-sm text-amber-700 flex items-center gap-1.5"><Car className="w-3.5 h-3.5" />Taxi fee (7 PM – 7 AM)</span>
                         <span className="text-sm font-medium text-amber-700">+{TAXI_FEE} MAD</span>
                       </div>
                     )}
@@ -804,7 +804,8 @@ export default function AdminInvoices() {
                   if (ms <= 0) return null;
                   const hours = ms / 3600000;
                   const base = Math.round(hours * SERVICE_RATE);
-                  const isEvening = inT.getHours() >= 19;
+                  const inHour = inT.getHours();
+                  const isNight = inHour >= 19 || inHour < 7;
                   return (
                     <div className="bg-blue-50 text-blue-800 text-xs px-4 py-3 rounded-lg border border-blue-100 space-y-1">
                       <div className="flex items-center gap-1.5 font-semibold">
@@ -815,15 +816,15 @@ export default function AdminInvoices() {
                         <span>{hours.toFixed(1)}h × {SERVICE_RATE} MAD/hr</span>
                         <span className="font-medium">{base} MAD</span>
                       </div>
-                      {isEvening && (
+                      {isNight && (
                         <div className="flex items-center justify-between text-amber-700">
-                          <span className="flex items-center gap-1"><Car className="w-3 h-3" /> Taxi fee (after 7 PM)</span>
+                          <span className="flex items-center gap-1"><Car className="w-3 h-3" /> Taxi fee (7 PM – 7 AM)</span>
                           <span className="font-medium">+{TAXI_FEE} MAD</span>
                         </div>
                       )}
                       <div className="flex items-center justify-between font-bold border-t border-blue-200 pt-1 mt-1">
                         <span>Total</span>
-                        <span>{isEvening ? base + TAXI_FEE : base} MAD</span>
+                        <span>{isNight ? base + TAXI_FEE : base} MAD</span>
                       </div>
                     </div>
                   );
