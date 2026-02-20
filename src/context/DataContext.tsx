@@ -259,7 +259,7 @@ export function DataProvider({ children }: DataProviderProps) {
   // --- Booking CRUD ---
 
   const addBooking = useCallback(
-    async (booking: Partial<Booking>): Promise<Booking> => {
+    async (booking: Partial<Booking>, meta?: { locale?: string }): Promise<Booking> => {
       const nanny = nannies.find((n) => n.id === booking.nannyId);
       try {
         const created = await apiFetch<DbBookingWithNanny>("/bookings", {
@@ -278,6 +278,7 @@ export function DataProvider({ children }: DataProviderProps) {
             children_ages: booking.childrenAges || "",
             notes: booking.notes || "",
             total_price: booking.totalPrice || 0,
+            locale: meta?.locale || "en",
           }),
         });
 

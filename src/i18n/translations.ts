@@ -243,6 +243,11 @@ export const translations: Record<Locale, TranslationTree> = {
       message: "The page you are looking for does not exist or has been moved.",
       backHome: "Back to Home",
     },
+
+    // Email
+    email: {
+      confirmationSent: "A confirmation email has been sent to your inbox. Check your spam folder if you don't see it.",
+    },
   },
 
   fr: {
@@ -470,6 +475,11 @@ export const translations: Record<Locale, TranslationTree> = {
       title: "Page Non Trouvée",
       message: "La page que vous recherchez n'existe pas ou a été déplacée.",
       backHome: "Retour à l'Accueil",
+    },
+
+    // Email
+    email: {
+      confirmationSent: "Un email de confirmation a été envoyé dans votre boîte de réception. Vérifiez vos spams si vous ne le voyez pas.",
     },
   },
 };

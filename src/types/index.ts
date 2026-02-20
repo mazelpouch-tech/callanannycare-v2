@@ -56,6 +56,7 @@ export interface DbBooking {
   status: BookingStatus;
   clock_in: string | null;
   clock_out: string | null;
+  locale: string;
   created_at: string;
   updated_at: string;
 }
@@ -250,7 +251,7 @@ export interface DataContextValue {
   resendInvite: (nannyId: number) => Promise<ApiResult<ResendInviteResponse>>;
 
   bookings: Booking[];
-  addBooking: (booking: Partial<Booking>) => Promise<Booking>;
+  addBooking: (booking: Partial<Booking>, meta?: { locale?: string }) => Promise<Booking>;
   updateBooking: (id: number | string, updates: Partial<Booking>) => Promise<void>;
   updateBookingStatus: (id: number | string, status: BookingStatus) => Promise<void>;
   clockInBooking: (id: number | string) => Promise<void>;

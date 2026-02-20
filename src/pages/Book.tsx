@@ -1050,8 +1050,11 @@ function BookingSuccess({ onBookAnother, onGoHome, bookingData }: BookingSuccess
       <h2 className="font-serif text-3xl sm:text-4xl font-bold text-foreground mb-3">
         {t("book.successTitle")}
       </h2>
-      <p className="text-muted-foreground text-lg max-w-md mb-8">
+      <p className="text-muted-foreground text-lg max-w-md mb-2">
         {t("book.successMessage")}
+      </p>
+      <p className="text-muted-foreground text-sm max-w-md mb-8">
+        📧 {t("email.confirmationSent")}
       </p>
 
       <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
@@ -1087,7 +1090,7 @@ function BookingSuccess({ onBookAnother, onGoHome, bookingData }: BookingSuccess
 // --- Main Book Component ---
 export default function Book() {
   const { addBooking } = useData();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
@@ -1208,7 +1211,7 @@ export default function Book() {
           status: "pending" as const,
         };
 
-        await addBooking(bookingPayload);
+        await addBooking(bookingPayload, { locale });
       }
 
       // Send booking info to Web3Forms (email to info@callanannycare.com)

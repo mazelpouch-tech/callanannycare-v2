@@ -88,6 +88,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // Send invoice email when booking is completed with clock_out (nanny checkout)
+      if (status === 'completed' && clock_out && result[0] && result[0].client_email) {
+        try {
+          // Query nanny name for the invoice
+          const nannyRows = await sql`
+            SELECT name FROM nannies WHERE id = ${result[0].nanny_id}
+          ` as { name: string }[];
+          const nannyName = nannyRows[0]?.name || 'Your Nanny';
+
+          const { sendInvoiceEmail } = await import('../_emailTemplates.js');
+          await sendInvoiceEmail({
+            bookingId: result[0].id,
+            clientName: result[0].client_name,
+            clientEmail: result[0].client_email,
+            clientPhone: result[0].client_phone,
+            hotel: result[0].hotel,
+            date: result[0].date,
+            startTime: result[0].start_time,
+            endTime: result[0].end_time,
+            clockIn: result[0].clock_in || clock_out,
+            clockOut: clock_out,
+            childrenCount: result[0].children_count,
+            childrenAges: result[0].children_ages,
+            totalPrice: result[0].total_price,
+            nannyName,
+            locale: (result[0] as Record<string, unknown>).locale as string || 'en',
+          });
+        } catch (invoiceError: unknown) {
+          console.error('Invoice email failed:', invoiceError);
+        }
+      }
+
       return res.status(200).json(result[0]);
     }
 

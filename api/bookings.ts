@@ -16,6 +16,7 @@ interface CreateBookingBody {
   children_ages?: string;
   notes?: string;
   total_price?: number;
+  locale?: string;
 }
 
 interface AvailableNannyRow {
@@ -44,7 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
-      const { nanny_id: provided_nanny_id, client_name, client_email, client_phone, hotel, date, start_time, end_time, plan, children_count, children_ages, notes, total_price } = req.body as CreateBookingBody;
+      const { nanny_id: provided_nanny_id, client_name, client_email, client_phone, hotel, date, start_time, end_time, plan, children_count, children_ages, notes, total_price, locale } = req.body as CreateBookingBody;
 
       // Auto-assign nanny via round-robin if none provided
       let nanny_id = provided_nanny_id;
@@ -65,8 +66,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const result = await sql`
-        INSERT INTO bookings (nanny_id, client_name, client_email, client_phone, hotel, date, start_time, end_time, plan, children_count, children_ages, notes, total_price, status)
-        VALUES (${nanny_id}, ${client_name}, ${client_email}, ${client_phone || ''}, ${hotel || ''}, ${date}, ${start_time}, ${end_time || ''}, ${plan || 'hourly'}, ${children_count || 1}, ${children_ages || ''}, ${notes || ''}, ${total_price || 0}, 'pending')
+        INSERT INTO bookings (nanny_id, client_name, client_email, client_phone, hotel, date, start_time, end_time, plan, children_count, children_ages, notes, total_price, status, locale)
+        VALUES (${nanny_id}, ${client_name}, ${client_email}, ${client_phone || ''}, ${hotel || ''}, ${date}, ${start_time}, ${end_time || ''}, ${plan || 'hourly'}, ${children_count || 1}, ${children_ages || ''}, ${notes || ''}, ${total_price || 0}, 'pending', ${locale || 'en'})
         RETURNING *
       ` as DbBooking[];
       // Create notification for nanny
@@ -121,6 +122,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           );
         } catch (waError: unknown) {
           console.error("WhatsApp notification failed:", waError);
+        }
+      }
+
+      // Send booking confirmation email to parent (best-effort)
+      if (result[0] && client_email) {
+        try {
+          const { sendConfirmationEmail } = await import('./_emailTemplates.js');
+          await sendConfirmationEmail({
+            bookingId: result[0].id,
+            clientName: client_name,
+            clientEmail: client_email,
+            clientPhone: client_phone || '',
+            hotel: hotel || '',
+            date,
+            startTime: start_time,
+            endTime: end_time || '',
+            childrenCount: children_count || 1,
+            childrenAges: children_ages || '',
+            totalPrice: total_price || 0,
+            notes: notes || '',
+            locale: locale || 'en',
+          });
+        } catch (emailError: unknown) {
+          console.error('Confirmation email failed:', emailError);
         }
       }
 
