@@ -132,13 +132,19 @@ export default function AdminInvoices() {
     if (dateFilter === "this-month") {
       const s = startOfMonth(now), e = endOfMonth(now);
       result = result.filter((b) => {
-        try { return isWithinInterval(parseISO(b.date), { start: s, end: e }); } catch { return false; }
+        try {
+          const d = b.clockIn ? new Date(b.clockIn) : parseISO(b.date);
+          return isWithinInterval(d, { start: s, end: e });
+        } catch { return false; }
       });
     } else if (dateFilter === "last-month") {
       const prev = subMonths(now, 1);
       const s = startOfMonth(prev), e = endOfMonth(prev);
       result = result.filter((b) => {
-        try { return isWithinInterval(parseISO(b.date), { start: s, end: e }); } catch { return false; }
+        try {
+          const d = b.clockIn ? new Date(b.clockIn) : parseISO(b.date);
+          return isWithinInterval(d, { start: s, end: e });
+        } catch { return false; }
       });
     }
     return result;
@@ -149,7 +155,12 @@ export default function AdminInvoices() {
     const now = new Date();
     const s = startOfMonth(now), e = endOfMonth(now);
     return invoices
-      .filter((b) => { try { return isWithinInterval(parseISO(b.date), { start: s, end: e }); } catch { return false; } })
+      .filter((b) => {
+        try {
+          const d = b.clockIn ? new Date(b.clockIn) : parseISO(b.date);
+          return isWithinInterval(d, { start: s, end: e });
+        } catch { return false; }
+      })
       .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
   }, [invoices]);
 
@@ -195,8 +206,8 @@ export default function AdminInvoices() {
       setFormError("Please select a nanny");
       return;
     }
-    if (!formData.date || !formData.clockIn || !formData.clockOut) {
-      setFormError("Date, clock-in, and clock-out are required");
+    if (!formData.clockIn || !formData.clockOut) {
+      setFormError("Clock-in and clock-out are required");
       return;
     }
     if (!formData.totalPrice || Number(formData.totalPrice) <= 0) {
@@ -207,6 +218,8 @@ export default function AdminInvoices() {
     setFormLoading(true);
     try {
       const nanny = nannies.find((n) => n.id === Number(formData.nannyId));
+      // Auto-derive date from clockIn
+      const derivedDate = formData.clockIn ? new Date(formData.clockIn).toISOString().slice(0, 10) : "";
 
       if (isEditing && formData.id) {
         await updateBooking(formData.id, {
@@ -216,7 +229,7 @@ export default function AdminInvoices() {
           clientEmail: formData.clientEmail.trim(),
           clientPhone: formData.clientPhone.trim(),
           hotel: formData.hotel.trim(),
-          date: formData.date,
+          date: derivedDate,
           clockIn: new Date(formData.clockIn).toISOString(),
           clockOut: new Date(formData.clockOut).toISOString(),
           childrenCount: Number(formData.childrenCount) || 1,
@@ -233,7 +246,7 @@ export default function AdminInvoices() {
           clientEmail: formData.clientEmail.trim(),
           clientPhone: formData.clientPhone.trim(),
           hotel: formData.hotel.trim(),
-          date: formData.date,
+          date: derivedDate,
           clockIn: new Date(formData.clockIn).toISOString(),
           clockOut: new Date(formData.clockOut).toISOString(),
           childrenCount: Number(formData.childrenCount) || 1,
@@ -417,7 +430,8 @@ export default function AdminInvoices() {
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Invoice #</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Billed To (Parent)</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Caregiver</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Clock In/Out</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hours</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
                     <th className="text-right px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
@@ -440,9 +454,10 @@ export default function AdminInvoices() {
                       </td>
                       <td className="px-5 py-4 text-sm text-muted-foreground">{inv.nannyName || "Unassigned"}</td>
                       <td className="px-5 py-4">
-                        <p className="text-sm text-muted-foreground">{fmtDate(inv.date)}</p>
-                        <p className="text-xs text-muted-foreground/70">{formatClockTime(inv.clockIn)} – {formatClockTime(inv.clockOut)}</p>
+                        <p className="text-sm text-foreground font-medium">{formatClockTime(inv.clockIn)} – {formatClockTime(inv.clockOut)}</p>
+                        <p className="text-xs text-muted-foreground/70">{inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : fmtDate(inv.date)}</p>
                       </td>
+                      <td className="px-5 py-4 text-sm text-muted-foreground">{calcWorkedHours(inv.clockIn, inv.clockOut)}h</td>
                       <td className="px-5 py-4 text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()} MAD</td>
                       <td className="px-5 py-4">
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
@@ -508,10 +523,10 @@ export default function AdminInvoices() {
                     </div>
                     <span className="text-sm font-bold text-foreground">{(inv.totalPrice || 0).toLocaleString()} MAD</span>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                     <span>Caregiver: {inv.nannyName || "Unassigned"}</span>
-                    <span>{fmtDate(inv.date)}</span>
-                    <span>{formatClockTime(inv.clockIn)} – {formatClockTime(inv.clockOut)}</span>
+                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatClockTime(inv.clockIn)} – {formatClockTime(inv.clockOut)}</span>
+                    <span className="font-medium">{calcWorkedHours(inv.clockIn, inv.clockOut)}h</span>
                   </div>
                   <div className="flex items-center gap-2 pt-1">
                     <button onClick={() => openEdit(inv)} className="flex items-center gap-1 text-xs font-medium text-primary bg-primary/10 px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors">
@@ -565,7 +580,7 @@ export default function AdminInvoices() {
                     <X className="w-5 h-5" />
                   </button>
                 </div>
-                <p className="text-white/70 text-xs mt-1">{inv.date ? fmtDate(inv.date) : "N/A"}</p>
+                <p className="text-white/70 text-xs mt-1">{inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A"}</p>
               </div>
 
               <div className="p-6 space-y-5">
@@ -754,18 +769,6 @@ export default function AdminInvoices() {
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   />
                 </div>
-              </div>
-
-              {/* Date */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Date *</label>
-                <input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => updateField("date", e.target.value)}
-                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                  required
-                />
               </div>
 
               {/* Clock In/Out */}
