@@ -1249,26 +1249,6 @@ export default function Book() {
         }
       }
 
-      // Send WhatsApp notification to business
-      try {
-        await fetch("/api/notify-booking", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            clientName: details.fullName,
-            clientPhone: details.phone,
-            hotel: details.accommodation,
-            dates: selectedDates.map((d) => format(d, "yyyy-MM-dd")),
-            time: `${startLabel} - ${endLabel}`,
-            childrenCount: Number(details.numChildren),
-            childNames: allChildNames,
-            totalPrice,
-          }),
-        });
-      } catch {
-        console.warn("WhatsApp notification failed, booking still saved.");
-      }
-
       const lastBooking: LastBookingData = {
         dates: selectedDates.map((d) => format(d, "yyyy-MM-dd")),
         startTime: startLabel,

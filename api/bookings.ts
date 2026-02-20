@@ -82,6 +82,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // Send WhatsApp Business notification (best-effort, non-blocking)
+      const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
+      const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID;
+      const WHATSAPP_BUSINESS_NUMBER = process.env.WHATSAPP_BUSINESS_NUMBER;
+
+      if (WHATSAPP_TOKEN && WHATSAPP_PHONE_ID && WHATSAPP_BUSINESS_NUMBER) {
+        try {
+          const waMessage = [
+            "🔔 *New Booking Received!*",
+            "",
+            `👤 *Client:* ${client_name}`,
+            `📱 *Phone:* ${client_phone || "N/A"}`,
+            `🏨 *Hotel:* ${hotel || "N/A"}`,
+            `📅 *Date:* ${date}`,
+            `🕐 *Time:* ${start_time}${end_time ? ` - ${end_time}` : ""}`,
+            `👶 *Children:* ${children_count || 1}`,
+            `💰 *Total:* ${total_price || 0} MAD`,
+            "",
+            "_Sent automatically by Call a Nanny_",
+          ].join("\n");
+
+          await fetch(
+            `https://graph.facebook.com/v18.0/${WHATSAPP_PHONE_ID}/messages`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                messaging_product: "whatsapp",
+                to: WHATSAPP_BUSINESS_NUMBER,
+                type: "text",
+                text: { body: waMessage },
+              }),
+            }
+          );
+        } catch (waError: unknown) {
+          console.error("WhatsApp notification failed:", waError);
+        }
+      }
+
       return res.status(201).json(result[0]);
     }
 
