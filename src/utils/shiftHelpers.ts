@@ -1,6 +1,6 @@
 import type { Booking, BookingStatus } from '../types';
 
-export const HOURLY_RATE = 250 / 7; // ~35.71 MAD/hr
+export const HOURLY_RATE = 31.25; // MAD/hr
 
 export const statusColors: Record<BookingStatus, string> = {
   pending: 'bg-yellow-100 text-yellow-700',
@@ -53,7 +53,7 @@ export function calcNannyPay(booking: Booking): number {
     return pay;
   }
 
-  let pay = 250;
+  let pay = Math.round(7 * HOURLY_RATE); // default 7h shift
   const st = booking.startTime || '';
   const hour = parseInt(st.replace(/[^0-9]/g, '')) || 0;
   const isPM = st.toLowerCase().includes('pm');

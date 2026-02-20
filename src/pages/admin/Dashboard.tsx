@@ -280,7 +280,7 @@ function MiniSparkline({ data, width = 80, height = 28, color = "#cd6845" }: { d
 
 // ─── Nanny Hours Report ─────────────────────────────────────────
 
-const NANNY_HOURLY_RATE = 250 / 7;
+const NANNY_HOURLY_RATE = 31.25;
 
 function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]; nannies: Nanny[] }) {
   const nannyHours = useMemo(() => {
@@ -407,7 +407,7 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
           </div>
 
           <div className="px-6 py-3 border-t border-border text-[10px] text-muted-foreground">
-            Rate: 250 MAD/7h ({Math.round(NANNY_HOURLY_RATE)} MAD/hr) · +100 MAD for evening shifts (after 7 PM)
+            Rate: {NANNY_HOURLY_RATE} MAD/hr ({Math.round(NANNY_HOURLY_RATE * 7)} MAD/7h) · +100 MAD for evening shifts (after 7 PM)
           </div>
         </>
       )}
