@@ -104,6 +104,8 @@ interface StepReviewProps {
   totalPrice: number;
   hours: number;
   dateCount: number;
+  taxiFeeTotal: number;
+  isEveningBooking: boolean;
   onEdit: (step: number) => void;
   onConfirm: () => void;
   isSubmitting: boolean;
@@ -817,6 +819,8 @@ function StepReview({
   totalPrice,
   hours,
   dateCount,
+  taxiFeeTotal,
+  isEveningBooking,
   onEdit,
   onConfirm,
   isSubmitting,
@@ -991,8 +995,14 @@ function StepReview({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">
-              150 MAD &times; {hours} hr{hours !== 1 ? "s" : ""} &times; {dateCount} date{dateCount !== 1 ? "s" : ""}
+              150 MAD &times; {hours} {t("book.hrs")} &times; {dateCount} {t("book.dateUnit")}
+              {" = "}{150 * hours * dateCount} MAD
             </p>
+            {isEveningBooking && (
+              <p className="text-sm text-amber-600 font-medium mt-1">
+                🚕 {t("book.taxiFee")}: +{taxiFeeTotal} MAD ({t("book.taxiFeeNote")})
+              </p>
+            )}
             <p className="text-2xl font-bold text-foreground mt-1">
               {totalPrice} MAD
             </p>
@@ -1130,15 +1140,27 @@ export default function Book() {
   }, [details.numChildren]);
 
   const RATE = 150; // MAD per hour
+  const TAXI_FEE = 100; // MAD flat fee for bookings starting at 7 PM or later
+  const EVENING_HOUR = 19; // 7 PM threshold
 
   const hours = useMemo(() => {
     if (!startTime || !endTime) return 0;
     return calculateHours(startTime, endTime);
   }, [startTime, endTime]);
 
+  const isEveningBooking = useMemo(() => {
+    if (!startTime) return false;
+    const hour = parseInt(startTime.split(":")[0], 10);
+    return hour >= EVENING_HOUR;
+  }, [startTime]);
+
+  const taxiFeeTotal = useMemo(() => {
+    return isEveningBooking ? TAXI_FEE * selectedDates.length : 0;
+  }, [isEveningBooking, selectedDates.length]);
+
   const totalPrice = useMemo(() => {
-    return RATE * hours * selectedDates.length;
-  }, [hours, selectedDates.length]);
+    return RATE * hours * selectedDates.length + taxiFeeTotal;
+  }, [hours, selectedDates.length, taxiFeeTotal]);
 
   const toggleDate = (date: Date) => {
     setSelectedDates((prev) => {
@@ -1380,6 +1402,8 @@ export default function Book() {
             totalPrice={totalPrice}
             hours={hours}
             dateCount={selectedDates.length}
+            taxiFeeTotal={taxiFeeTotal}
+            isEveningBooking={isEveningBooking}
             onEdit={(s: number) => setStep(s)}
             onConfirm={handleConfirm}
             isSubmitting={isSubmitting}
