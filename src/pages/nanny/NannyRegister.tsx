@@ -265,7 +265,7 @@ export default function NannyRegister() {
         <div className="bg-card rounded-2xl shadow-soft border border-border p-8 max-h-[90vh] overflow-y-auto">
           {/* Header */}
           <div className="text-center mb-8">
-            <img src="/logo.png" alt="call a nanny" className="w-28 h-28 object-contain mx-auto mb-2" />
+            <img src="/logo.png" alt="call a nanny" className="w-36 h-36 object-contain mx-auto mb-2" />
             <h1 className="font-serif text-2xl font-bold text-foreground">
               {t("nanny.register.welcomeTitle")}
             </h1>

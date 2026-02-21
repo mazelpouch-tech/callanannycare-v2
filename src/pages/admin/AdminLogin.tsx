@@ -118,7 +118,7 @@ export default function AdminLogin() {
 
         <div className="relative w-full max-w-md">
           <div className="text-center mb-8">
-            <img src="/logo.png" alt="call a nanny" className="w-28 h-28 object-contain mx-auto mb-2" />
+            <img src="/logo.png" alt="call a nanny" className="w-36 h-36 object-contain mx-auto mb-2" />
             <h1 className="font-serif text-3xl font-bold text-foreground">call a nanny</h1>
             <p className="text-muted-foreground mt-1 text-sm">Administration Portal</p>
           </div>
@@ -230,7 +230,7 @@ export default function AdminLogin() {
 
         <div className="relative w-full max-w-md">
           <div className="text-center mb-8">
-            <img src="/logo.png" alt="call a nanny" className="w-28 h-28 object-contain mx-auto mb-2" />
+            <img src="/logo.png" alt="call a nanny" className="w-36 h-36 object-contain mx-auto mb-2" />
             <h1 className="font-serif text-3xl font-bold text-foreground">call a nanny</h1>
             <p className="text-muted-foreground mt-1 text-sm">Administration Portal</p>
           </div>
@@ -338,7 +338,7 @@ export default function AdminLogin() {
 
         <div className="relative w-full max-w-md">
           <div className="text-center mb-8">
-            <img src="/logo.png" alt="call a nanny" className="w-28 h-28 object-contain mx-auto mb-2" />
+            <img src="/logo.png" alt="call a nanny" className="w-36 h-36 object-contain mx-auto mb-2" />
             <h1 className="font-serif text-3xl font-bold text-foreground">call a nanny</h1>
             <p className="text-muted-foreground mt-1 text-sm">Administration Portal</p>
           </div>

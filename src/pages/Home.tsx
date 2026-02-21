@@ -58,22 +58,30 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      {/* ===== Hero Section ===== */}
-      <section className="gradient-sand pt-20 pb-24 px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            {/* Text Column */}
-            <div className="text-center lg:text-left">
-              <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-tight">
-                {t("home.heroTitle")}{" "}
-                <span className="text-gradient-warm">{t("home.heroHighlight")}</span>
-              </h1>
+      {/* ===== Hero Photo Banner ===== */}
+      <section className="relative">
+        <div className="w-full h-[50vh] sm:h-[60vh] lg:h-[70vh] overflow-hidden">
+          <img
+            src="/hero-photo.jpg"
+            alt="A nanny playing with children in a beautiful Marrakech garden"
+            className="w-full h-full object-cover"
+          />
+          {/* Dark overlay for text readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/50" />
+        </div>
 
-              <p className="mt-6 text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+        {/* Overlay content */}
+        <div className="absolute inset-0 flex items-end">
+          <div className="w-full pb-10 sm:pb-16 px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-7xl text-center">
+              <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-tight drop-shadow-lg">
+                {t("home.heroTitle")}{" "}
+                <span className="text-orange-200">{t("home.heroHighlight")}</span>
+              </h1>
+              <p className="mt-4 text-base sm:text-xl text-white/85 max-w-2xl mx-auto leading-relaxed drop-shadow">
                 {t("home.heroSubtitle")}
               </p>
-
-              <div className="mt-10 flex flex-col sm:flex-row items-center lg:items-start justify-center lg:justify-start gap-4">
+              <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
                   to="/book"
                   className="gradient-warm text-white rounded-full px-8 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center gap-2"
@@ -83,63 +91,53 @@ export default function Home() {
                 </Link>
                 <Link
                   to="/nannies"
-                  className="border border-primary text-primary rounded-full px-8 py-3 font-semibold hover:bg-primary/5 transition-colors flex items-center gap-2"
+                  className="border border-white/70 text-white rounded-full px-8 py-3 font-semibold hover:bg-white/10 transition-colors flex items-center gap-2 backdrop-blur-sm"
                 >
                   {t("common.browseNannies")}
                   <ChevronRight className="w-4 h-4" />
                 </Link>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-              {/* Stats Bar */}
-              <div className="mt-12 flex flex-col sm:flex-row items-center lg:items-start justify-center lg:justify-start gap-8 sm:gap-10">
-                <div className="flex items-center gap-3">
-                  <div className="gradient-warm w-10 h-10 rounded-full flex items-center justify-center">
-                    <Users className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-xl font-bold text-foreground">50+</p>
-                    <p className="text-sm text-muted-foreground">{t("home.verifiedNannies")}</p>
-                  </div>
-                </div>
-
-                <div className="hidden sm:block w-px h-10 bg-border" />
-
-                <div className="flex items-center gap-3">
-                  <div className="gradient-warm w-10 h-10 rounded-full flex items-center justify-center">
-                    <Heart className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-xl font-bold text-foreground">1000+</p>
-                    <p className="text-sm text-muted-foreground">{t("home.happyFamilies")}</p>
-                  </div>
-                </div>
-
-                <div className="hidden sm:block w-px h-10 bg-border" />
-
-                <div className="flex items-center gap-3">
-                  <div className="gradient-warm w-10 h-10 rounded-full flex items-center justify-center">
-                    <Star className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-xl font-bold text-foreground">4.9</p>
-                    <p className="text-sm text-muted-foreground">{t("home.averageRating")}</p>
-                  </div>
-                </div>
+      {/* ===== Stats Bar ===== */}
+      <section className="gradient-sand py-10 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-12">
+            <div className="flex items-center gap-3">
+              <div className="gradient-warm w-10 h-10 rounded-full flex items-center justify-center">
+                <Users className="w-5 h-5 text-white" />
+              </div>
+              <div className="text-left">
+                <p className="text-xl font-bold text-foreground">50+</p>
+                <p className="text-sm text-muted-foreground">{t("home.verifiedNannies")}</p>
               </div>
             </div>
 
-            {/* Image Column */}
-            <div className="relative">
-              <div className="rounded-2xl overflow-hidden shadow-warm">
-                <img
-                  src="/hero-photo.jpg"
-                  alt="A nanny playing with children in a beautiful Marrakech garden"
-                  className="w-full h-auto object-cover aspect-[4/3]"
-                />
+            <div className="hidden sm:block w-px h-10 bg-border" />
+
+            <div className="flex items-center gap-3">
+              <div className="gradient-warm w-10 h-10 rounded-full flex items-center justify-center">
+                <Heart className="w-5 h-5 text-white" />
               </div>
-              {/* Decorative accent */}
-              <div className="absolute -bottom-4 -right-4 w-24 h-24 gradient-warm rounded-2xl -z-10 opacity-30" />
-              <div className="absolute -top-4 -left-4 w-16 h-16 bg-accent rounded-full -z-10 opacity-20" />
+              <div className="text-left">
+                <p className="text-xl font-bold text-foreground">1000+</p>
+                <p className="text-sm text-muted-foreground">{t("home.happyFamilies")}</p>
+              </div>
+            </div>
+
+            <div className="hidden sm:block w-px h-10 bg-border" />
+
+            <div className="flex items-center gap-3">
+              <div className="gradient-warm w-10 h-10 rounded-full flex items-center justify-center">
+                <Star className="w-5 h-5 text-white" />
+              </div>
+              <div className="text-left">
+                <p className="text-xl font-bold text-foreground">4.9</p>
+                <p className="text-sm text-muted-foreground">{t("home.averageRating")}</p>
+              </div>
             </div>
           </div>
         </div>
