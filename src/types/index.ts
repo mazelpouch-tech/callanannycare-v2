@@ -208,6 +208,32 @@ export interface DashboardStats {
   todayBookings: number;
 }
 
+export interface LoginLog {
+  id: number;
+  userType: string;
+  userId: number | null;
+  userEmail: string | null;
+  userName: string | null;
+  action: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  details: string | null;
+  createdAt: string;
+}
+
+export interface DbLoginLog {
+  id: number;
+  user_type: string;
+  user_id: number | null;
+  user_email: string | null;
+  user_name: string | null;
+  action: string;
+  ip_address: string | null;
+  user_agent: string | null;
+  details: string | null;
+  created_at: string;
+}
+
 export interface PricingPlan {
   id: string;
   name: string;

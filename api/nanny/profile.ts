@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb } from '../_db.js';
 import type { DbNanny } from '@/types';
+import { logLoginEvent, extractRequestMeta } from '../_auditLog.js';
 
 interface UpdateProfileBody {
   nannyId: number;
@@ -49,6 +50,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (nanny[0].pin !== currentPin) return res.status(403).json({ error: 'Current PIN is incorrect' });
 
         await sql`UPDATE nannies SET pin = ${newPin}, updated_at = NOW() WHERE id = ${nannyId}`;
+
+        const { ip, userAgent } = extractRequestMeta(req);
+        await logLoginEvent({ userType: 'nanny', userId: nannyId, action: 'pin_change', ipAddress: ip, userAgent });
+
         return res.status(200).json({ success: true, message: 'PIN updated' });
       }
 

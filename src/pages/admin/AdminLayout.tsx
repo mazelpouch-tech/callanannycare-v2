@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   QrCode,
   FileText,
+  ScrollText,
   LogOut,
   Menu,
   X,
@@ -31,6 +32,7 @@ const sidebarLinks: SidebarLink[] = [
   { to: "/admin/nannies", label: "Nannies", icon: Users },
   { to: "/admin/users", label: "Admin Users", icon: ShieldCheck },
   { to: "/admin/qr-codes", label: "QR Codes", icon: QrCode },
+  { to: "/admin/login-logs", label: "Login Logs", icon: ScrollText },
 ];
 
 export default function AdminLayout() {

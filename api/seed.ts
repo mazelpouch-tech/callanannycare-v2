@@ -108,6 +108,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       )
     `;
 
+    // Create login_logs table for audit trail
+    await sql`
+      CREATE TABLE IF NOT EXISTS login_logs (
+        id SERIAL PRIMARY KEY,
+        user_type VARCHAR(20) NOT NULL,
+        user_id INTEGER,
+        user_email VARCHAR(255),
+        user_name VARCHAR(255),
+        action VARCHAR(50) NOT NULL,
+        ip_address VARCHAR(50),
+        user_agent TEXT,
+        details TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+
     // Seed default admin user if none exists
     const adminExists = await sql`SELECT COUNT(*) as count FROM admin_users` as CountRow[];
     if (parseInt(adminExists[0].count) === 0) {
