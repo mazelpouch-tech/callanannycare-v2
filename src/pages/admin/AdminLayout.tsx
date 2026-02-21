@@ -72,9 +72,7 @@ export default function AdminLayout() {
         {/* Sidebar Header */}
         <div className="flex items-center justify-between px-5 py-6 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 gradient-warm rounded-lg flex items-center justify-center shadow-warm">
-              <span className="text-white font-bold text-sm">CN</span>
-            </div>
+            <img src="/logo-icon.png" alt="call a nanny" className="w-9 h-9 object-contain" />
             <div>
               <h1 className="font-serif text-lg font-bold text-foreground leading-tight">
                 call a nanny

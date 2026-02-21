@@ -36,8 +36,9 @@ export default function Navbar() {
           {/* Logo */}
           <Link
             to="/"
-            className="font-serif text-xl font-bold text-gradient-warm tracking-tight"
+            className="flex items-center gap-2 font-serif text-xl font-bold text-gradient-warm tracking-tight"
           >
+            <img src="/logo-icon.png" alt="" className="w-8 h-8 object-contain" />
             call a nanny
           </Link>
 
@@ -99,7 +100,8 @@ export default function Navbar() {
         }`}
       >
         <div className="flex items-center justify-between p-4 border-b border-border">
-          <span className="font-serif text-lg font-bold text-gradient-warm">
+          <span className="flex items-center gap-2 font-serif text-lg font-bold text-gradient-warm">
+            <img src="/logo-icon.png" alt="" className="w-7 h-7 object-contain" />
             call a nanny
           </span>
           <button

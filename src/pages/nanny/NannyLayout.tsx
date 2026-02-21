@@ -58,28 +58,38 @@ export default function NannyLayout() {
           sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
-        {/* Sidebar header */}
-        <div className="p-6 border-b border-border">
+        {/* Sidebar brand */}
+        <div className="px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="bg-accent/10 w-10 h-10 rounded-full flex items-center justify-center">
+            <img src="/logo-icon.png" alt="call a nanny" className="w-9 h-9 object-contain" />
+            <div>
+              <h1 className="font-serif text-lg font-bold text-foreground leading-tight">
+                call a nanny
+              </h1>
+              <span className="inline-block text-[10px] font-semibold uppercase tracking-wider text-accent bg-accent/10 px-2 py-0.5 rounded-full mt-0.5">
+                {t("nanny.layout.nannyPortal")}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Nanny profile */}
+        <div className="px-5 py-3 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="bg-accent/10 w-8 h-8 rounded-full flex items-center justify-center shrink-0">
               {nannyProfile?.image ? (
                 <img
                   src={nannyProfile.image}
                   alt={nannyProfile.name}
-                  className="w-10 h-10 rounded-full object-cover"
+                  className="w-8 h-8 rounded-full object-cover"
                 />
               ) : (
-                <UserCircle className="w-6 h-6 text-accent" />
+                <UserCircle className="w-5 h-5 text-accent" />
               )}
             </div>
-            <div className="min-w-0">
-              <h2 className="font-semibold text-foreground text-sm truncate">
-                {nannyProfile?.name || "Nanny"}
-              </h2>
-              <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded-full font-medium">
-                {t("nanny.layout.nannyPortal")}
-              </span>
-            </div>
+            <span className="font-medium text-foreground text-sm truncate">
+              {nannyProfile?.name || "Nanny"}
+            </span>
           </div>
         </div>
 
