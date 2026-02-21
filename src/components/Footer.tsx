@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Mail, Phone, MapPin, Heart } from "lucide-react";
+import { Mail, Phone, MapPin, MessageCircle } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 
 export default function Footer() {
@@ -32,9 +32,6 @@ export default function Footer() {
             <p className="text-background/70 text-sm leading-relaxed">
               {t("footer.description")}
             </p>
-            <div className="flex items-center gap-1 text-sm text-background/50">
-              {t("footer.madeWith")} <Heart className="w-4 h-4 text-primary fill-primary" /> {t("footer.inMarrakech")}
-            </div>
           </div>
 
           {/* Quick Links */}
@@ -81,20 +78,31 @@ export default function Footer() {
             <ul className="space-y-3">
               <li>
                 <a
-                  href="mailto:contact@callananny.ma"
+                  href="mailto:info@callanannycare.com"
                   className="flex items-center gap-2 text-background/70 hover:text-background text-sm transition-colors"
                 >
                   <Mail className="w-4 h-4 shrink-0" />
-                  contact@callananny.ma
+                  info@callanannycare.com
                 </a>
               </li>
               <li>
                 <a
-                  href="tel:+212XXXXXXXXX"
+                  href="tel:+212656643375"
                   className="flex items-center gap-2 text-background/70 hover:text-background text-sm transition-colors"
                 >
                   <Phone className="w-4 h-4 shrink-0" />
-                  +212 XXX-XXXXXX
+                  +212 656-643375
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://wa.me/212656643375"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-background/70 hover:text-background text-sm transition-colors"
+                >
+                  <MessageCircle className="w-4 h-4 shrink-0" />
+                  WhatsApp
                 </a>
               </li>
               <li>
