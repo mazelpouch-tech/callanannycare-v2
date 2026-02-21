@@ -40,6 +40,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { nannyId, bio, languages, specialties, image, available, changePin, currentPin, newPin } = req.body as UpdateProfileBody;
       if (!nannyId) return res.status(400).json({ error: 'nannyId is required' });
 
+      // Validate image size (base64 can be large)
+      if (image && image.length > 2 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Image too large. Maximum 1.5 MB.' });
+      }
+
       // Handle PIN change
       if (changePin) {
         if (!currentPin || !newPin) return res.status(400).json({ error: 'Current and new PIN required' });

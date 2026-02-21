@@ -18,6 +18,7 @@ import {
   RefreshCw,
   UserPlus,
 } from "lucide-react";
+import ImageUpload from "../../components/ImageUpload";
 import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
 import type { Nanny, NannyStatus } from "@/types";
@@ -877,17 +878,11 @@ export default function AdminNannies() {
                 />
               </div>
 
-              {/* Image URL */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Image URL</label>
-                <input
-                  type="url"
-                  value={form.image}
-                  onChange={(e) => handleFormChange("image", e.target.value)}
-                  placeholder="https://example.com/photo.jpg"
-                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-                />
-              </div>
+              {/* Profile Photo Upload */}
+              <ImageUpload
+                currentImage={form.image}
+                onImageChange={(base64) => handleFormChange("image", base64)}
+              />
 
               {/* Phone Number */}
               <div>

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
+import ImageUpload from "../../components/ImageUpload";
 import type { NannyProfile as NannyProfileType } from "@/types";
 
 export default function NannyProfile() {
@@ -365,21 +366,12 @@ export default function NannyProfile() {
             )}
           </div>
 
-          {/* Image URL */}
+          {/* Profile Photo Upload */}
           {editing && (
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                <Camera className="w-4 h-4 inline mr-1.5" />
-                {t("nanny.profile.imageUrl")}
-              </label>
-              <input
-                type="url"
-                value={form.image}
-                onChange={(e) => setForm({ ...form, image: e.target.value })}
-                className="w-full px-4 py-3 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                placeholder="https://..."
-              />
-            </div>
+            <ImageUpload
+              currentImage={form.image}
+              onImageChange={(base64) => setForm({ ...form, image: base64 })}
+            />
           )}
 
           {/* Availability Toggle */}
