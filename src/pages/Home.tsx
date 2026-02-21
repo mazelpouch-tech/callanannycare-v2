@@ -66,11 +66,10 @@ export default function Home() {
             alt="A nanny playing with children in a beautiful Marrakech garden"
             className="w-full h-full object-cover"
           />
-          {/* Dark overlay for text readability */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/20 to-black/50" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40" />
         </div>
 
-        {/* Overlay content */}
+        {/* Only the title on the photo */}
         <div className="absolute inset-0 flex items-end">
           <div className="w-full pb-10 sm:pb-16 px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-7xl text-center">
@@ -78,34 +77,37 @@ export default function Home() {
                 {t("home.heroTitle")}{" "}
                 <span className="text-orange-200">{t("home.heroHighlight")}</span>
               </h1>
-              <p className="mt-4 text-base sm:text-xl text-white/85 max-w-2xl mx-auto leading-relaxed drop-shadow">
-                {t("home.heroSubtitle")}
-              </p>
-              <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link
-                  to="/book"
-                  className="gradient-warm text-white rounded-full px-8 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center gap-2"
-                >
-                  {t("common.bookANanny")}
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-                <Link
-                  to="/nannies"
-                  className="border border-white/70 text-white rounded-full px-8 py-3 font-semibold hover:bg-white/10 transition-colors flex items-center gap-2 backdrop-blur-sm"
-                >
-                  {t("common.browseNannies")}
-                  <ChevronRight className="w-4 h-4" />
-                </Link>
-              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ===== Stats Bar ===== */}
-      <section className="gradient-sand py-10 px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-12">
+      {/* ===== Content below the photo ===== */}
+      <section className="gradient-sand py-12 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl text-center">
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            {t("home.heroSubtitle")}
+          </p>
+
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              to="/book"
+              className="gradient-warm text-white rounded-full px-8 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center gap-2"
+            >
+              {t("common.bookANanny")}
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              to="/nannies"
+              className="border border-primary text-primary rounded-full px-8 py-3 font-semibold hover:bg-primary/5 transition-colors flex items-center gap-2"
+            >
+              {t("common.browseNannies")}
+              <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {/* Stats */}
+          <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-12">
             <div className="flex items-center gap-3">
               <div className="gradient-warm w-10 h-10 rounded-full flex items-center justify-center">
                 <Users className="w-5 h-5 text-white" />
