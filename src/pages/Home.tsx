@@ -66,12 +66,12 @@ export default function Home() {
             alt="A nanny playing with children in a beautiful Marrakech garden"
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/25 to-transparent" />
         </div>
 
         {/* Only the title on the photo */}
-        <div className="absolute inset-0 flex items-end">
-          <div className="w-full pb-10 sm:pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full pt-10 sm:pt-16 px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-7xl text-center">
               <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-tight drop-shadow-lg">
                 {t("home.heroTitle")}{" "}
