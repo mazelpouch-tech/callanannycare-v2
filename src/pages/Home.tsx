@@ -58,27 +58,24 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      {/* ===== Hero Photo Banner ===== */}
-      <section className="relative">
+      {/* ===== Hero Title ===== */}
+      <section className="gradient-sand pt-8 pb-4 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl text-center">
+          <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight">
+            {t("home.heroTitle")}{" "}
+            <span className="text-orange-500">{t("home.heroHighlight")}</span>
+          </h1>
+        </div>
+      </section>
+
+      {/* ===== Hero Photo ===== */}
+      <section>
         <div className="w-full h-[50vh] sm:h-[60vh] lg:h-[70vh] overflow-hidden">
           <img
             src="/hero-photo.jpg"
             alt="A nanny playing with children in a beautiful Marrakech garden"
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/25 to-transparent" />
-        </div>
-
-        {/* Title at the very top of the photo */}
-        <div className="absolute inset-0 flex items-start">
-          <div className="w-full pt-4 sm:pt-6 px-4 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-7xl text-center">
-              <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-tight drop-shadow-lg">
-                {t("home.heroTitle")}{" "}
-                <span className="text-orange-200">{t("home.heroHighlight")}</span>
-              </h1>
-            </div>
-          </div>
         </div>
       </section>
 
