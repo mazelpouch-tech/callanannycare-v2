@@ -23,10 +23,12 @@ import {
   AlertTriangle,
   Download,
   Pencil,
+  TimerReset,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
+import ExtendBookingModal from "../../components/ExtendBookingModal";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
 import { calcBookedHours } from "@/utils/shiftHelpers";
 
@@ -127,6 +129,9 @@ export default function AdminBookings() {
   const [showEditBooking, setShowEditBooking] = useState(false);
   const [editBookingLoading, setEditBookingLoading] = useState(false);
   const [editBookingData, setEditBookingData] = useState<EditBookingForm | null>(null);
+
+  // Extend Booking Modal
+  const [extendBooking, setExtendBooking] = useState<Booking | null>(null);
 
   // Auto-refresh bookings every 30s to pick up nanny confirmations
   useEffect(() => {
@@ -622,6 +627,17 @@ export default function AdminBookings() {
                                 <Pencil className="w-4 h-4" />
                               </button>
 
+                              {/* Extend */}
+                              {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
+                                <button
+                                  onClick={() => setExtendBooking(booking)}
+                                  className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                                  title="Extend booking"
+                                >
+                                  <TimerReset className="w-4 h-4" />
+                                </button>
+                              )}
+
                               {/* Confirm */}
                               {booking.status === "pending" && (
                                 <button
@@ -899,6 +915,15 @@ export default function AdminBookings() {
                     >
                       <Pencil className="w-3.5 h-3.5" /> Edit
                     </button>
+
+                    {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
+                      <button
+                        onClick={() => setExtendBooking(booking)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors"
+                      >
+                        <TimerReset className="w-3.5 h-3.5" /> Extend
+                      </button>
+                    )}
 
                     {booking.status === "pending" && (
                       <button
@@ -1524,6 +1549,36 @@ export default function AdminBookings() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Extend Booking Modal */}
+      {extendBooking && (
+        <ExtendBookingModal
+          booking={extendBooking}
+          rate={nannies.find((n) => n.id === extendBooking.nannyId)?.rate || 150}
+          onConfirm={async (newEndTime, newTotalPrice) => {
+            await updateBooking(extendBooking.id, { endTime: newEndTime, totalPrice: newTotalPrice });
+            await fetchBookings();
+          }}
+          onClose={() => setExtendBooking(null)}
+          t={(key: string) => {
+            const map: Record<string, string> = {
+              "extend.extendBooking": "Extend Booking",
+              "extend.newEndTime": "New End Time",
+              "extend.selectNewEnd": "Select new end time",
+              "extend.additionalHours": "Additional Hours",
+              "extend.additionalCost": "Additional Cost",
+              "extend.newTotal": "New Total",
+              "extend.confirmExtend": "Confirm Extension",
+              "extend.extending": "Extending...",
+              "extend.extendSuccess": "Booking extended successfully!",
+              "extend.noLaterSlots": "No later time slots available",
+              "extend.summary": "Extension Summary",
+              "shared.cancel": "Cancel",
+            };
+            return map[key] || key;
+          }}
+        />
       )}
     </div>
   );

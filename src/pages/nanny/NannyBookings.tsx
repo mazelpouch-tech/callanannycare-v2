@@ -13,6 +13,7 @@ import {
   PlayCircle,
   StopCircle,
   Timer,
+  TimerReset,
   Plus,
   X,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { Fragment } from "react";
 import PhoneInput from "../../components/PhoneInput";
+import ExtendBookingModal from "../../components/ExtendBookingModal";
 import {
   statusColors,
   formatDuration,
@@ -89,13 +91,14 @@ function LiveTimer({ clockIn }: LiveTimerProps) {
 }
 
 export default function NannyBookings() {
-  const { nannyBookings, fetchNannyBookings, updateBookingStatus, clockInBooking, clockOutBooking, addBooking, nannyProfile } = useData();
+  const { nannyBookings, fetchNannyBookings, updateBookingStatus, updateBooking, clockInBooking, clockOutBooking, addBooking, nannyProfile } = useData();
   const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
   const [expandedId, setExpandedId] = useState<number | string | null>(null);
   const [actionLoading, setActionLoading] = useState<number | string | null>(null);
+  const [extendBooking, setExtendBooking] = useState<typeof nannyBookings[0] | null>(null);
 
   // New booking form state
   const [showForm, setShowForm] = useState(false);
@@ -627,6 +630,17 @@ export default function NannyBookings() {
                                 {t("nanny.bookings.endShift")}
                               </button>
                             )}
+                            {/* Extend for confirmed or active bookings */}
+                            {(booking.status === "confirmed" || (booking.clockIn && !booking.clockOut && booking.status !== "cancelled")) && (
+                              <button
+                                onClick={() => setExtendBooking(booking)}
+                                className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-lg hover:bg-blue-100 transition-colors"
+                                title={t("extend.extendBooking")}
+                              >
+                                <TimerReset className="w-3.5 h-3.5" />
+                                {t("extend.extendShift")}
+                              </button>
+                            )}
                             {/* WhatsApp parent */}
                             {booking.clientPhone && (
                               <button
@@ -828,6 +842,16 @@ export default function NannyBookings() {
                         {t("nanny.bookings.endShift")}
                       </button>
                     )}
+                    {/* Extend for confirmed or active */}
+                    {(booking.status === "confirmed" || (booking.clockIn && !booking.clockOut && booking.status !== "cancelled")) && (
+                      <button
+                        onClick={() => setExtendBooking(booking)}
+                        className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors"
+                      >
+                        <TimerReset className="w-4 h-4" />
+                        {t("extend.extendShift")}
+                      </button>
+                    )}
                   </div>
 
                   {/* WhatsApp + details toggle */}
@@ -896,6 +920,19 @@ export default function NannyBookings() {
           </>
         )}
       </div>
+
+      {/* Extend Booking Modal */}
+      {extendBooking && (
+        <ExtendBookingModal
+          booking={extendBooking}
+          onConfirm={async (newEndTime, newTotalPrice) => {
+            await updateBooking(extendBooking.id, { endTime: newEndTime, totalPrice: newTotalPrice });
+            await fetchNannyBookings();
+          }}
+          onClose={() => setExtendBooking(null)}
+          t={t}
+        />
+      )}
     </div>
   );
 }

@@ -19,6 +19,9 @@ const strings = {
     whatNext: 'What happens next?',
     whatNextText: 'A qualified nanny will be assigned to your booking shortly. You will receive updates via WhatsApp or email.',
     contactUs: 'If you have any questions, contact us at',
+    extendBooking: 'Need More Time?',
+    extendBookingText: 'You can extend your booking anytime by clicking the button below.',
+    extendBookingBtn: 'Extend Booking',
     invoice: 'INVOICE',
     invoiceGreeting: 'Please find below the invoice for the childcare service provided by Call a Nanny.',
     caregiver: 'Caregiver',
@@ -56,6 +59,9 @@ const strings = {
     whatNext: 'Et maintenant ?',
     whatNextText: 'Une nounou qualifiée sera assignée à votre réservation sous peu. Vous recevrez des mises à jour par WhatsApp ou email.',
     contactUs: 'Pour toute question, contactez-nous à',
+    extendBooking: 'Besoin de Plus de Temps ?',
+    extendBookingText: 'Vous pouvez prolonger votre réservation à tout moment en cliquant sur le bouton ci-dessous.',
+    extendBookingBtn: 'Prolonger la Réservation',
     invoice: 'FACTURE',
     invoiceGreeting: 'Veuillez trouver ci-dessous la facture pour le service de garde fourni par Call a Nanny.',
     caregiver: 'Garde d\'enfants',
@@ -164,6 +170,7 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData): Promis
   const resend = new Resend(apiKey);
   const locale: Locale = data.locale === 'fr' ? 'fr' : 'en';
   const s = t(locale);
+  const baseUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
 
   const content = `
     <h2 style="margin:0 0 8px;color:#1a1a1a;font-size:22px;font-family:Georgia,'Times New Roman',serif;">${s.greeting} ${data.clientName},</h2>
@@ -183,6 +190,13 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData): Promis
     <div style="margin:28px 0;padding:20px;background-color:#fff7ed;border-radius:12px;border-left:4px solid #f97316;">
       <h3 style="margin:0 0 8px;color:#1a1a1a;font-size:15px;font-weight:600;">${s.whatNext}</h3>
       <p style="margin:0;color:#666;font-size:14px;line-height:1.5;">${s.whatNextText}</p>
+    </div>
+
+    <!-- Extend Booking CTA -->
+    <div style="margin:28px 0;padding:20px;background-color:#eff6ff;border-radius:12px;text-align:center;">
+      <h3 style="margin:0 0 6px;color:#1a1a1a;font-size:15px;font-weight:600;">🕐 ${s.extendBooking}</h3>
+      <p style="margin:0 0 16px;color:#666;font-size:13px;line-height:1.5;">${s.extendBookingText}</p>
+      <a href="${baseUrl}/extend/${data.bookingId}" style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:50px;box-shadow:0 2px 8px rgba(59,130,246,0.3);">${s.extendBookingBtn}</a>
     </div>
 
     <p style="margin:0;color:#999;font-size:13px;text-align:center;">${s.contactUs} <a href="mailto:info@callanannycare.com" style="color:#f97316;">info@callanannycare.com</a></p>

@@ -14,6 +14,7 @@ import {
   Timer,
   Loader2,
   Coffee,
+  TimerReset,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -28,6 +29,7 @@ import {
   calcActualHoursWorked,
   HOURLY_RATE,
 } from "@/utils/shiftHelpers";
+import ExtendBookingModal from "../../components/ExtendBookingModal";
 
 const MONTHS_SHORT_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MONTHS_SHORT_FR = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
@@ -39,6 +41,7 @@ interface MyShiftSectionProps {
   clockInBooking: (id: number | string) => Promise<void>;
   clockOutBooking: (id: number | string) => Promise<void>;
   fetchNannyBookings: () => Promise<void>;
+  onExtend: (booking: Booking) => void;
   t: (key: string) => string;
 }
 
@@ -173,7 +176,7 @@ function DashboardSkeleton() {
 
 // ─── My Shift Section (prominent, always visible) ────────────────
 
-function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyBookings, t }: MyShiftSectionProps) {
+function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyBookings, onExtend, t }: MyShiftSectionProps) {
   const [actionLoading, setActionLoading] = useState(false);
 
   // Find active shift (clocked in, not clocked out)
@@ -229,18 +232,27 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
           </p>
         </div>
 
-        <button
-          onClick={() => handleEndShift(activeShift.id)}
-          disabled={actionLoading}
-          className="w-full mt-4 flex items-center justify-center gap-2 py-4 px-6 bg-red-600 text-white text-lg font-bold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 shadow-lg"
-        >
-          {actionLoading ? (
-            <Loader2 className="w-6 h-6 animate-spin" />
-          ) : (
-            <StopCircle className="w-6 h-6" />
-          )}
-          {t("nanny.dashboard.endShift")}
-        </button>
+        <div className="flex gap-3 mt-4">
+          <button
+            onClick={() => onExtend(activeShift)}
+            className="flex-1 flex items-center justify-center gap-2 py-4 px-4 bg-blue-600 text-white text-base font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-lg"
+          >
+            <TimerReset className="w-5 h-5" />
+            {t("extend.extendShift")}
+          </button>
+          <button
+            onClick={() => handleEndShift(activeShift.id)}
+            disabled={actionLoading}
+            className="flex-1 flex items-center justify-center gap-2 py-4 px-4 bg-red-600 text-white text-base font-bold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 shadow-lg"
+          >
+            {actionLoading ? (
+              <Loader2 className="w-6 h-6 animate-spin" />
+            ) : (
+              <StopCircle className="w-5 h-5" />
+            )}
+            {t("nanny.dashboard.endShift")}
+          </button>
+        </div>
       </div>
     );
   }
@@ -367,8 +379,10 @@ export default function NannyDashboard() {
     fetchNannyBookings,
     clockInBooking,
     clockOutBooking,
+    updateBooking,
   } = useData();
   const { t, locale } = useLanguage();
+  const [extendBooking, setExtendBooking] = useState<Booking | null>(null);
 
   useEffect(() => {
     fetchNannyStats();
@@ -455,6 +469,7 @@ export default function NannyDashboard() {
         clockInBooking={clockInBooking}
         clockOutBooking={clockOutBooking}
         fetchNannyBookings={fetchNannyBookings}
+        onExtend={setExtendBooking}
         t={t}
       />
 
@@ -660,6 +675,19 @@ export default function NannyDashboard() {
           <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto" />
         </Link>
       </div>
+
+      {/* Extend Booking Modal */}
+      {extendBooking && (
+        <ExtendBookingModal
+          booking={extendBooking}
+          onConfirm={async (newEndTime, newTotalPrice) => {
+            await updateBooking(extendBooking.id, { endTime: newEndTime, totalPrice: newTotalPrice });
+            await fetchNannyBookings();
+          }}
+          onClose={() => setExtendBooking(null)}
+          t={t}
+        />
+      )}
     </div>
   );
 }

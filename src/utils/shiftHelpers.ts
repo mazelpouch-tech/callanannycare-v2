@@ -33,7 +33,7 @@ export function formatHoursWorked(clockIn: string, clockOut: string): string {
 }
 
 /** Parse time string in various formats ("09h00", "9:00", "14h30", "2:30 PM") to decimal hours */
-function parseTimeToHours(t: string): number | null {
+export function parseTimeToHours(t: string): number | null {
   if (!t) return null;
   // "09h00" / "14h30" format
   const hFormat = t.match(/^(\d{1,2})h(\d{2})$/i);
@@ -127,3 +127,14 @@ export function formatTime(timeStr: string): string {
   const h12 = hour % 12 || 12;
   return `${h12}:${m} ${ampm}`;
 }
+
+/** Shared time slots from 07:00 to 23:30 in 30-min steps */
+export const TIME_SLOTS: { value: string; label: string }[] = (() => {
+  const slots: { value: string; label: string }[] = [];
+  for (let h = 7; h <= 23; h++) {
+    const hh = String(h).padStart(2, '0');
+    slots.push({ value: `${h}:00`, label: `${hh}h00` });
+    if (h < 23 || true) slots.push({ value: `${h}:30`, label: `${hh}h30` });
+  }
+  return slots;
+})();
