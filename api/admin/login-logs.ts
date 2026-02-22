@@ -20,18 +20,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const action = req.query.action as string | undefined;
     const search = req.query.search as string | undefined;
 
-    // Build conditions
-    const conditions: string[] = [];
-    const params: unknown[] = [];
-
-    if (userType && userType !== 'all') {
-      conditions.push(`user_type = '${userType === 'admin' ? 'admin' : 'nanny'}'`);
-    }
-    if (action && action !== 'all') {
-      conditions.push(`action = '${action.replace(/[^a-z_]/g, '')}'`);
-    }
-
-    const whereClause = conditions.length > 0 ? conditions.join(' AND ') : 'TRUE';
+    const safeUserType = (userType && userType !== 'all') ? (userType === 'admin' ? 'admin' : 'nanny') : null;
+    const safeAction = (action && action !== 'all') ? action.replace(/[^a-z_]/g, '') : null;
 
     let rows: DbLoginLog[];
     let total: CountRow[];
@@ -40,31 +30,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const pattern = `%${search}%`;
       rows = await sql`
         SELECT * FROM login_logs
-        WHERE (${sql(whereClause)}) IS NOT NULL
-          AND user_type = COALESCE(${userType && userType !== 'all' ? userType : null}, user_type)
-          AND action = COALESCE(${action && action !== 'all' ? action : null}, action)
+        WHERE user_type = COALESCE(${safeUserType}, user_type)
+          AND action = COALESCE(${safeAction}, action)
           AND (user_email ILIKE ${pattern} OR user_name ILIKE ${pattern})
         ORDER BY created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       ` as DbLoginLog[];
       total = await sql`
         SELECT COUNT(*) as count FROM login_logs
-        WHERE user_type = COALESCE(${userType && userType !== 'all' ? userType : null}, user_type)
-          AND action = COALESCE(${action && action !== 'all' ? action : null}, action)
+        WHERE user_type = COALESCE(${safeUserType}, user_type)
+          AND action = COALESCE(${safeAction}, action)
           AND (user_email ILIKE ${pattern} OR user_name ILIKE ${pattern})
       ` as CountRow[];
     } else {
       rows = await sql`
         SELECT * FROM login_logs
-        WHERE user_type = COALESCE(${userType && userType !== 'all' ? userType : null}, user_type)
-          AND action = COALESCE(${action && action !== 'all' ? action : null}, action)
+        WHERE user_type = COALESCE(${safeUserType}, user_type)
+          AND action = COALESCE(${safeAction}, action)
         ORDER BY created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       ` as DbLoginLog[];
       total = await sql`
         SELECT COUNT(*) as count FROM login_logs
-        WHERE user_type = COALESCE(${userType && userType !== 'all' ? userType : null}, user_type)
-          AND action = COALESCE(${action && action !== 'all' ? action : null}, action)
+        WHERE user_type = COALESCE(${safeUserType}, user_type)
+          AND action = COALESCE(${safeAction}, action)
       ` as CountRow[];
     }
 
