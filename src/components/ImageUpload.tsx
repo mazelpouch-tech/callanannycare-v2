@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Camera, Upload, X, Loader2 } from "lucide-react";
+import { Camera, Upload, Loader2 } from "lucide-react";
 
 interface ImageUploadProps {
   currentImage: string;

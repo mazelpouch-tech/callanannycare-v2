@@ -12,7 +12,6 @@ import {
   Loader2,
   ToggleLeft,
   ToggleRight,
-  Camera,
   Lock,
   Info,
   X,
