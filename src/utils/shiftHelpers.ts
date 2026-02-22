@@ -63,6 +63,39 @@ export function calcNannyPay(booking: Booking): number {
   return pay;
 }
 
+/** Parse time string in various formats ("09h00", "9:00", "14h30", "2:30 PM") to decimal hours */
+function parseTimeToHours(t: string): number | null {
+  if (!t) return null;
+  // "09h00" / "14h30" format
+  const hFormat = t.match(/^(\d{1,2})h(\d{2})$/i);
+  if (hFormat) return parseInt(hFormat[1]) + parseInt(hFormat[2]) / 60;
+  // "9:00" / "14:30" format
+  const colonFormat = t.match(/^(\d{1,2}):(\d{2})/);
+  if (colonFormat) {
+    let h = parseInt(colonFormat[1]);
+    const m = parseInt(colonFormat[2]);
+    if (/pm/i.test(t) && h < 12) h += 12;
+    if (/am/i.test(t) && h === 12) h = 0;
+    return h + m / 60;
+  }
+  return null;
+}
+
+/** Calculate booked hours from start/end time strings, with optional day count */
+export function calcBookedHours(startTime: string, endTime: string, startDate?: string, endDate?: string | null): number {
+  const s = parseTimeToHours(startTime);
+  const e = parseTimeToHours(endTime);
+  if (s === null || e === null || e <= s) return 0;
+  const hoursPerDay = e - s;
+  let days = 1;
+  if (startDate && endDate) {
+    const d1 = new Date(startDate).getTime();
+    const d2 = new Date(endDate).getTime();
+    if (d2 > d1) days = Math.round((d2 - d1) / 86400000) + 1;
+  }
+  return hoursPerDay * days;
+}
+
 export function formatDate(dateStr: string): string {
   if (!dateStr) return '';
   const d = new Date(dateStr);

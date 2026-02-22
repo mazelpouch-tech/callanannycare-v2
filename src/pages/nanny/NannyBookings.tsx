@@ -25,6 +25,7 @@ import {
   formatDuration,
   formatHoursWorked,
   calcShiftPay,
+  calcBookedHours,
   isToday,
 } from "@/utils/shiftHelpers";
 
@@ -508,6 +509,7 @@ export default function NannyBookings() {
                     <th className="px-5 py-3 font-medium">{t("shared.client")}</th>
                     <th className="px-5 py-3 font-medium">{t("shared.date")}</th>
                     <th className="px-5 py-3 font-medium">{t("shared.time")}</th>
+                    <th className="px-5 py-3 font-medium">{t("shared.hours")}</th>
                     <th className="px-5 py-3 font-medium">{t("shared.plan")}</th>
                     <th className="px-5 py-3 font-medium">{t("shared.status")}</th>
                     <th className="px-5 py-3 font-medium">{t("nanny.bookings.shift")}</th>
@@ -527,6 +529,12 @@ export default function NannyBookings() {
                         <td className="px-5 py-3 text-sm text-muted-foreground">
                           {booking.startTime}
                           {booking.endTime ? ` - ${booking.endTime}` : ""}
+                        </td>
+                        <td className="px-5 py-3 text-sm font-medium text-foreground">
+                          {(() => {
+                            const h = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                            return h > 0 ? `${h}h` : "—";
+                          })()}
                         </td>
                         <td className="px-5 py-3 text-sm capitalize">
                           {booking.plan}
@@ -655,7 +663,7 @@ export default function NannyBookings() {
                       </tr>
                       {expandedId === booking.id && (
                         <tr className="bg-muted/20">
-                          <td colSpan={7} className="px-5 py-4">
+                          <td colSpan={8} className="px-5 py-4">
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                               <div>
                                 <span className="text-muted-foreground">{t("shared.email")}</span>
@@ -727,6 +735,10 @@ export default function NannyBookings() {
                       <Clock className="w-3.5 h-3.5" />
                       {booking.date}{booking.endDate ? ` → ${booking.endDate}` : ""} · {booking.startTime}
                       {booking.endTime ? ` - ${booking.endTime}` : ""}
+                      {(() => {
+                        const h = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                        return h > 0 ? ` (${h}h)` : "";
+                      })()}
                     </div>
                     {booking.hotel && (
                       <div className="flex items-center gap-1.5">

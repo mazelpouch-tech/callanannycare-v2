@@ -28,6 +28,7 @@ import { format, parseISO } from "date-fns";
 import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
+import { calcBookedHours } from "@/utils/shiftHelpers";
 
 interface EditBookingForm {
   id: number | string;
@@ -527,6 +528,9 @@ export default function AdminBookings() {
                       Time
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Hours
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Plan
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -568,6 +572,12 @@ export default function AdminBookings() {
                           </td>
                           <td className="px-4 py-3.5 text-sm text-muted-foreground">
                             {formatTime(booking.startTime)}{booking.endTime ? ` - ${booking.endTime}` : ""}
+                          </td>
+                          <td className="px-4 py-3.5 text-sm font-medium text-foreground">
+                            {(() => {
+                              const h = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                              return h > 0 ? `${h}h` : "—";
+                            })()}
                           </td>
                           <td className="px-4 py-3.5 text-sm text-muted-foreground capitalize">
                             {booking.plan || "N/A"}
@@ -679,7 +689,7 @@ export default function AdminBookings() {
                         {isExpanded && (
                           <tr>
                             <td
-                              colSpan={11}
+                              colSpan={12}
                               className="px-4 py-4 bg-muted/20"
                             >
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -803,7 +813,13 @@ export default function AdminBookings() {
                       </div>
                       <div className="flex items-center gap-1.5 text-muted-foreground">
                         <Clock className="w-3.5 h-3.5 shrink-0" />
-                        <span>{formatTime(booking.startTime)}{booking.endTime ? ` - ${booking.endTime}` : ""}</span>
+                        <span>
+                          {formatTime(booking.startTime)}{booking.endTime ? ` - ${booking.endTime}` : ""}
+                          {(() => {
+                            const h = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                            return h > 0 ? ` (${h}h)` : "";
+                          })()}
+                        </span>
                       </div>
                       <div className="flex items-center gap-1.5 text-muted-foreground">
                         <Mail className="w-3.5 h-3.5 shrink-0" />

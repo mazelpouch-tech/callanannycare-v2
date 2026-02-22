@@ -874,6 +874,10 @@ function StepReview({
               <span className="text-foreground font-medium">{t("book.time")}:</span>{" "}
               {startLabel} - {endLabel}
             </p>
+            <p className="mt-1">
+              <span className="text-foreground font-medium">{t("shared.hours")}:</span>{" "}
+              {hours * dateCount}h ({hours}h &times; {dateCount} {t("book.dateUnit")})
+            </p>
           </div>
         </div>
 
