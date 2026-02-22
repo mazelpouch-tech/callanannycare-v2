@@ -8,7 +8,7 @@ import {
 import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, subDays, isAfter } from "date-fns";
 import { useData } from "../../context/DataContext";
 import type { Booking, Nanny, BookingStatus } from "@/types";
-import { calcShiftPay, HOURLY_RATE } from "@/utils/shiftHelpers";
+import { calcShiftPayBreakdown, HOURLY_RATE } from "@/utils/shiftHelpers";
 
 // ─── Chart Data Types ────────────────────────────────────────────
 
@@ -287,21 +287,23 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
     const clockedBookings = bookings.filter((b) => b.clockIn && b.clockOut);
     if (clockedBookings.length === 0) return [];
 
-    const nannyMap: Record<string, { name: string; shifts: number; totalHours: number; totalPay: number }> = {};
+    const nannyMap: Record<string, { name: string; shifts: number; totalHours: number; basePay: number; taxiFee: number; totalPay: number }> = {};
     clockedBookings.forEach((b) => {
       const nannyId = b.nannyId;
       if (nannyId == null) return;
       const nannyName = b.nannyName || "Unknown";
       if (!nannyMap[nannyId]) {
-        nannyMap[nannyId] = { name: nannyName, shifts: 0, totalHours: 0, totalPay: 0 };
+        nannyMap[nannyId] = { name: nannyName, shifts: 0, totalHours: 0, basePay: 0, taxiFee: 0, totalPay: 0 };
       }
       const ms = new Date(b.clockOut!).getTime() - new Date(b.clockIn!).getTime();
       const hours = ms / 3600000;
-      const pay = calcShiftPay(b.clockIn!, b.clockOut!);
+      const bd = calcShiftPayBreakdown(b.clockIn!, b.clockOut!);
 
       nannyMap[nannyId].shifts += 1;
       nannyMap[nannyId].totalHours += hours;
-      nannyMap[nannyId].totalPay += pay;
+      nannyMap[nannyId].basePay += bd.basePay;
+      nannyMap[nannyId].taxiFee += bd.taxiFee;
+      nannyMap[nannyId].totalPay += bd.total;
     });
 
     return Object.values(nannyMap)
@@ -310,6 +312,8 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
   }, [bookings]);
 
   const totalAllHours = nannyHours.reduce((s, n) => s + n.totalHours, 0);
+  const totalAllBasePay = nannyHours.reduce((s, n) => s + n.basePay, 0);
+  const totalAllTaxi = nannyHours.reduce((s, n) => s + n.taxiFee, 0);
   const totalAllPay = nannyHours.reduce((s, n) => s + n.totalPay, 0);
   const totalAllShifts = nannyHours.reduce((s, n) => s + n.shifts, 0);
 
@@ -325,6 +329,7 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
             <span>{totalAllShifts} shifts</span>
             <span>{totalAllHours.toFixed(1)} hrs</span>
             <span className="font-semibold text-foreground">{totalAllPay.toLocaleString()} MAD</span>
+            <span className="text-muted-foreground/70">({totalAllBasePay.toLocaleString()} + {totalAllTaxi} taxi)</span>
           </div>
         )}
       </div>
@@ -351,7 +356,9 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
                   <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Shifts</th>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hours</th>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Avg/Shift</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pay</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hourly Pay</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Taxi Fee</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Pay</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -364,6 +371,16 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
                     <td className="px-6 py-3 text-sm text-muted-foreground">{nanny.totalHours}h</td>
                     <td className="px-6 py-3 text-sm text-muted-foreground">
                       {(nanny.totalHours / nanny.shifts).toFixed(1)}h
+                    </td>
+                    <td className="px-6 py-3 text-sm text-muted-foreground text-right">
+                      {nanny.basePay.toLocaleString()} MAD
+                    </td>
+                    <td className="px-6 py-3 text-sm text-right">
+                      {nanny.taxiFee > 0 ? (
+                        <span className="text-orange-600 font-medium">+{nanny.taxiFee} MAD</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-6 py-3 text-sm font-semibold text-foreground text-right">
                       {nanny.totalPay.toLocaleString()} MAD
@@ -378,6 +395,10 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
                   <td className="px-6 py-3 text-sm font-bold text-foreground">{totalAllHours.toFixed(1)}h</td>
                   <td className="px-6 py-3 text-sm font-bold text-foreground">
                     {totalAllShifts > 0 ? (totalAllHours / totalAllShifts).toFixed(1) : 0}h
+                  </td>
+                  <td className="px-6 py-3 text-sm font-bold text-foreground text-right">{totalAllBasePay.toLocaleString()} MAD</td>
+                  <td className="px-6 py-3 text-sm font-bold text-orange-600 text-right">
+                    {totalAllTaxi > 0 ? `+${totalAllTaxi.toLocaleString()} MAD` : "—"}
                   </td>
                   <td className="px-6 py-3 text-sm font-bold text-foreground text-right">{totalAllPay.toLocaleString()} MAD</td>
                 </tr>
@@ -397,6 +418,12 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
                   <span>{nanny.shifts} shifts</span>
                   <span>{nanny.totalHours}h total</span>
                   <span>{(nanny.totalHours / nanny.shifts).toFixed(1)}h avg</span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span>Hourly: {nanny.basePay} MAD</span>
+                  {nanny.taxiFee > 0 && (
+                    <span className="text-orange-600">Taxi: +{nanny.taxiFee} MAD</span>
+                  )}
                 </div>
               </div>
             ))}

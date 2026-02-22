@@ -23,8 +23,8 @@ import {
   isToday,
   formatDuration,
   formatHoursWorked,
-  calcShiftPay,
-  calcNannyPay,
+  calcShiftPayBreakdown,
+  calcNannyPayBreakdown,
   calcActualHoursWorked,
   HOURLY_RATE,
 } from "@/utils/shiftHelpers";
@@ -60,17 +60,19 @@ function LiveTimer({ clockIn, large }: LiveTimerProps) {
   );
 }
 
-// Simple bar chart for nanny pay
+// Simple bar chart for nanny pay with breakdown
 function PayChart({ bookings, t, locale }: PayChartProps) {
   const MONTHS = locale === "fr" ? MONTHS_SHORT_FR : MONTHS_SHORT_EN;
   const monthlyPay = useMemo(() => {
     const now = new Date();
-    const months: { key: string; label: string; total: number }[] = [];
+    const months: { key: string; label: string; basePay: number; taxiFee: number; total: number }[] = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       months.push({
         key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
         label: MONTHS[d.getMonth()],
+        basePay: 0,
+        taxiFee: 0,
         total: 0,
       });
     }
@@ -78,7 +80,12 @@ function PayChart({ bookings, t, locale }: PayChartProps) {
       if (b.status === "cancelled" || !b.date) return;
       const monthKey = b.date.substring(0, 7);
       const month = months.find((m) => m.key === monthKey);
-      if (month) month.total += calcNannyPay(b);
+      if (month) {
+        const bd = calcNannyPayBreakdown(b);
+        month.basePay += bd.basePay;
+        month.taxiFee += bd.taxiFee;
+        month.total += bd.total;
+      }
     });
     return months;
   }, [bookings]);
@@ -96,6 +103,8 @@ function PayChart({ bookings, t, locale }: PayChartProps) {
       <div className="flex items-end gap-2 h-32">
         {monthlyPay.map((month) => {
           const heightPct = maxVal > 0 ? (month.total / maxVal) * 100 : 0;
+          const baseHPct = maxVal > 0 ? (month.basePay / maxVal) * 100 : 0;
+          const taxiHPct = maxVal > 0 ? (month.taxiFee / maxVal) * 100 : 0;
           return (
             <div key={month.key} className="flex-1 flex flex-col items-center gap-1">
               <span className="text-[10px] text-muted-foreground font-medium">
@@ -103,16 +112,32 @@ function PayChart({ bookings, t, locale }: PayChartProps) {
               </span>
               <div className="w-full flex justify-center">
                 <div
-                  className="w-full max-w-[32px] rounded-t-md gradient-warm transition-all duration-500"
+                  className="w-full max-w-[32px] flex flex-col-reverse overflow-hidden rounded-t-md"
                   style={{ height: `${Math.max(heightPct, 2)}%`, minHeight: "4px" }}
-                />
+                >
+                  <div className="w-full gradient-warm" style={{ height: baseHPct > 0 ? `${(baseHPct / Math.max(heightPct, 1)) * 100}%` : "100%" }} />
+                  {taxiHPct > 0 && (
+                    <div className="w-full bg-orange-400" style={{ height: `${(taxiHPct / Math.max(heightPct, 1)) * 100}%` }} />
+                  )}
+                </div>
               </div>
               <span className="text-[10px] text-muted-foreground font-medium">{month.label}</span>
             </div>
           );
         })}
       </div>
-      <p className="text-[10px] text-muted-foreground mt-3 text-center">
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 mt-3">
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-2 rounded-sm gradient-warm inline-block" />
+          <span className="text-[10px] text-muted-foreground">{t("nanny.dashboard.hourlyPay")}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-2 rounded-sm bg-orange-400 inline-block" />
+          <span className="text-[10px] text-muted-foreground">{t("nanny.dashboard.taxiFee")}</span>
+        </div>
+      </div>
+      <p className="text-[10px] text-muted-foreground mt-2 text-center">
         {t("nanny.dashboard.payInfo").replace("{rate}", String(Math.round(HOURLY_RATE)))}
       </p>
     </div>
@@ -268,7 +293,13 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
 
   // ── STATE 3: Today's shift completed ──
   if (todayCompleted.length > 0) {
-    const totalPayToday = todayCompleted.reduce((sum: number, b: Booking) => sum + calcShiftPay(b.clockIn!, b.clockOut!), 0);
+    const todayBreakdown = todayCompleted.reduce(
+      (acc, b) => {
+        const bd = calcShiftPayBreakdown(b.clockIn!, b.clockOut!);
+        return { basePay: acc.basePay + bd.basePay, taxiFee: acc.taxiFee + bd.taxiFee, total: acc.total + bd.total };
+      },
+      { basePay: 0, taxiFee: 0, total: 0 }
+    );
 
     return (
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 sm:p-8">
@@ -289,9 +320,17 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
             <p className="text-xs text-blue-600">{t("nanny.dashboard.hoursLabel")}</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-blue-800">{totalPayToday}</p>
+            <p className="text-2xl font-bold text-blue-800">{todayBreakdown.total}</p>
             <p className="text-xs text-blue-600">{t("nanny.dashboard.madEarned")}</p>
           </div>
+        </div>
+
+        {/* Pay breakdown */}
+        <div className="mt-4 flex items-center justify-center gap-4 text-xs text-blue-700">
+          <span>{t("nanny.dashboard.hourlyPay")}: {todayBreakdown.basePay} MAD</span>
+          {todayBreakdown.taxiFee > 0 && (
+            <span>{t("nanny.dashboard.taxiFee")}: +{todayBreakdown.taxiFee} MAD</span>
+          )}
         </div>
       </div>
     );
@@ -349,10 +388,16 @@ export default function NannyDashboard() {
       .reduce((sum, b) => sum + calcActualHoursWorked(b.clockIn!, b.clockOut!), 0);
   }, [nannyBookings]);
 
-  const totalActualPay = useMemo(() => {
+  const payBreakdown = useMemo(() => {
     return nannyBookings
       .filter((b) => b.status !== "cancelled")
-      .reduce((sum, b) => sum + calcNannyPay(b), 0);
+      .reduce(
+        (acc, b) => {
+          const bd = calcNannyPayBreakdown(b);
+          return { basePay: acc.basePay + bd.basePay, taxiFee: acc.taxiFee + bd.taxiFee, total: acc.total + bd.total };
+        },
+        { basePay: 0, taxiFee: 0, total: 0 }
+      );
   }, [nannyBookings]);
 
   const isLoading = !nannyStats && nannyBookings.length === 0;
@@ -384,7 +429,7 @@ export default function NannyDashboard() {
     },
     {
       label: t("nanny.dashboard.myPay"),
-      value: totalActualPay,
+      value: payBreakdown.total,
       suffix: "MAD",
       icon: DollarSign,
       bg: "bg-orange-50",
@@ -444,6 +489,21 @@ export default function NannyDashboard() {
           );
         })}
       </div>
+
+      {/* Pay Breakdown */}
+      {payBreakdown.total > 0 && (
+        <div className="bg-orange-50/50 border border-orange-200/60 rounded-xl px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+          <span className="font-medium text-foreground">{t("nanny.dashboard.payBreakdown")}:</span>
+          <span className="text-muted-foreground">
+            {t("nanny.dashboard.hourlyPay")}: <span className="font-semibold text-foreground">{payBreakdown.basePay} MAD</span>
+          </span>
+          {payBreakdown.taxiFee > 0 && (
+            <span className="text-muted-foreground">
+              {t("nanny.dashboard.taxiFee")}: <span className="font-semibold text-orange-600">+{payBreakdown.taxiFee} MAD</span>
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Pay Chart */}
       <PayChart bookings={nannyBookings} t={t} locale={locale} />

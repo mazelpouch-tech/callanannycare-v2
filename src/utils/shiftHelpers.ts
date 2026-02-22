@@ -70,26 +70,41 @@ function isEveningShift(startHour: number, endHour: number): boolean {
   return startHour >= 19 || startHour < 7 || endHour > 19 || endHour <= 7;
 }
 
+/** Pay breakdown: base hourly pay + taxi fee */
+export interface PayBreakdown {
+  basePay: number;    // hours × HOURLY_RATE
+  taxiFee: number;    // 100 MAD if evening shift, else 0
+  total: number;      // basePay + taxiFee
+}
+
 export function calcShiftPay(clockIn: string, clockOut: string): number {
+  return calcShiftPayBreakdown(clockIn, clockOut).total;
+}
+
+export function calcShiftPayBreakdown(clockIn: string, clockOut: string): PayBreakdown {
   const ms = new Date(clockOut).getTime() - new Date(clockIn).getTime();
   const hours = ms / 3600000;
-  let pay = Math.round(hours * HOURLY_RATE);
+  const basePay = Math.round(hours * HOURLY_RATE);
   const inHour = new Date(clockIn).getHours();
   const outHour = new Date(clockOut).getHours();
-  if (isEveningShift(inHour, outHour)) pay += 100;
-  return pay;
+  const taxiFee = isEveningShift(inHour, outHour) ? 100 : 0;
+  return { basePay, taxiFee, total: basePay + taxiFee };
 }
 
 export function calcNannyPay(booking: Booking): number {
-  if (booking.status === 'cancelled') return 0;
+  return calcNannyPayBreakdown(booking).total;
+}
+
+export function calcNannyPayBreakdown(booking: Booking): PayBreakdown {
+  if (booking.status === 'cancelled') return { basePay: 0, taxiFee: 0, total: 0 };
 
   // Only count pay from actual clock in/out data (real worked hours)
   if (booking.clockIn && booking.clockOut) {
-    return calcShiftPay(booking.clockIn, booking.clockOut);
+    return calcShiftPayBreakdown(booking.clockIn, booking.clockOut);
   }
 
   // No clock data = no pay yet (shift hasn't been worked)
-  return 0;
+  return { basePay: 0, taxiFee: 0, total: 0 };
 }
 
 /** Calculate hours actually worked from clock in/out timestamps */

@@ -21,7 +21,7 @@ import {
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
 import ImageUpload from "../../components/ImageUpload";
-import { calcActualHoursWorked, calcNannyPay } from "@/utils/shiftHelpers";
+import { calcActualHoursWorked, calcNannyPayBreakdown } from "@/utils/shiftHelpers";
 import type { NannyProfile as NannyProfileType } from "@/types";
 
 export default function NannyProfile() {
@@ -51,14 +51,20 @@ export default function NannyProfile() {
     fetchNannyBookings();
   }, [fetchNannyBookings]);
 
-  // Calculate total hours & pay from actual clock data
+  // Calculate total hours & pay breakdown from actual clock data
   const totalHoursWorked = nannyBookings
     .filter((b) => b.clockIn && b.clockOut && b.status !== "cancelled")
     .reduce((sum, b) => sum + calcActualHoursWorked(b.clockIn!, b.clockOut!), 0);
 
-  const totalPay = nannyBookings
+  const payBreakdown = nannyBookings
     .filter((b) => b.status !== "cancelled")
-    .reduce((sum, b) => sum + calcNannyPay(b), 0);
+    .reduce(
+      (acc, b) => {
+        const bd = calcNannyPayBreakdown(b);
+        return { basePay: acc.basePay + bd.basePay, taxiFee: acc.taxiFee + bd.taxiFee, total: acc.total + bd.total };
+      },
+      { basePay: 0, taxiFee: 0, total: 0 }
+    );
 
   useEffect(() => {
     if (nannyProfile?.id) {
@@ -239,10 +245,19 @@ export default function NannyProfile() {
                 <p className="text-xs text-muted-foreground mt-0.5">{t("nanny.dashboard.hoursWorked")}</p>
               </div>
               <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 text-center">
-                <p className="text-2xl font-bold text-orange-600">{totalPay}<span className="text-sm font-normal ml-1">MAD</span></p>
+                <p className="text-2xl font-bold text-orange-600">{payBreakdown.total}<span className="text-sm font-normal ml-1">MAD</span></p>
                 <p className="text-xs text-muted-foreground mt-0.5">{t("nanny.dashboard.myPay")}</p>
               </div>
             </div>
+            {/* Pay breakdown detail */}
+            {payBreakdown.total > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span>{t("nanny.dashboard.hourlyPay")}: <span className="font-semibold text-foreground">{payBreakdown.basePay} MAD</span></span>
+                {payBreakdown.taxiFee > 0 && (
+                  <span>{t("nanny.dashboard.taxiFee")}: <span className="font-semibold text-orange-600">+{payBreakdown.taxiFee} MAD</span></span>
+                )}
+              </div>
+            )}
             {/* Nanny pay info */}
             <div className="mt-3 flex items-start gap-2 text-xs bg-accent/5 border border-accent/20 rounded-lg px-3 py-2.5">
               <DollarSign className="w-3.5 h-3.5 mt-0.5 shrink-0 text-accent" />
