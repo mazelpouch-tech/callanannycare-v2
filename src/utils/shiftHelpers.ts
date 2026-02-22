@@ -32,37 +32,6 @@ export function formatHoursWorked(clockIn: string, clockOut: string): string {
   return `${h}h ${m}m`;
 }
 
-export function calcShiftPay(clockIn: string, clockOut: string): number {
-  const ms = new Date(clockOut).getTime() - new Date(clockIn).getTime();
-  const hours = ms / 3600000;
-  let pay = Math.round(hours * HOURLY_RATE);
-  const inHour = new Date(clockIn).getHours();
-  if (inHour >= 19) pay += 100;
-  return pay;
-}
-
-export function calcNannyPay(booking: Booking): number {
-  if (booking.status === 'cancelled') return 0;
-
-  if (booking.clockIn && booking.clockOut) {
-    const ms = new Date(booking.clockOut).getTime() - new Date(booking.clockIn).getTime();
-    const hours = ms / 3600000;
-    let pay = Math.round(hours * HOURLY_RATE);
-    const inHour = new Date(booking.clockIn).getHours();
-    if (inHour >= 19) pay += 100;
-    return pay;
-  }
-
-  let pay = Math.round(8 * HOURLY_RATE); // default 8h shift (250 MAD)
-  const st = booking.startTime || '';
-  const hour = parseInt(st.replace(/[^0-9]/g, '')) || 0;
-  const isPM = st.toLowerCase().includes('pm');
-  let hour24 = hour;
-  if (isPM && hour < 12) hour24 = hour + 12;
-  if (hour24 >= 19) pay += 100;
-  return pay;
-}
-
 /** Parse time string in various formats ("09h00", "9:00", "14h30", "2:30 PM") to decimal hours */
 function parseTimeToHours(t: string): number | null {
   if (!t) return null;
@@ -94,6 +63,41 @@ export function calcBookedHours(startTime: string, endTime: string, startDate?: 
     if (d2 > d1) days = Math.round((d2 - d1) / 86400000) + 1;
   }
   return hoursPerDay * days;
+}
+
+/** Check if a shift overlaps with 7PM-7AM (evening/night window) */
+function isEveningShift(startHour: number, endHour: number): boolean {
+  return startHour >= 19 || startHour < 7 || endHour > 19 || endHour <= 7;
+}
+
+export function calcShiftPay(clockIn: string, clockOut: string): number {
+  const ms = new Date(clockOut).getTime() - new Date(clockIn).getTime();
+  const hours = ms / 3600000;
+  let pay = Math.round(hours * HOURLY_RATE);
+  const inHour = new Date(clockIn).getHours();
+  const outHour = new Date(clockOut).getHours();
+  if (isEveningShift(inHour, outHour)) pay += 100;
+  return pay;
+}
+
+export function calcNannyPay(booking: Booking): number {
+  if (booking.status === 'cancelled') return 0;
+
+  if (booking.clockIn && booking.clockOut) {
+    return calcShiftPay(booking.clockIn, booking.clockOut);
+  }
+
+  // Use booked hours from start/end time
+  const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+  let pay = Math.round(hours * HOURLY_RATE);
+
+  // Check taxi fee from booked time
+  const startH = parseTimeToHours(booking.startTime || '');
+  const endH = parseTimeToHours(booking.endTime || '');
+  if (startH !== null && endH !== null && isEveningShift(startH, endH)) {
+    pay += 100;
+  }
+  return pay;
 }
 
 export function formatDate(dateStr: string): string {

@@ -8,6 +8,7 @@ import {
 import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, subDays, isAfter } from "date-fns";
 import { useData } from "../../context/DataContext";
 import type { Booking, Nanny, BookingStatus } from "@/types";
+import { calcShiftPay, HOURLY_RATE } from "@/utils/shiftHelpers";
 
 // ─── Chart Data Types ────────────────────────────────────────────
 
@@ -280,8 +281,6 @@ function MiniSparkline({ data, width = 80, height = 28, color = "#cd6845" }: { d
 
 // ─── Nanny Hours Report ─────────────────────────────────────────
 
-const NANNY_HOURLY_RATE = 31.25;
-
 function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]; nannies: Nanny[] }) {
   const nannyHours = useMemo(() => {
     // Only consider bookings with clock data
@@ -298,10 +297,7 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
       }
       const ms = new Date(b.clockOut!).getTime() - new Date(b.clockIn!).getTime();
       const hours = ms / 3600000;
-      let pay = Math.round(hours * NANNY_HOURLY_RATE);
-      // Evening bonus
-      const inHour = new Date(b.clockIn!).getHours();
-      if (inHour >= 19) pay += 100;
+      const pay = calcShiftPay(b.clockIn!, b.clockOut!);
 
       nannyMap[nannyId].shifts += 1;
       nannyMap[nannyId].totalHours += hours;
@@ -407,7 +403,7 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
           </div>
 
           <div className="px-6 py-3 border-t border-border text-[10px] text-muted-foreground">
-            Rate: {NANNY_HOURLY_RATE} MAD/hr ({Math.round(NANNY_HOURLY_RATE * 8)} MAD/8h) · +100 MAD for evening shifts (after 7 PM)
+            Rate: {HOURLY_RATE} MAD/hr ({Math.round(HOURLY_RATE * 8)} MAD/8h) · +100 MAD for evening shifts (7 PM - 7 AM)
           </div>
         </>
       )}
