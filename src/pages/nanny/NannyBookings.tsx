@@ -43,7 +43,8 @@ interface BookingFormData {
   clientEmail: string;
   clientPhone: string;
   hotel: string;
-  date: string;
+  startDate: string;
+  endDate: string;
   startTime: string;
   endTime: string;
   numChildren: string;
@@ -56,13 +57,17 @@ const emptyForm: BookingFormData = {
   clientEmail: "",
   clientPhone: "",
   hotel: "",
-  date: "",
+  startDate: "",
+  endDate: "",
   startTime: "",
   endTime: "",
   numChildren: "1",
   childrenAges: "",
   notes: "",
 };
+
+const RATE = 150; // MAD per hour
+const TAXI_FEE = 100; // MAD flat fee for night bookings
 
 // Live timer component
 function LiveTimer({ clockIn }: LiveTimerProps) {
@@ -148,8 +153,24 @@ export default function NannyBookings() {
 
   const handleNewBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.clientName || !formData.date || !formData.startTime) return;
+    if (!formData.clientName || !formData.startDate || !formData.startTime) return;
     setFormLoading(true);
+
+    // Calculate price (hidden from nanny, stored for admin)
+    const [sh, sm] = (formData.startTime || "0:0").split(":").map(Number);
+    const [eh, em] = (formData.endTime || "0:0").split(":").map(Number);
+    const hours = Math.max(0, (eh + em / 60) - (sh + sm / 60));
+    const startDate = new Date(formData.startDate);
+    const endDate = formData.endDate ? new Date(formData.endDate) : startDate;
+    const dayCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1);
+    const isEvening = eh > 19 || (eh === 19 && em > 0) || sh < 7;
+    const taxiFee = isEvening ? TAXI_FEE * dayCount : 0;
+    const totalPrice = RATE * hours * dayCount + taxiFee;
+
+    // Format times for display
+    const startLabel = TIME_SLOTS.find(s => s.value === formData.startTime)?.label || formData.startTime;
+    const endLabel = TIME_SLOTS.find(s => s.value === formData.endTime)?.label || formData.endTime;
+
     try {
       await addBooking({
         nannyId: nannyProfile?.id ?? undefined,
@@ -158,13 +179,15 @@ export default function NannyBookings() {
         clientEmail: formData.clientEmail,
         clientPhone: formData.clientPhone,
         hotel: formData.hotel,
-        date: formData.date,
-        startTime: formData.startTime,
-        endTime: formData.endTime,
+        date: formData.startDate,
+        endDate: formData.endDate || null,
+        startTime: startLabel,
+        endTime: endLabel,
         plan: "hourly",
         childrenCount: parseInt(formData.numChildren) || 1,
         childrenAges: formData.childrenAges,
         notes: formData.notes,
+        totalPrice,
         status: "confirmed",
       });
       setShowForm(false);
@@ -280,16 +303,28 @@ export default function NannyBookings() {
                 />
               </div>
 
-              {/* Date */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">{t("shared.date")} *</label>
-                <input
-                  type="date"
-                  required
-                  value={formData.date}
-                  onChange={(e) => handleFormChange("date", e.target.value)}
-                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                />
+              {/* Date Range */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">{t("shared.date")} *</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.startDate}
+                    onChange={(e) => handleFormChange("startDate", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.endDate")}</label>
+                  <input
+                    type="date"
+                    value={formData.endDate}
+                    min={formData.startDate}
+                    onChange={(e) => handleFormChange("endDate", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  />
+                </div>
               </div>
 
               {/* Start / End Time */}
@@ -377,7 +412,7 @@ export default function NannyBookings() {
                 </button>
                 <button
                   type="submit"
-                  disabled={formLoading || !formData.clientName || !formData.date || !formData.startTime}
+                  disabled={formLoading || !formData.clientName || !formData.startDate || !formData.startTime}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 gradient-warm text-white text-sm font-medium rounded-lg shadow-warm hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
                   {formLoading && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -487,7 +522,7 @@ export default function NannyBookings() {
                           {booking.clientName}
                         </td>
                         <td className="px-5 py-3 text-sm text-muted-foreground">
-                          {booking.date}
+                          {booking.date}{booking.endDate ? ` → ${booking.endDate}` : ""}
                         </td>
                         <td className="px-5 py-3 text-sm text-muted-foreground">
                           {booking.startTime}
@@ -690,7 +725,7 @@ export default function NannyBookings() {
                   <div className="space-y-1 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5" />
-                      {booking.date} · {booking.startTime}
+                      {booking.date}{booking.endDate ? ` → ${booking.endDate}` : ""} · {booking.startTime}
                       {booking.endTime ? ` - ${booking.endTime}` : ""}
                     </div>
                     {booking.hotel && (

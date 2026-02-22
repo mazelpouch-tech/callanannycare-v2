@@ -69,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Name and email are required' });
       }
 
-      const existing = await sql`SELECT id, status FROM nannies WHERE email = ${email}` as DbNanny[];
+      const existing = await sql`SELECT id, status FROM nannies WHERE LOWER(email) = LOWER(${email})` as DbNanny[];
       if (existing.length > 0) {
         return res.status(409).json({ error: 'A nanny with this email already exists' });
       }

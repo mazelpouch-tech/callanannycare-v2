@@ -44,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const result = await sql`
           SELECT id, name, email, password, role, is_active, last_login, login_count
           FROM admin_users
-          WHERE email = ${email}
+          WHERE LOWER(email) = LOWER(${email})
         ` as DbAdminUser[];
 
         const { ip, userAgent } = extractRequestMeta(req);
@@ -95,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: 'Name and email are required' });
         }
 
-        const existing = await sql`SELECT id FROM admin_users WHERE email = ${email}` as AdminIdRow[];
+        const existing = await sql`SELECT id FROM admin_users WHERE LOWER(email) = LOWER(${email})` as AdminIdRow[];
         if (existing.length > 0) {
           return res.status(409).json({ error: 'An admin with this email already exists' });
         }
@@ -178,7 +178,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: 'Email is required' });
         }
 
-        const admin = await sql`SELECT id, name, email FROM admin_users WHERE email = ${email} AND is_active = true` as DbAdminUser[];
+        const admin = await sql`SELECT id, name, email FROM admin_users WHERE LOWER(email) = LOWER(${email}) AND is_active = true` as DbAdminUser[];
         if (admin.length === 0) {
           // Don't reveal if email exists
           return res.status(200).json({ success: true, message: 'If that email is registered, a reset link has been generated.' });
@@ -322,7 +322,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Check email uniqueness if changing email
       if (email) {
-        const emailCheck = await sql`SELECT id FROM admin_users WHERE email = ${email} AND id != ${adminId}` as AdminIdRow[];
+        const emailCheck = await sql`SELECT id FROM admin_users WHERE LOWER(email) = LOWER(${email}) AND id != ${adminId}` as AdminIdRow[];
         if (emailCheck.length > 0) {
           return res.status(409).json({ error: 'Another admin already uses this email' });
         }

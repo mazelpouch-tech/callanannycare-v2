@@ -10,6 +10,7 @@ interface UpdateBookingBody {
   client_phone?: string;
   hotel?: string;
   date?: string;
+  end_date?: string | null;
   start_time?: string;
   end_time?: string;
   plan?: BookingPlan;
@@ -44,7 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     if (req.method === 'PUT') {
-      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice } = req.body as UpdateBookingBody;
+      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice } = req.body as UpdateBookingBody;
       const result = await sql`
         UPDATE bookings SET
           nanny_id = COALESCE(${nanny_id !== undefined ? nanny_id : null}, nanny_id),
@@ -54,6 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           client_phone = COALESCE(${client_phone}, client_phone),
           hotel = COALESCE(${hotel}, hotel),
           date = COALESCE(${date}, date),
+          end_date = COALESCE(${end_date !== undefined ? end_date : null}, end_date),
           start_time = COALESCE(${start_time}, start_time),
           end_time = COALESCE(${end_time}, end_time),
           plan = COALESCE(${plan}, plan),

@@ -47,6 +47,7 @@ export interface DbBooking {
   client_phone: string;
   hotel: string;
   date: string;
+  end_date: string | null;
   start_time: string;
   end_time: string;
   plan: BookingPlan;
@@ -129,6 +130,7 @@ export interface Booking {
   clientPhone: string;
   hotel: string;
   date: string;
+  endDate: string | null;
   startTime: string;
   endTime: string;
   plan: BookingPlan;
