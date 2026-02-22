@@ -492,6 +492,20 @@ export const translations: Record<Locale, TranslationTree> = {
       extendYourBooking: "Extend Your Booking",
       backToHome: "Back to Home",
     },
+
+    // Forward booking
+    forward: {
+      forwardBooking: "Forward Booking",
+      forwardShift: "Forward",
+      selectNanny: "Select a Nanny",
+      forwardTo: "Forward to",
+      confirmForward: "Confirm Forward",
+      forwarding: "Forwarding...",
+      forwardSuccess: "Booking forwarded successfully!",
+      noOtherNannies: "No other nannies available",
+      forwardNote: "The booking will be reassigned and the new nanny will be notified by email.",
+      currentNanny: "Currently assigned to",
+    },
   },
 
   fr: {
@@ -968,6 +982,20 @@ export const translations: Record<Locale, TranslationTree> = {
       loadingBooking: "Chargement de la reservation...",
       extendYourBooking: "Prolonger Votre Reservation",
       backToHome: "Retour a l'accueil",
+    },
+
+    // Forward booking
+    forward: {
+      forwardBooking: "Transférer la Réservation",
+      forwardShift: "Transférer",
+      selectNanny: "Sélectionner une Nounou",
+      forwardTo: "Transférer à",
+      confirmForward: "Confirmer le Transfert",
+      forwarding: "Transfert...",
+      forwardSuccess: "Réservation transférée avec succès !",
+      noOtherNannies: "Aucune autre nounou disponible",
+      forwardNote: "La réservation sera réattribuée et la nouvelle nounou sera notifiée par email.",
+      currentNanny: "Actuellement assignée à",
     },
   },
 };

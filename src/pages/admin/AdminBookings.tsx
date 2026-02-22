@@ -24,11 +24,13 @@ import {
   Download,
   Pencil,
   TimerReset,
+  ArrowRightLeft,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
 import ExtendBookingModal from "../../components/ExtendBookingModal";
+import ForwardBookingModal from "../../components/ForwardBookingModal";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
 import { calcBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE } from "@/utils/shiftHelpers";
 
@@ -132,6 +134,9 @@ export default function AdminBookings() {
 
   // Extend Booking Modal
   const [extendBooking, setExtendBooking] = useState<Booking | null>(null);
+
+  // Forward Booking Modal
+  const [forwardBooking, setForwardBooking] = useState<Booking | null>(null);
 
   // Auto-refresh bookings every 30s to pick up nanny confirmations
   useEffect(() => {
@@ -674,6 +679,17 @@ export default function AdminBookings() {
                                 </button>
                               )}
 
+                              {/* Forward */}
+                              {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
+                                <button
+                                  onClick={() => setForwardBooking(booking)}
+                                  className="p-1.5 rounded-lg text-orange-600 hover:bg-orange-50 transition-colors"
+                                  title="Forward to another nanny"
+                                >
+                                  <ArrowRightLeft className="w-4 h-4" />
+                                </button>
+                              )}
+
                               {/* Confirm */}
                               {booking.status === "pending" && (
                                 <button
@@ -1031,6 +1047,15 @@ export default function AdminBookings() {
                         className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors"
                       >
                         <TimerReset className="w-3.5 h-3.5" /> Extend
+                      </button>
+                    )}
+
+                    {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
+                      <button
+                        onClick={() => setForwardBooking(booking)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-orange-600 hover:bg-orange-50 transition-colors"
+                      >
+                        <ArrowRightLeft className="w-3.5 h-3.5" /> Forward
                       </button>
                     )}
 
@@ -1683,6 +1708,40 @@ export default function AdminBookings() {
               "extend.extendSuccess": "Booking extended successfully!",
               "extend.noLaterSlots": "No later time slots available",
               "extend.summary": "Extension Summary",
+              "shared.cancel": "Cancel",
+            };
+            return map[key] || key;
+          }}
+        />
+      )}
+
+      {/* Forward Booking Modal */}
+      {forwardBooking && (
+        <ForwardBookingModal
+          booking={forwardBooking}
+          nannies={nannies}
+          currentNannyId={forwardBooking.nannyId}
+          onConfirm={async (newNannyId) => {
+            const newNanny = nannies.find((n) => n.id === newNannyId);
+            await updateBooking(forwardBooking.id, {
+              nannyId: newNannyId,
+              nannyName: newNanny?.name || "",
+            });
+            await fetchBookings();
+          }}
+          onClose={() => setForwardBooking(null)}
+          t={(key: string) => {
+            const map: Record<string, string> = {
+              "forward.forwardBooking": "Forward Booking",
+              "forward.forwardShift": "Forward",
+              "forward.selectNanny": "Select a nanny...",
+              "forward.forwardTo": "Forward to",
+              "forward.confirmForward": "Confirm Forward",
+              "forward.forwarding": "Forwarding...",
+              "forward.forwardSuccess": "Booking forwarded successfully!",
+              "forward.noOtherNannies": "No other active nannies available",
+              "forward.forwardNote": "The new nanny will be notified by email about this assignment.",
+              "forward.currentNanny": "Current Nanny",
               "shared.cancel": "Cancel",
             };
             return map[key] || key;
