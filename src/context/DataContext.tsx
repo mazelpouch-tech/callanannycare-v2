@@ -259,6 +259,39 @@ export function DataProvider({ children }: DataProviderProps) {
 
   // --- Booking CRUD ---
 
+  const fetchBookings = useCallback(async () => {
+    try {
+      const apiBookings = await apiFetch<DbBookingWithNanny[]>("/bookings");
+      const normalizedBookings: Booking[] = apiBookings.map((b) => ({
+        id: b.id,
+        nannyId: b.nanny_id,
+        nannyName: b.nanny_name || b.client_name,
+        nannyImage: b.nanny_image || "",
+        clientName: b.client_name,
+        clientEmail: b.client_email,
+        clientPhone: b.client_phone,
+        hotel: b.hotel,
+        date: b.date,
+        endDate: b.end_date ?? null,
+        startTime: b.start_time,
+        endTime: b.end_time,
+        plan: b.plan,
+        childrenCount: b.children_count,
+        childrenAges: b.children_ages,
+        notes: b.notes,
+        totalPrice: b.total_price,
+        status: b.status,
+        createdAt: b.created_at,
+        clockIn: b.clock_in,
+        clockOut: b.clock_out,
+      }));
+      setBookings(normalizedBookings);
+      saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
+    } catch {
+      console.warn("Failed to refresh bookings");
+    }
+  }, []);
+
   const addBooking = useCallback(
     async (booking: Partial<Booking>, meta?: { locale?: string }): Promise<Booking> => {
       const nanny = nannies.find((n) => n.id === booking.nannyId);
@@ -908,6 +941,7 @@ export function DataProvider({ children }: DataProviderProps) {
       toggleNannyStatus,
       resendInvite,
       bookings,
+      fetchBookings,
       addBooking,
       updateBooking,
       updateBookingStatus,
@@ -947,7 +981,7 @@ export function DataProvider({ children }: DataProviderProps) {
     }),
     [
       nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability, inviteNanny, toggleNannyStatus, resendInvite,
-      bookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking, resendInvoice,
+      bookings, fetchBookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking, resendInvoice,
       stats, isAdmin, adminProfile, adminUsers, adminLogin, adminLogout,
       fetchAdminUsers, addAdminUser, updateAdminUser, deleteAdminUser,
       changeAdminPassword, forgotAdminPassword, resetAdminPassword, registerAdmin, loading,

@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import {
   Search,
   Filter,
@@ -95,7 +95,7 @@ const statusConfig: Record<BookingStatus, { label: string; className: string }> 
 const statusFilters = ["all", "pending", "confirmed", "completed", "cancelled"];
 
 export default function AdminBookings() {
-  const { bookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking } = useData();
+  const { bookings, fetchBookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking } = useData();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -127,6 +127,12 @@ export default function AdminBookings() {
   const [showEditBooking, setShowEditBooking] = useState(false);
   const [editBookingLoading, setEditBookingLoading] = useState(false);
   const [editBookingData, setEditBookingData] = useState<EditBookingForm | null>(null);
+
+  // Auto-refresh bookings every 30s to pick up nanny confirmations
+  useEffect(() => {
+    const interval = setInterval(fetchBookings, 30000);
+    return () => clearInterval(interval);
+  }, [fetchBookings]);
 
   const openEditModal = (booking: Booking) => {
     setEditBookingData({

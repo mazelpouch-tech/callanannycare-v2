@@ -282,6 +282,7 @@ export interface DataContextValue {
   resendInvite: (nannyId: number) => Promise<ApiResult<ResendInviteResponse>>;
 
   bookings: Booking[];
+  fetchBookings: () => Promise<void>;
   addBooking: (booking: Partial<Booking>, meta?: { locale?: string }) => Promise<Booking>;
   updateBooking: (id: number | string, updates: Partial<Booking>) => Promise<void>;
   updateBookingStatus: (id: number | string, status: BookingStatus) => Promise<void>;
