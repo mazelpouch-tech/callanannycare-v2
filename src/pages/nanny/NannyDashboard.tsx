@@ -341,11 +341,8 @@ export default function NannyDashboard() {
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
     .slice(0, 5);
 
-  const isLoading = !nannyStats && nannyBookings.length === 0;
-
-  if (isLoading) return <DashboardSkeleton />;
-
   // Calculate hours & pay ONLY from actual clock in/out data
+  // (must be before any early return to respect React hooks rules)
   const totalActualHours = useMemo(() => {
     return nannyBookings
       .filter((b) => b.clockIn && b.clockOut && b.status !== "cancelled")
@@ -357,6 +354,10 @@ export default function NannyDashboard() {
       .filter((b) => b.status !== "cancelled")
       .reduce((sum, b) => sum + calcNannyPay(b), 0);
   }, [nannyBookings]);
+
+  const isLoading = !nannyStats && nannyBookings.length === 0;
+
+  if (isLoading) return <DashboardSkeleton />;
 
   const statCards = [
     {
