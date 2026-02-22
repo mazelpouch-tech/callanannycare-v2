@@ -37,22 +37,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       WHERE nanny_id = ${nannyId}
     ` as StatsRow[];
 
-    // Calculate hours from completed bookings (prioritize clock data)
+    // Calculate hours ONLY from actual clock in/out data (real worked shifts)
     const hoursResult = await sql`
       SELECT
         COALESCE(SUM(
-          CASE
-            WHEN clock_out IS NOT NULL AND clock_in IS NOT NULL THEN
-              EXTRACT(EPOCH FROM (clock_out - clock_in)) / 3600
-            WHEN end_time != '' AND start_time != '' THEN
-              EXTRACT(EPOCH FROM (end_time::time - start_time::time)) / 3600
-            WHEN plan = 'half-day' THEN 5
-            WHEN plan = 'full-day' THEN 10
-            ELSE total_price::float / NULLIF((SELECT rate FROM nannies WHERE id = ${nannyId}), 0)
-          END
+          EXTRACT(EPOCH FROM (clock_out::timestamptz - clock_in::timestamptz)) / 3600
         ), 0) as total_hours_worked
       FROM bookings
-      WHERE nanny_id = ${nannyId} AND status = 'completed'
+      WHERE nanny_id = ${nannyId}
+        AND status = 'completed'
+        AND clock_in IS NOT NULL
+        AND clock_out IS NOT NULL
     ` as HoursRow[];
 
     const stats = result[0];

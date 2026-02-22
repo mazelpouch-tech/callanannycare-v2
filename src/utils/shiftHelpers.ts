@@ -83,21 +83,19 @@ export function calcShiftPay(clockIn: string, clockOut: string): number {
 export function calcNannyPay(booking: Booking): number {
   if (booking.status === 'cancelled') return 0;
 
+  // Only count pay from actual clock in/out data (real worked hours)
   if (booking.clockIn && booking.clockOut) {
     return calcShiftPay(booking.clockIn, booking.clockOut);
   }
 
-  // Use booked hours from start/end time
-  const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
-  let pay = Math.round(hours * HOURLY_RATE);
+  // No clock data = no pay yet (shift hasn't been worked)
+  return 0;
+}
 
-  // Check taxi fee from booked time
-  const startH = parseTimeToHours(booking.startTime || '');
-  const endH = parseTimeToHours(booking.endTime || '');
-  if (startH !== null && endH !== null && isEveningShift(startH, endH)) {
-    pay += 100;
-  }
-  return pay;
+/** Calculate hours actually worked from clock in/out timestamps */
+export function calcActualHoursWorked(clockIn: string, clockOut: string): number {
+  const ms = new Date(clockOut).getTime() - new Date(clockIn).getTime();
+  return Math.max(0, ms / 3600000);
 }
 
 export function formatDate(dateStr: string): string {

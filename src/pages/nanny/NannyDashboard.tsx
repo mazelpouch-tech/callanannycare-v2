@@ -25,6 +25,7 @@ import {
   formatHoursWorked,
   calcShiftPay,
   calcNannyPay,
+  calcActualHoursWorked,
   HOURLY_RATE,
 } from "@/utils/shiftHelpers";
 
@@ -344,10 +345,23 @@ export default function NannyDashboard() {
 
   if (isLoading) return <DashboardSkeleton />;
 
+  // Calculate hours & pay ONLY from actual clock in/out data
+  const totalActualHours = useMemo(() => {
+    return nannyBookings
+      .filter((b) => b.clockIn && b.clockOut && b.status !== "cancelled")
+      .reduce((sum, b) => sum + calcActualHoursWorked(b.clockIn!, b.clockOut!), 0);
+  }, [nannyBookings]);
+
+  const totalActualPay = useMemo(() => {
+    return nannyBookings
+      .filter((b) => b.status !== "cancelled")
+      .reduce((sum, b) => sum + calcNannyPay(b), 0);
+  }, [nannyBookings]);
+
   const statCards = [
     {
       label: t("nanny.dashboard.hoursWorked"),
-      value: nannyStats?.totalHoursWorked ?? 0,
+      value: parseFloat(totalActualHours.toFixed(1)),
       suffix: t("nanny.dashboard.hrs"),
       icon: Clock,
       bg: "bg-primary/10",
@@ -369,9 +383,7 @@ export default function NannyDashboard() {
     },
     {
       label: t("nanny.dashboard.myPay"),
-      value: nannyBookings
-        .filter((b) => b.status !== "cancelled")
-        .reduce((sum, b) => sum + calcNannyPay(b), 0),
+      value: totalActualPay,
       suffix: "MAD",
       icon: DollarSign,
       bg: "bg-orange-50",

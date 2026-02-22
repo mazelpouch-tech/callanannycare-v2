@@ -21,10 +21,11 @@ import {
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
 import ImageUpload from "../../components/ImageUpload";
+import { calcActualHoursWorked, calcNannyPay } from "@/utils/shiftHelpers";
 import type { NannyProfile as NannyProfileType } from "@/types";
 
 export default function NannyProfile() {
-  const { nannyProfile, updateNannyProfile } = useData();
+  const { nannyProfile, updateNannyProfile, nannyBookings, fetchNannyBookings } = useData();
   const { t } = useLanguage();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -45,6 +46,19 @@ export default function NannyProfile() {
   const [showPins, setShowPins] = useState(false);
 
   const [fullProfile, setFullProfile] = useState<NannyProfileType | null>(null);
+
+  useEffect(() => {
+    fetchNannyBookings();
+  }, [fetchNannyBookings]);
+
+  // Calculate total hours & pay from actual clock data
+  const totalHoursWorked = nannyBookings
+    .filter((b) => b.clockIn && b.clockOut && b.status !== "cancelled")
+    .reduce((sum, b) => sum + calcActualHoursWorked(b.clockIn!, b.clockOut!), 0);
+
+  const totalPay = nannyBookings
+    .filter((b) => b.status !== "cancelled")
+    .reduce((sum, b) => sum + calcNannyPay(b), 0);
 
   useEffect(() => {
     if (nannyProfile?.id) {
@@ -217,6 +231,17 @@ export default function NannyProfile() {
                 <Clock className="w-4 h-4" />
                 {profile.experience}
               </span>
+            </div>
+            {/* Hours & Pay summary */}
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 text-center">
+                <p className="text-2xl font-bold text-primary">{parseFloat(totalHoursWorked.toFixed(1))}<span className="text-sm font-normal ml-1">hrs</span></p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t("nanny.dashboard.hoursWorked")}</p>
+              </div>
+              <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 text-center">
+                <p className="text-2xl font-bold text-orange-600">{totalPay}<span className="text-sm font-normal ml-1">MAD</span></p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t("nanny.dashboard.myPay")}</p>
+              </div>
             </div>
             {/* Nanny pay info */}
             <div className="mt-3 flex items-start gap-2 text-xs bg-accent/5 border border-accent/20 rounded-lg px-3 py-2.5">
