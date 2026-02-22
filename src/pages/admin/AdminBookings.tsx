@@ -30,7 +30,7 @@ import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
 import ExtendBookingModal from "../../components/ExtendBookingModal";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
-import { calcBookedHours } from "@/utils/shiftHelpers";
+import { calcBookedHours, calcNannyPayBreakdown } from "@/utils/shiftHelpers";
 
 interface EditBookingForm {
   id: number | string;
@@ -545,7 +545,7 @@ export default function AdminBookings() {
                       Plan
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Price
+                      Price / Nanny Pay
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Status
@@ -593,8 +593,22 @@ export default function AdminBookings() {
                           <td className="px-4 py-3.5 text-sm text-muted-foreground capitalize">
                             {booking.plan || "N/A"}
                           </td>
-                          <td className="px-4 py-3.5 text-sm font-medium text-foreground">
-                            {booking.totalPrice ? `${booking.totalPrice} MAD` : "N/A"}
+                          <td className="px-4 py-3.5">
+                            <div className="text-sm font-medium text-foreground">
+                              {booking.totalPrice ? `${booking.totalPrice.toLocaleString()} MAD` : "N/A"}
+                            </div>
+                            {(() => {
+                              const pd = calcNannyPayBreakdown(booking);
+                              if (pd.total <= 0) return null;
+                              return (
+                                <div className="text-[11px] text-muted-foreground mt-0.5">
+                                  <span className="text-emerald-600 font-medium">{pd.basePay} MAD</span>
+                                  {pd.taxiFee > 0 && (
+                                    <span className="text-orange-500 font-medium"> + {pd.taxiFee} taxi</span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="px-4 py-3.5">
                             <span
@@ -763,6 +777,31 @@ export default function AdminBookings() {
                                     </p>
                                   </div>
                                 </div>
+                                {(() => {
+                                  const pd = calcNannyPayBreakdown(booking);
+                                  if (pd.total <= 0) return null;
+                                  return (
+                                    <div className="flex items-center gap-2">
+                                      <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+                                      <div>
+                                        <p className="text-xs text-muted-foreground">
+                                          Nanny Pay
+                                        </p>
+                                        <p className="font-medium text-foreground">
+                                          <span className="text-emerald-600">{pd.basePay} MAD</span>
+                                          <span className="text-muted-foreground mx-1">hourly</span>
+                                          {pd.taxiFee > 0 && (
+                                            <>
+                                              <span className="text-orange-500">+ {pd.taxiFee} MAD</span>
+                                              <span className="text-muted-foreground ml-1">taxi</span>
+                                            </>
+                                          )}
+                                          <span className="text-foreground ml-2 font-bold">= {pd.total} MAD</span>
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
                               </div>
                               {/* Quick actions */}
                               <div className="flex gap-2 mt-3 pt-3 border-t border-border">
@@ -855,9 +894,21 @@ export default function AdminBookings() {
                       </div>
                       <div className="text-muted-foreground">
                         <span className="font-medium text-foreground">
-                          {booking.totalPrice ? `${booking.totalPrice} MAD` : "N/A"}
+                          {booking.totalPrice ? `${booking.totalPrice.toLocaleString()} MAD` : "N/A"}
                         </span>
                         <span className="ml-1 capitalize">({booking.plan || "N/A"})</span>
+                        {(() => {
+                          const pd = calcNannyPayBreakdown(booking);
+                          if (pd.total <= 0) return null;
+                          return (
+                            <div className="text-[10px] mt-0.5">
+                              Nanny: <span className="text-emerald-600 font-medium">{pd.basePay} MAD</span>
+                              {pd.taxiFee > 0 && (
+                                <span className="text-orange-500 font-medium"> + {pd.taxiFee} taxi</span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 
