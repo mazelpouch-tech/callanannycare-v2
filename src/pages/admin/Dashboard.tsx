@@ -964,7 +964,22 @@ export default function Dashboard() {
                           <p className="text-sm font-medium text-foreground">{booking.clientName || "N/A"}</p>
                           <p className="text-xs text-muted-foreground">{booking.clientEmail || ""}</p>
                         </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">{booking.nannyName || "N/A"}</td>
+                        <td className="px-6 py-4">
+                          {booking.nannyName ? (
+                            <div className="flex items-center gap-2">
+                              {booking.nannyImage ? (
+                                <img src={booking.nannyImage} alt={booking.nannyName} className="w-7 h-7 rounded-full object-cover border border-border" />
+                              ) : (
+                                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                                  {booking.nannyName.charAt(0)}
+                                </div>
+                              )}
+                              <span className="text-sm font-medium text-foreground">{booking.nannyName}</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground italic">Unassigned</span>
+                          )}
+                        </td>
                         <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(booking.date)}</td>
                         <td className="px-6 py-4 text-sm font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()} MAD</td>
                         <td className="px-6 py-4">
@@ -1004,9 +1019,24 @@ export default function Dashboard() {
                       <p className="font-medium text-foreground text-sm">{booking.clientName || "N/A"}</p>
                       <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}>{status.label}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>{booking.nannyName || "N/A"}</span>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {booking.nannyName ? (
+                        <div className="flex items-center gap-1.5">
+                          {booking.nannyImage ? (
+                            <img src={booking.nannyImage} alt={booking.nannyName} className="w-5 h-5 rounded-full object-cover border border-border" />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                              {booking.nannyName.charAt(0)}
+                            </div>
+                          )}
+                          <span className="font-medium text-foreground">{booking.nannyName}</span>
+                        </div>
+                      ) : (
+                        <span className="italic">Unassigned</span>
+                      )}
+                      <span>·</span>
                       <span>{formatDate(booking.date)}</span>
+                      <span>·</span>
                       <span className="font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()} MAD</span>
                     </div>
                     <div className="flex items-center gap-2">
