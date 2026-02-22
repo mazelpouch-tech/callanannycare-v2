@@ -3,7 +3,6 @@ import { getDb } from '../_db.js';
 import crypto from 'crypto';
 import type { DbAdminUser } from '@/types';
 import { sendAdminInviteEmail } from '../_emailTemplates.js';
-import { logLoginEvent, extractRequestMeta } from '../_auditLog.js';
 
 interface AdminLoginBody {
   action?: string;
@@ -47,22 +46,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           WHERE LOWER(email) = LOWER(${email})
         ` as DbAdminUser[];
 
-        const { ip, userAgent } = extractRequestMeta(req);
-
         if (result.length === 0) {
-          await logLoginEvent({ userType: 'admin', userEmail: email, action: 'login_failed', ipAddress: ip, userAgent, details: 'Email not found' });
           return res.status(401).json({ error: 'Invalid credentials' });
         }
 
         const admin = result[0];
 
         if (!admin.is_active) {
-          await logLoginEvent({ userType: 'admin', userId: admin.id, userEmail: email, userName: admin.name, action: 'login_failed', ipAddress: ip, userAgent, details: 'Account deactivated' });
           return res.status(403).json({ error: 'Your account has been deactivated. Contact the super admin.' });
         }
 
         if (admin.password !== password) {
-          await logLoginEvent({ userType: 'admin', userId: admin.id, userEmail: email, userName: admin.name, action: 'login_failed', ipAddress: ip, userAgent, details: 'Invalid password' });
           return res.status(401).json({ error: 'Invalid credentials' });
         }
 
@@ -73,8 +67,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             login_count = COALESCE(login_count, 0) + 1
           WHERE id = ${admin.id}
         `;
-
-        await logLoginEvent({ userType: 'admin', userId: admin.id, userEmail: email, userName: admin.name, action: 'login_success', ipAddress: ip, userAgent });
 
         return res.status(200).json({
           success: true,
@@ -166,9 +158,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           WHERE id = ${adminId}
         `;
 
-        const { ip: pwIp, userAgent: pwUa } = extractRequestMeta(req);
-        await logLoginEvent({ userType: 'admin', userId: adminId, action: 'password_change', ipAddress: pwIp, userAgent: pwUa });
-
         return res.status(200).json({ success: true, message: 'Password changed successfully' });
       }
 
@@ -238,9 +227,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             updated_at = NOW()
           WHERE id = ${admin[0].id}
         `;
-
-        const { ip: resetIp, userAgent: resetUa } = extractRequestMeta(req);
-        await logLoginEvent({ userType: 'admin', userId: admin[0].id, action: 'password_reset', ipAddress: resetIp, userAgent: resetUa });
 
         return res.status(200).json({ success: true, message: 'Password has been reset successfully. You can now log in.' });
       }

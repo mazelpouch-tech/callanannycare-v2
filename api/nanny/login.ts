@@ -1,7 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb } from '../_db.js';
 import type { DbNanny } from '@/types';
-import { logLoginEvent, extractRequestMeta } from '../_auditLog.js';
 
 interface NannyLoginBody {
   email: string;
@@ -23,15 +22,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Email and PIN are required' });
     }
 
-    const { ip, userAgent } = extractRequestMeta(req);
-
     const result = await sql`
       SELECT id, name, email, image, location, rating, experience, bio, specialties, languages, rate, available, status
       FROM nannies WHERE LOWER(email) = LOWER(${email}) AND pin = ${pin}
     ` as DbNanny[];
 
     if (result.length === 0) {
-      await logLoginEvent({ userType: 'nanny', userEmail: email, action: 'login_failed', ipAddress: ip, userAgent, details: 'Invalid email or PIN' });
       return res.status(401).json({ error: 'Invalid email or PIN' });
     }
 
@@ -39,15 +35,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Access control: block login for non-active nannies
     if (nanny.status === 'blocked') {
-      await logLoginEvent({ userType: 'nanny', userId: nanny.id, userEmail: email, userName: nanny.name, action: 'login_failed', ipAddress: ip, userAgent, details: 'Account blocked' });
       return res.status(403).json({ error: 'Your account has been suspended. Please contact the admin.' });
     }
     if (nanny.status === 'invited') {
-      await logLoginEvent({ userType: 'nanny', userId: nanny.id, userEmail: email, userName: nanny.name, action: 'login_failed', ipAddress: ip, userAgent, details: 'Registration incomplete' });
       return res.status(403).json({ error: 'Please complete your registration using your invitation link.' });
     }
-
-    await logLoginEvent({ userType: 'nanny', userId: nanny.id, userEmail: email, userName: nanny.name, action: 'login_success', ipAddress: ip, userAgent });
 
     return res.status(200).json({
       success: true,
