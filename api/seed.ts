@@ -76,6 +76,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS clock_in TIMESTAMPTZ`;
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS clock_out TIMESTAMPTZ`;
 
+    // Add end_date column for multi-day bookings
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS end_date VARCHAR(20)`;
+
     // Create notifications table
     await sql`
       CREATE TABLE IF NOT EXISTS nanny_notifications (

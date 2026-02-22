@@ -134,6 +134,7 @@ export function DataProvider({ children }: DataProviderProps) {
             clientPhone: b.client_phone,
             hotel: b.hotel,
             date: b.date,
+            endDate: b.end_date ?? null,
             startTime: b.start_time,
             endTime: b.end_time,
             plan: b.plan,
@@ -271,6 +272,7 @@ export function DataProvider({ children }: DataProviderProps) {
             client_phone: booking.clientPhone || "",
             hotel: booking.hotel || "",
             date: booking.date,
+            end_date: booking.endDate || null,
             start_time: booking.startTime || "",
             end_time: booking.endTime || "",
             plan: booking.plan || "hourly",
@@ -295,6 +297,7 @@ export function DataProvider({ children }: DataProviderProps) {
           clientPhone: created.client_phone,
           hotel: created.hotel,
           date: created.date,
+          endDate: created.end_date ?? null,
           startTime: created.start_time,
           endTime: created.end_time,
           plan: created.plan,
@@ -365,6 +368,7 @@ export function DataProvider({ children }: DataProviderProps) {
     if (updates.clientPhone !== undefined) apiBody.client_phone = updates.clientPhone;
     if (updates.hotel !== undefined) apiBody.hotel = updates.hotel;
     if (updates.date !== undefined) apiBody.date = updates.date;
+    if (updates.endDate !== undefined) apiBody.end_date = updates.endDate;
     if (updates.startTime !== undefined) apiBody.start_time = updates.startTime;
     if (updates.endTime !== undefined) apiBody.end_time = updates.endTime;
     if (updates.plan !== undefined) apiBody.plan = updates.plan;
@@ -509,6 +513,7 @@ export function DataProvider({ children }: DataProviderProps) {
     clientPhone: b.client_phone,
     hotel: b.hotel,
     date: b.date,
+    endDate: b.end_date ?? null,
     startTime: b.start_time,
     endTime: b.end_time,
     plan: b.plan,

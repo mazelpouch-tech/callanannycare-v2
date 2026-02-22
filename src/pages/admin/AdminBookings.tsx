@@ -37,6 +37,7 @@ interface EditBookingForm {
   clientPhone: string;
   hotel: string;
   date: string;
+  endDate: string;
   startTime: string;
   endTime: string;
   plan: string;
@@ -52,6 +53,7 @@ interface NewBookingForm {
   clientEmail: string;
   clientPhone: string;
   date: string;
+  endDate: string;
   startTime: string;
   endTime: string;
   plan: string;
@@ -109,6 +111,7 @@ export default function AdminBookings() {
     clientEmail: "",
     clientPhone: "",
     date: "",
+    endDate: "",
     startTime: "",
     endTime: "",
     plan: "hourly",
@@ -132,6 +135,7 @@ export default function AdminBookings() {
       clientEmail: booking.clientEmail || "",
       clientPhone: booking.clientPhone || "",
       date: booking.date || "",
+      endDate: booking.endDate || "",
       startTime: "",
       endTime: "",
       plan: "hourly",
@@ -197,6 +201,7 @@ export default function AdminBookings() {
       clientPhone: editBookingData.clientPhone,
       hotel: editBookingData.hotel,
       date: editBookingData.date,
+      endDate: editBookingData.endDate || null,
       startTime: startLabel,
       endTime: endLabel,
       plan: editBookingData.plan as BookingPlan,
@@ -246,6 +251,7 @@ export default function AdminBookings() {
       nannyId: selectedNanny.id,
       nannyName: selectedNanny.name,
       date: newBooking.date,
+      endDate: newBooking.endDate || null,
       startTime: startLabel,
       endTime: endLabel,
       plan: newBooking.plan as BookingPlan,
@@ -268,6 +274,7 @@ export default function AdminBookings() {
       clientEmail: "",
       clientPhone: "",
       date: "",
+      endDate: "",
       startTime: "",
       endTime: "",
       plan: "hourly",
@@ -318,7 +325,7 @@ export default function AdminBookings() {
 
   // CSV export
   const exportCSV = () => {
-    const headers = ["ID", "Client", "Email", "Phone", "Nanny", "Date", "Time", "Plan", "Price", "Status", "Hotel", "Notes"];
+    const headers = ["ID", "Client", "Email", "Phone", "Nanny", "Start Date", "End Date", "Time", "Plan", "Price", "Status", "Hotel", "Notes"];
     const rows = filteredBookings.map((b) => [
       b.id,
       b.clientName || "",
@@ -326,6 +333,7 @@ export default function AdminBookings() {
       b.clientPhone || "",
       b.nannyName || "",
       b.date || "",
+      b.endDate || "",
       `${b.startTime || ""}${b.endTime ? " - " + b.endTime : ""}`,
       b.plan || "",
       b.totalPrice || 0,
@@ -556,7 +564,7 @@ export default function AdminBookings() {
                             {booking.nannyName || "N/A"}
                           </td>
                           <td className="px-4 py-3.5 text-sm text-muted-foreground">
-                            {formatDate(booking.date)}
+                            {formatDate(booking.date)}{booking.endDate ? ` → ${formatDate(booking.endDate)}` : ""}
                           </td>
                           <td className="px-4 py-3.5 text-sm text-muted-foreground">
                             {formatTime(booking.startTime)}{booking.endTime ? ` - ${booking.endTime}` : ""}
@@ -791,7 +799,7 @@ export default function AdminBookings() {
                       </div>
                       <div className="flex items-center gap-1.5 text-muted-foreground">
                         <Calendar className="w-3.5 h-3.5 shrink-0" />
-                        <span>{formatDate(booking.date)}</span>
+                        <span>{formatDate(booking.date)}{booking.endDate ? ` → ${formatDate(booking.endDate)}` : ""}</span>
                       </div>
                       <div className="flex items-center gap-1.5 text-muted-foreground">
                         <Clock className="w-3.5 h-3.5 shrink-0" />
@@ -1029,19 +1037,34 @@ export default function AdminBookings() {
                 </div>
               </div>
 
-              {/* Date */}
-              <div>
-                <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                  Date <span className="text-destructive">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={newBooking.date}
-                  onChange={(e) => setNewBooking({ ...newBooking, date: e.target.value })}
-                  required
-                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
-                />
+              {/* Date Range */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                    Start Date <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={newBooking.date}
+                    onChange={(e) => setNewBooking({ ...newBooking, date: e.target.value })}
+                    required
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newBooking.endDate}
+                    min={newBooking.date}
+                    onChange={(e) => setNewBooking({ ...newBooking, endDate: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
+                </div>
               </div>
 
               {/* Time */}
@@ -1294,19 +1317,34 @@ export default function AdminBookings() {
                 </div>
               </div>
 
-              {/* Date */}
-              <div>
-                <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                  Date <span className="text-destructive">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={editBookingData.date}
-                  onChange={(e) => setEditBookingData({ ...editBookingData, date: e.target.value })}
-                  required
-                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
-                />
+              {/* Date Range */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                    Start Date <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={editBookingData.date}
+                    onChange={(e) => setEditBookingData({ ...editBookingData, date: e.target.value })}
+                    required
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editBookingData.endDate}
+                    min={editBookingData.date}
+                    onChange={(e) => setEditBookingData({ ...editBookingData, endDate: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
+                </div>
               </div>
 
               {/* Time */}

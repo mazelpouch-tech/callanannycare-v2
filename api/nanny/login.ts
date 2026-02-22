@@ -24,7 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const result = await sql`
       SELECT id, name, email, image, location, rating, experience, bio, specialties, languages, rate, available, status
-      FROM nannies WHERE email = ${email} AND pin = ${pin}
+      FROM nannies WHERE LOWER(email) = LOWER(${email}) AND pin = ${pin}
     ` as DbNanny[];
 
     if (result.length === 0) {

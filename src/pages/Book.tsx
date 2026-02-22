@@ -1182,8 +1182,6 @@ export default function Book() {
 
     const startLabel = TIME_SLOTS.find((s) => s.value === startTime)?.label || startTime;
     const endLabel = TIME_SLOTS.find((s) => s.value === endTime)?.label || endTime;
-    const perDatePrice = RATE * hours;
-
     // Build child info summary for notes — all children
     const childSummaryParts: string[] = [];
     childrenInfo.forEach((child, idx) => {
@@ -1209,29 +1207,31 @@ export default function Book() {
       .join(", ");
 
     try {
-      // Loop through each selected date and create a booking
-      for (const date of selectedDates) {
-        const bookingPayload = {
-          date: format(date, "yyyy-MM-dd"),
-          startTime: startLabel,
-          endTime: endLabel,
-          plan: "hourly" as BookingPlan,
-          totalPrice: perDatePrice,
-          clientName: details.fullName,
-          clientEmail: details.email,
-          clientPhone: details.phone,
-          hotel: details.accommodation,
-          childrenCount: Number(details.numChildren),
-          childrenAges: childrenInfo.map((c) => c.childAge).filter(Boolean).join(", "),
-          notes: enrichedNotes,
-          nannyId: null,
-          nannyName: "",
-          nannyImage: "",
-          status: "pending" as const,
-        };
+      // Create a single booking with date range
+      const firstDate = format(selectedDates[0], "yyyy-MM-dd");
+      const lastDate = selectedDates.length > 1 ? format(selectedDates[selectedDates.length - 1], "yyyy-MM-dd") : null;
 
-        await addBooking(bookingPayload, { locale });
-      }
+      const bookingPayload = {
+        date: firstDate,
+        endDate: lastDate,
+        startTime: startLabel,
+        endTime: endLabel,
+        plan: "hourly" as BookingPlan,
+        totalPrice,
+        clientName: details.fullName,
+        clientEmail: details.email,
+        clientPhone: details.phone,
+        hotel: details.accommodation,
+        childrenCount: Number(details.numChildren),
+        childrenAges: childrenInfo.map((c) => c.childAge).filter(Boolean).join(", "),
+        notes: enrichedNotes,
+        nannyId: null,
+        nannyName: "",
+        nannyImage: "",
+        status: "pending" as const,
+      };
+
+      await addBooking(bookingPayload, { locale });
 
       // Send booking info to Web3Forms (email to info@callanannycare.com)
       if (WEB3FORMS_KEY) {
