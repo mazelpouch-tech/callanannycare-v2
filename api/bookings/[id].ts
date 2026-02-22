@@ -91,6 +91,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // Send assignment email when nanny_id is changed (nanny reassigned/assigned)
+      if (nanny_id !== undefined && nanny_id && result[0]) {
+        try {
+          const nannyRows = await sql`SELECT name, email FROM nannies WHERE id = ${nanny_id}` as { name: string; email: string | null }[];
+          if (nannyRows[0]?.email) {
+            const { sendNannyAssignmentEmail } = await import('../_emailTemplates.js');
+            await sendNannyAssignmentEmail({
+              nannyName: nannyRows[0].name,
+              nannyEmail: nannyRows[0].email,
+              bookingId: result[0].id,
+              clientName: result[0].client_name,
+              date: result[0].date,
+              endDate: result[0].end_date || null,
+              startTime: result[0].start_time,
+              endTime: result[0].end_time || '',
+              hotel: result[0].hotel || '',
+              childrenCount: result[0].children_count || 1,
+              totalPrice: result[0].total_price || 0,
+            });
+          }
+        } catch (nannyEmailError: unknown) {
+          console.error('Nanny assignment email failed:', nannyEmailError);
+        }
+      }
+
       // Send invoice when booking is completed with clock_out (nanny checkout)
       if (status === 'completed' && clock_out && result[0]) {
         // Query nanny name for the invoice

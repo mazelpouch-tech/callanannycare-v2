@@ -85,6 +85,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } catch (notifError: unknown) {
           console.error('Failed to create notification:', notifError);
         }
+
+        // Send assignment email to nanny
+        try {
+          const nannyRows = await sql`SELECT name, email FROM nannies WHERE id = ${nanny_id}` as { name: string; email: string | null }[];
+          if (nannyRows[0]?.email) {
+            const { sendNannyAssignmentEmail } = await import('./_emailTemplates.js');
+            await sendNannyAssignmentEmail({
+              nannyName: nannyRows[0].name,
+              nannyEmail: nannyRows[0].email,
+              bookingId: result[0].id,
+              clientName: client_name,
+              date,
+              endDate: end_date || null,
+              startTime: start_time,
+              endTime: end_time || '',
+              hotel: hotel || '',
+              childrenCount: children_count || 1,
+              totalPrice: total_price || 0,
+            });
+          }
+        } catch (nannyEmailError: unknown) {
+          console.error('Nanny assignment email failed:', nannyEmailError);
+        }
       }
 
       // Send WhatsApp Business notification (best-effort, non-blocking)
