@@ -107,6 +107,25 @@ export function calcNannyPayBreakdown(booking: Booking): PayBreakdown {
   return { basePay: 0, taxiFee: 0, total: 0 };
 }
 
+/**
+ * Estimate nanny pay from booked time strings (before clock data exists).
+ * Uses the booking's startTime/endTime to estimate hours and detect evening shifts.
+ */
+export function estimateNannyPayBreakdown(
+  startTime: string,
+  endTime: string,
+  startDate?: string,
+  endDate?: string | null
+): PayBreakdown {
+  const hours = calcBookedHours(startTime, endTime, startDate, endDate);
+  if (hours <= 0) return { basePay: 0, taxiFee: 0, total: 0 };
+  const basePay = Math.round(hours * HOURLY_RATE);
+  const startH = parseTimeToHours(startTime);
+  const endH = parseTimeToHours(endTime);
+  const taxiFee = startH !== null && endH !== null && isEveningShift(startH, endH) ? 100 : 0;
+  return { basePay, taxiFee, total: basePay + taxiFee };
+}
+
 /** Calculate hours actually worked from clock in/out timestamps */
 export function calcActualHoursWorked(clockIn: string, clockOut: string): number {
   const ms = new Date(clockOut).getTime() - new Date(clockIn).getTime();

@@ -30,7 +30,7 @@ import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
 import ExtendBookingModal from "../../components/ExtendBookingModal";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
-import { calcBookedHours, calcNannyPayBreakdown } from "@/utils/shiftHelpers";
+import { calcBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE } from "@/utils/shiftHelpers";
 
 interface EditBookingForm {
   id: number | string;
@@ -594,19 +594,41 @@ export default function AdminBookings() {
                             {booking.plan || "N/A"}
                           </td>
                           <td className="px-4 py-3.5">
-                            <div className="text-sm font-medium text-foreground">
-                              {booking.totalPrice ? `${booking.totalPrice.toLocaleString()} MAD` : "N/A"}
-                            </div>
                             {(() => {
-                              const pd = calcNannyPayBreakdown(booking);
-                              if (pd.total <= 0) return null;
+                              const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                              const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 150;
+                              const actualPay = calcNannyPayBreakdown(booking);
+                              const estPay = actualPay.total > 0
+                                ? actualPay
+                                : estimateNannyPayBreakdown(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                              const isActual = actualPay.total > 0;
+
                               return (
-                                <div className="text-[11px] text-muted-foreground mt-0.5">
-                                  <span className="text-emerald-600 font-medium">{pd.basePay} MAD</span>
-                                  {pd.taxiFee > 0 && (
-                                    <span className="text-orange-500 font-medium"> + {pd.taxiFee} taxi</span>
+                                <>
+                                  <div className="text-sm font-medium text-foreground">
+                                    {booking.totalPrice ? `${booking.totalPrice.toLocaleString()} MAD` : "N/A"}
+                                  </div>
+                                  {hours > 0 && (
+                                    <div className="text-[11px] text-muted-foreground">
+                                      {nannyRate}/hr × {hours}h
+                                    </div>
                                   )}
-                                </div>
+                                  {estPay.total > 0 && (
+                                    <div className="text-[11px] mt-0.5">
+                                      <span className={isActual ? "text-emerald-600 font-medium" : "text-emerald-600/70"}>
+                                        {estPay.basePay} MAD
+                                      </span>
+                                      {estPay.taxiFee > 0 && (
+                                        <span className={isActual ? "text-orange-500 font-medium" : "text-orange-500/70"}>
+                                          {" "}+ {estPay.taxiFee} taxi
+                                        </span>
+                                      )}
+                                      {!isActual && (
+                                        <span className="text-muted-foreground/50 italic ml-0.5">est.</span>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
                               );
                             })()}
                           </td>
@@ -778,28 +800,51 @@ export default function AdminBookings() {
                                   </div>
                                 </div>
                                 {(() => {
-                                  const pd = calcNannyPayBreakdown(booking);
-                                  if (pd.total <= 0) return null;
+                                  const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                                  const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 150;
+                                  const actualPay = calcNannyPayBreakdown(booking);
+                                  const estPay = actualPay.total > 0
+                                    ? actualPay
+                                    : estimateNannyPayBreakdown(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                                  const isActual = actualPay.total > 0;
+
                                   return (
-                                    <div className="flex items-center gap-2">
-                                      <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
-                                      <div>
-                                        <p className="text-xs text-muted-foreground">
-                                          Nanny Pay
-                                        </p>
-                                        <p className="font-medium text-foreground">
-                                          <span className="text-emerald-600">{pd.basePay} MAD</span>
-                                          <span className="text-muted-foreground mx-1">hourly</span>
-                                          {pd.taxiFee > 0 && (
-                                            <>
-                                              <span className="text-orange-500">+ {pd.taxiFee} MAD</span>
-                                              <span className="text-muted-foreground ml-1">taxi</span>
-                                            </>
-                                          )}
-                                          <span className="text-foreground ml-2 font-bold">= {pd.total} MAD</span>
-                                        </p>
-                                      </div>
-                                    </div>
+                                    <>
+                                      {hours > 0 && (
+                                        <div className="flex items-center gap-2">
+                                          <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+                                          <div>
+                                            <p className="text-xs text-muted-foreground">
+                                              Client Price
+                                            </p>
+                                            <p className="font-medium text-foreground">
+                                              {nannyRate} MAD/hr × {hours}h = <span className="font-bold">{booking.totalPrice?.toLocaleString()} MAD</span>
+                                            </p>
+                                          </div>
+                                        </div>
+                                      )}
+                                      {estPay.total > 0 && (
+                                        <div className="flex items-center gap-2">
+                                          <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+                                          <div>
+                                            <p className="text-xs text-muted-foreground">
+                                              Nanny Pay {!isActual && <span className="italic">(estimated)</span>}
+                                            </p>
+                                            <p className="font-medium text-foreground">
+                                              <span className="text-emerald-600">{estPay.basePay} MAD</span>
+                                              <span className="text-muted-foreground mx-1">hourly ({HOURLY_RATE}/hr)</span>
+                                              {estPay.taxiFee > 0 && (
+                                                <>
+                                                  <span className="text-orange-500">+ {estPay.taxiFee} MAD</span>
+                                                  <span className="text-muted-foreground ml-1">taxi</span>
+                                                </>
+                                              )}
+                                              <span className="text-foreground ml-2 font-bold">= {estPay.total} MAD</span>
+                                            </p>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </>
                                   );
                                 })()}
                               </div>
@@ -896,17 +941,30 @@ export default function AdminBookings() {
                         <span className="font-medium text-foreground">
                           {booking.totalPrice ? `${booking.totalPrice.toLocaleString()} MAD` : "N/A"}
                         </span>
-                        <span className="ml-1 capitalize">({booking.plan || "N/A"})</span>
                         {(() => {
-                          const pd = calcNannyPayBreakdown(booking);
-                          if (pd.total <= 0) return null;
+                          const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                          const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 150;
+                          const actualPay = calcNannyPayBreakdown(booking);
+                          const estPay = actualPay.total > 0
+                            ? actualPay
+                            : estimateNannyPayBreakdown(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                          const isActual = actualPay.total > 0;
+
                           return (
-                            <div className="text-[10px] mt-0.5">
-                              Nanny: <span className="text-emerald-600 font-medium">{pd.basePay} MAD</span>
-                              {pd.taxiFee > 0 && (
-                                <span className="text-orange-500 font-medium"> + {pd.taxiFee} taxi</span>
+                            <>
+                              {hours > 0 && (
+                                <div className="text-[10px]">{nannyRate}/hr × {hours}h</div>
                               )}
-                            </div>
+                              {estPay.total > 0 && (
+                                <div className="text-[10px] mt-0.5">
+                                  Nanny: <span className={isActual ? "text-emerald-600 font-medium" : "text-emerald-600/70"}>{estPay.basePay}</span>
+                                  {estPay.taxiFee > 0 && (
+                                    <span className={isActual ? "text-orange-500 font-medium" : "text-orange-500/70"}> + {estPay.taxiFee} taxi</span>
+                                  )}
+                                  {!isActual && <span className="text-muted-foreground/50 italic ml-0.5">est.</span>}
+                                </div>
+                              )}
+                            </>
                           );
                         })()}
                       </div>
