@@ -191,7 +191,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               `⏱ *Hours:* ${hoursWorked}h`,
               `👶 *Children:* ${result[0].children_count || 1}`,
               '',
-              `💰 *Total: ${result[0].total_price || 0} MAD*`,
+              `💰 *Total: ${result[0].total_price || 0}€*`,
               '',
               '_Thank you for choosing Call a Nanny!_',
               '_Payment is due upon completion of service._',
@@ -233,7 +233,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               `👩‍👧 *Nanny:* ${invoiceNannyName}`,
               `📅 *Date:* ${result[0].date}`,
               `⏱ *Hours:* ${hoursWorked}h`,
-              `💰 *Amount:* ${result[0].total_price || 0} MAD`,
+              `💰 *Amount:* ${result[0].total_price || 0}€`,
               '',
               `_Invoice sent to parent${result[0].client_email ? ' via email & WhatsApp' : parentPhone ? ' via WhatsApp' : ''}_`,
             ].join('\n');

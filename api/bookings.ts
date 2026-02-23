@@ -126,7 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             `📅 *Date:* ${date}`,
             `🕐 *Time:* ${start_time}${end_time ? ` - ${end_time}` : ""}`,
             `👶 *Children:* ${children_count || 1}`,
-            `💰 *Total:* ${total_price || 0} MAD`,
+            `💰 *Total:* ${total_price || 0}€`,
             "",
             "_Sent automatically by Call a Nanny_",
           ].join("\n");

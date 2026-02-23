@@ -2,10 +2,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb } from './_db.js';
 
 interface CountRow { count: string }
+interface RateRow { rate: number }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const sql = getDb();
-  
+
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
@@ -20,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         bio TEXT,
         specialties JSONB DEFAULT '[]',
         languages JSONB DEFAULT '[]',
-        rate INTEGER DEFAULT 150,
+        rate INTEGER DEFAULT 10,
         image VARCHAR(500) DEFAULT '',
         experience VARCHAR(100) DEFAULT '1 year',
         available BOOLEAN DEFAULT true,
@@ -127,6 +128,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       )
     `;
 
+    // ─── MAD → EUR Price Migration ──────────────────────────────────
+    // Old pricing was in MAD (150 MAD/hr). New pricing is EUR (10€/hr).
+    // Detect if migration is needed by checking nanny rates.
+    // If any nanny has rate > 50, it means rates are still in MAD.
+    // Convert booking prices (÷15 because 150MAD/hr → 10€/hr)
+    // and update nanny rates to 10€.
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS price_migrated_to_eur BOOLEAN DEFAULT false`;
+
+    const nannyRates = await sql`SELECT rate FROM nannies WHERE rate > 50 LIMIT 1` as RateRow[];
+    const needsMigration = nannyRates.length > 0;
+
+    let migrated = 0;
+    if (needsMigration) {
+      // Convert old MAD booking prices to EUR (divide by 15: 150MAD/hr → 10€/hr)
+      // Only convert bookings that haven't been migrated yet
+      const result = await sql`
+        UPDATE bookings
+        SET total_price = GREATEST(ROUND(total_price::numeric / 15), 1),
+            price_migrated_to_eur = true
+        WHERE price_migrated_to_eur = false
+          AND total_price > 0
+      `;
+      migrated = (result as unknown as { count?: number })?.count || 0;
+
+      // Mark any remaining bookings as migrated (e.g., price = 0)
+      await sql`UPDATE bookings SET price_migrated_to_eur = true WHERE price_migrated_to_eur = false`;
+
+      // Update all nanny rates from MAD to EUR
+      await sql`UPDATE nannies SET rate = 10 WHERE rate > 50`;
+    }
+    // ────────────────────────────────────────────────────────────────
+
     // Seed default admin user if none exists
     const adminExists = await sql`SELECT COUNT(*) as count FROM admin_users` as CountRow[];
     if (parseInt(adminExists[0].count) === 0) {
@@ -142,21 +175,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Check if real nannies already exist
     const sanaeExists = await sql`SELECT COUNT(*) as count FROM nannies WHERE name = 'Sanae'` as CountRow[];
     if (parseInt(sanaeExists[0].count) === 0) {
-      // Insert real nannies
+      // Insert real nannies (rate = 10€/hr)
       await sql`
         INSERT INTO nannies (name, location, rating, bio, specialties, languages, rate, image, experience, available, phone, email, pin, status) VALUES
-        ('Sanae', 'Gueliz, Marrakech', 4.9, 'Sanae is a dedicated and experienced nanny with a warm approach to childcare. She is great with children of all ages and ensures a safe, fun environment.', '["Early Childhood","First Aid Certified","Creative Activities"]', '["Arabic","French","English"]', 150, '', '5 years', true, '+212 631 363 797', 'sanae@callanannycare.com', '123456', 'active'),
-        ('Fatima Zahra', 'Hivernage, Marrakech', 4.8, 'Fatima Zahra is an experienced childcare professional who specializes in early childhood development and speaks fluent French and English.', '["Early Childhood","Montessori","Newborn Care"]', '["Arabic","French","English"]', 150, '', '8 years', true, '+212 674 666 498', 'fatimazahra@callanannycare.com', '123456', 'active'),
-        ('Majda', 'Medina, Marrakech', 4.7, 'Majda brings creativity and patience to every family she works with. She loves outdoor activities and has a gentle approach with toddlers.', '["Outdoor Activities","Toddler Specialist","Pediatric First Aid"]', '["Arabic","French"]', 150, '', '4 years', true, '+212 677 191 510', 'majda@callanannycare.com', '123456', 'active'),
-        ('Hayat', 'Palmeraie, Marrakech', 4.9, 'Hayat has extensive experience working with international families and luxury hotel guests. She provides premium childcare with attention to every detail.', '["Premium Care","Hotel Experience","Multiple Children"]', '["Arabic","French","English"]', 150, '', '10 years', true, '+212 672 456 927', 'hayat@callanannycare.com', '123456', 'active'),
-        ('Naima', 'Amelkis, Marrakech', 4.6, 'Naima specializes in infant care and has completed advanced training in newborn care. She is calm, patient, and incredibly nurturing.', '["Infant Specialist","Night Care","Sleep Training"]', '["Arabic","French"]', 150, '', '6 years', true, '+212 639 196 589', 'naima@callanannycare.com', '123456', 'active'),
-        ('Laila', 'Targa, Marrakech', 4.8, 'Laila is a multilingual nanny who loves introducing children to Moroccan culture through stories, songs, and creative play.', '["Cultural Activities","Storytelling","School-Age Children"]', '["Arabic","French","English"]', 150, '', '7 years', true, '+212 668 932 117', 'laila@callanannycare.com', '123456', 'active'),
-        ('Samira', 'Gueliz, Marrakech', 4.8, 'Samira brings warmth and energy to every family. With a background in education, she creates engaging activities that children love.', '["Creative Activities","Education Background","Multiple Children"]', '["Arabic","French","English"]', 150, '', '5 years', true, '+212 661 744 300', 'samira@callanannycare.com', '123456', 'active')
+        ('Sanae', 'Gueliz, Marrakech', 4.9, 'Sanae is a dedicated and experienced nanny with a warm approach to childcare. She is great with children of all ages and ensures a safe, fun environment.', '["Early Childhood","First Aid Certified","Creative Activities"]', '["Arabic","French","English"]', 10, '', '5 years', true, '+212 631 363 797', 'sanae@callanannycare.com', '123456', 'active'),
+        ('Fatima Zahra', 'Hivernage, Marrakech', 4.8, 'Fatima Zahra is an experienced childcare professional who specializes in early childhood development and speaks fluent French and English.', '["Early Childhood","Montessori","Newborn Care"]', '["Arabic","French","English"]', 10, '', '8 years', true, '+212 674 666 498', 'fatimazahra@callanannycare.com', '123456', 'active'),
+        ('Majda', 'Medina, Marrakech', 4.7, 'Majda brings creativity and patience to every family she works with. She loves outdoor activities and has a gentle approach with toddlers.', '["Outdoor Activities","Toddler Specialist","Pediatric First Aid"]', '["Arabic","French"]', 10, '', '4 years', true, '+212 677 191 510', 'majda@callanannycare.com', '123456', 'active'),
+        ('Hayat', 'Palmeraie, Marrakech', 4.9, 'Hayat has extensive experience working with international families and luxury hotel guests. She provides premium childcare with attention to every detail.', '["Premium Care","Hotel Experience","Multiple Children"]', '["Arabic","French","English"]', 10, '', '10 years', true, '+212 672 456 927', 'hayat@callanannycare.com', '123456', 'active'),
+        ('Naima', 'Amelkis, Marrakech', 4.6, 'Naima specializes in infant care and has completed advanced training in newborn care. She is calm, patient, and incredibly nurturing.', '["Infant Specialist","Night Care","Sleep Training"]', '["Arabic","French"]', 10, '', '6 years', true, '+212 639 196 589', 'naima@callanannycare.com', '123456', 'active'),
+        ('Laila', 'Targa, Marrakech', 4.8, 'Laila is a multilingual nanny who loves introducing children to Moroccan culture through stories, songs, and creative play.', '["Cultural Activities","Storytelling","School-Age Children"]', '["Arabic","French","English"]', 10, '', '7 years', true, '+212 668 932 117', 'laila@callanannycare.com', '123456', 'active'),
+        ('Samira', 'Gueliz, Marrakech', 4.8, 'Samira brings warmth and energy to every family. With a background in education, she creates engaging activities that children love.', '["Creative Activities","Education Background","Multiple Children"]', '["Arabic","French","English"]', 10, '', '5 years', true, '+212 661 744 300', 'samira@callanannycare.com', '123456', 'active')
       `;
     }
 
     const existing = await sql`SELECT COUNT(*) as count FROM nannies` as CountRow[];
-    return res.status(200).json({ message: 'Database updated with real nanny names and phone numbers', nannies: parseInt(existing[0].count) });
+    return res.status(200).json({
+      message: needsMigration
+        ? `Database updated. MAD→EUR migration complete: ${migrated} booking(s) converted, nanny rates updated to 10€/hr.`
+        : 'Database up to date (EUR pricing already active).',
+      nannies: parseInt(existing[0].count),
+      migrated: needsMigration,
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Seed error:', error);

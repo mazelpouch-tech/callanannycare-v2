@@ -34,7 +34,7 @@ const strings = {
     rate: 'Rate',
     totalAmount: 'Total Amount',
     hours: 'hours',
-    perHour: 'MAD/hour',
+    perHour: '€/hour',
     thankYouService: 'Thank you for choosing Call a Nanny!',
     paymentNote: 'Payment is due upon completion of service.',
     bookingDetails: 'Booking Details',
@@ -77,7 +77,7 @@ const strings = {
     rate: 'Tarif',
     totalAmount: 'Montant Total',
     hours: 'heures',
-    perHour: 'MAD/heure',
+    perHour: '€/heure',
     thankYouService: 'Merci d\'avoir choisi Call a Nanny !',
     paymentNote: 'Le paiement est dû à la fin du service.',
     bookingDetails: 'Détails de la Réservation',
@@ -189,7 +189,7 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData): Promis
       ${row(s.timeSlot, data.startTime && data.endTime ? `${data.startTime} - ${data.endTime}` : data.startTime)}
       ${row(s.accommodation, data.hotel || 'N/A')}
       ${row(s.children, `${data.childrenCount}`)}
-      ${row(s.totalPrice, `<strong style="color:#f97316;font-size:16px;">${data.totalPrice} MAD</strong>`)}
+      ${row(s.totalPrice, `<strong style="color:#f97316;font-size:16px;">${data.totalPrice}€</strong>`)}
     </table>
 
     <!-- What happens next -->
@@ -589,7 +589,7 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
     <!-- Total Amount Box -->
     <div style="margin:24px 0;padding:20px;background-color:#fff7ed;border-radius:12px;text-align:center;">
       <p style="margin:0 0 4px;color:#666;font-size:13px;text-transform:uppercase;letter-spacing:1px;">${s.totalAmount}</p>
-      <p style="margin:0;color:#f97316;font-size:32px;font-weight:700;">${data.totalPrice} MAD</p>
+      <p style="margin:0;color:#f97316;font-size:32px;font-weight:700;">${data.totalPrice}€</p>
       <p style="margin:8px 0 0;color:#999;font-size:12px;">${s.paymentNote}</p>
     </div>
 
