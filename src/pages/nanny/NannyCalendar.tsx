@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   startOfMonth,
   endOfMonth,
@@ -11,11 +11,20 @@ import {
   isToday,
   addMonths,
   subMonths,
+  isBefore,
+  startOfDay,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, MapPin, User, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, User, Clock, Ban, Loader2 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
 import type { Booking, BookingStatus } from "@/types";
+
+interface BlockedDate {
+  id: number;
+  date: string;
+  reason: string;
+  created_at: string;
+}
 
 const statusDot: Record<BookingStatus, string> = {
   pending: "bg-yellow-400",
@@ -31,15 +40,49 @@ const statusColors: Record<BookingStatus, string> = {
   cancelled: "bg-red-100 text-red-700",
 };
 
+const API_BASE = "/api";
+
 export default function NannyCalendar() {
-  const { nannyBookings, fetchNannyBookings } = useData();
+  const { nannyBookings, fetchNannyBookings, nannyProfile } = useData();
   const { t } = useLanguage();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
+  const [blockReason, setBlockReason] = useState("");
+  const [blockLoading, setBlockLoading] = useState(false);
 
   useEffect(() => {
     fetchNannyBookings();
   }, [fetchNannyBookings]);
+
+  // Fetch blocked dates from profile endpoint
+  const fetchBlockedDates = useCallback(async () => {
+    if (!nannyProfile?.id) return;
+    try {
+      const res = await fetch(`${API_BASE}/nanny/profile?nannyId=${nannyProfile.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setBlockedDates(data.blocked_dates || []);
+      }
+    } catch {
+      console.warn("Failed to fetch blocked dates");
+    }
+  }, [nannyProfile]);
+
+  useEffect(() => {
+    fetchBlockedDates();
+  }, [fetchBlockedDates]);
+
+  // Set of blocked date strings for quick lookup
+  const blockedDateSet = useMemo(() => {
+    return new Set(blockedDates.map((bd) => bd.date));
+  }, [blockedDates]);
+
+  // Get blocked date info for a specific date
+  const getBlockedInfo = useCallback(
+    (dateKey: string) => blockedDates.find((bd) => bd.date === dateKey) || null,
+    [blockedDates]
+  );
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -63,6 +106,37 @@ export default function NannyCalendar() {
     const key = format(selectedDate, "yyyy-MM-dd");
     return bookingsByDate[key] || [];
   }, [selectedDate, bookingsByDate]);
+
+  const selectedDateKey = selectedDate ? format(selectedDate, "yyyy-MM-dd") : null;
+  const isSelectedBlocked = selectedDateKey ? blockedDateSet.has(selectedDateKey) : false;
+  const selectedBlockedInfo = selectedDateKey ? getBlockedInfo(selectedDateKey) : null;
+  const isPast = selectedDate ? isBefore(startOfDay(selectedDate), startOfDay(new Date())) : false;
+
+  const handleToggleBlock = async () => {
+    if (!nannyProfile?.id || !selectedDateKey) return;
+    setBlockLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/nanny/profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nannyId: nannyProfile.id,
+          action: isSelectedBlocked ? "unblock_date" : "block_date",
+          date: selectedDateKey,
+          reason: isSelectedBlocked ? undefined : blockReason,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBlockedDates(data.blocked_dates || []);
+        setBlockReason("");
+      }
+    } catch {
+      console.warn("Failed to toggle block date");
+    } finally {
+      setBlockLoading(false);
+    }
+  };
 
   const weekDays = [t("shared.mon"), t("shared.tue"), t("shared.wed"), t("shared.thu"), t("shared.fri"), t("shared.sat"), t("shared.sun")];
 
@@ -119,6 +193,7 @@ export default function NannyCalendar() {
               const inMonth = isSameMonth(day, currentMonth);
               const today = isToday(day);
               const selected = selectedDate && isSameDay(day, selectedDate);
+              const isBlocked = blockedDateSet.has(dateKey);
 
               return (
                 <button
@@ -129,6 +204,8 @@ export default function NannyCalendar() {
                       ? "text-muted-foreground/30"
                       : selected
                       ? "bg-accent/15 border-2 border-accent"
+                      : isBlocked
+                      ? "bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800"
                       : today
                       ? "bg-primary/5 ring-2 ring-primary/30"
                       : "hover:bg-muted/50"
@@ -138,6 +215,8 @@ export default function NannyCalendar() {
                     className={`block text-xs sm:text-sm font-medium ${
                       !inMonth
                         ? ""
+                        : isBlocked
+                        ? "text-red-500 dark:text-red-400"
                         : today
                         ? "text-primary font-bold"
                         : "text-foreground"
@@ -146,8 +225,15 @@ export default function NannyCalendar() {
                     {format(day, "d")}
                   </span>
 
+                  {/* Blocked indicator */}
+                  {isBlocked && inMonth && (
+                    <div className="flex justify-center mt-0.5">
+                      <Ban className="w-3 h-3 text-red-400" />
+                    </div>
+                  )}
+
                   {/* Booking dots */}
-                  {dayBookings.length > 0 && inMonth && (
+                  {dayBookings.length > 0 && inMonth && !isBlocked && (
                     <div className="flex gap-0.5 justify-center mt-1 flex-wrap">
                       {dayBookings.slice(0, 3).map((b) => (
                         <div
@@ -162,6 +248,20 @@ export default function NannyCalendar() {
                           +{dayBookings.length - 3}
                         </span>
                       )}
+                    </div>
+                  )}
+
+                  {/* Show booking dots even on blocked dates */}
+                  {dayBookings.length > 0 && inMonth && isBlocked && (
+                    <div className="flex gap-0.5 justify-center mt-0.5 flex-wrap">
+                      {dayBookings.slice(0, 2).map((b) => (
+                        <div
+                          key={b.id}
+                          className={`w-1 h-1 rounded-full ${
+                            statusDot[b.status] || "bg-gray-400"
+                          }`}
+                        />
+                      ))}
                     </div>
                   )}
                 </button>
@@ -179,6 +279,12 @@ export default function NannyCalendar() {
                 </span>
               </div>
             ))}
+            <div className="flex items-center gap-1.5">
+              <Ban className="w-3 h-3 text-red-400" />
+              <span className="text-xs text-muted-foreground">
+                {t("nanny.calendar.blocked")}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -191,9 +297,16 @@ export default function NannyCalendar() {
                 : t("nanny.calendar.selectDay")}
             </h3>
             {selectedDate && (
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {selectedDayBookings.length} {selectedDayBookings.length !== 1 ? t("nanny.calendar.bookingsLabel") : t("nanny.calendar.booking")}
-              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-sm text-muted-foreground">
+                  {selectedDayBookings.length} {selectedDayBookings.length !== 1 ? t("nanny.calendar.bookingsLabel") : t("nanny.calendar.booking")}
+                </p>
+                {isSelectedBlocked && (
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                    {t("nanny.calendar.blocked")}
+                  </span>
+                )}
+              </div>
             )}
           </div>
 
@@ -201,47 +314,100 @@ export default function NannyCalendar() {
             <div className="p-6 text-center text-muted-foreground text-sm">
               {t("nanny.calendar.clickDate")}
             </div>
-          ) : selectedDayBookings.length === 0 ? (
-            <div className="p-6 text-center text-muted-foreground text-sm">
-              {t("nanny.calendar.noBookings")}
-            </div>
           ) : (
             <div className="divide-y divide-border">
-              {selectedDayBookings.map((booking) => (
-                <div key={booking.id} className="p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-muted-foreground" />
-                      <span className="font-medium text-foreground text-sm">
-                        {booking.clientName}
-                      </span>
-                    </div>
-                    <span
-                      className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${
-                        statusColors[booking.status] || "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      {booking.status}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <Clock className="w-3.5 h-3.5" />
-                    {booking.startTime}
-                    {booking.endTime ? ` - ${booking.endTime}` : ""}
-                    <span className="ml-2 capitalize text-xs bg-muted px-1.5 py-0.5 rounded">
-                      {booking.plan}
-                    </span>
-                  </div>
-
-                  {booking.hotel && (
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <MapPin className="w-3.5 h-3.5" />
-                      {booking.hotel}
-                    </div>
+              {/* Block/Unblock control */}
+              {selectedDate && !isPast && (
+                <div className="p-4 space-y-3">
+                  {isSelectedBlocked ? (
+                    <>
+                      {selectedBlockedInfo?.reason && (
+                        <p className="text-sm text-red-600 italic">
+                          {selectedBlockedInfo.reason}
+                        </p>
+                      )}
+                      <button
+                        onClick={handleToggleBlock}
+                        disabled={blockLoading}
+                        className="w-full py-2.5 px-4 border border-green-300 text-green-700 rounded-xl text-sm font-medium hover:bg-green-50 transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                      >
+                        {blockLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          t("nanny.calendar.unblockDate")
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        value={blockReason}
+                        onChange={(e) => setBlockReason(e.target.value)}
+                        placeholder={t("nanny.calendar.reasonPlaceholder")}
+                        className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-red-300/50"
+                      />
+                      <button
+                        onClick={handleToggleBlock}
+                        disabled={blockLoading}
+                        className="w-full py-2.5 px-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm font-medium hover:bg-red-100 transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                      >
+                        {blockLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Ban className="w-4 h-4" />
+                            {t("nanny.calendar.blockDate")}
+                          </>
+                        )}
+                      </button>
+                    </>
                   )}
                 </div>
-              ))}
+              )}
+
+              {/* Bookings list */}
+              {selectedDayBookings.length === 0 ? (
+                <div className="p-6 text-center text-muted-foreground text-sm">
+                  {t("nanny.calendar.noBookings")}
+                </div>
+              ) : (
+                selectedDayBookings.map((booking) => (
+                  <div key={booking.id} className="p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-muted-foreground" />
+                        <span className="font-medium text-foreground text-sm">
+                          {booking.clientName}
+                        </span>
+                      </div>
+                      <span
+                        className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${
+                          statusColors[booking.status] || "bg-gray-100 text-gray-600"
+                        }`}
+                      >
+                        {booking.status}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Clock className="w-3.5 h-3.5" />
+                      {booking.startTime}
+                      {booking.endTime ? ` - ${booking.endTime}` : ""}
+                      <span className="ml-2 capitalize text-xs bg-muted px-1.5 py-0.5 rounded">
+                        {booking.plan}
+                      </span>
+                    </div>
+
+                    {booking.hotel && (
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <MapPin className="w-3.5 h-3.5" />
+                        {booking.hotel}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>

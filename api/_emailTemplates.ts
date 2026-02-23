@@ -47,6 +47,12 @@ const strings = {
     invoiceNumber: 'Invoice Number',
     invoiceDate: 'Invoice Date',
     issuedBy: 'Issued by',
+    reminderSubject: 'Booking Reminder - Tomorrow!',
+    reminderGreeting: 'Your booking is tomorrow!',
+    reminderText: 'Just a friendly reminder that your childcare booking is scheduled for tomorrow. Here are the details:',
+    reminderNanny: 'Your Nanny',
+    reminderContact: 'Need to make changes? Contact us as soon as possible.',
+    reminderSeeYou: 'We look forward to seeing you!',
   },
   fr: {
     confirmSubject: 'Confirmation de Réservation - Call a Nanny',
@@ -90,6 +96,12 @@ const strings = {
     invoiceNumber: 'Numéro de Facture',
     invoiceDate: 'Date de Facture',
     issuedBy: 'Émis par',
+    reminderSubject: 'Rappel de Réservation - Demain !',
+    reminderGreeting: 'Votre réservation est demain !',
+    reminderText: 'Un petit rappel : votre réservation de garde d\'enfants est prévue pour demain. Voici les détails :',
+    reminderNanny: 'Votre Nounou',
+    reminderContact: 'Besoin de modifications ? Contactez-nous dès que possible.',
+    reminderSeeYou: 'Nous avons hâte de vous retrouver !',
   },
 };
 
@@ -613,4 +625,78 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
     subject: `${s.invoiceSubject} #${data.bookingId}`,
     html: emailWrapper(content),
   });
+}
+
+// ============================================================
+// Parent Booking Reminder Email (24h before)
+// ============================================================
+
+export interface ParentReminderEmailData {
+  bookingId: number;
+  clientName: string;
+  clientEmail: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  hotel: string;
+  childrenCount: number;
+  nannyName: string;
+  locale: string;
+}
+
+export async function sendParentReminderEmail(data: ParentReminderEmailData): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log('RESEND_API_KEY not configured. Parent reminder email skipped.');
+    return false;
+  }
+
+  const resend = new Resend(apiKey);
+  const locale: Locale = data.locale === 'fr' ? 'fr' : 'en';
+  const s = t(locale);
+  const baseUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
+
+  const content = `
+    <h2 style="margin:0 0 8px;color:#1a1a1a;font-size:22px;font-family:Georgia,'Times New Roman',serif;">${s.greeting} ${data.clientName},</h2>
+    <p style="margin:0 0 24px;color:#666;font-size:16px;line-height:1.5;">${s.reminderText}</p>
+
+    ${sectionTitle(s.bookingDetails)}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden;">
+      ${row(s.bookingRef, `#${data.bookingId}`)}
+      ${row(s.dateOfService, data.date)}
+      ${row(s.timeSlot, data.startTime && data.endTime ? `${data.startTime} - ${data.endTime}` : data.startTime)}
+      ${row(s.accommodation, data.hotel || 'N/A')}
+      ${row(s.children, `${data.childrenCount}`)}
+      ${row(s.reminderNanny, data.nannyName)}
+    </table>
+
+    <!-- Extend Booking CTA -->
+    <div style="margin:28px 0;padding:20px;background-color:#eff6ff;border-radius:12px;text-align:center;">
+      <h3 style="margin:0 0 6px;color:#1a1a1a;font-size:15px;font-weight:600;">🕐 ${s.extendBooking}</h3>
+      <p style="margin:0 0 16px;color:#666;font-size:13px;line-height:1.5;">${s.extendBookingText}</p>
+      <a href="${baseUrl}/extend/${data.bookingId}" style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:50px;box-shadow:0 2px 8px rgba(59,130,246,0.3);">${s.extendBookingBtn}</a>
+    </div>
+
+    <div style="margin:28px 0;padding:20px;background-color:#fff7ed;border-radius:12px;border-left:4px solid #f97316;">
+      <h3 style="margin:0 0 8px;color:#1a1a1a;font-size:15px;font-weight:600;">${s.reminderSeeYou}</h3>
+      <p style="margin:0;color:#666;font-size:14px;line-height:1.5;">${s.reminderContact}</p>
+    </div>
+
+    <p style="margin:0;color:#999;font-size:13px;text-align:center;">${s.contactUs} <a href="mailto:info@callanannycare.com" style="color:#f97316;">info@callanannycare.com</a></p>
+  `;
+
+  const fromAddress = process.env.RESEND_FROM_EMAIL || 'Call a Nanny <onboarding@resend.dev>';
+
+  try {
+    await resend.emails.send({
+      from: fromAddress,
+      to: data.clientEmail,
+      subject: `${s.reminderSubject} — ${data.date}`,
+      html: emailWrapper(content),
+    });
+    return true;
+  } catch (err) {
+    console.error('Failed to send parent reminder email:', err);
+    return false;
+  }
 }

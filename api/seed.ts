@@ -129,6 +129,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       )
     `;
 
+    // ─── Nanny Blocked Dates & Reminder Tracking ────────────────────
+    await sql`
+      CREATE TABLE IF NOT EXISTS nanny_blocked_dates (
+        id SERIAL PRIMARY KEY,
+        nanny_id INTEGER REFERENCES nannies(id) ON DELETE CASCADE,
+        date VARCHAR(20) NOT NULL,
+        reason VARCHAR(255) DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_nanny_blocked_unique ON nanny_blocked_dates(nanny_id, date)`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reminder_sent BOOLEAN DEFAULT false`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS locale VARCHAR(10) DEFAULT 'en'`;
+    // ────────────────────────────────────────────────────────────────
+
     // ─── MAD → EUR Price Migration ──────────────────────────────────
     // Old pricing was in MAD (150 MAD/hr). New pricing is EUR (10€/hr).
     // Detect if migration is needed by checking nanny rates.

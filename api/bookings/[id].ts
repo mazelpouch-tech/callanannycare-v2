@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDb } from '../_db.js';
+import { getDb, timesOverlap, getDateRange } from '../_db.js';
 import type { DbBookingWithNanny, BookingStatus, BookingPlan } from '@/types';
 
 interface UpdateBookingBody {
@@ -47,6 +47,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     if (req.method === 'PUT') {
       const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder } = req.body as UpdateBookingBody;
+
+      // ─── Conflict check when nanny/date/time changes ────────────
+      if (nanny_id !== undefined || date || end_date !== undefined || start_time || end_time) {
+        const currentRows = await sql`SELECT * FROM bookings WHERE id = ${id}` as DbBookingWithNanny[];
+        if (currentRows.length > 0) {
+          const cur = currentRows[0];
+          const effNannyId = nanny_id !== undefined ? nanny_id : cur.nanny_id;
+          const effDate = date || cur.date;
+          const effEndDate = end_date !== undefined ? end_date : cur.end_date;
+          const effStartTime = start_time || cur.start_time;
+          const effEndTime = end_time || cur.end_time || '23h59';
+
+          if (effNannyId) {
+            const bookingDates = getDateRange(effDate, effEndDate || null);
+            const conflicts = await sql`
+              SELECT id, date, start_time, end_time, client_name FROM bookings
+              WHERE nanny_id = ${effNannyId} AND id != ${id} AND status != 'cancelled' AND date = ANY(${bookingDates})
+            ` as { id: number; date: string; start_time: string; end_time: string; client_name: string }[];
+
+            const overlapping = conflicts.filter(
+              c => timesOverlap(effStartTime, effEndTime, c.start_time, c.end_time || '23h59')
+            );
+            if (overlapping.length > 0) {
+              return res.status(409).json({
+                error: 'Scheduling conflict: this nanny already has a booking at this time.',
+                conflicts: overlapping.map(c => ({
+                  bookingId: c.id, date: c.date, startTime: c.start_time, endTime: c.end_time, clientName: c.client_name,
+                })),
+              });
+            }
+          }
+        }
+      }
+      // ────────────────────────────────────────────────────────────
+
       const result = await sql`
         UPDATE bookings SET
           nanny_id = COALESCE(${nanny_id !== undefined ? nanny_id : null}, nanny_id),

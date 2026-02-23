@@ -21,6 +21,7 @@ export default function ExtendBookingModal({
   const [newEndTime, setNewEndTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [conflictError, setConflictError] = useState<string | null>(null);
 
   // Filter time slots to only show times AFTER current end time
   const availableSlots = useMemo(() => {
@@ -56,12 +57,16 @@ export default function ExtendBookingModal({
   const handleConfirm = async () => {
     if (!extension || !newEndTime) return;
     setLoading(true);
+    setConflictError(null);
     try {
       await onConfirm(newEndTime, extension.newTotalPrice);
       setSuccess(true);
       setTimeout(() => onClose(), 1200);
-    } catch {
+    } catch (err: unknown) {
       setLoading(false);
+      if (err && typeof err === 'object' && 'status' in err && (err as { status: number }).status === 409) {
+        setConflictError(err instanceof Error ? err.message : 'Extending this booking would create a scheduling conflict.');
+      }
     }
   };
 
@@ -179,6 +184,13 @@ export default function ExtendBookingModal({
               <p className="text-xs text-muted-foreground text-center mt-1">
                 {booking.startTime} - {newEndTime} ({extension.newHours}h)
               </p>
+            </div>
+          )}
+
+          {/* Conflict warning */}
+          {conflictError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+              ⚠️ {conflictError}
             </div>
           )}
         </div>

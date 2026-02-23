@@ -57,6 +57,17 @@ function saveToStorage(key: string, value: unknown): void {
   }
 }
 
+export class ApiError extends Error {
+  status: number;
+  conflicts?: { bookingId: number; date: string; startTime: string; endTime: string; clientName: string }[];
+  constructor(message: string, status: number, conflicts?: ApiError['conflicts']) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.conflicts = conflicts;
+  }
+}
+
 async function apiFetch<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
   try {
     const res = await fetch(`${API_BASE}${path}`, {
@@ -65,7 +76,7 @@ async function apiFetch<T = unknown>(path: string, options: RequestInit = {}): P
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `API error ${res.status}`);
+      throw new ApiError(err.error || `API error ${res.status}`, res.status, err.conflicts);
     }
     return await res.json();
   } catch (error) {

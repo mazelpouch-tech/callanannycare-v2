@@ -30,6 +30,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.method === 'GET') {
       const nannies = await sql`SELECT * FROM nannies ORDER BY name ASC` as DbNanny[];
+
+      // Optionally include blocked dates for all nannies (used by ForwardBookingModal)
+      if (req.query.include_blocked === 'true') {
+        const allBlocked = await sql`
+          SELECT nanny_id, date FROM nanny_blocked_dates ORDER BY date ASC
+        ` as { nanny_id: number; date: string }[];
+        // Group by nanny_id
+        const blockedByNanny: Record<number, string[]> = {};
+        for (const row of allBlocked) {
+          if (!blockedByNanny[row.nanny_id]) blockedByNanny[row.nanny_id] = [];
+          blockedByNanny[row.nanny_id].push(row.date);
+        }
+        const nanniesWithBlocked = nannies.map(n => ({
+          ...n,
+          blocked_dates: blockedByNanny[n.id] || [],
+        }));
+        return res.status(200).json(nanniesWithBlocked);
+      }
+
       return res.status(200).json(nannies);
     }
     
