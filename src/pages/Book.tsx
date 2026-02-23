@@ -48,8 +48,7 @@ interface ProgressBarProps {
 
 interface StepDateTimeProps {
   selectedDates: Date[];
-  onDateToggle: (date: Date) => void;
-  onDateRemove: (date: Date) => void;
+  onDatesChange: (dates: Date[]) => void;
   startTime: string;
   onStartTimeChange: (time: string) => void;
   endTime: string;
@@ -77,7 +76,6 @@ interface StepDetailsProps {
 interface ChildInfo {
   childFirstName: string;
   childLastName: string;
-  childDob: string;
   childAge: string;
   childGender: string;
   allergies: string;
@@ -132,7 +130,6 @@ interface BookingSuccessProps {
 const EMPTY_CHILD: ChildInfo = {
   childFirstName: "",
   childLastName: "",
-  childDob: "",
   childAge: "",
   childGender: "",
   allergies: "",
@@ -216,8 +213,7 @@ function ProgressBar({ currentStep }: ProgressBarProps) {
 // --- Step 1: Date & Time ---
 function StepDateTime({
   selectedDates,
-  onDateToggle,
-  onDateRemove,
+  onDatesChange,
   startTime,
   onStartTimeChange,
   endTime,
@@ -231,6 +227,8 @@ function StepDateTime({
   const [currentMonth, setCurrentMonth] = useState(
     selectedDates.length > 0 ? startOfMonth(selectedDates[0]) : startOfMonth(new Date())
   );
+  const [rangeStart, setRangeStart] = useState<Date | null>(null);
+  const [hoveredDate, setHoveredDate] = useState<Date | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -245,13 +243,51 @@ function StepDateTime({
     ? ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"]
     : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+  // Set of selected date keys for fast lookup
+  const selectedSet = useMemo(
+    () => new Set(selectedDates.map((d) => d.toISOString())),
+    [selectedDates]
+  );
+
+  // Preview range when hovering after first click (desktop only)
+  const previewSet = useMemo(() => {
+    if (!rangeStart || !hoveredDate) return new Set<string>();
+    const start = rangeStart <= hoveredDate ? rangeStart : hoveredDate;
+    const end = rangeStart <= hoveredDate ? hoveredDate : rangeStart;
+    return new Set(eachDayOfInterval({ start, end }).map((d) => d.toISOString()));
+  }, [rangeStart, hoveredDate]);
+
+  const handleDateClick = (day: Date) => {
+    if (!rangeStart) {
+      // First click — set range start
+      setRangeStart(day);
+      onDatesChange([day]);
+    } else {
+      // Second click — complete the range
+      const start = rangeStart <= day ? rangeStart : day;
+      const end = rangeStart <= day ? day : rangeStart;
+      const range = eachDayOfInterval({ start, end });
+      onDatesChange(range);
+      setRangeStart(null);
+      setHoveredDate(null);
+    }
+  };
+
+  const clearDates = () => {
+    onDatesChange([]);
+    setRangeStart(null);
+    setHoveredDate(null);
+  };
+
   return (
     <div>
       <h2 className="font-serif text-2xl sm:text-3xl font-bold text-foreground mb-2">
         {t("book.chooseDateTitle")}
       </h2>
       <p className="text-muted-foreground mb-6">
-        {t("book.chooseDateSubtitle")}
+        {rangeStart
+          ? (locale === "fr" ? "Appuyez sur la date de fin pour sélectionner la période" : "Now tap the end date to select the range")
+          : t("book.chooseDateSubtitle")}
       </p>
 
       {/* Calendar */}
@@ -292,26 +328,33 @@ function StepDateTime({
             <div key={`empty-${i}`} />
           ))}
           {days.map((day) => {
+            const dayKey = day.toISOString();
             const isPast = isBefore(day, todayDate);
             const isCurrentMonth = isSameMonth(day, currentMonth);
-            const isSelectedDay = selectedDates.some((d) => isSameDay(day, d));
+            const isSelected = selectedSet.has(dayKey);
+            const isPreview = !isSelected && previewSet.has(dayKey);
             const isTodayDay = isToday(day);
+            const isRangeStartDay = rangeStart ? isSameDay(day, rangeStart) : false;
 
             return (
               <button
-                key={day.toISOString()}
+                key={dayKey}
                 type="button"
                 disabled={isPast || !isCurrentMonth}
-                onClick={() => onDateToggle(day)}
+                onClick={() => handleDateClick(day)}
+                onMouseEnter={() => rangeStart && setHoveredDate(day)}
+                onMouseLeave={() => setHoveredDate(null)}
                 className={`aspect-square flex items-center justify-center text-sm rounded-full transition-all duration-200 ${
-                  isSelectedDay
+                  isSelected
                     ? "gradient-warm text-white font-bold shadow-warm"
+                    : isPreview
+                    ? "bg-primary/15 text-primary font-semibold"
                     : isTodayDay
                     ? "ring-2 ring-primary text-foreground font-semibold hover:bg-primary/10"
                     : isPast || !isCurrentMonth
                     ? "text-muted-foreground/40 cursor-not-allowed"
                     : "text-foreground hover:bg-muted font-medium"
-                }`}
+                } ${isRangeStartDay ? "ring-2 ring-primary ring-offset-2" : ""}`}
               >
                 {format(day, "d")}
               </button>
@@ -320,24 +363,31 @@ function StepDateTime({
         </div>
       </div>
 
-      {/* Selected Date Chips */}
+      {/* Selected Range Chip */}
       {selectedDates.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-6">
-          {selectedDates.map((d) => (
-            <span
-              key={d.toISOString()}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium"
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium">
+            {format(selectedDates[0], "EEE, MMM d", { locale: dateFnsLocale })}
+            {selectedDates.length === 1 && rangeStart && (
+              <span className="text-primary/60">→ ...</span>
+            )}
+            {selectedDates.length > 1 && (
+              <>
+                <span className="text-primary/60">→</span>
+                {format(selectedDates[selectedDates.length - 1], "EEE, MMM d", { locale: dateFnsLocale })}
+                <span className="text-primary/60 text-xs">
+                  ({selectedDates.length} {locale === "fr" ? "jours" : "days"})
+                </span>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={clearDates}
+              className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
             >
-              {format(d, "EEE, MMM d", { locale: dateFnsLocale })}
-              <button
-                type="button"
-                onClick={() => onDateRemove(d)}
-                className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </span>
-          ))}
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </span>
         </div>
       )}
 
@@ -555,7 +605,7 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
 
 // --- Step 3: Child Info (multi-child support) ---
 function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange, wantUpdates, onWantUpdatesChange, onBack, onNext }: StepChildInfoProps) {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const [activeChild, setActiveChild] = useState(0);
   const isPlural = childrenInfo.length > 1;
 
@@ -576,7 +626,15 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
     onChange(updated);
   };
 
-  const isValid = childrenInfo.every((c) => c.childFirstName.trim()) && agreeTerms;
+  const isValid = childrenInfo.every((c) => c.childFirstName.trim() && c.childAge) && agreeTerms;
+
+  const ageOptions = [
+    { value: "Under 1", label: locale === "en" ? "Under 1 year" : "Moins de 1 an" },
+    ...Array.from({ length: 12 }, (_, i) => ({
+      value: `${i + 1}`,
+      label: `${i + 1} ${locale === "en" ? (i + 1 === 1 ? "year" : "years") : (i + 1 === 1 ? "an" : "ans")}`,
+    })),
+  ];
 
   const renderChildForm = (child: ChildInfo, index: number) => (
     <div className="space-y-6 max-w-xl">
@@ -612,29 +670,21 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
               />
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-semibold text-foreground mb-1.5 block">
-                {t("book.dateOfBirth")}
+                {t("book.age")} <span className="text-destructive">*</span>
               </label>
-              <input
-                type="date"
-                value={child.childDob}
-                onChange={updateChild(index, "childDob")}
-                className="w-full rounded-lg border border-border p-3 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-semibold text-foreground mb-1.5 block">
-                {t("book.age")}
-              </label>
-              <input
-                type="text"
+              <select
                 value={child.childAge}
                 onChange={updateChild(index, "childAge")}
-                placeholder={t("book.agePlaceholder")}
-                className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
+                className="w-full rounded-lg border border-border p-3 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+              >
+                <option value="">{locale === "en" ? "Select age" : "Sélectionner l'âge"}</option>
+                {ageOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="text-sm font-semibold text-foreground mb-1.5 block">
@@ -959,10 +1009,10 @@ function StepReview({
                       <span className="text-foreground font-medium">{t("book.name")}:</span>{" "}
                       {child.childFirstName} {child.childLastName}
                     </p>
-                    {(child.childAge || child.childDob) && (
+                    {child.childAge && (
                       <p>
-                        <span className="text-foreground font-medium">{t("book.age")} / {t("book.dateOfBirth")}:</span>{" "}
-                        {child.childAge}{child.childAge && child.childDob ? " / " : ""}{child.childDob}
+                        <span className="text-foreground font-medium">{t("book.age")}:</span>{" "}
+                        {child.childAge}
                       </p>
                     )}
                     {child.childGender && (
@@ -1188,18 +1238,8 @@ export default function Book() {
     return RATE * hours * selectedDates.length + taxiFeeTotal;
   }, [hours, selectedDates.length, taxiFeeTotal]);
 
-  const toggleDate = (date: Date) => {
-    setSelectedDates((prev) => {
-      const exists = prev.some((d) => isSameDay(d, date));
-      if (exists) {
-        return prev.filter((d) => !isSameDay(d, date));
-      }
-      return [...prev, date].sort((a, b) => a.getTime() - b.getTime());
-    });
-  };
-
-  const removeDate = (date: Date) => {
-    setSelectedDates((prev) => prev.filter((d) => !isSameDay(d, date)));
+  const handleDatesChange = (dates: Date[]) => {
+    setSelectedDates(dates.sort((a, b) => a.getTime() - b.getTime()));
   };
 
   const WEB3FORMS_KEY = import.meta.env.VITE_WEB3FORMS_KEY || "";
@@ -1217,7 +1257,6 @@ export default function Book() {
       const prefix = childrenInfo.length > 1 ? `[Child ${idx + 1}] ` : "";
       childSummaryParts.push(`${prefix}Child: ${child.childFirstName} ${child.childLastName}`.trim());
       if (child.childAge) childSummaryParts.push(`${prefix}Age: ${child.childAge}`);
-      if (child.childDob) childSummaryParts.push(`${prefix}DOB: ${child.childDob}`);
       if (child.childGender) childSummaryParts.push(`${prefix}Gender: ${child.childGender}`);
       if (child.noAllergies) {
         childSummaryParts.push(`${prefix}Allergies: None`);
@@ -1269,7 +1308,6 @@ export default function Book() {
           childrenInfo.forEach((child, idx) => {
             const label = childrenInfo.length > 1 ? ` ${idx + 1}` : "";
             childFields[`Child${label} Name`] = `${child.childFirstName} ${child.childLastName || ""}`.trim();
-            childFields[`Child${label} DOB`] = child.childDob || "N/A";
             childFields[`Child${label} Age`] = child.childAge || "N/A";
             childFields[`Child${label} Gender`] = child.childGender || "N/A";
             childFields[`Child${label} Allergies`] = child.noAllergies ? "None" : (child.allergies || "N/A");
@@ -1379,8 +1417,7 @@ export default function Book() {
         {step === 1 && (
           <StepDateTime
             selectedDates={selectedDates}
-            onDateToggle={toggleDate}
-            onDateRemove={removeDate}
+            onDatesChange={handleDatesChange}
             startTime={startTime}
             onStartTimeChange={setStartTime}
             endTime={endTime}
