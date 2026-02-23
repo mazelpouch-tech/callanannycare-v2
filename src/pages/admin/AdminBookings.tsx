@@ -25,8 +25,9 @@ import {
   Pencil,
   TimerReset,
   ArrowRightLeft,
+  Bell,
 } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
 import ExtendBookingModal from "../../components/ExtendBookingModal";
@@ -96,16 +97,80 @@ const statusConfig: Record<BookingStatus, { label: string; className: string }> 
   },
 };
 
+type UrgencyLevel = "normal" | "warning" | "critical";
+
+function getUrgencyLevel(createdAt: string, status: string): UrgencyLevel {
+  if (status !== "pending") return "normal";
+  const hoursElapsed = (Date.now() - new Date(createdAt).getTime()) / 3600000;
+  if (hoursElapsed > 3) return "critical";
+  if (hoursElapsed > 1) return "warning";
+  return "normal";
+}
+
+function UrgencyBadge({ booking }: { booking: Booking }) {
+  const urgency = getUrgencyLevel(booking.createdAt, booking.status);
+  if (booking.status !== "pending" || urgency === "normal") {
+    const status = statusConfig[booking.status] || statusConfig.pending;
+    return (
+      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}>
+        {status.label}
+      </span>
+    );
+  }
+
+  const elapsed = formatDistanceToNow(new Date(booking.createdAt), { addSuffix: true });
+
+  if (urgency === "critical") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-300 animate-pulse">
+        <AlertTriangle className="w-3 h-3" />
+        Needs Attention
+        <span className="text-[10px] font-normal opacity-70">({elapsed})</span>
+      </span>
+    );
+  }
+
+  // warning
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-300">
+      <Clock className="w-3 h-3" />
+      Awaiting Confirmation
+      <span className="text-[10px] font-normal opacity-70">({elapsed})</span>
+    </span>
+  );
+}
+
 const statusFilters = ["all", "pending", "confirmed", "completed", "cancelled"];
 
 export default function AdminBookings() {
-  const { bookings, fetchBookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking } = useData();
+  const { bookings, fetchBookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking, sendBookingReminder } = useData();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
   const [expandedRow, setExpandedRow] = useState<number | string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | string | null>(null);
+
+  // Reminder cooldown tracking (booking ID → timestamp)
+  const [remindedBookings, setRemindedBookings] = useState<Record<string, number>>({});
+  const [reminderLoading, setReminderLoading] = useState<number | string | null>(null);
+
+  const handleSendReminder = async (bookingId: number | string) => {
+    setReminderLoading(bookingId);
+    try {
+      await sendBookingReminder(bookingId);
+      setRemindedBookings((prev) => ({ ...prev, [String(bookingId)]: Date.now() }));
+    } catch (err) {
+      console.error("Reminder failed:", err);
+    }
+    setReminderLoading(null);
+  };
+
+  const isReminderCooling = (bookingId: number | string) => {
+    const ts = remindedBookings[String(bookingId)];
+    if (!ts) return false;
+    return Date.now() - ts < 30 * 60 * 1000; // 30 minutes
+  };
 
   // New Booking Modal
   const [showNewBooking, setShowNewBooking] = useState(false);
@@ -562,7 +627,6 @@ export default function AdminBookings() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filteredBookings.map((booking) => {
-                    const status = statusConfig[booking.status] || statusConfig.pending;
                     const isExpanded = expandedRow === booking.id;
 
                     return (
@@ -638,11 +702,7 @@ export default function AdminBookings() {
                             })()}
                           </td>
                           <td className="px-4 py-3.5">
-                            <span
-                              className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}
-                            >
-                              {status.label}
-                            </span>
+                            <UrgencyBadge booking={booking} />
                           </td>
                           <td className="px-4 py-3.5">
                             <div className="flex items-center justify-end gap-1.5">
@@ -700,6 +760,22 @@ export default function AdminBookings() {
                                   title="Confirm booking"
                                 >
                                   <Check className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {/* Send Reminder */}
+                              {booking.status === "pending" && (
+                                <button
+                                  onClick={() => handleSendReminder(booking.id)}
+                                  disabled={isReminderCooling(booking.id) || reminderLoading === booking.id}
+                                  className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
+                                  title={isReminderCooling(booking.id) ? "Reminder sent" : "Send reminder to nanny"}
+                                >
+                                  {reminderLoading === booking.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Bell className="w-4 h-4" />
+                                  )}
                                 </button>
                               )}
 
@@ -897,7 +973,6 @@ export default function AdminBookings() {
           {/* Mobile Cards */}
           <div className="lg:hidden space-y-3">
             {filteredBookings.map((booking) => {
-              const status = statusConfig[booking.status] || statusConfig.pending;
               const isExpanded = expandedRow === booking.id;
 
               return (
@@ -916,11 +991,7 @@ export default function AdminBookings() {
                           ID: {truncateId(booking.id)}
                         </p>
                       </div>
-                      <span
-                        className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}
-                      >
-                        {status.label}
-                      </span>
+                      <UrgencyBadge booking={booking} />
                     </div>
 
                     {/* Info Grid */}
@@ -1067,6 +1138,21 @@ export default function AdminBookings() {
                         className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-accent hover:bg-accent/10 transition-colors"
                       >
                         <Check className="w-3.5 h-3.5" /> Confirm
+                      </button>
+                    )}
+
+                    {booking.status === "pending" && (
+                      <button
+                        onClick={() => handleSendReminder(booking.id)}
+                        disabled={isReminderCooling(booking.id) || reminderLoading === booking.id}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
+                      >
+                        {reminderLoading === booking.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Bell className="w-3.5 h-3.5" />
+                        )}
+                        {isReminderCooling(booking.id) ? "Reminded" : "Remind"}
                       </button>
                     )}
 

@@ -487,6 +487,13 @@ export function DataProvider({ children }: DataProviderProps) {
     });
   }, []);
 
+  const sendBookingReminder = useCallback(async (id: number | string): Promise<void> => {
+    await apiFetch(`/bookings/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ send_reminder: true }),
+    });
+  }, []);
+
   // --- Nanny Portal Auth & Data ---
 
   const nannyLogin = useCallback(async (email: string, pin: string) => {
@@ -949,6 +956,7 @@ export function DataProvider({ children }: DataProviderProps) {
       clockOutBooking,
       deleteBooking,
       resendInvoice,
+      sendBookingReminder,
       stats,
       isAdmin,
       adminProfile,
@@ -981,7 +989,7 @@ export function DataProvider({ children }: DataProviderProps) {
     }),
     [
       nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability, inviteNanny, toggleNannyStatus, resendInvite,
-      bookings, fetchBookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking, resendInvoice,
+      bookings, fetchBookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking, resendInvoice, sendBookingReminder,
       stats, isAdmin, adminProfile, adminUsers, adminLogin, adminLogout,
       fetchAdminUsers, addAdminUser, updateAdminUser, deleteAdminUser,
       changeAdminPassword, forgotAdminPassword, resetAdminPassword, registerAdmin, loading,

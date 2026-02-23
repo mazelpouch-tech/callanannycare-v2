@@ -3,9 +3,9 @@ import { Link } from "react-router-dom";
 import {
   CalendarDays, Clock, DollarSign, ArrowRight,
   Eye, TrendingUp, Users, Activity, Star,
-  ArrowUpRight, ArrowDownRight, Timer, FileText, CheckCircle,
+  ArrowUpRight, ArrowDownRight, Timer, FileText, CheckCircle, AlertTriangle,
 } from "lucide-react";
-import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, subDays, isAfter } from "date-fns";
+import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, subDays, isAfter, formatDistanceToNow } from "date-fns";
 import { useData } from "../../context/DataContext";
 import type { Booking, Nanny, BookingStatus } from "@/types";
 import { calcShiftPayBreakdown, HOURLY_RATE } from "@/utils/shiftHelpers";
@@ -446,6 +446,34 @@ const statusConfig: Record<BookingStatus, { label: string; className: string }> 
   completed: { label: "Completed", className: "bg-blue-50 text-blue-700 border border-blue-200" },
   cancelled: { label: "Cancelled", className: "bg-red-50 text-red-700 border border-red-200" },
 };
+
+function DashboardUrgencyBadge({ booking }: { booking: Booking }) {
+  const status = statusConfig[booking.status] || statusConfig.pending;
+  if (booking.status !== "pending") {
+    return <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}>{status.label}</span>;
+  }
+  const hoursElapsed = (Date.now() - new Date(booking.createdAt).getTime()) / 3600000;
+  const elapsed = formatDistanceToNow(new Date(booking.createdAt), { addSuffix: true });
+  if (hoursElapsed > 3) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-300 animate-pulse">
+        <AlertTriangle className="w-3 h-3" />
+        Needs Attention
+        <span className="text-[10px] font-normal opacity-70">({elapsed})</span>
+      </span>
+    );
+  }
+  if (hoursElapsed > 1) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-300">
+        <Clock className="w-3 h-3" />
+        Awaiting
+        <span className="text-[10px] font-normal opacity-70">({elapsed})</span>
+      </span>
+    );
+  }
+  return <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}>{status.label}</span>;
+}
 
 const STATUS_COLORS: Record<BookingStatus, string> = {
   confirmed: "#4a9e6e",
@@ -957,7 +985,6 @@ export default function Dashboard() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {recentBookings.map((booking) => {
-                    const status = statusConfig[booking.status] || statusConfig.pending;
                     return (
                       <tr key={booking.id} className="hover:bg-muted/50 transition-colors">
                         <td className="px-6 py-4">
@@ -983,7 +1010,7 @@ export default function Dashboard() {
                         <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(booking.date)}</td>
                         <td className="px-6 py-4 text-sm font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()} MAD</td>
                         <td className="px-6 py-4">
-                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}>{status.label}</span>
+                          <DashboardUrgencyBadge booking={booking} />
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
@@ -1012,12 +1039,11 @@ export default function Dashboard() {
             {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-border">
               {recentBookings.map((booking) => {
-                const status = statusConfig[booking.status] || statusConfig.pending;
                 return (
                   <div key={booking.id} className="px-5 py-4 space-y-2">
                     <div className="flex items-center justify-between">
                       <p className="font-medium text-foreground text-sm">{booking.clientName || "N/A"}</p>
-                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}>{status.label}</span>
+                      <DashboardUrgencyBadge booking={booking} />
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       {booking.nannyName ? (

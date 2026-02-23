@@ -290,6 +290,7 @@ export interface DataContextValue {
   clockOutBooking: (id: number | string) => Promise<void>;
   deleteBooking: (id: number | string) => Promise<void>;
   resendInvoice: (id: number | string) => Promise<void>;
+  sendBookingReminder: (id: number | string) => Promise<void>;
 
   stats: DashboardStats;
 

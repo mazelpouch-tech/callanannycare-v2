@@ -21,6 +21,7 @@ interface UpdateBookingBody {
   clock_in?: string | null;
   clock_out?: string | null;
   resend_invoice?: boolean;
+  send_reminder?: boolean;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -45,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     if (req.method === 'PUT') {
-      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice } = req.body as UpdateBookingBody;
+      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder } = req.body as UpdateBookingBody;
       const result = await sql`
         UPDATE bookings SET
           nanny_id = COALESCE(${nanny_id !== undefined ? nanny_id : null}, nanny_id),
@@ -288,6 +289,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } catch (resendError: unknown) {
           console.error('Resend invoice email failed:', resendError);
         }
+      }
+
+      // Send reminder email to nanny for pending bookings
+      if (send_reminder && result[0] && result[0].nanny_id && result[0].status === 'pending') {
+        try {
+          const nannyRowsR = await sql`SELECT name, email FROM nannies WHERE id = ${result[0].nanny_id}` as { name: string; email: string | null }[];
+          if (nannyRowsR[0]?.email) {
+            const { sendNannyReminderEmail } = await import('../_emailTemplates.js');
+            await sendNannyReminderEmail({
+              nannyName: nannyRowsR[0].name,
+              nannyEmail: nannyRowsR[0].email,
+              bookingId: result[0].id,
+              clientName: result[0].client_name,
+              date: result[0].date,
+              endDate: result[0].end_date || null,
+              startTime: result[0].start_time,
+              endTime: result[0].end_time || '',
+              hotel: result[0].hotel || '',
+              childrenCount: result[0].children_count || 1,
+              totalPrice: result[0].total_price || 0,
+            });
+          }
+        } catch (reminderError: unknown) {
+          console.error('Reminder email failed:', reminderError);
+        }
+        return res.status(200).json({ ...result[0], reminded: true });
       }
 
       return res.status(200).json(result[0]);

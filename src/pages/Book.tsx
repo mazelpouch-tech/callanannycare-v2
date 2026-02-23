@@ -1094,6 +1094,38 @@ function BookingSuccess({ onBookAnother, onGoHome, bookingData }: BookingSuccess
   );
 }
 
+const PARENT_STORAGE_KEY = "callanannycare_parent";
+
+function loadSavedParent(): BookingDetails {
+  try {
+    const raw = localStorage.getItem(PARENT_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        fullName: parsed.fullName || "",
+        email: parsed.email || "",
+        phone: parsed.phone || "",
+        accommodation: parsed.accommodation || "",
+        numChildren: parsed.numChildren || "1",
+        notes: "",
+      };
+    }
+  } catch { /* ignore */ }
+  return { fullName: "", email: "", phone: "", accommodation: "", numChildren: "1", notes: "" };
+}
+
+function saveParentDetails(details: BookingDetails) {
+  try {
+    localStorage.setItem(PARENT_STORAGE_KEY, JSON.stringify({
+      fullName: details.fullName,
+      email: details.email,
+      phone: details.phone,
+      accommodation: details.accommodation,
+      numChildren: details.numChildren,
+    }));
+  } catch { /* ignore */ }
+}
+
 // --- Main Book Component ---
 export default function Book() {
   const { addBooking } = useData();
@@ -1109,15 +1141,8 @@ export default function Book() {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
 
-  // Step 2 state
-  const [details, setDetails] = useState<BookingDetails>({
-    fullName: "",
-    email: "",
-    phone: "",
-    accommodation: "",
-    numChildren: "1",
-    notes: "",
-  });
+  // Step 2 state — initialize from localStorage
+  const [details, setDetails] = useState<BookingDetails>(loadSavedParent);
 
   // Step 3 state — array of children
   const [childrenInfo, setChildrenInfo] = useState<ChildInfo[]>([{ ...EMPTY_CHILD }]);
@@ -1291,6 +1316,7 @@ export default function Book() {
       };
 
       setLastBookingData(lastBooking);
+      saveParentDetails(details);
       setIsSubmitting(false);
       setIsSuccess(true);
     } catch (err) {
@@ -1304,14 +1330,7 @@ export default function Book() {
     setSelectedDates([]);
     setStartTime("");
     setEndTime("");
-    setDetails({
-      fullName: "",
-      email: "",
-      phone: "",
-      accommodation: "",
-      numChildren: "1",
-      notes: "",
-    });
+    setDetails(loadSavedParent());
     setChildrenInfo([{ ...EMPTY_CHILD }]);
     setAgreeTerms(false);
     setWantUpdates(false);
