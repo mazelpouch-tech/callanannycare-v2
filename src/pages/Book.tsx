@@ -137,6 +137,9 @@ const EMPTY_CHILD: ChildInfo = {
   specialInstructions: "",
 };
 
+const RATE = 10; // EUR per hour
+const TAXI_FEE = 10; // EUR flat fee for bookings in the 7 PM – 7 AM night window
+
 // 24h time slots from 07:00 to 23:30 (30-min steps)
 const TIME_SLOTS: { value: string; label: string }[] = [];
 for (let h = 7; h <= 23; h++) {
@@ -605,7 +608,7 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
 
 // --- Step 3: Child Info (multi-child support) ---
 function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange, wantUpdates, onWantUpdatesChange, onBack, onNext }: StepChildInfoProps) {
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
   const [activeChild, setActiveChild] = useState(0);
   const isPlural = childrenInfo.length > 1;
 
@@ -626,15 +629,7 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
     onChange(updated);
   };
 
-  const isValid = childrenInfo.every((c) => c.childFirstName.trim() && c.childAge) && agreeTerms;
-
-  const ageOptions = [
-    { value: "Under 1", label: locale === "en" ? "Under 1 year" : "Moins de 1 an" },
-    ...Array.from({ length: 12 }, (_, i) => ({
-      value: `${i + 1}`,
-      label: `${i + 1} ${locale === "en" ? (i + 1 === 1 ? "year" : "years") : (i + 1 === 1 ? "an" : "ans")}`,
-    })),
-  ];
+  const isValid = childrenInfo.every((c) => c.childFirstName.trim() && c.childAge.trim()) && agreeTerms;
 
   const renderChildForm = (child: ChildInfo, index: number) => (
     <div className="space-y-6 max-w-xl">
@@ -675,16 +670,14 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
               <label className="text-sm font-semibold text-foreground mb-1.5 block">
                 {t("book.age")} <span className="text-destructive">*</span>
               </label>
-              <select
+              <input
+                type="text"
+                required
                 value={child.childAge}
                 onChange={updateChild(index, "childAge")}
-                className="w-full rounded-lg border border-border p-3 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-              >
-                <option value="">{locale === "en" ? "Select age" : "Sélectionner l'âge"}</option>
-                {ageOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+                placeholder={t("book.agePlaceholder")}
+                className="w-full rounded-lg border border-border p-3 bg-background text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
             </div>
             <div>
               <label className="text-sm font-semibold text-foreground mb-1.5 block">
@@ -1042,16 +1035,16 @@ function StepReview({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">
-              150 MAD &times; {hours} {t("book.hrs")} &times; {dateCount} {t("book.dateUnit")}
-              {" = "}{150 * hours * dateCount} MAD
+              {RATE}€ &times; {hours} {t("book.hrs")} &times; {dateCount} {t("book.dateUnit")}
+              {" = "}{RATE * hours * dateCount}€
             </p>
             {isEveningBooking && (
               <p className="text-sm text-amber-600 font-medium mt-1">
-                🚕 {t("book.taxiFee")}: +{taxiFeeTotal} MAD ({t("book.taxiFeeNote")})
+                🚕 {t("book.taxiFee")}: +{taxiFeeTotal}€ ({t("book.taxiFeeNote")})
               </p>
             )}
             <p className="text-2xl font-bold text-foreground mt-1">
-              {totalPrice} MAD
+              {totalPrice}€
             </p>
           </div>
           <button
@@ -1211,8 +1204,6 @@ export default function Book() {
     });
   }, [details.numChildren]);
 
-  const RATE = 150; // MAD per hour
-  const TAXI_FEE = 100; // MAD flat fee for bookings in the 7 PM – 7 AM night window
   const NIGHT_START = 19; // 7 PM
   const NIGHT_END = 7;    // 7 AM
 
@@ -1327,7 +1318,7 @@ export default function Book() {
               "Hotel / Address": details.accommodation,
               "Booking Dates": selectedDates.map((d) => format(d, "yyyy-MM-dd")).join(", "),
               "Booking Time": `${startLabel} - ${endLabel}`,
-              "Total Price": `${totalPrice} MAD`,
+              "Total Price": `${totalPrice}€`,
               "Number of Children": details.numChildren,
               "Photo/Video Updates": wantUpdates ? "Yes" : "No",
               ...childFields,
