@@ -360,7 +360,7 @@ export default function AdminNannies() {
                         </div>
                       </td>
                       <td className="px-5 py-4 text-sm font-medium text-foreground">
-                        {nanny.rate} MAD/hr
+                        {nanny.rate} €/hr
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2">
@@ -501,7 +501,7 @@ export default function AdminNannies() {
                       <div className="flex items-center gap-2 mt-1.5">
                         {renderStatusBadge(nanny.status || "active")}
                         <span className="text-xs font-medium text-foreground">
-                          {nanny.rate} MAD/hr
+                          {nanny.rate} €/hr
                         </span>
                       </div>
                       <p className="text-xs mt-1">
@@ -815,7 +815,7 @@ export default function AdminNannies() {
               {/* Rate and Experience */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Rate (MAD/hr) *</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Rate (€/hr) *</label>
                   <input
                     type="number"
                     value={form.rate}

@@ -675,7 +675,7 @@ export default function AdminBookings() {
                               return (
                                 <>
                                   <div className="text-sm font-medium text-foreground">
-                                    {booking.totalPrice ? `${booking.totalPrice.toLocaleString()} MAD` : "N/A"}
+                                    {booking.totalPrice ? `${booking.totalPrice.toLocaleString()}€` : "N/A"}
                                   </div>
                                   {hours > 0 && (
                                     <div className="text-[11px] text-muted-foreground">
@@ -685,7 +685,7 @@ export default function AdminBookings() {
                                   {estPay.total > 0 && (
                                     <div className="text-[11px] mt-0.5">
                                       <span className={isActual ? "text-emerald-600 font-medium" : "text-emerald-600/70"}>
-                                        {estPay.basePay} MAD
+                                        {estPay.basePay}€
                                       </span>
                                       {estPay.taxiFee > 0 && (
                                         <span className={isActual ? "text-orange-500 font-medium" : "text-orange-500/70"}>
@@ -910,7 +910,7 @@ export default function AdminBookings() {
                                               Client Price
                                             </p>
                                             <p className="font-medium text-foreground">
-                                              {nannyRate} MAD/hr × {hours}h = <span className="font-bold">{booking.totalPrice?.toLocaleString()} MAD</span>
+                                              {nannyRate}€/hr × {hours}h = <span className="font-bold">{booking.totalPrice?.toLocaleString()}€</span>
                                             </p>
                                           </div>
                                         </div>
@@ -923,15 +923,15 @@ export default function AdminBookings() {
                                               Nanny Pay {!isActual && <span className="italic">(estimated)</span>}
                                             </p>
                                             <p className="font-medium text-foreground">
-                                              <span className="text-emerald-600">{estPay.basePay} MAD</span>
+                                              <span className="text-emerald-600">{estPay.basePay}€</span>
                                               <span className="text-muted-foreground mx-1">hourly ({HOURLY_RATE}/hr)</span>
                                               {estPay.taxiFee > 0 && (
                                                 <>
-                                                  <span className="text-orange-500">+ {estPay.taxiFee} MAD</span>
+                                                  <span className="text-orange-500">+ {estPay.taxiFee}€</span>
                                                   <span className="text-muted-foreground ml-1">taxi</span>
                                                 </>
                                               )}
-                                              <span className="text-foreground ml-2 font-bold">= {estPay.total} MAD</span>
+                                              <span className="text-foreground ml-2 font-bold">= {estPay.total}€</span>
                                             </p>
                                           </div>
                                         </div>
@@ -1026,7 +1026,7 @@ export default function AdminBookings() {
                       </div>
                       <div className="text-muted-foreground">
                         <span className="font-medium text-foreground">
-                          {booking.totalPrice ? `${booking.totalPrice.toLocaleString()} MAD` : "N/A"}
+                          {booking.totalPrice ? `${booking.totalPrice.toLocaleString()}€` : "N/A"}
                         </span>
                         {(() => {
                           const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
@@ -1240,7 +1240,7 @@ export default function AdminBookings() {
                   <option value="">Choose a nanny...</option>
                   {availableNannies.map((n) => (
                     <option key={n.id} value={n.id}>
-                      {n.name} — {n.rate} MAD/hr ({n.location})
+                      {n.name} — {n.rate}€/hr ({n.location})
                     </option>
                   ))}
                 </select>
@@ -1453,10 +1453,10 @@ export default function AdminBookings() {
                   <div className="text-sm text-muted-foreground">
                     <span className="font-medium text-foreground">{selectedNanny.name}</span>
                     <span className="mx-1.5">·</span>
-                    {selectedNanny.rate} MAD/hr × {newBookingHours} hrs
+                    {selectedNanny.rate}€/hr × {newBookingHours} hrs
                   </div>
                   <div className="text-lg font-bold text-foreground">
-                    {newBookingPrice.toLocaleString()} MAD
+                    {newBookingPrice.toLocaleString()}€
                   </div>
                 </div>
               )}
@@ -1520,7 +1520,7 @@ export default function AdminBookings() {
                   <option value="">Choose a nanny...</option>
                   {allActiveNannies.map((n) => (
                     <option key={n.id} value={n.id}>
-                      {n.name} — {n.rate} MAD/hr ({n.location})
+                      {n.name} — {n.rate}€/hr ({n.location})
                     </option>
                   ))}
                 </select>
@@ -1734,10 +1734,10 @@ export default function AdminBookings() {
                   <div className="text-sm text-muted-foreground">
                     <span className="font-medium text-foreground">{editSelectedNanny.name}</span>
                     <span className="mx-1.5">·</span>
-                    {editSelectedNanny.rate} MAD/hr × {editBookingHours} hrs
+                    {editSelectedNanny.rate}€/hr × {editBookingHours} hrs
                   </div>
                   <div className="text-lg font-bold text-foreground">
-                    {editBookingPrice.toLocaleString()} MAD
+                    {editBookingPrice.toLocaleString()}€
                   </div>
                 </div>
               )}

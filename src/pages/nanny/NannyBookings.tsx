@@ -71,8 +71,8 @@ const emptyForm: BookingFormData = {
   notes: "",
 };
 
-const RATE = 150; // MAD per hour
-const TAXI_FEE = 100; // MAD flat fee for night bookings
+const RATE = 10; // € per hour
+const TAXI_FEE = 10; // € flat fee for night bookings
 
 // Live timer component
 function LiveTimer({ clockIn }: LiveTimerProps) {
@@ -562,7 +562,7 @@ export default function NannyBookings() {
                                 {formatHoursWorked(booking.clockIn!, booking.clockOut!)}
                               </span>
                               <span className="text-muted-foreground ml-1">
-                                · {calcShiftPay(booking.clockIn!, booking.clockOut!)} MAD
+                                · {calcShiftPay(booking.clockIn!, booking.clockOut!)}€
                               </span>
                             </div>
                           ) : booking.clockIn && !booking.clockOut ? (
@@ -786,7 +786,7 @@ export default function NannyBookings() {
                         {formatHoursWorked(booking.clockIn!, booking.clockOut!)}
                       </span>
                       <span className="bg-green-50 text-green-700 px-2 py-1 rounded font-medium">
-                        {calcShiftPay(booking.clockIn!, booking.clockOut!)} MAD
+                        {calcShiftPay(booking.clockIn!, booking.clockOut!)}€
                       </span>
                     </div>
                   )}

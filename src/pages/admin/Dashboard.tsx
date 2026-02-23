@@ -103,7 +103,7 @@ function AreaChart({ data, width = 600, height = 220, color = "#cd6845", id = "a
           </circle>
           {/* Tooltip hover area */}
           <circle cx={p.x} cy={p.y} r="16" fill="transparent" className="cursor-pointer">
-            <title>{`${data[i].label}: ${data[i].value.toLocaleString()} MAD`}</title>
+            <title>{`${data[i].label}: ${data[i].value.toLocaleString()}€`}</title>
           </circle>
         </g>
       ))}
@@ -328,7 +328,7 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span>{totalAllShifts} shifts</span>
             <span>{totalAllHours.toFixed(1)} hrs</span>
-            <span className="font-semibold text-foreground">{totalAllPay.toLocaleString()} MAD</span>
+            <span className="font-semibold text-foreground">{totalAllPay.toLocaleString()}€</span>
             <span className="text-muted-foreground/70">({totalAllBasePay.toLocaleString()} + {totalAllTaxi} taxi)</span>
           </div>
         )}
@@ -373,17 +373,17 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
                       {(nanny.totalHours / nanny.shifts).toFixed(1)}h
                     </td>
                     <td className="px-6 py-3 text-sm text-muted-foreground text-right">
-                      {nanny.basePay.toLocaleString()} MAD
+                      {nanny.basePay.toLocaleString()}€
                     </td>
                     <td className="px-6 py-3 text-sm text-right">
                       {nanny.taxiFee > 0 ? (
-                        <span className="text-orange-600 font-medium">+{nanny.taxiFee} MAD</span>
+                        <span className="text-orange-600 font-medium">+{nanny.taxiFee}€</span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
                     </td>
                     <td className="px-6 py-3 text-sm font-semibold text-foreground text-right">
-                      {nanny.totalPay.toLocaleString()} MAD
+                      {nanny.totalPay.toLocaleString()}€
                     </td>
                   </tr>
                 ))}
@@ -396,11 +396,11 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
                   <td className="px-6 py-3 text-sm font-bold text-foreground">
                     {totalAllShifts > 0 ? (totalAllHours / totalAllShifts).toFixed(1) : 0}h
                   </td>
-                  <td className="px-6 py-3 text-sm font-bold text-foreground text-right">{totalAllBasePay.toLocaleString()} MAD</td>
+                  <td className="px-6 py-3 text-sm font-bold text-foreground text-right">{totalAllBasePay.toLocaleString()}€</td>
                   <td className="px-6 py-3 text-sm font-bold text-orange-600 text-right">
-                    {totalAllTaxi > 0 ? `+${totalAllTaxi.toLocaleString()} MAD` : "—"}
+                    {totalAllTaxi > 0 ? `+${totalAllTaxi.toLocaleString()}€` : "—"}
                   </td>
-                  <td className="px-6 py-3 text-sm font-bold text-foreground text-right">{totalAllPay.toLocaleString()} MAD</td>
+                  <td className="px-6 py-3 text-sm font-bold text-foreground text-right">{totalAllPay.toLocaleString()}€</td>
                 </tr>
               </tfoot>
             </table>
@@ -412,7 +412,7 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
               <div key={i} className="px-5 py-4 space-y-1">
                 <div className="flex items-center justify-between">
                   <p className="font-medium text-foreground text-sm">{nanny.name}</p>
-                  <span className="text-sm font-semibold text-foreground">{nanny.totalPay.toLocaleString()} MAD</span>
+                  <span className="text-sm font-semibold text-foreground">{nanny.totalPay.toLocaleString()}€</span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <span>{nanny.shifts} shifts</span>
@@ -420,9 +420,9 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
                   <span>{(nanny.totalHours / nanny.shifts).toFixed(1)}h avg</span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span>Hourly: {nanny.basePay} MAD</span>
+                  <span>Hourly: {nanny.basePay}€</span>
                   {nanny.taxiFee > 0 && (
-                    <span className="text-orange-600">Taxi: +{nanny.taxiFee} MAD</span>
+                    <span className="text-orange-600">Taxi: +{nanny.taxiFee}€</span>
                   )}
                 </div>
               </div>
@@ -430,7 +430,7 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
           </div>
 
           <div className="px-6 py-3 border-t border-border text-[10px] text-muted-foreground">
-            Rate: {HOURLY_RATE} MAD/hr ({Math.round(HOURLY_RATE * 8)} MAD/8h) · +100 MAD for evening shifts (7 PM - 7 AM)
+            Rate: {HOURLY_RATE}€/hr ({Math.round(HOURLY_RATE * 8)}€/8h) · +10€ for evening shifts (7 PM - 7 AM)
           </div>
         </>
       )}
@@ -695,7 +695,7 @@ export default function Dashboard() {
             </div>
             <MiniSparkline data={revenueSparkline} color="#4a9e6e" />
           </div>
-          <p className="text-2xl font-bold text-foreground">{stats.totalRevenue.toLocaleString()} <span className="text-sm font-medium text-muted-foreground">MAD</span></p>
+          <p className="text-2xl font-bold text-foreground">{stats.totalRevenue.toLocaleString()} <span className="text-sm font-medium text-muted-foreground">€</span></p>
           <div className="flex items-center justify-between mt-1">
             <p className="text-xs text-muted-foreground">Total Revenue</p>
             {trends.revenueTrend !== 0 && (
@@ -715,7 +715,7 @@ export default function Dashboard() {
             </div>
             <div className="text-right">
               <p className="text-[10px] text-muted-foreground">Avg Value</p>
-              <p className="text-xs font-semibold text-foreground">{avgBookingValue.toLocaleString()} MAD</p>
+              <p className="text-xs font-semibold text-foreground">{avgBookingValue.toLocaleString()}€</p>
             </div>
           </div>
           <p className="text-2xl font-bold text-foreground">{stats.pendingBookings}</p>
@@ -749,7 +749,7 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center gap-1.5 text-xs font-medium text-accent bg-accent/10 px-2.5 py-1 rounded-full">
               <TrendingUp className="w-3.5 h-3.5" />
-              {trends.thisRevenue.toLocaleString()} MAD this month
+              {trends.thisRevenue.toLocaleString()}€ this month
             </div>
           </div>
           <AreaChart data={monthlyRevenue} id="revenue" />
@@ -807,7 +807,7 @@ export default function Dashboard() {
                 <DollarSign className="w-10 h-10 text-primary" />
               </div>
               <p className="text-3xl font-bold text-foreground">{stats.totalRevenue.toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground mt-1">MAD</p>
+              <p className="text-sm text-muted-foreground mt-1">€</p>
               <div className="mt-4 flex items-center gap-2 text-xs">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLAN_COLORS.hourly }} />
                 <span className="text-muted-foreground">Hourly Plan</span>
@@ -852,7 +852,7 @@ export default function Dashboard() {
           {allInvoices.length > 0 && (
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span>{allInvoices.length} invoice{allInvoices.length !== 1 ? "s" : ""}</span>
-              <span className="font-semibold text-foreground">{totalInvoiced.toLocaleString()} MAD</span>
+              <span className="font-semibold text-foreground">{totalInvoiced.toLocaleString()}€</span>
             </div>
           )}
         </div>
@@ -897,7 +897,7 @@ export default function Dashboard() {
                         <p className="text-xs text-muted-foreground/70">{formatTime(inv.clockIn)} – {formatTime(inv.clockOut)}</p>
                       </td>
                       <td className="px-6 py-4 text-sm text-muted-foreground">{calcWorkedHours(inv.clockIn, inv.clockOut)}h</td>
-                      <td className="px-6 py-4 text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()} MAD</td>
+                      <td className="px-6 py-4 text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</td>
                       <td className="px-6 py-4">
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
                           <CheckCircle className="w-3 h-3" />
@@ -926,7 +926,7 @@ export default function Dashboard() {
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">Billed To</p>
                       <p className="font-medium text-foreground text-sm">{inv.clientName || "N/A"}</p>
                     </div>
-                    <span className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()} MAD</span>
+                    <span className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</span>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span>Caregiver: {inv.nannyName || "Unassigned"}</span>
@@ -1008,7 +1008,7 @@ export default function Dashboard() {
                           )}
                         </td>
                         <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(booking.date)}</td>
-                        <td className="px-6 py-4 text-sm font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()} MAD</td>
+                        <td className="px-6 py-4 text-sm font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()}€</td>
                         <td className="px-6 py-4">
                           <DashboardUrgencyBadge booking={booking} />
                         </td>
@@ -1063,7 +1063,7 @@ export default function Dashboard() {
                       <span>·</span>
                       <span>{formatDate(booking.date)}</span>
                       <span>·</span>
-                      <span className="font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()} MAD</span>
+                      <span className="font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()}€</span>
                     </div>
                     <div className="flex items-center gap-2">
                       {booking.status === "pending" && (

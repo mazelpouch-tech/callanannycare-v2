@@ -65,8 +65,8 @@ function parseTimeValue(val: string) {
   return h + m / 60;
 }
 
-const RATE = 150;
-const TAXI_FEE = 100;
+const RATE = 10;
+const TAXI_FEE = 10;
 const NIGHT_START = 19;
 const NIGHT_END = 7;
 
@@ -660,21 +660,21 @@ export default function RebookBooking() {
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{s.priceSummary}</p>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-500">
-                    {RATE} MAD × {hours}h × {selectedDates.length} {s.perDay}
+                    {RATE}€ × {hours}h × {selectedDates.length} {s.perDay}
                   </span>
                   <span className="font-semibold text-gray-900">
-                    {(RATE * hours * selectedDates.length).toLocaleString()} MAD
+                    {(RATE * hours * selectedDates.length).toLocaleString()}€
                   </span>
                 </div>
                 {isEveningBooking && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-amber-600">{s.taxiFee}</span>
-                    <span className="font-semibold text-amber-600">+{taxiFeeTotal} MAD</span>
+                    <span className="font-semibold text-amber-600">+{taxiFeeTotal}€</span>
                   </div>
                 )}
                 <div className="border-t border-orange-200/60 pt-2 flex items-center justify-between">
                   <span className="text-sm font-bold text-gray-900">{s.total}</span>
-                  <span className="text-xl font-bold text-gray-900">{totalPrice.toLocaleString()} MAD</span>
+                  <span className="text-xl font-bold text-gray-900">{totalPrice.toLocaleString()}€</span>
                 </div>
               </div>
             )}
@@ -736,7 +736,7 @@ export default function RebookBooking() {
                   {TIME_SLOTS.find((sl) => sl.value === startTime)?.label || startTime} -{" "}
                   {TIME_SLOTS.find((sl) => sl.value === endTime)?.label || endTime}
                 </span>
-                <span className="text-sm font-bold text-orange-600">{totalPrice.toLocaleString()} MAD</span>
+                <span className="text-sm font-bold text-orange-600">{totalPrice.toLocaleString()}€</span>
               </div>
             </div>
 

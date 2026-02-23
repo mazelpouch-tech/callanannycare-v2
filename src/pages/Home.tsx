@@ -271,7 +271,7 @@ export default function Home() {
                       {plan.price}
                     </span>
                     <span className="text-muted-foreground text-lg">
-                      MAD / {plan.unit}
+                      € / {plan.unit}
                     </span>
                   </div>
 

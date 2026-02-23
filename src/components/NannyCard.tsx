@@ -91,7 +91,7 @@ export default function NannyCard({ nanny, showBookButton = true, onViewDetails 
         <div className="flex items-center gap-1.5">
           <Clock className="w-4 h-4 text-muted-foreground" />
           <span className="text-base font-semibold text-card-foreground">
-            {rate} MAD
+            {rate}€
           </span>
           <span className="text-sm text-muted-foreground">/hr</span>
         </div>

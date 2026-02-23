@@ -5,7 +5,7 @@ import { calcBookedHours, parseTimeToHours, TIME_SLOTS } from "@/utils/shiftHelp
 
 interface ExtendBookingModalProps {
   booking: Booking;
-  rate?: number; // parent rate (default 150 MAD/hr)
+  rate?: number; // parent rate (default 10€/hr)
   onConfirm: (newEndTime: string, newTotalPrice: number) => Promise<void>;
   onClose: () => void;
   t: (key: string) => string;
@@ -13,7 +13,7 @@ interface ExtendBookingModalProps {
 
 export default function ExtendBookingModal({
   booking,
-  rate = 150,
+  rate = 10,
   onConfirm,
   onClose,
   t,
@@ -116,7 +116,7 @@ export default function ExtendBookingModal({
               </span>
               <ArrowRight className="w-3 h-3 text-muted-foreground" />
               <span className="text-sm font-semibold text-foreground">
-                {booking.totalPrice?.toLocaleString()} MAD
+                {booking.totalPrice?.toLocaleString()}€
               </span>
             </div>
           </div>
@@ -165,7 +165,7 @@ export default function ExtendBookingModal({
                   {t("extend.additionalCost")}
                 </span>
                 <span className="font-semibold text-primary">
-                  +{extension.additionalCost.toLocaleString()} MAD
+                  +{extension.additionalCost.toLocaleString()}€
                 </span>
               </div>
               <div className="border-t border-primary/20 pt-2 flex items-center justify-between">
@@ -173,7 +173,7 @@ export default function ExtendBookingModal({
                   {t("extend.newTotal")}
                 </span>
                 <span className="text-lg font-bold text-foreground">
-                  {extension.newTotalPrice.toLocaleString()} MAD
+                  {extension.newTotalPrice.toLocaleString()}€
                 </span>
               </div>
               <p className="text-xs text-muted-foreground text-center mt-1">

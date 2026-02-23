@@ -130,8 +130,8 @@ export default function ExtendBooking() {
       });
   }, [id]);
 
-  // Default rate for parent price = 150 MAD/hr
-  const rate = 150;
+  // Default rate for parent price = 10€/hr
+  const rate = 10;
 
   // Available time slots (after current end)
   const availableSlots = useMemo(() => {
@@ -374,7 +374,7 @@ export default function ExtendBooking() {
                   </span>
                   <ArrowRight className="w-3 h-3 text-gray-300" />
                   <span className="text-sm font-semibold text-gray-900">
-                    {booking.total_price?.toLocaleString()} MAD
+                    {booking.total_price?.toLocaleString()}€
                   </span>
                 </div>
               </div>
@@ -419,13 +419,13 @@ export default function ExtendBooking() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">{s.additionalCost}</span>
                     <span className="font-semibold text-orange-600">
-                      +{extension.additionalCost.toLocaleString()} MAD
+                      +{extension.additionalCost.toLocaleString()}€
                     </span>
                   </div>
                   <div className="border-t border-orange-200/60 pt-2 flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-900">{s.newTotal}</span>
                     <span className="text-lg font-bold text-gray-900">
-                      {extension.newTotalPrice.toLocaleString()} MAD
+                      {extension.newTotalPrice.toLocaleString()}€
                     </span>
                   </div>
                   <p className="text-xs text-gray-400 text-center mt-1">
@@ -486,7 +486,7 @@ export default function ExtendBooking() {
                 </span>
                 <ArrowRight className="w-3 h-3 text-gray-300" />
                 <span className="text-sm font-bold text-orange-600">
-                  {booking.total_price?.toLocaleString()} MAD
+                  {booking.total_price?.toLocaleString()}€
                 </span>
               </div>
             </div>
