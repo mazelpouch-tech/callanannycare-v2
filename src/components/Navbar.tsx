@@ -30,90 +30,94 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link
-            to="/"
-            className="flex items-center gap-2 font-serif text-xl font-bold text-gradient-warm tracking-tight"
-          >
-            <img src="/logo-icon.png" alt="" className="w-10 h-10 object-contain" />
-            call a nanny
-          </Link>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <Link
-                key={link.to}
-                to={link.to}
-                onClick={link.to === "/#pricing" ? handlePricingClick : undefined}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
-
-            {/* Language Switcher */}
-            <button
-              onClick={toggleLanguage}
-              className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-muted"
-              aria-label="Switch language"
-            >
-              <Globe className="w-4 h-4" />
-              {t("common.switchLang")}
-            </button>
-
+    <>
+      <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
+            {/* Logo */}
             <Link
-              to="/book"
-              className="gradient-warm text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:opacity-90 transition-opacity shadow-warm flex items-center gap-2"
+              to="/"
+              className="flex items-center gap-2 font-serif text-xl font-bold text-gradient-warm tracking-tight"
             >
-              <Phone className="w-4 h-4" />
-              {t("common.bookNow")}
+              <img src="/logo-icon.png" alt="" className="w-10 h-10 object-contain" />
+              call a nanny
             </Link>
+
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center gap-8">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  onClick={link.to === "/#pricing" ? handlePricingClick : undefined}
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {link.label}
+                </Link>
+              ))}
+
+              {/* Language Switcher */}
+              <button
+                onClick={toggleLanguage}
+                className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-muted"
+                aria-label="Switch language"
+              >
+                <Globe className="w-4 h-4" />
+                {t("common.switchLang")}
+              </button>
+
+              <Link
+                to="/book"
+                className="gradient-warm text-white text-sm font-semibold px-5 py-2.5 rounded-full hover:opacity-90 transition-opacity shadow-warm flex items-center gap-2"
+              >
+                <Phone className="w-4 h-4" />
+                {t("common.bookNow")}
+              </Link>
+            </div>
+
+            {/* Mobile Hamburger */}
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="md:hidden p-2 text-foreground hover:text-primary transition-colors"
+              aria-label="Open menu"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
           </div>
-
-          {/* Mobile Hamburger */}
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="md:hidden p-2 text-foreground hover:text-primary transition-colors"
-            aria-label="Open menu"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
         </div>
-      </div>
+      </nav>
 
-      {/* Mobile Overlay */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-foreground/30 backdrop-blur-sm md:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-
-      {/* Mobile Slide-in Panel */}
+      {/* Mobile Overlay — rendered outside <nav> so backdrop-filter doesn't break position:fixed */}
       <div
-        className={`fixed top-0 right-0 z-50 h-full w-72 bg-background shadow-xl transform transition-transform duration-300 ease-in-out md:hidden ${
+        className={`fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm md:hidden transition-opacity duration-300 ${
+          mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={() => setMobileOpen(false)}
+      />
+
+      {/* Mobile Slide-in Panel — rendered outside <nav> */}
+      <div
+        className={`fixed top-0 right-0 z-[101] h-full w-[280px] bg-white shadow-2xl transform transition-transform duration-300 ease-in-out md:hidden ${
           mobileOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between p-4 border-b border-border">
+        {/* Panel Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <span className="flex items-center gap-2 font-serif text-lg font-bold text-gradient-warm">
             <img src="/logo-icon.png" alt="" className="w-9 h-9 object-contain" />
             call a nanny
           </span>
           <button
             onClick={() => setMobileOpen(false)}
-            className="p-2 text-foreground hover:text-primary transition-colors"
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors"
             aria-label="Close menu"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="flex flex-col p-4 gap-1">
+        {/* Navigation Links */}
+        <div className="flex flex-col px-4 pt-4 gap-0.5">
           {navLinks.map((link) => (
             <Link
               key={link.to}
@@ -122,7 +126,7 @@ export default function Navbar() {
                 if (link.to === "/#pricing") handlePricingClick(e);
                 setMobileOpen(false);
               }}
-              className="text-foreground hover:text-primary font-medium py-3 px-3 rounded-lg hover:bg-muted transition-colors"
+              className="text-gray-800 hover:text-orange-500 font-medium py-3.5 px-4 rounded-xl hover:bg-orange-50 transition-all text-[15px]"
             >
               {link.label}
             </Link>
@@ -134,24 +138,25 @@ export default function Navbar() {
               toggleLanguage();
               setMobileOpen(false);
             }}
-            className="text-foreground hover:text-primary font-medium py-3 px-3 rounded-lg hover:bg-muted transition-colors flex items-center gap-2 text-left"
+            className="text-gray-800 hover:text-orange-500 font-medium py-3.5 px-4 rounded-xl hover:bg-orange-50 transition-all flex items-center gap-2.5 text-left text-[15px]"
           >
-            <Globe className="w-4 h-4" />
+            <Globe className="w-[18px] h-[18px]" />
             {locale === "en" ? "Fran\u00e7ais" : "English"}
           </button>
+        </div>
 
-          <div className="mt-4 pt-4 border-t border-border">
-            <Link
-              to="/book"
-              onClick={() => setMobileOpen(false)}
-              className="gradient-warm text-white font-semibold py-3 px-5 rounded-full hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2"
-            >
-              <Phone className="w-4 h-4" />
-              {t("common.bookNow")}
-            </Link>
-          </div>
+        {/* Book Now CTA */}
+        <div className="px-5 mt-6">
+          <Link
+            to="/book"
+            onClick={() => setMobileOpen(false)}
+            className="gradient-warm text-white font-semibold py-3.5 rounded-full hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2 text-[15px]"
+          >
+            <Phone className="w-4 h-4" />
+            {t("common.bookNow")}
+          </Link>
         </div>
       </div>
-    </nav>
+    </>
   );
 }
