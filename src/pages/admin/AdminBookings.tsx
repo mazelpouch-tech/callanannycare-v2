@@ -34,6 +34,7 @@ import ExtendBookingModal from "../../components/ExtendBookingModal";
 import ForwardBookingModal from "../../components/ForwardBookingModal";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
 import { calcBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE } from "@/utils/shiftHelpers";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
 
 interface EditBookingForm {
   id: number | string;
@@ -144,6 +145,7 @@ const statusFilters = ["all", "pending", "confirmed", "completed", "cancelled"];
 
 export default function AdminBookings() {
   const { bookings, fetchBookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking, sendBookingReminder } = useData();
+  const { toDH } = useExchangeRate();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -677,6 +679,9 @@ export default function AdminBookings() {
                                   <div className="text-sm font-medium text-foreground">
                                     {booking.totalPrice ? `${booking.totalPrice.toLocaleString()}€` : "N/A"}
                                   </div>
+                                  {booking.totalPrice && (
+                                    <div className="text-[10px] text-muted-foreground">{toDH(booking.totalPrice).toLocaleString()} DH</div>
+                                  )}
                                   {hours > 0 && (
                                     <div className="text-[11px] text-muted-foreground">
                                       {nannyRate}/hr × {hours}h
@@ -912,6 +917,9 @@ export default function AdminBookings() {
                                             <p className="font-medium text-foreground">
                                               {nannyRate}€/hr × {hours}h = <span className="font-bold">{booking.totalPrice?.toLocaleString()}€</span>
                                             </p>
+                                            {booking.totalPrice && (
+                                              <p className="text-xs text-muted-foreground mt-0.5">≈ {toDH(booking.totalPrice).toLocaleString()} DH</p>
+                                            )}
                                           </div>
                                         </div>
                                       )}
@@ -1028,6 +1036,9 @@ export default function AdminBookings() {
                         <span className="font-medium text-foreground">
                           {booking.totalPrice ? `${booking.totalPrice.toLocaleString()}€` : "N/A"}
                         </span>
+                        {booking.totalPrice && (
+                          <span className="text-[10px] text-muted-foreground ml-1">({toDH(booking.totalPrice).toLocaleString()} DH)</span>
+                        )}
                         {(() => {
                           const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
                           const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 150;
@@ -1455,8 +1466,9 @@ export default function AdminBookings() {
                     <span className="mx-1.5">·</span>
                     {selectedNanny.rate}€/hr × {newBookingHours} hrs
                   </div>
-                  <div className="text-lg font-bold text-foreground">
-                    {newBookingPrice.toLocaleString()}€
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-foreground">{newBookingPrice.toLocaleString()}€</div>
+                    <div className="text-xs text-muted-foreground">{toDH(newBookingPrice).toLocaleString()} DH</div>
                   </div>
                 </div>
               )}
@@ -1736,8 +1748,9 @@ export default function AdminBookings() {
                     <span className="mx-1.5">·</span>
                     {editSelectedNanny.rate}€/hr × {editBookingHours} hrs
                   </div>
-                  <div className="text-lg font-bold text-foreground">
-                    {editBookingPrice.toLocaleString()}€
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-foreground">{editBookingPrice.toLocaleString()}€</div>
+                    <div className="text-xs text-muted-foreground">{toDH(editBookingPrice).toLocaleString()} DH</div>
                   </div>
                 </div>
               )}

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, subDays, isAfter, formatDistanceToNow } from "date-fns";
 import { useData } from "../../context/DataContext";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
 import type { Booking, Nanny, BookingStatus } from "@/types";
 import { calcShiftPayBreakdown, HOURLY_RATE } from "@/utils/shiftHelpers";
 
@@ -490,6 +491,7 @@ const PLAN_COLORS = {
 
 export default function Dashboard() {
   const { bookings, nannies, stats, adminProfile, updateBookingStatus } = useData();
+  const { toDH } = useExchangeRate();
 
   // ── Compute monthly revenue data (last 7 months) ──
   const monthlyRevenue = useMemo(() => {
@@ -696,6 +698,7 @@ export default function Dashboard() {
             <MiniSparkline data={revenueSparkline} color="#4a9e6e" />
           </div>
           <p className="text-2xl font-bold text-foreground">{stats.totalRevenue.toLocaleString()} <span className="text-sm font-medium text-muted-foreground">€</span></p>
+          <p className="text-[10px] text-muted-foreground">{toDH(stats.totalRevenue).toLocaleString()} DH</p>
           <div className="flex items-center justify-between mt-1">
             <p className="text-xs text-muted-foreground">Total Revenue</p>
             {trends.revenueTrend !== 0 && (
@@ -715,7 +718,7 @@ export default function Dashboard() {
             </div>
             <div className="text-right">
               <p className="text-[10px] text-muted-foreground">Avg Value</p>
-              <p className="text-xs font-semibold text-foreground">{avgBookingValue.toLocaleString()}€</p>
+              <p className="text-xs font-semibold text-foreground">{avgBookingValue.toLocaleString()}€ <span className="text-[10px] font-normal text-muted-foreground">({toDH(avgBookingValue).toLocaleString()} DH)</span></p>
             </div>
           </div>
           <p className="text-2xl font-bold text-foreground">{stats.pendingBookings}</p>
@@ -749,7 +752,7 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center gap-1.5 text-xs font-medium text-accent bg-accent/10 px-2.5 py-1 rounded-full">
               <TrendingUp className="w-3.5 h-3.5" />
-              {trends.thisRevenue.toLocaleString()}€ this month
+              {trends.thisRevenue.toLocaleString()}€ <span className="text-accent/70">({toDH(trends.thisRevenue).toLocaleString()} DH)</span>
             </div>
           </div>
           <AreaChart data={monthlyRevenue} id="revenue" />
@@ -808,6 +811,7 @@ export default function Dashboard() {
               </div>
               <p className="text-3xl font-bold text-foreground">{stats.totalRevenue.toLocaleString()}</p>
               <p className="text-sm text-muted-foreground mt-1">€</p>
+              <p className="text-xs text-muted-foreground">{toDH(stats.totalRevenue).toLocaleString()} DH</p>
               <div className="mt-4 flex items-center gap-2 text-xs">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLAN_COLORS.hourly }} />
                 <span className="text-muted-foreground">Hourly Plan</span>
@@ -853,6 +857,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span>{allInvoices.length} invoice{allInvoices.length !== 1 ? "s" : ""}</span>
               <span className="font-semibold text-foreground">{totalInvoiced.toLocaleString()}€</span>
+              <span className="text-muted-foreground/70">({toDH(totalInvoiced).toLocaleString()} DH)</span>
             </div>
           )}
         </div>
@@ -897,7 +902,10 @@ export default function Dashboard() {
                         <p className="text-xs text-muted-foreground/70">{formatTime(inv.clockIn)} – {formatTime(inv.clockOut)}</p>
                       </td>
                       <td className="px-6 py-4 text-sm text-muted-foreground">{calcWorkedHours(inv.clockIn, inv.clockOut)}h</td>
-                      <td className="px-6 py-4 text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</div>
+                        <div className="text-[10px] text-muted-foreground">{toDH(inv.totalPrice || 0).toLocaleString()} DH</div>
+                      </td>
                       <td className="px-6 py-4">
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
                           <CheckCircle className="w-3 h-3" />
@@ -926,7 +934,10 @@ export default function Dashboard() {
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">Billed To</p>
                       <p className="font-medium text-foreground text-sm">{inv.clientName || "N/A"}</p>
                     </div>
-                    <span className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</span>
+                    <div className="text-right">
+                      <span className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</span>
+                      <div className="text-[10px] text-muted-foreground">{toDH(inv.totalPrice || 0).toLocaleString()} DH</div>
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span>Caregiver: {inv.nannyName || "Unassigned"}</span>
@@ -1008,7 +1019,10 @@ export default function Dashboard() {
                           )}
                         </td>
                         <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(booking.date)}</td>
-                        <td className="px-6 py-4 text-sm font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()}€</td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()}€</div>
+                          <div className="text-[10px] text-muted-foreground">{toDH(booking.totalPrice || 0).toLocaleString()} DH</div>
+                        </td>
                         <td className="px-6 py-4">
                           <DashboardUrgencyBadge booking={booking} />
                         </td>
@@ -1063,7 +1077,7 @@ export default function Dashboard() {
                       <span>·</span>
                       <span>{formatDate(booking.date)}</span>
                       <span>·</span>
-                      <span className="font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()}€</span>
+                      <span className="font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()}€ <span className="text-[10px] text-muted-foreground">({toDH(booking.totalPrice || 0).toLocaleString()} DH)</span></span>
                     </div>
                     <div className="flex items-center gap-2">
                       {booking.status === "pending" && (
