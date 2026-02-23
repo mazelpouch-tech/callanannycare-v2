@@ -42,6 +42,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         WHERE b.id = ${id}
       ` as DbBookingWithNanny[];
       if (result.length === 0) return res.status(404).json({ error: 'Booking not found' });
+
+      // Email verification for parent tracking page
+      const emailParam = req.query.email;
+      if (emailParam && typeof emailParam === 'string') {
+        if (result[0].client_email?.toLowerCase().trim() !== emailParam.toLowerCase().trim()) {
+          return res.status(403).json({ error: 'Email does not match this booking' });
+        }
+      }
+
       return res.status(200).json(result[0]);
     }
     

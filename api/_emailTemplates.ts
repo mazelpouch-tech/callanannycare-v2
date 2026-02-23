@@ -19,6 +19,9 @@ const strings = {
     whatNext: 'What happens next?',
     whatNextText: 'A qualified nanny will be assigned to your booking shortly. You will receive updates via WhatsApp or email.',
     contactUs: 'If you have any questions, contact us at',
+    trackBooking: 'Track Your Booking',
+    trackBookingText: 'Follow the real-time status of your booking — see when your nanny is confirmed, on the way, and more.',
+    trackBookingBtn: 'Track My Booking',
     extendBooking: 'Need More Time?',
     extendBookingText: 'You can extend your booking anytime by clicking the button below.',
     extendBookingBtn: 'Extend Booking',
@@ -68,6 +71,9 @@ const strings = {
     whatNext: 'Et maintenant ?',
     whatNextText: 'Une nounou qualifiée sera assignée à votre réservation sous peu. Vous recevrez des mises à jour par WhatsApp ou email.',
     contactUs: 'Pour toute question, contactez-nous à',
+    trackBooking: 'Suivre Votre Réservation',
+    trackBookingText: 'Suivez le statut en temps réel de votre réservation — voyez quand votre nounou est confirmée, en chemin, et plus encore.',
+    trackBookingBtn: 'Suivre Ma Réservation',
     extendBooking: 'Besoin de Plus de Temps ?',
     extendBookingText: 'Vous pouvez prolonger votre réservation à tout moment en cliquant sur le bouton ci-dessous.',
     extendBookingBtn: 'Prolonger la Réservation',
@@ -208,6 +214,13 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData): Promis
     <div style="margin:28px 0;padding:20px;background-color:#fff7ed;border-radius:12px;border-left:4px solid #f97316;">
       <h3 style="margin:0 0 8px;color:#1a1a1a;font-size:15px;font-weight:600;">${s.whatNext}</h3>
       <p style="margin:0;color:#666;font-size:14px;line-height:1.5;">${s.whatNextText}</p>
+    </div>
+
+    <!-- Track Booking CTA -->
+    <div style="margin:28px 0;padding:20px;background:linear-gradient(135deg,#fff7ed,#fdf2f8);border-radius:12px;text-align:center;border:1px solid #fed7aa;">
+      <h3 style="margin:0 0 6px;color:#1a1a1a;font-size:15px;font-weight:600;">${s.trackBooking}</h3>
+      <p style="margin:0 0 16px;color:#666;font-size:13px;line-height:1.5;">${s.trackBookingText}</p>
+      <a href="${baseUrl}/booking/${data.bookingId}" style="display:inline-block;background:linear-gradient(135deg,#f97316,#ec4899);color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:50px;box-shadow:0 2px 8px rgba(249,115,22,0.3);">${s.trackBookingBtn}</a>
     </div>
 
     <!-- Extend Booking CTA -->
@@ -669,6 +682,13 @@ export async function sendParentReminderEmail(data: ParentReminderEmailData): Pr
       ${row(s.children, `${data.childrenCount}`)}
       ${row(s.reminderNanny, data.nannyName)}
     </table>
+
+    <!-- Track Booking CTA -->
+    <div style="margin:28px 0;padding:20px;background:linear-gradient(135deg,#fff7ed,#fdf2f8);border-radius:12px;text-align:center;border:1px solid #fed7aa;">
+      <h3 style="margin:0 0 6px;color:#1a1a1a;font-size:15px;font-weight:600;">${s.trackBooking}</h3>
+      <p style="margin:0 0 16px;color:#666;font-size:13px;line-height:1.5;">${s.trackBookingText}</p>
+      <a href="${baseUrl}/booking/${data.bookingId}" style="display:inline-block;background:linear-gradient(135deg,#f97316,#ec4899);color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:50px;box-shadow:0 2px 8px rgba(249,115,22,0.3);">${s.trackBookingBtn}</a>
+    </div>
 
     <!-- Extend Booking CTA -->
     <div style="margin:28px 0;padding:20px;background-color:#eff6ff;border-radius:12px;text-align:center;">

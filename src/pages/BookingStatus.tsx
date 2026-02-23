@@ -1,0 +1,598 @@
+import { useState, useEffect, useCallback } from "react";
+import {
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  Mail,
+  ArrowLeft,
+  Clock,
+  MapPin,
+  Users,
+  Phone,
+  CalendarDays,
+  Timer,
+  CircleDot,
+  RefreshCw,
+  MessageCircle,
+  Star,
+} from "lucide-react";
+import { useParams, Link } from "react-router-dom";
+
+const API = import.meta.env.VITE_API_URL || "";
+
+interface BookingData {
+  id: number;
+  client_name: string;
+  client_email: string;
+  client_phone: string;
+  hotel: string;
+  date: string;
+  end_date: string | null;
+  start_time: string;
+  end_time: string;
+  total_price: number;
+  status: string;
+  nanny_id: number | null;
+  nanny_name: string | null;
+  nanny_image: string | null;
+  children_count: number;
+  children_ages: string;
+  notes: string;
+  clock_in: string | null;
+  clock_out: string | null;
+  plan: string;
+  created_at: string;
+}
+
+type Step = "verify" | "status";
+
+const T = {
+  en: {
+    title: "Track Your Booking",
+    subtitle: "Check the real-time status of your childcare booking.",
+    verifyTitle: "Verify Your Identity",
+    verifyDesc: "Enter the email address you used when booking.",
+    emailPlaceholder: "your@email.com",
+    verify: "Verify",
+    verifying: "Verifying...",
+    emailMismatch: "Email does not match this booking. Please try again.",
+    bookingNotFound: "Booking not found",
+    bookingNotFoundDesc: "This booking link may be invalid or expired.",
+    loading: "Loading booking...",
+    backToHome: "Back to Home",
+    bookingRef: "Booking Ref",
+    statusTitle: "Booking Status",
+    yourNanny: "Your Nanny",
+    nannyPending: "A nanny will be assigned shortly",
+    bookingDetails: "Booking Details",
+    dateLabel: "Date",
+    timeLabel: "Time",
+    hotelLabel: "Location",
+    childrenLabel: "Children",
+    totalLabel: "Total",
+    notesLabel: "Notes",
+    timeline: "Timeline",
+    submitted: "Booking Submitted",
+    confirmed: "Nanny Confirmed",
+    shiftStarted: "Shift Started",
+    shiftCompleted: "Shift Completed",
+    clockedIn: "Clocked in at",
+    clockedOut: "Clocked out at",
+    liveUpdates: "Auto-refreshes every 30 seconds",
+    lastUpdated: "Last updated",
+    extendBooking: "Extend Booking",
+    rebookBooking: "Book Again",
+    contactNanny: "WhatsApp Nanny",
+    pending: "Pending",
+    confirmedStatus: "Confirmed",
+    completed: "Completed",
+    cancelled: "Cancelled",
+    active: "Active",
+  },
+  fr: {
+    title: "Suivre Votre Réservation",
+    subtitle: "Consultez le statut en temps réel de votre réservation de garde.",
+    verifyTitle: "Vérifiez Votre Identité",
+    verifyDesc: "Entrez l'email utilisé lors de la réservation.",
+    emailPlaceholder: "votre@email.com",
+    verify: "Vérifier",
+    verifying: "Vérification...",
+    emailMismatch: "L'email ne correspond pas à cette réservation. Veuillez réessayer.",
+    bookingNotFound: "Réservation introuvable",
+    bookingNotFoundDesc: "Ce lien peut être invalide ou expiré.",
+    loading: "Chargement...",
+    backToHome: "Retour à l'Accueil",
+    bookingRef: "Réf. Réservation",
+    statusTitle: "Statut de la Réservation",
+    yourNanny: "Votre Nounou",
+    nannyPending: "Une nounou sera assignée sous peu",
+    bookingDetails: "Détails de la Réservation",
+    dateLabel: "Date",
+    timeLabel: "Heure",
+    hotelLabel: "Lieu",
+    childrenLabel: "Enfants",
+    totalLabel: "Total",
+    notesLabel: "Notes",
+    timeline: "Chronologie",
+    submitted: "Réservation Soumise",
+    confirmed: "Nounou Confirmée",
+    shiftStarted: "Quart Commencé",
+    shiftCompleted: "Quart Terminé",
+    clockedIn: "Pointage entrée à",
+    clockedOut: "Pointage sortie à",
+    liveUpdates: "Actualisation automatique toutes les 30 secondes",
+    lastUpdated: "Dernière mise à jour",
+    extendBooking: "Prolonger la Réservation",
+    rebookBooking: "Réserver à Nouveau",
+    contactNanny: "WhatsApp Nounou",
+    pending: "En attente",
+    confirmedStatus: "Confirmée",
+    completed: "Terminée",
+    cancelled: "Annulée",
+    active: "Active",
+  },
+};
+
+const statusConfig: Record<string, { color: string; bg: string; border: string }> = {
+  pending: { color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200" },
+  confirmed: { color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200" },
+  completed: { color: "text-green-700", bg: "bg-green-50", border: "border-green-200" },
+  cancelled: { color: "text-red-700", bg: "bg-red-50", border: "border-red-200" },
+};
+
+function formatClockTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return iso;
+  }
+}
+
+export default function BookingStatus() {
+  const { id } = useParams<{ id: string }>();
+  const [locale, setLocale] = useState<"en" | "fr">("en");
+  const s = T[locale];
+
+  const [booking, setBooking] = useState<BookingData | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [loadingBooking, setLoadingBooking] = useState(true);
+
+  const [step, setStep] = useState<Step>("verify");
+  const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // Fetch booking on mount (basic existence check — no email data exposed)
+  useEffect(() => {
+    if (!id) return;
+    setLoadingBooking(true);
+    fetch(`${API}/api/bookings/${id}`)
+      .then((r) => {
+        if (!r.ok) throw new Error("Not found");
+        return r.json();
+      })
+      .then(() => {
+        // Booking exists, but we don't store full data until verified
+        setLoadingBooking(false);
+      })
+      .catch(() => {
+        setLoadError(true);
+        setLoadingBooking(false);
+      });
+  }, [id]);
+
+  // Verify email and fetch full booking data
+  const handleVerify = async () => {
+    if (!id) return;
+    setVerifying(true);
+    setEmailError("");
+    try {
+      const res = await fetch(`${API}/api/bookings/${id}?email=${encodeURIComponent(email.trim())}`);
+      if (res.status === 403) {
+        setEmailError(s.emailMismatch);
+        setVerifying(false);
+        return;
+      }
+      if (!res.ok) throw new Error("Not found");
+      const data = await res.json();
+      setBooking(data);
+      setLastUpdated(new Date());
+      setStep("status");
+    } catch {
+      setEmailError(s.emailMismatch);
+    }
+    setVerifying(false);
+  };
+
+  // Auto-refresh every 30s once verified
+  const refreshBooking = useCallback(async () => {
+    if (!id || !email) return;
+    try {
+      const res = await fetch(`${API}/api/bookings/${id}?email=${encodeURIComponent(email.trim())}`);
+      if (res.ok) {
+        const data = await res.json();
+        setBooking(data);
+        setLastUpdated(new Date());
+      }
+    } catch { /* silent */ }
+  }, [id, email]);
+
+  useEffect(() => {
+    if (step !== "status") return;
+    const interval = setInterval(refreshBooking, 30000);
+    return () => clearInterval(interval);
+  }, [step, refreshBooking]);
+
+  // Status display helpers
+  const getStatusLabel = (status: string) => {
+    const map: Record<string, string> = {
+      pending: s.pending,
+      confirmed: s.confirmedStatus,
+      completed: s.completed,
+      cancelled: s.cancelled,
+    };
+    return map[status] || status;
+  };
+
+  const isActive = booking?.clock_in && !booking?.clock_out && booking?.status !== "completed";
+
+  // Timeline steps
+  const getTimelineSteps = () => {
+    if (!booking) return [];
+    const steps = [
+      {
+        label: s.submitted,
+        done: true,
+        active: booking.status === "pending",
+        detail: new Date(booking.created_at).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" }),
+      },
+      {
+        label: s.confirmed,
+        done: ["confirmed", "completed"].includes(booking.status) || !!booking.clock_in,
+        active: booking.status === "confirmed" && !booking.clock_in,
+        detail: null,
+      },
+      {
+        label: s.shiftStarted,
+        done: !!booking.clock_in,
+        active: !!booking.clock_in && !booking.clock_out,
+        detail: booking.clock_in ? `${s.clockedIn} ${formatClockTime(booking.clock_in)}` : null,
+      },
+      {
+        label: s.shiftCompleted,
+        done: booking.status === "completed",
+        active: false,
+        detail: booking.clock_out ? `${s.clockedOut} ${formatClockTime(booking.clock_out)}` : null,
+      },
+    ];
+    return steps;
+  };
+
+  // ─── Loading state ───
+  if (loadingBooking) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-orange-500 mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">{s.loading}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Not found ───
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-white flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 max-w-md w-full p-8 text-center">
+          <AlertCircle className="w-14 h-14 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">{s.bookingNotFound}</h2>
+          <p className="text-gray-500 text-sm mb-6">{s.bookingNotFoundDesc}</p>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-orange-600 hover:bg-orange-50 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            {s.backToHome}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-white">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-orange-500 to-pink-500 px-4 py-6 text-center text-white relative">
+        <h1 className="text-2xl font-bold font-serif tracking-tight">call a nanny</h1>
+        <p className="text-white/80 text-xs mt-1">Professional Childcare · Marrakech</p>
+        <button
+          onClick={() => setLocale((l) => (l === "en" ? "fr" : "en"))}
+          className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 text-white text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
+        >
+          {locale === "en" ? "FR" : "EN"}
+        </button>
+      </div>
+
+      <div className="max-w-md mx-auto px-4 py-8">
+        {/* Title */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-orange-100 mb-4">
+            <CalendarDays className="w-7 h-7 text-orange-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 font-serif">{s.title}</h2>
+          <p className="text-gray-500 text-sm mt-2">{s.subtitle}</p>
+        </div>
+
+        {/* ─── Step 1: Email Verification ─── */}
+        {step === "verify" && (
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
+                  <Mail className="w-5 h-5 text-blue-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">{s.verifyTitle}</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">{s.verifyDesc}</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setEmailError("");
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && handleVerify()}
+                  placeholder={s.emailPlaceholder}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300/50 focus:border-orange-400"
+                />
+                {emailError && (
+                  <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {emailError}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={handleVerify}
+                disabled={!email.trim() || verifying}
+                className="w-full py-3 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {verifying ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {s.verifying}
+                  </>
+                ) : (
+                  s.verify
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── Step 2: Live Booking Status ─── */}
+        {step === "status" && booking && (
+          <div className="space-y-5">
+            {/* Status Badge */}
+            <div className={`rounded-2xl border ${statusConfig[booking.status]?.border || "border-gray-200"} ${statusConfig[booking.status]?.bg || "bg-gray-50"} p-5`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">{s.bookingRef} #{booking.id}</p>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-lg font-bold ${statusConfig[booking.status]?.color || "text-gray-700"}`}>
+                      {getStatusLabel(booking.status)}
+                    </span>
+                    {isActive && (
+                      <span className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+                      </span>
+                    )}
+                  </div>
+                  {isActive && (
+                    <p className="text-xs text-green-600 font-medium mt-1">
+                      {s.active} — {s.clockedIn} {formatClockTime(booking.clock_in!)}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={refreshBooking}
+                  className="p-2 rounded-lg hover:bg-white/50 text-gray-400 hover:text-gray-600 transition-colors"
+                  title="Refresh"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Nanny Card */}
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{s.yourNanny}</p>
+              </div>
+              <div className="px-5 py-4">
+                {booking.nanny_name ? (
+                  <div className="flex items-center gap-4">
+                    {booking.nanny_image ? (
+                      <img
+                        src={booking.nanny_image}
+                        alt={booking.nanny_name}
+                        className="w-14 h-14 rounded-full object-cover border-2 border-orange-200"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-full bg-orange-100 flex items-center justify-center">
+                        <Star className="w-6 h-6 text-orange-400" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-base font-semibold text-gray-900">{booking.nanny_name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Call a Nanny · Marrakech</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 text-gray-400">
+                    <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center">
+                      <Clock className="w-6 h-6" />
+                    </div>
+                    <p className="text-sm italic">{s.nannyPending}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Booking Details */}
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{s.bookingDetails}</p>
+              </div>
+              <div className="divide-y divide-gray-50">
+                <div className="flex items-center gap-3 px-5 py-3">
+                  <CalendarDays className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                  <span className="text-xs text-gray-500 w-20">{s.dateLabel}</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {booking.date}
+                    {booking.end_date && booking.end_date !== booking.date ? ` — ${booking.end_date}` : ""}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 px-5 py-3">
+                  <Timer className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                  <span className="text-xs text-gray-500 w-20">{s.timeLabel}</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {booking.start_time} — {booking.end_time || "TBD"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 px-5 py-3">
+                  <MapPin className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                  <span className="text-xs text-gray-500 w-20">{s.hotelLabel}</span>
+                  <span className="text-sm font-medium text-gray-900">{booking.hotel || "N/A"}</span>
+                </div>
+                <div className="flex items-center gap-3 px-5 py-3">
+                  <Users className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                  <span className="text-xs text-gray-500 w-20">{s.childrenLabel}</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {booking.children_count || 1}
+                    {booking.children_ages ? ` (${booking.children_ages})` : ""}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 px-5 py-3">
+                  <span className="w-4 h-4 flex items-center justify-center text-orange-400 flex-shrink-0 font-bold text-xs">€</span>
+                  <span className="text-xs text-gray-500 w-20">{s.totalLabel}</span>
+                  <span className="text-sm font-bold text-orange-600">{booking.total_price?.toLocaleString()}€</span>
+                </div>
+                {booking.notes && (
+                  <div className="flex items-start gap-3 px-5 py-3">
+                    <Phone className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
+                    <span className="text-xs text-gray-500 w-20">{s.notesLabel}</span>
+                    <span className="text-sm text-gray-700">{booking.notes}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Timeline */}
+            {booking.status !== "cancelled" && (
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{s.timeline}</p>
+                </div>
+                <div className="px-5 py-4">
+                  <div className="space-y-0">
+                    {getTimelineSteps().map((tl, i, arr) => (
+                      <div key={i} className="flex gap-3">
+                        {/* Dot + Line */}
+                        <div className="flex flex-col items-center">
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            tl.done
+                              ? "bg-green-500"
+                              : tl.active
+                              ? "bg-orange-500 animate-pulse"
+                              : "bg-gray-200"
+                          }`}>
+                            {tl.done ? (
+                              <CheckCircle className="w-3 h-3 text-white" />
+                            ) : (
+                              <CircleDot className="w-3 h-3 text-white" />
+                            )}
+                          </div>
+                          {i < arr.length - 1 && (
+                            <div className={`w-0.5 h-8 ${tl.done ? "bg-green-300" : "bg-gray-200"}`} />
+                          )}
+                        </div>
+                        {/* Label */}
+                        <div className="pb-4">
+                          <p className={`text-sm font-medium ${
+                            tl.done ? "text-gray-900" : tl.active ? "text-orange-600" : "text-gray-400"
+                          }`}>
+                            {tl.label}
+                          </p>
+                          {tl.detail && (
+                            <p className="text-xs text-gray-400 mt-0.5">{tl.detail}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex flex-col gap-3">
+              {(booking.status === "pending" || booking.status === "confirmed") && (
+                <Link
+                  to={`/extend/${booking.id}`}
+                  className="w-full py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl text-sm font-bold text-center hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                >
+                  <Clock className="w-4 h-4" />
+                  {s.extendBooking}
+                </Link>
+              )}
+              {booking.nanny_name && (
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(`Hi, I'm ${booking.client_name}. I have a booking (#${booking.id}) on ${booking.date}.`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 bg-green-500 text-white rounded-xl text-sm font-bold text-center hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  {s.contactNanny}
+                </a>
+              )}
+              <Link
+                to={`/rebook/${booking.id}`}
+                className="w-full py-3 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-xl text-sm font-bold text-center hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                {s.rebookBooking}
+              </Link>
+            </div>
+
+            {/* Auto-refresh footer */}
+            <div className="text-center space-y-1">
+              <p className="text-xs text-gray-400 flex items-center justify-center gap-1">
+                <RefreshCw className="w-3 h-3" />
+                {s.liveUpdates}
+              </p>
+              {lastUpdated && (
+                <p className="text-xs text-gray-300">
+                  {s.lastUpdated}: {lastUpdated.toLocaleTimeString()}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

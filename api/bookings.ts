@@ -122,6 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               if (!phone.startsWith('+') && !phone.match(/^\d{10,}/)) phone = '+' + phone;
               phone = phone.replace('+', '');
 
+              const reminderSiteUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
               const waMsg = [
                 '📅 *Booking Reminder — Tomorrow!*',
                 '',
@@ -131,6 +132,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 `🕐 *Time:* ${b.start_time}${b.end_time ? ` - ${b.end_time}` : ''}`,
                 `🏨 *Location:* ${b.hotel || 'N/A'}`,
                 `👶 *Children:* ${b.children_count || 1}`,
+                '',
+                `📍 *Track:* ${reminderSiteUrl}/booking/${b.id}`,
                 '',
                 '_Your booking is scheduled for tomorrow. See you then!_',
                 '_Call a Nanny — callanannycare.com_',
@@ -288,6 +291,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (WHATSAPP_TOKEN && WHATSAPP_PHONE_ID && WHATSAPP_BUSINESS_NUMBER) {
         try {
+          const siteUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
           const waMessage = [
             "🔔 *New Booking Received!*",
             "",
@@ -298,6 +302,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             `🕐 *Time:* ${start_time}${end_time ? ` - ${end_time}` : ""}`,
             `👶 *Children:* ${children_count || 1}`,
             `💰 *Total:* ${total_price || 0}€`,
+            "",
+            `📍 *Track:* ${siteUrl}/booking/${result[0].id}`,
             "",
             "_Sent automatically by Call a Nanny_",
           ].join("\n");
