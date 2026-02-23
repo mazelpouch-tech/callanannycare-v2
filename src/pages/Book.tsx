@@ -140,12 +140,14 @@ const EMPTY_CHILD: ChildInfo = {
 const RATE = 10; // EUR per hour
 const TAXI_FEE = 10; // EUR flat fee for bookings in the 7 PM – 7 AM night window
 
-// 24h time slots from 00:00 to 23:30 (30-min steps)
+// 24h time slots from 06:00 to 05:30 (business-day ordering, 30-min steps)
 const TIME_SLOTS: { value: string; label: string }[] = [];
-for (let h = 0; h <= 23; h++) {
+for (let i = 0; i < 48; i++) {
+  const h = (6 + Math.floor(i / 2)) % 24;
+  const m = (i % 2) * 30;
   const hh = String(h).padStart(2, "0");
-  TIME_SLOTS.push({ value: `${h}:00`, label: `${hh}h00` });
-  TIME_SLOTS.push({ value: `${h}:30`, label: `${hh}h30` });
+  const mm = m === 0 ? "00" : "30";
+  TIME_SLOTS.push({ value: `${h}:${mm}`, label: `${hh}h${mm}` });
 }
 
 function parseTimeValue(val: string) {

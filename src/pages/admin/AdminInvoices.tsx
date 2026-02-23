@@ -14,11 +14,12 @@ import type { Booking } from "@/types";
 const SERVICE_RATE = 10; // €/hr — client rate (same as booking page)
 const TAXI_FEE = 10;
 
-// 24h time slots from 00:00 to 23:30 (30-min steps)
+// 24h time slots from 06:00 to 05:30 (business-day ordering, 30-min steps)
 const TIME_SLOTS: string[] = [];
-for (let h = 0; h <= 23; h++) {
-  TIME_SLOTS.push(`${String(h).padStart(2, "0")}:00`);
-  TIME_SLOTS.push(`${String(h).padStart(2, "0")}:30`);
+for (let i = 0; i < 48; i++) {
+  const h = (6 + Math.floor(i / 2)) % 24;
+  const m = (i % 2) * 30;
+  TIME_SLOTS.push(`${String(h).padStart(2, "0")}:${m === 0 ? "00" : "30"}`);
 }
 
 // ─── Helpers ────────────────────────────────────────────────
