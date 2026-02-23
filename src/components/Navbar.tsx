@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Phone, Globe } from "lucide-react";
+import { Menu, X, Phone, Globe, Shield, UserCircle } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 
 export default function Navbar() {
@@ -154,6 +154,29 @@ export default function Navbar() {
           >
             <Phone className="w-4 h-4" />
             {t("common.bookNow")}
+          </Link>
+        </div>
+
+        {/* Portal Access */}
+        <div className="px-4 mt-6 pt-5 border-t border-gray-100">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-4 mb-2">
+            {locale === "en" ? "Portal Access" : "Accès Portail"}
+          </p>
+          <Link
+            to="/nanny/login"
+            onClick={() => setMobileOpen(false)}
+            className="text-gray-500 hover:text-orange-500 font-medium py-3 px-4 rounded-xl hover:bg-orange-50 transition-all flex items-center gap-2.5 text-[14px]"
+          >
+            <UserCircle className="w-[18px] h-[18px]" />
+            {locale === "en" ? "Nanny Login" : "Connexion Nounou"}
+          </Link>
+          <Link
+            to="/admin/login"
+            onClick={() => setMobileOpen(false)}
+            className="text-gray-500 hover:text-orange-500 font-medium py-3 px-4 rounded-xl hover:bg-orange-50 transition-all flex items-center gap-2.5 text-[14px]"
+          >
+            <Shield className="w-[18px] h-[18px]" />
+            {locale === "en" ? "Admin Login" : "Connexion Admin"}
           </Link>
         </div>
       </div>
