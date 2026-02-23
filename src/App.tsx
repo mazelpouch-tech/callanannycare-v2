@@ -7,6 +7,7 @@ import Book from './pages/Book'
 import ParentForm from './pages/ParentForm'
 import ExtendBooking from './pages/ExtendBooking'
 import RebookBooking from './pages/RebookBooking'
+import PrivacyPolicy from './pages/PrivacyPolicy'
 import NotFound from './pages/NotFound'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminLayout from './pages/admin/AdminLayout'
@@ -43,6 +44,7 @@ export default function App() {
       <Route path="/parent-form" element={<ParentForm />} />
       <Route path="/extend/:id" element={<ExtendBooking />} />
       <Route path="/rebook/:id" element={<RebookBooking />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
       {/* Admin routes */}
       <Route path="/admin/login" element={<AdminLogin />} />
