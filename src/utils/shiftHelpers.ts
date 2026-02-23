@@ -147,13 +147,13 @@ export function formatTime(timeStr: string): string {
   return `${h12}:${m} ${ampm}`;
 }
 
-/** Shared time slots from 07:00 to 23:30 in 30-min steps */
+/** Shared time slots from 00:00 to 23:30 in 30-min steps */
 export const TIME_SLOTS: { value: string; label: string }[] = (() => {
   const slots: { value: string; label: string }[] = [];
-  for (let h = 7; h <= 23; h++) {
+  for (let h = 0; h <= 23; h++) {
     const hh = String(h).padStart(2, '0');
     slots.push({ value: `${h}:00`, label: `${hh}h00` });
-    if (h < 23 || true) slots.push({ value: `${h}:30`, label: `${hh}h30` });
+    slots.push({ value: `${h}:30`, label: `${hh}h30` });
   }
   return slots;
 })();
