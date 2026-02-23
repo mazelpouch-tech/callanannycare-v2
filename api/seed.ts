@@ -3,6 +3,7 @@ import { getDb } from './_db.js';
 
 interface CountRow { count: string }
 interface RateRow { rate: number }
+interface BookingRow { id: number; start_time: string; end_time: string; date: string; end_date: string | null; total_price: number }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const sql = getDb();
@@ -134,7 +135,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // If any nanny has rate > 50, it means rates are still in MAD.
     // Convert booking prices (÷15 because 150MAD/hr → 10€/hr)
     // and update nanny rates to 10€.
-    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS price_migrated_to_eur BOOLEAN DEFAULT false`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS price_migrated_to_eur BOOLEAN DEFAULT true`;
+    await sql`ALTER TABLE bookings ALTER COLUMN price_migrated_to_eur SET DEFAULT true`;
 
     const nannyRates = await sql`SELECT rate FROM nannies WHERE rate > 50 LIMIT 1` as RateRow[];
     const needsMigration = nannyRates.length > 0;
@@ -157,6 +159,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Update all nanny rates from MAD to EUR
       await sql`UPDATE nannies SET rate = 10 WHERE rate > 50`;
+    }
+    // ────────────────────────────────────────────────────────────────
+
+    // ─── Price Repair ─────────────────────────────────────────────
+    // Fix bookings corrupted by migration: new EUR-priced bookings that
+    // had price_migrated_to_eur=false (default) got divided by 15.
+    // Recalculate from stored times for any booking with a suspiciously
+    // low price (< 50% of expected).
+    const REPAIR_RATE = 10; // €/hr
+    const REPAIR_TAXI = 10; // € flat fee for evening bookings
+    let repaired = 0;
+    const bookingsToCheck = await sql`
+      SELECT id, start_time, end_time, date, end_date, total_price
+      FROM bookings
+      WHERE start_time LIKE '%h%' AND end_time LIKE '%h%'
+        AND start_time != '' AND end_time != ''
+        AND total_price > 0
+    ` as BookingRow[];
+
+    for (const b of bookingsToCheck) {
+      try {
+        const [sh, sm] = b.start_time.split('h').map(Number);
+        const [eh, em] = b.end_time.split('h').map(Number);
+        if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) continue;
+        const hours = Math.max(0, (eh + em / 60) - (sh + sm / 60));
+        if (hours <= 0) continue;
+
+        let dayCount = 1;
+        if (b.end_date && b.end_date !== b.date) {
+          const startMs = new Date(b.date).getTime();
+          const endMs = new Date(b.end_date).getTime();
+          if (!isNaN(startMs) && !isNaN(endMs)) {
+            dayCount = Math.max(1, Math.round((endMs - startMs) / 86400000) + 1);
+          }
+        }
+
+        const isEvening = eh > 19 || (eh === 19 && em > 0) || sh < 7;
+        const taxiFee = isEvening ? REPAIR_TAXI * dayCount : 0;
+        const expectedPrice = Math.round(REPAIR_RATE * hours * dayCount + taxiFee);
+
+        // Only repair if price is way off (less than 50% of expected)
+        if (expectedPrice > 0 && b.total_price < expectedPrice * 0.5) {
+          await sql`UPDATE bookings SET total_price = ${expectedPrice} WHERE id = ${b.id}`;
+          repaired++;
+        }
+      } catch { /* skip unparseable */ }
     }
     // ────────────────────────────────────────────────────────────────
 
@@ -189,12 +237,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const existing = await sql`SELECT COUNT(*) as count FROM nannies` as CountRow[];
+    const parts: string[] = [];
+    if (needsMigration) parts.push(`MAD→EUR migration: ${migrated} booking(s) converted, nanny rates updated to 10€/hr`);
+    if (repaired > 0) parts.push(`Price repair: ${repaired} booking(s) recalculated`);
+    if (parts.length === 0) parts.push('Database up to date');
+
     return res.status(200).json({
-      message: needsMigration
-        ? `Database updated. MAD→EUR migration complete: ${migrated} booking(s) converted, nanny rates updated to 10€/hr.`
-        : 'Database up to date (EUR pricing already active).',
+      message: parts.join('. ') + '.',
       nannies: parseInt(existing[0].count),
       migrated: needsMigration,
+      repaired,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
