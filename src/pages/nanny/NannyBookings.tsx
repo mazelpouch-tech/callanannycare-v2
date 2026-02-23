@@ -562,7 +562,7 @@ export default function NannyBookings() {
                                 {formatHoursWorked(booking.clockIn!, booking.clockOut!)}
                               </span>
                               <span className="text-muted-foreground ml-1">
-                                · {calcShiftPay(booking.clockIn!, booking.clockOut!)}€
+                                · {calcShiftPay(booking.clockIn!, booking.clockOut!)} DH
                               </span>
                             </div>
                           ) : booking.clockIn && !booking.clockOut ? (
@@ -786,7 +786,7 @@ export default function NannyBookings() {
                         {formatHoursWorked(booking.clockIn!, booking.clockOut!)}
                       </span>
                       <span className="bg-green-50 text-green-700 px-2 py-1 rounded font-medium">
-                        {calcShiftPay(booking.clockIn!, booking.clockOut!)}€
+                        {calcShiftPay(booking.clockIn!, booking.clockOut!)} DH
                       </span>
                     </div>
                   )}

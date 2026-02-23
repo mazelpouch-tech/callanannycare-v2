@@ -245,16 +245,16 @@ export default function NannyProfile() {
                 <p className="text-xs text-muted-foreground mt-0.5">{t("nanny.dashboard.hoursWorked")}</p>
               </div>
               <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 text-center">
-                <p className="text-2xl font-bold text-orange-600">{payBreakdown.total}<span className="text-sm font-normal ml-1">€</span></p>
+                <p className="text-2xl font-bold text-orange-600">{payBreakdown.total}<span className="text-sm font-normal ml-1">DH</span></p>
                 <p className="text-xs text-muted-foreground mt-0.5">{t("nanny.dashboard.myPay")}</p>
               </div>
             </div>
             {/* Pay breakdown detail */}
             {payBreakdown.total > 0 && (
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                <span>{t("nanny.dashboard.hourlyPay")}: <span className="font-semibold text-foreground">{payBreakdown.basePay}€</span></span>
+                <span>{t("nanny.dashboard.hourlyPay")}: <span className="font-semibold text-foreground">{payBreakdown.basePay} DH</span></span>
                 {payBreakdown.taxiFee > 0 && (
-                  <span>{t("nanny.dashboard.taxiFee")}: <span className="font-semibold text-orange-600">+{payBreakdown.taxiFee}€</span></span>
+                  <span>{t("nanny.dashboard.taxiFee")}: <span className="font-semibold text-orange-600">+{payBreakdown.taxiFee} DH</span></span>
                 )}
               </div>
             )}

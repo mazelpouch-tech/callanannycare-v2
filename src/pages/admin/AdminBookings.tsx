@@ -685,11 +685,11 @@ export default function AdminBookings() {
                                   {estPay.total > 0 && (
                                     <div className="text-[11px] mt-0.5">
                                       <span className={isActual ? "text-emerald-600 font-medium" : "text-emerald-600/70"}>
-                                        {estPay.basePay}€
+                                        {estPay.basePay} DH
                                       </span>
                                       {estPay.taxiFee > 0 && (
                                         <span className={isActual ? "text-orange-500 font-medium" : "text-orange-500/70"}>
-                                          {" "}+ {estPay.taxiFee} taxi
+                                          {" "}+ {estPay.taxiFee} DH taxi
                                         </span>
                                       )}
                                       {!isActual && (
@@ -923,15 +923,15 @@ export default function AdminBookings() {
                                               Nanny Pay {!isActual && <span className="italic">(estimated)</span>}
                                             </p>
                                             <p className="font-medium text-foreground">
-                                              <span className="text-emerald-600">{estPay.basePay}€</span>
-                                              <span className="text-muted-foreground mx-1">hourly ({HOURLY_RATE}/hr)</span>
+                                              <span className="text-emerald-600">{estPay.basePay} DH</span>
+                                              <span className="text-muted-foreground mx-1">hourly ({HOURLY_RATE} DH/hr)</span>
                                               {estPay.taxiFee > 0 && (
                                                 <>
-                                                  <span className="text-orange-500">+ {estPay.taxiFee}€</span>
+                                                  <span className="text-orange-500">+ {estPay.taxiFee} DH</span>
                                                   <span className="text-muted-foreground ml-1">taxi</span>
                                                 </>
                                               )}
-                                              <span className="text-foreground ml-2 font-bold">= {estPay.total}€</span>
+                                              <span className="text-foreground ml-2 font-bold">= {estPay.total} DH</span>
                                             </p>
                                           </div>
                                         </div>

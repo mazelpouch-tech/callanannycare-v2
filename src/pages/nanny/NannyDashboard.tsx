@@ -339,9 +339,9 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
 
         {/* Pay breakdown */}
         <div className="mt-4 flex items-center justify-center gap-4 text-xs text-blue-700">
-          <span>{t("nanny.dashboard.hourlyPay")}: {todayBreakdown.basePay}€</span>
+          <span>{t("nanny.dashboard.hourlyPay")}: {todayBreakdown.basePay} DH</span>
           {todayBreakdown.taxiFee > 0 && (
-            <span>{t("nanny.dashboard.taxiFee")}: +{todayBreakdown.taxiFee}€</span>
+            <span>{t("nanny.dashboard.taxiFee")}: +{todayBreakdown.taxiFee} DH</span>
           )}
         </div>
       </div>
@@ -444,7 +444,7 @@ export default function NannyDashboard() {
     {
       label: t("nanny.dashboard.myPay"),
       value: payBreakdown.total,
-      suffix: "€",
+      suffix: "DH",
       icon: DollarSign,
       bg: "bg-orange-50",
       color: "text-orange-600",
@@ -510,11 +510,11 @@ export default function NannyDashboard() {
         <div className="bg-orange-50/50 border border-orange-200/60 rounded-xl px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
           <span className="font-medium text-foreground">{t("nanny.dashboard.payBreakdown")}:</span>
           <span className="text-muted-foreground">
-            {t("nanny.dashboard.hourlyPay")}: <span className="font-semibold text-foreground">{payBreakdown.basePay}€</span>
+            {t("nanny.dashboard.hourlyPay")}: <span className="font-semibold text-foreground">{payBreakdown.basePay} DH</span>
           </span>
           {payBreakdown.taxiFee > 0 && (
             <span className="text-muted-foreground">
-              {t("nanny.dashboard.taxiFee")}: <span className="font-semibold text-orange-600">+{payBreakdown.taxiFee}€</span>
+              {t("nanny.dashboard.taxiFee")}: <span className="font-semibold text-orange-600">+{payBreakdown.taxiFee} DH</span>
             </span>
           )}
         </div>

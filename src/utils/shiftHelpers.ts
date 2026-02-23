@@ -1,6 +1,6 @@
 import type { Booking, BookingStatus } from '../types';
 
-export const HOURLY_RATE = 5; // €/hr
+export const HOURLY_RATE = 31.25; // DH/hr
 
 export const statusColors: Record<BookingStatus, string> = {
   pending: 'bg-yellow-100 text-yellow-700',
@@ -73,7 +73,7 @@ function isEveningShift(startHour: number, endHour: number): boolean {
 /** Pay breakdown: base hourly pay + taxi fee */
 export interface PayBreakdown {
   basePay: number;    // hours × HOURLY_RATE
-  taxiFee: number;    // 10€ if evening shift, else 0
+  taxiFee: number;    // 100 DH if evening shift, else 0
   total: number;      // basePay + taxiFee
 }
 
@@ -87,7 +87,7 @@ export function calcShiftPayBreakdown(clockIn: string, clockOut: string): PayBre
   const basePay = Math.round(hours * HOURLY_RATE);
   const inHour = new Date(clockIn).getHours();
   const outHour = new Date(clockOut).getHours();
-  const taxiFee = isEveningShift(inHour, outHour) ? 10 : 0;
+  const taxiFee = isEveningShift(inHour, outHour) ? 100 : 0;
   return { basePay, taxiFee, total: basePay + taxiFee };
 }
 
@@ -122,7 +122,7 @@ export function estimateNannyPayBreakdown(
   const basePay = Math.round(hours * HOURLY_RATE);
   const startH = parseTimeToHours(startTime);
   const endH = parseTimeToHours(endTime);
-  const taxiFee = startH !== null && endH !== null && isEveningShift(startH, endH) ? 10 : 0;
+  const taxiFee = startH !== null && endH !== null && isEveningShift(startH, endH) ? 100 : 0;
   return { basePay, taxiFee, total: basePay + taxiFee };
 }
 

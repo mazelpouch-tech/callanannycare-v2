@@ -328,7 +328,7 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span>{totalAllShifts} shifts</span>
             <span>{totalAllHours.toFixed(1)} hrs</span>
-            <span className="font-semibold text-foreground">{totalAllPay.toLocaleString()}€</span>
+            <span className="font-semibold text-foreground">{totalAllPay.toLocaleString()} DH</span>
             <span className="text-muted-foreground/70">({totalAllBasePay.toLocaleString()} + {totalAllTaxi} taxi)</span>
           </div>
         )}
@@ -373,17 +373,17 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
                       {(nanny.totalHours / nanny.shifts).toFixed(1)}h
                     </td>
                     <td className="px-6 py-3 text-sm text-muted-foreground text-right">
-                      {nanny.basePay.toLocaleString()}€
+                      {nanny.basePay.toLocaleString()} DH
                     </td>
                     <td className="px-6 py-3 text-sm text-right">
                       {nanny.taxiFee > 0 ? (
-                        <span className="text-orange-600 font-medium">+{nanny.taxiFee}€</span>
+                        <span className="text-orange-600 font-medium">+{nanny.taxiFee} DH</span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
                     </td>
                     <td className="px-6 py-3 text-sm font-semibold text-foreground text-right">
-                      {nanny.totalPay.toLocaleString()}€
+                      {nanny.totalPay.toLocaleString()} DH
                     </td>
                   </tr>
                 ))}
@@ -396,11 +396,11 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
                   <td className="px-6 py-3 text-sm font-bold text-foreground">
                     {totalAllShifts > 0 ? (totalAllHours / totalAllShifts).toFixed(1) : 0}h
                   </td>
-                  <td className="px-6 py-3 text-sm font-bold text-foreground text-right">{totalAllBasePay.toLocaleString()}€</td>
+                  <td className="px-6 py-3 text-sm font-bold text-foreground text-right">{totalAllBasePay.toLocaleString()} DH</td>
                   <td className="px-6 py-3 text-sm font-bold text-orange-600 text-right">
-                    {totalAllTaxi > 0 ? `+${totalAllTaxi.toLocaleString()}€` : "—"}
+                    {totalAllTaxi > 0 ? `+${totalAllTaxi.toLocaleString()} DH` : "—"}
                   </td>
-                  <td className="px-6 py-3 text-sm font-bold text-foreground text-right">{totalAllPay.toLocaleString()}€</td>
+                  <td className="px-6 py-3 text-sm font-bold text-foreground text-right">{totalAllPay.toLocaleString()} DH</td>
                 </tr>
               </tfoot>
             </table>
@@ -412,7 +412,7 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
               <div key={i} className="px-5 py-4 space-y-1">
                 <div className="flex items-center justify-between">
                   <p className="font-medium text-foreground text-sm">{nanny.name}</p>
-                  <span className="text-sm font-semibold text-foreground">{nanny.totalPay.toLocaleString()}€</span>
+                  <span className="text-sm font-semibold text-foreground">{nanny.totalPay.toLocaleString()} DH</span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <span>{nanny.shifts} shifts</span>
@@ -420,9 +420,9 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
                   <span>{(nanny.totalHours / nanny.shifts).toFixed(1)}h avg</span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span>Hourly: {nanny.basePay}€</span>
+                  <span>Hourly: {nanny.basePay} DH</span>
                   {nanny.taxiFee > 0 && (
-                    <span className="text-orange-600">Taxi: +{nanny.taxiFee}€</span>
+                    <span className="text-orange-600">Taxi: +{nanny.taxiFee} DH</span>
                   )}
                 </div>
               </div>
@@ -430,7 +430,7 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
           </div>
 
           <div className="px-6 py-3 border-t border-border text-[10px] text-muted-foreground">
-            Rate: {HOURLY_RATE}€/hr ({Math.round(HOURLY_RATE * 8)}€/8h) · +10€ for evening shifts (7 PM - 7 AM)
+            Rate: {HOURLY_RATE} DH/hr ({Math.round(HOURLY_RATE * 8)} DH/8h) · +100 DH for evening shifts (7 PM - 7 AM)
           </div>
         </>
       )}
