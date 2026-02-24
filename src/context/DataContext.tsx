@@ -532,13 +532,6 @@ export function DataProvider({ children }: DataProviderProps) {
     });
   }, []);
 
-  const sendReviewLink = useCallback(async (id: number | string): Promise<string> => {
-    const result = await apiFetch<{ success: boolean; reviewUrl: string }>(`/reviews?action=send`, {
-      method: "POST",
-      body: JSON.stringify({ booking_id: id }),
-    });
-    return result.reviewUrl;
-  }, []);
 
   // --- Nanny Portal Auth & Data ---
 
@@ -1006,7 +999,6 @@ export function DataProvider({ children }: DataProviderProps) {
       deleteBooking,
       resendInvoice,
       sendBookingReminder,
-      sendReviewLink,
       stats,
       isAdmin,
       adminProfile,
@@ -1039,7 +1031,7 @@ export function DataProvider({ children }: DataProviderProps) {
     }),
     [
       nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability, inviteNanny, toggleNannyStatus, resendInvite,
-      bookings, fetchBookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking, resendInvoice, sendBookingReminder, sendReviewLink,
+      bookings, fetchBookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking, resendInvoice, sendBookingReminder,
       stats, isAdmin, adminProfile, adminUsers, adminLogin, adminLogout,
       fetchAdminUsers, addAdminUser, updateAdminUser, deleteAdminUser,
       changeAdminPassword, forgotAdminPassword, resetAdminPassword, registerAdmin, loading,

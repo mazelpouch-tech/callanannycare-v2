@@ -17,6 +17,8 @@ import {
   X,
   Eye,
   EyeOff,
+  Link,
+  Check,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -44,6 +46,7 @@ export default function NannyProfile() {
   const [pinMessage, setPinMessage] = useState("");
   const [pinSaving, setPinSaving] = useState(false);
   const [showPins, setShowPins] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const [fullProfile, setFullProfile] = useState<NannyProfileType | null>(null);
 
@@ -273,6 +276,55 @@ export default function NannyProfile() {
               </span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Review Link Section */}
+      <div className="bg-card rounded-xl border border-border p-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center">
+              <Star className="w-4.5 h-4.5 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground text-sm">Review Link</h3>
+              <p className="text-xs text-muted-foreground">Copy & share with parents to collect reviews</p>
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              const reviewUrl = `${window.location.origin}/review/nanny/${profile.id}`;
+              try {
+                await navigator.clipboard.writeText(reviewUrl);
+              } catch {
+                const textArea = document.createElement("textarea");
+                textArea.value = reviewUrl;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand("copy");
+                document.body.removeChild(textArea);
+              }
+              setLinkCopied(true);
+              setTimeout(() => setLinkCopied(false), 2000);
+            }}
+            className={`flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${
+              linkCopied
+                ? "bg-green-50 text-green-600"
+                : "bg-amber-50 text-amber-600 hover:bg-amber-100"
+            }`}
+          >
+            {linkCopied ? (
+              <>
+                <Check className="w-4 h-4" />
+                Copied!
+              </>
+            ) : (
+              <>
+                <Link className="w-4 h-4" />
+                Copy Link
+              </>
+            )}
+          </button>
         </div>
       </div>
 

@@ -22,7 +22,6 @@ export default function ReviewNannyPublic() {
   // Review form state
   const [clientName, setClientName] = useState("");
   const [rating, setRating] = useState(0);
-  const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -109,7 +108,6 @@ export default function ReviewNannyPublic() {
   const nannyRating = Number(nanny.rating) || 0;
   const languages = toArray(nanny.languages);
   const specialties = toArray(nanny.specialties);
-  const displayRating = hoverRating || rating;
   const ratingLabels = ["", "Poor", "Fair", "Good", "Very Good", "Excellent"];
 
   const avgRating = reviews.length > 0
@@ -192,29 +190,29 @@ export default function ReviewNannyPublic() {
                     onChange={(e) => setClientName(e.target.value)}
                     placeholder="Enter your name"
                     maxLength={100}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300"
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300"
+                    style={{ fontSize: "16px" }}
                   />
                 </div>
 
                 {/* Star rating */}
                 <div className="text-center">
                   <p className="text-sm text-gray-600 mb-3">How was your experience?</p>
-                  <div className="flex justify-center gap-2">
+                  <div className="flex justify-center gap-3">
                     {[1, 2, 3, 4, 5].map((s) => (
                       <button
                         key={s}
                         type="button"
-                        onClick={() => setRating(s)}
-                        onMouseEnter={() => setHoverRating(s)}
-                        onMouseLeave={() => setHoverRating(0)}
-                        className="transition-transform hover:scale-110 focus:outline-none"
+                        onPointerDown={() => setRating(s)}
+                        className="p-1 focus:outline-none active:scale-95 transition-transform"
+                        style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
                       >
-                        <Star className={`w-10 h-10 transition-colors ${s <= displayRating ? "fill-amber-400 text-amber-400" : "text-gray-300 hover:text-amber-200"}`} />
+                        <Star className={`w-11 h-11 transition-colors ${s <= (rating) ? "fill-amber-400 text-amber-400" : "text-gray-300"}`} />
                       </button>
                     ))}
                   </div>
-                  {displayRating > 0 && (
-                    <p className="text-sm font-medium text-amber-600 mt-2">{ratingLabels[displayRating]}</p>
+                  {rating > 0 && (
+                    <p className="text-sm font-medium text-amber-600 mt-2">{ratingLabels[rating]}</p>
                   )}
                 </div>
 
@@ -227,9 +225,10 @@ export default function ReviewNannyPublic() {
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     placeholder="What did you like? Any suggestions?"
-                    rows={3}
+                    rows={4}
                     maxLength={1000}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 resize-none"
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 resize-none"
+                    style={{ fontSize: "16px" }}
                   />
                   <p className="text-xs text-gray-400 text-right mt-1">{comment.length}/1000</p>
                 </div>

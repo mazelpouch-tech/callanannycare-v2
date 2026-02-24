@@ -18,10 +18,7 @@ import {
   X,
   ArrowRightLeft,
   AlertTriangle,
-  Star,
   Pencil,
-  Copy,
-  Check,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -100,7 +97,7 @@ function LiveTimer({ clockIn }: LiveTimerProps) {
 }
 
 export default function NannyBookings() {
-  const { nannyBookings, fetchNannyBookings, updateBookingStatus, updateBooking, clockInBooking, clockOutBooking, addBooking, nannyProfile, nannies, sendReviewLink } = useData();
+  const { nannyBookings, fetchNannyBookings, updateBookingStatus, updateBooking, clockInBooking, clockOutBooking, addBooking, nannyProfile, nannies } = useData();
   const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -108,47 +105,6 @@ export default function NannyBookings() {
   const [expandedId, setExpandedId] = useState<number | string | null>(null);
   const [actionLoading, setActionLoading] = useState<number | string | null>(null);
 
-  // Review link tracking
-  const [reviewSentBookings, setReviewSentBookings] = useState<Record<string, { sentAt: number; url: string }>>({});
-  const [reviewLoading, setReviewLoading] = useState<number | string | null>(null);
-  const [copiedBookingId, setCopiedBookingId] = useState<number | string | null>(null);
-
-  const handleSendReviewLink = async (bookingId: number | string) => {
-    setReviewLoading(bookingId);
-    try {
-      const url = await sendReviewLink(bookingId);
-      setReviewSentBookings((prev) => ({ ...prev, [String(bookingId)]: { sentAt: Date.now(), url } }));
-    } catch (err) {
-      console.error("Send review link failed:", err);
-    }
-    setReviewLoading(null);
-  };
-
-  const handleCopyReviewLink = async () => {
-    if (!nannyProfile?.id) return;
-    const reviewUrl = `${window.location.origin}/review/nanny/${nannyProfile.id}`;
-    try {
-      await navigator.clipboard.writeText(reviewUrl);
-      setCopiedBookingId("nanny");
-      setTimeout(() => setCopiedBookingId(null), 2000);
-    } catch {
-      // Fallback for older browsers
-      const textArea = document.createElement("textarea");
-      textArea.value = reviewUrl;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textArea);
-      setCopiedBookingId("nanny");
-      setTimeout(() => setCopiedBookingId(null), 2000);
-    }
-  };
-
-  const isReviewCooling = (bookingId: number | string) => {
-    const entry = reviewSentBookings[String(bookingId)];
-    if (!entry) return false;
-    return Date.now() - entry.sentAt < 30 * 60 * 1000;
-  };
   const [extendBooking, setExtendBooking] = useState<typeof nannyBookings[0] | null>(null);
   const [forwardBooking, setForwardBooking] = useState<typeof nannyBookings[0] | null>(null);
 
@@ -836,35 +792,6 @@ export default function NannyBookings() {
                                 <MessageCircle className="w-4 h-4" />
                               </button>
                             )}
-                            {/* Send Review Link + Copy */}
-                            {booking.status === "completed" && (
-                              <>
-                                <button
-                                  onClick={() => handleSendReviewLink(booking.id)}
-                                  disabled={isReviewCooling(booking.id) || reviewLoading === booking.id}
-                                  className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 text-amber-600 text-xs font-medium rounded-lg hover:bg-amber-100 transition-colors disabled:opacity-40"
-                                  title={isReviewCooling(booking.id) ? "Review link sent" : "Send review link to parent"}
-                                >
-                                  {reviewLoading === booking.id ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  ) : (
-                                    <Star className="w-3.5 h-3.5" />
-                                  )}
-                                  {isReviewCooling(booking.id) ? "Sent" : "Review"}
-                                </button>
-                                <button
-                                  onClick={() => handleCopyReviewLink()}
-                                  className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-colors"
-                                  title={copiedBookingId === "nanny" ? "Copied!" : "Copy my review link"}
-                                >
-                                  {copiedBookingId === "nanny" ? (
-                                    <Check className="w-3.5 h-3.5 text-green-600" />
-                                  ) : (
-                                    <Copy className="w-3.5 h-3.5" />
-                                  )}
-                                </button>
-                              </>
-                            )}
                             {/* Expand */}
                             <button
                               onClick={() =>
@@ -1094,34 +1021,6 @@ export default function NannyBookings() {
                         <Pencil className="w-4 h-4" />
                         Edit
                       </button>
-                    )}
-                    {/* Send Review Link + Copy */}
-                    {booking.status === "completed" && (
-                      <>
-                        <button
-                          onClick={() => handleSendReviewLink(booking.id)}
-                          disabled={isReviewCooling(booking.id) || reviewLoading === booking.id}
-                          className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg bg-amber-50 text-amber-600 text-sm font-medium hover:bg-amber-100 transition-colors disabled:opacity-40"
-                        >
-                          {reviewLoading === booking.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Star className="w-4 h-4" />
-                          )}
-                          {isReviewCooling(booking.id) ? "Review Sent" : "Send Review Link"}
-                        </button>
-                        <button
-                          onClick={() => handleCopyReviewLink()}
-                          className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg bg-gray-50 text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors"
-                        >
-                          {copiedBookingId === "nanny" ? (
-                            <Check className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <Copy className="w-4 h-4" />
-                          )}
-                          {copiedBookingId === "nanny" ? "Copied!" : "Copy My Review Link"}
-                        </button>
-                      </>
                     )}
                   </div>
 

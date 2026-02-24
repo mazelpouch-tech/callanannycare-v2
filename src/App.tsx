@@ -8,7 +8,6 @@ import ParentForm from './pages/ParentForm'
 import ExtendBooking from './pages/ExtendBooking'
 import RebookBooking from './pages/RebookBooking'
 import BookingStatus from './pages/BookingStatus'
-import ReviewNanny from './pages/ReviewNanny'
 import ReviewNannyPublic from './pages/ReviewNannyPublic'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import NotFound from './pages/NotFound'
@@ -49,7 +48,6 @@ export default function App() {
       <Route path="/rebook/:id" element={<RebookBooking />} />
       <Route path="/booking/:id" element={<BookingStatus />} />
       <Route path="/review/nanny/:id" element={<ReviewNannyPublic />} />
-      <Route path="/review/:id" element={<ReviewNanny />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
       {/* Admin routes */}
