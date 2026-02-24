@@ -194,7 +194,7 @@ export default function AdminLayout() {
                 <span className={`ml-auto text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full ${
                   hasCriticalPending ? "bg-red-500 animate-pulse" : "bg-orange-500"
                 }`}>
-                  {stats.pendingBookings > 9 ? "9+" : stats.pendingBookings}
+                  {stats?.pendingBookings && stats.pendingBookings > 9 ? "9+" : stats?.pendingBookings}
                 </span>
               )}
               {label === "Messages" && unreadChatCount > 0 && (
