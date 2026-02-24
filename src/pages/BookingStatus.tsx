@@ -15,6 +15,8 @@ import {
   RefreshCw,
   MessageCircle,
   Star,
+  XCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { useParams, Link } from "react-router-dom";
 
@@ -88,6 +90,17 @@ const T = {
     completed: "Completed",
     cancelled: "Cancelled",
     active: "Active",
+    cancelBooking: "Cancel Booking",
+    cancelTitle: "Cancel Booking",
+    cancelWarning: "This will notify your nanny and the Call a Nanny team.",
+    cancelFeeWarning: "⚠️ Your booking is within 24 hours. A cancellation fee may apply.",
+    cancelNoFee: "✅ No cancellation fee — you are cancelling more than 24 hours before your service.",
+    cancelReasonLabel: "Reason for cancellation",
+    cancelReasonPlaceholder: "e.g. Change of plans, schedule conflict...",
+    keepBooking: "Keep Booking",
+    yesCancelIt: "Yes, Cancel It",
+    cancelling: "Cancelling...",
+    cancelSuccess: "Booking cancelled successfully.",
   },
   fr: {
     title: "Suivre Votre Réservation",
@@ -130,6 +143,17 @@ const T = {
     completed: "Terminée",
     cancelled: "Annulée",
     active: "Active",
+    cancelBooking: "Annuler la Réservation",
+    cancelTitle: "Annuler la Réservation",
+    cancelWarning: "Cela notifiera votre nounou et l'équipe Call a Nanny.",
+    cancelFeeWarning: "⚠️ Votre réservation est dans moins de 24 heures. Des frais d'annulation peuvent s'appliquer.",
+    cancelNoFee: "✅ Aucun frais d'annulation — vous annulez plus de 24 heures avant votre service.",
+    cancelReasonLabel: "Raison de l'annulation",
+    cancelReasonPlaceholder: "ex. Changement de plans, conflit d'horaire...",
+    keepBooking: "Garder la Réservation",
+    yesCancelIt: "Oui, Annuler",
+    cancelling: "Annulation...",
+    cancelSuccess: "Réservation annulée avec succès.",
   },
 };
 
@@ -166,6 +190,50 @@ export default function BookingStatus() {
   const [emailError, setEmailError] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // Cancel state
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelSuccess, setCancelSuccess] = useState(false);
+
+  const handleParentCancel = async () => {
+    if (!booking || !id) return;
+    setCancelLoading(true);
+    try {
+      const res = await fetch(`${API}/api/bookings/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "cancelled",
+          cancellation_reason: cancelReason.trim(),
+          cancelled_by: "parent",
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBooking(data);
+        setCancelSuccess(true);
+        setShowCancelModal(false);
+        setCancelReason("");
+      }
+    } catch (err) {
+      console.error("Cancel failed:", err);
+    }
+    setCancelLoading(false);
+  };
+
+  // Compute 24h fee flag for cancel modal
+  const getHasFee = () => {
+    if (!booking) return false;
+    try {
+      const startStr = (booking.start_time || "09:00").replace("h", ":");
+      const bookingDateTime = new Date(`${booking.date}T${startStr}:00`);
+      return (bookingDateTime.getTime() - Date.now()) / 3600000 < 24;
+    } catch {
+      return false;
+    }
+  };
 
   // Fetch booking on mount (basic existence check — no email data exposed)
   useEffect(() => {
@@ -549,7 +617,7 @@ export default function BookingStatus() {
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-3">
-              {(booking.status === "pending" || booking.status === "confirmed") && (
+              {(booking.status === "pending" || booking.status === "confirmed") && !cancelSuccess && (
                 <Link
                   to={`/extend/${booking.id}`}
                   className="w-full py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl text-sm font-bold text-center hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
@@ -576,7 +644,87 @@ export default function BookingStatus() {
                 <RefreshCw className="w-4 h-4" />
                 {s.rebookBooking}
               </Link>
+
+              {/* Cancel Booking */}
+              {(booking.status === "pending" || booking.status === "confirmed") && !cancelSuccess && (
+                <button
+                  onClick={() => setShowCancelModal(true)}
+                  className="w-full py-3 border-2 border-red-200 text-red-600 rounded-xl text-sm font-bold text-center hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <XCircle className="w-4 h-4" />
+                  {s.cancelBooking}
+                </button>
+              )}
+
+              {/* Cancel success message */}
+              {cancelSuccess && (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+                  <CheckCircle className="w-6 h-6 text-green-500 mx-auto mb-2" />
+                  <p className="text-sm font-medium text-green-700">{s.cancelSuccess}</p>
+                </div>
+              )}
             </div>
+
+            {/* Cancel Confirmation Modal */}
+            {showCancelModal && (
+              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowCancelModal(false); setCancelReason(""); }}>
+                <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+                  <div className="p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                        <AlertTriangle className="w-5 h-5 text-red-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">{s.cancelTitle}</h3>
+                        <p className="text-sm text-gray-500">#{booking.id}</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-3">
+                      <p className="text-sm text-orange-800">{s.cancelWarning}</p>
+                    </div>
+
+                    {/* 24h fee warning */}
+                    <div className={`rounded-xl p-3 mb-4 ${getHasFee() ? "bg-red-50 border border-red-200" : "bg-green-50 border border-green-200"}`}>
+                      <p className={`text-sm ${getHasFee() ? "text-red-700" : "text-green-700"}`}>
+                        {getHasFee() ? s.cancelFeeWarning : s.cancelNoFee}
+                      </p>
+                    </div>
+
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      {s.cancelReasonLabel} <span className="text-gray-400 font-normal">(optional)</span>
+                    </label>
+                    <textarea
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      placeholder={s.cancelReasonPlaceholder}
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="flex gap-3 p-4 border-t border-gray-100">
+                    <button
+                      onClick={() => { setShowCancelModal(false); setCancelReason(""); }}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                    >
+                      {s.keepBooking}
+                    </button>
+                    <button
+                      onClick={handleParentCancel}
+                      disabled={cancelLoading}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {cancelLoading ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> {s.cancelling}</>
+                      ) : (
+                        s.yesCancelIt
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Auto-refresh footer */}
             <div className="text-center space-y-1">

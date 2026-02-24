@@ -157,6 +157,9 @@ export function DataProvider({ children }: DataProviderProps) {
             createdAt: b.created_at,
             clockIn: b.clock_in,
             clockOut: b.clock_out,
+            cancelledAt: b.cancelled_at ?? null,
+            cancellationReason: b.cancellation_reason || '',
+            cancelledBy: b.cancelled_by || '',
           }));
           setBookings(normalizedBookings);
           saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -295,6 +298,9 @@ export function DataProvider({ children }: DataProviderProps) {
         createdAt: b.created_at,
         clockIn: b.clock_in,
         clockOut: b.clock_out,
+        cancelledAt: b.cancelled_at ?? null,
+        cancellationReason: b.cancellation_reason || '',
+        cancelledBy: b.cancelled_by || '',
       }));
       setBookings(normalizedBookings);
       saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -353,6 +359,9 @@ export function DataProvider({ children }: DataProviderProps) {
           createdAt: created.created_at,
           clockIn: created.clock_in ?? null,
           clockOut: created.clock_out ?? null,
+          cancelledAt: created.cancelled_at ?? null,
+          cancellationReason: created.cancellation_reason || '',
+          cancelledBy: created.cancelled_by || '',
         };
         setBookings((prev) => {
           const updated = [...prev, normalized];
@@ -380,7 +389,11 @@ export function DataProvider({ children }: DataProviderProps) {
     [nannies]
   );
 
-  const updateBookingStatus = useCallback(async (id: number | string, status: BookingStatus): Promise<void> => {
+  const updateBookingStatus = useCallback(async (
+    id: number | string,
+    status: BookingStatus,
+    meta?: { reason?: string; cancelledBy?: string }
+  ): Promise<void> => {
     const validStatuses: BookingStatus[] = ["pending", "confirmed", "completed", "cancelled"];
     if (!validStatuses.includes(status)) {
       console.error(`Invalid booking status: ${status}`);
@@ -389,14 +402,28 @@ export function DataProvider({ children }: DataProviderProps) {
     try {
       await apiFetch(`/bookings/${id}`, {
         method: "PUT",
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({
+          status,
+          ...(status === "cancelled" && meta ? {
+            cancellation_reason: meta.reason || "",
+            cancelled_by: meta.cancelledBy || "admin",
+          } : {}),
+        }),
       });
     } catch {
       console.warn("API status update failed, updating locally");
     }
     setBookings((prev) => {
       const updated = prev.map((b) =>
-        b.id === id ? { ...b, status } : b
+        b.id === id ? {
+          ...b,
+          status,
+          ...(status === "cancelled" ? {
+            cancelledAt: new Date().toISOString(),
+            cancellationReason: meta?.reason || "",
+            cancelledBy: meta?.cancelledBy || "",
+          } : {}),
+        } : b
       );
       saveToStorage(STORAGE_KEYS.bookings, updated);
       return updated;
@@ -576,6 +603,9 @@ export function DataProvider({ children }: DataProviderProps) {
     createdAt: b.created_at,
     clockIn: b.clock_in,
     clockOut: b.clock_out,
+    cancelledAt: b.cancelled_at ?? null,
+    cancellationReason: b.cancellation_reason || '',
+    cancelledBy: b.cancelled_by || '',
   }), []);
 
   const fetchNannyBookings = useCallback(async () => {

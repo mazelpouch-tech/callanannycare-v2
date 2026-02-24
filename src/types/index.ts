@@ -59,6 +59,9 @@ export interface DbBooking {
   clock_in: string | null;
   clock_out: string | null;
   locale: string;
+  cancelled_at: string | null;
+  cancellation_reason: string;
+  cancelled_by: string;
   created_at: string;
   updated_at: string;
 }
@@ -142,6 +145,9 @@ export interface Booking {
   createdAt: string;
   clockIn: string | null;
   clockOut: string | null;
+  cancelledAt: string | null;
+  cancellationReason: string;
+  cancelledBy: string;
 }
 
 export interface Notification {
@@ -285,7 +291,7 @@ export interface DataContextValue {
   fetchBookings: () => Promise<void>;
   addBooking: (booking: Partial<Booking>, meta?: { locale?: string }) => Promise<Booking>;
   updateBooking: (id: number | string, updates: Partial<Booking>) => Promise<void>;
-  updateBookingStatus: (id: number | string, status: BookingStatus) => Promise<void>;
+  updateBookingStatus: (id: number | string, status: BookingStatus, meta?: { reason?: string; cancelledBy?: string }) => Promise<void>;
   clockInBooking: (id: number | string) => Promise<void>;
   clockOutBooking: (id: number | string) => Promise<void>;
   deleteBooking: (id: number | string) => Promise<void>;

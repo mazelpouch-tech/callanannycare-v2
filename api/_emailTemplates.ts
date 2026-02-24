@@ -56,6 +56,22 @@ const strings = {
     reminderNanny: 'Your Nanny',
     reminderContact: 'Need to make changes? Contact us as soon as possible.',
     reminderSeeYou: 'We look forward to seeing you!',
+    // Nanny confirmed
+    nannyConfirmedSubject: '🎉 Your Nanny is Confirmed!',
+    nannyConfirmedGreeting: 'Great news!',
+    nannyConfirmedText: 'Your nanny has accepted your booking and is ready to care for your little ones.',
+    nannyProfileLabel: 'Meet Your Nanny',
+    nannyExperience: 'Experience',
+    nannyLanguages: 'Languages',
+    nannySpecialties: 'Specialties',
+    nannyRating: 'Rating',
+    // Cancellation
+    cancellationSubject: 'Booking Cancelled',
+    cancellationText: 'Your booking has been cancelled. Here are the details:',
+    cancellationReason: 'Reason',
+    cancellationFeeNote: 'A cancellation fee may apply as the cancellation was made within 24 hours of your scheduled service.',
+    cancellationNoFee: 'No cancellation fee applies — your booking was cancelled more than 24 hours before the scheduled service.',
+    cancelledByLabel: 'Cancelled by',
   },
   fr: {
     confirmSubject: 'Confirmation de Réservation - Call a Nanny',
@@ -108,6 +124,22 @@ const strings = {
     reminderNanny: 'Votre Nounou',
     reminderContact: 'Besoin de modifications ? Contactez-nous dès que possible.',
     reminderSeeYou: 'Nous avons hâte de vous retrouver !',
+    // Nanny confirmed
+    nannyConfirmedSubject: '🎉 Votre Nounou est Confirmée !',
+    nannyConfirmedGreeting: 'Bonne nouvelle !',
+    nannyConfirmedText: 'Votre nounou a accepté votre réservation et est prête à s\'occuper de vos enfants.',
+    nannyProfileLabel: 'Votre Nounou',
+    nannyExperience: 'Expérience',
+    nannyLanguages: 'Langues',
+    nannySpecialties: 'Spécialités',
+    nannyRating: 'Évaluation',
+    // Cancellation
+    cancellationSubject: 'Réservation Annulée',
+    cancellationText: 'Votre réservation a été annulée. Voici les détails :',
+    cancellationReason: 'Raison',
+    cancellationFeeNote: 'Des frais d\'annulation peuvent s\'appliquer car l\'annulation a été effectuée moins de 24h avant le service.',
+    cancellationNoFee: 'Aucun frais d\'annulation — votre réservation a été annulée plus de 24h avant le service.',
+    cancelledByLabel: 'Annulé par',
   },
 };
 
@@ -717,6 +749,235 @@ export async function sendParentReminderEmail(data: ParentReminderEmailData): Pr
     return true;
   } catch (err) {
     console.error('Failed to send parent reminder email:', err);
+    return false;
+  }
+}
+
+// ============================================================
+// Nanny Confirmed Email (sent to parent when nanny accepts)
+// ============================================================
+
+export interface NannyConfirmedEmailData {
+  bookingId: number;
+  clientName: string;
+  clientEmail: string;
+  hotel: string;
+  date: string;
+  endDate?: string | null;
+  startTime: string;
+  endTime: string;
+  childrenCount: number;
+  childrenAges: string;
+  totalPrice: number;
+  nannyName: string;
+  nannyImage: string;
+  nannyBio: string;
+  nannyExperience: string;
+  nannyRating: number;
+  nannyLanguages: string[];
+  nannySpecialties: string[];
+  locale: string;
+}
+
+export async function sendNannyConfirmedEmail(data: NannyConfirmedEmailData): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log('RESEND_API_KEY not configured. Nanny confirmed email skipped.');
+    return false;
+  }
+
+  const resend = new Resend(apiKey);
+  const locale: Locale = data.locale === 'fr' ? 'fr' : 'en';
+  const s = t(locale);
+  const baseUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
+
+  const dateDisplay = data.endDate && data.endDate !== data.date
+    ? `${data.date} — ${data.endDate}`
+    : data.date;
+
+  const nannyPhoto = data.nannyImage
+    ? `<img src="${data.nannyImage}" alt="${data.nannyName}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid #fed7aa;display:block;margin:0 auto 12px;" />`
+    : `<div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#f97316,#ec4899);display:block;margin:0 auto 12px;text-align:center;line-height:80px;"><span style="color:#fff;font-size:28px;font-weight:700;">${data.nannyName.charAt(0)}</span></div>`;
+
+  const starsCount = Math.min(Math.round(data.nannyRating), 5);
+  const starsHtml = Array(starsCount).fill('&#11088;').join('');
+  const languagesList = data.nannyLanguages.length > 0 ? data.nannyLanguages.join(' &middot; ') : 'N/A';
+  const specialtiesTags = data.nannySpecialties
+    .map(sp => `<span style="display:inline-block;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;font-size:11px;padding:3px 10px;border-radius:20px;margin:3px 3px 0 0;">${sp}</span>`)
+    .join('');
+
+  const content = `
+    <!-- Congratulatory banner -->
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="font-size:48px;margin-bottom:8px;">&#127881;</div>
+      <h2 style="margin:0 0 6px;color:#1a1a1a;font-size:24px;font-family:Georgia,'Times New Roman',serif;">${s.nannyConfirmedGreeting}</h2>
+      <p style="margin:0;color:#666;font-size:15px;line-height:1.5;">${s.nannyConfirmedText}</p>
+    </div>
+
+    <!-- Nanny Profile Card -->
+    ${sectionTitle(s.nannyProfileLabel)}
+    <div style="border:1px solid #fed7aa;border-radius:16px;overflow:hidden;margin-bottom:24px;">
+      <div style="background:linear-gradient(135deg,#fff7ed,#fdf2f8);padding:24px;text-align:center;">
+        ${nannyPhoto}
+        <p style="margin:0;font-size:20px;font-weight:700;color:#1a1a1a;">${data.nannyName}</p>
+        <p style="margin:4px 0 8px;color:#f97316;font-size:14px;">${starsHtml} ${data.nannyRating.toFixed(1)}</p>
+        ${data.nannyBio ? `<p style="margin:0;color:#666;font-size:13px;font-style:italic;line-height:1.5;">${data.nannyBio}</p>` : ''}
+      </div>
+      <div style="padding:16px 20px;background:#fff;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          ${row(s.nannyExperience, data.nannyExperience || 'N/A')}
+          ${row(s.nannyLanguages, languagesList)}
+          ${row(s.nannyRating, `${data.nannyRating.toFixed(1)} / 5`)}
+        </table>
+        ${data.nannySpecialties.length > 0 ? `
+          <div style="margin-top:12px;">
+            <p style="margin:0 0 6px;color:#666;font-size:12px;text-transform:uppercase;letter-spacing:1px;">${s.nannySpecialties}</p>
+            <div>${specialtiesTags}</div>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+
+    <!-- Booking Details -->
+    ${sectionTitle(s.bookingDetails)}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden;">
+      ${row(s.bookingRef, `#${data.bookingId}`)}
+      ${row(s.dateOfService, dateDisplay)}
+      ${row(s.timeSlot, `${data.startTime} - ${data.endTime}`)}
+      ${row(s.accommodation, data.hotel || 'N/A')}
+      ${row(s.children, `${data.childrenCount}${data.childrenAges ? ' (' + data.childrenAges + ')' : ''}`)}
+      ${row(s.totalPrice, `<strong style="color:#f97316;font-size:16px;">${data.totalPrice}&euro;</strong>`)}
+    </table>
+
+    <!-- Track CTA -->
+    <div style="margin:28px 0;padding:20px;background:linear-gradient(135deg,#fff7ed,#fdf2f8);border-radius:12px;text-align:center;border:1px solid #fed7aa;">
+      <h3 style="margin:0 0 6px;color:#1a1a1a;font-size:15px;font-weight:600;">${s.trackBooking}</h3>
+      <p style="margin:0 0 16px;color:#666;font-size:13px;">${s.trackBookingText}</p>
+      <a href="${baseUrl}/booking/${data.bookingId}" style="display:inline-block;background:linear-gradient(135deg,#f97316,#ec4899);color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:50px;box-shadow:0 2px 8px rgba(249,115,22,0.3);">${s.trackBookingBtn}</a>
+    </div>
+
+    <!-- Extend + Rebook CTAs -->
+    <div style="margin:28px 0;padding:20px;background-color:#eff6ff;border-radius:12px;text-align:center;">
+      <h3 style="margin:0 0 6px;color:#1a1a1a;font-size:15px;font-weight:600;">&#128336; ${s.extendBooking}</h3>
+      <p style="margin:0 0 16px;color:#666;font-size:13px;line-height:1.5;">${s.extendBookingText}</p>
+      <a href="${baseUrl}/extend/${data.bookingId}" style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:50px;box-shadow:0 2px 8px rgba(59,130,246,0.3);">${s.extendBookingBtn}</a>
+    </div>
+
+    <div style="margin:28px 0;padding:20px;background-color:#fdf2f8;border-radius:12px;text-align:center;">
+      <h3 style="margin:0 0 6px;color:#1a1a1a;font-size:15px;font-weight:600;">${s.rebookTitle}</h3>
+      <p style="margin:0 0 16px;color:#666;font-size:13px;line-height:1.5;">${s.rebookText}</p>
+      <a href="${baseUrl}/rebook/${data.bookingId}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:50px;box-shadow:0 2px 8px rgba(236,72,153,0.3);">${s.rebookBtn}</a>
+    </div>
+
+    <p style="margin:0;color:#999;font-size:13px;text-align:center;">${s.contactUs} <a href="mailto:info@callanannycare.com" style="color:#f97316;">info@callanannycare.com</a></p>
+  `;
+
+  const fromAddress = process.env.RESEND_FROM_EMAIL || 'Call a Nanny <onboarding@resend.dev>';
+
+  try {
+    await resend.emails.send({
+      from: fromAddress,
+      to: data.clientEmail,
+      cc: ['info@callanannycare.com'],
+      subject: s.nannyConfirmedSubject,
+      html: emailWrapper(content),
+    });
+    return true;
+  } catch (err) {
+    console.error('Failed to send nanny confirmed email:', err);
+    return false;
+  }
+}
+
+// ============================================================
+// Cancellation Email (sent to parent when booking is cancelled)
+// ============================================================
+
+export interface CancellationEmailData {
+  bookingId: number;
+  clientName: string;
+  clientEmail: string;
+  hotel: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  childrenCount: number;
+  totalPrice: number;
+  cancellationReason: string;
+  cancelledBy: string;
+  hasCancellationFee: boolean;
+  locale: string;
+}
+
+export async function sendCancellationEmail(data: CancellationEmailData): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log('RESEND_API_KEY not configured. Cancellation email skipped.');
+    return false;
+  }
+
+  const resend = new Resend(apiKey);
+  const locale: Locale = data.locale === 'fr' ? 'fr' : 'en';
+  const s = t(locale);
+  const baseUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
+
+  const cancelledByMap: Record<string, Record<string, string>> = {
+    en: { admin: 'Call a Nanny Service', nanny: 'Your Nanny', parent: 'You' },
+    fr: { admin: 'Service Call a Nanny', nanny: 'Votre Nounou', parent: 'Vous-m\u00eame' },
+  };
+  const cancelledByDisplay = cancelledByMap[locale]?.[data.cancelledBy] || data.cancelledBy;
+
+  const content = `
+    <!-- Cancellation banner -->
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:48px;margin-bottom:8px;">&#10060;</div>
+      <h2 style="margin:0 0 6px;color:#1a1a1a;font-size:22px;font-family:Georgia,'Times New Roman',serif;">${s.greeting} ${data.clientName},</h2>
+      <p style="margin:0;color:#666;font-size:15px;">${s.cancellationText}</p>
+    </div>
+
+    <!-- Booking Details -->
+    ${sectionTitle(s.bookingDetails)}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden;">
+      ${row(s.bookingRef, `#${data.bookingId}`)}
+      ${row(s.dateOfService, data.date)}
+      ${row(s.timeSlot, `${data.startTime} - ${data.endTime}`)}
+      ${row(s.accommodation, data.hotel || 'N/A')}
+      ${row(s.children, `${data.childrenCount}`)}
+      ${row(s.totalPrice, `${data.totalPrice}&euro;`)}
+      ${data.cancellationReason ? row(s.cancellationReason, data.cancellationReason) : ''}
+      ${row(s.cancelledByLabel, cancelledByDisplay)}
+    </table>
+
+    <!-- Fee notice -->
+    <div style="margin:24px 0;padding:16px 20px;border-radius:12px;border-left:4px solid ${data.hasCancellationFee ? '#ef4444' : '#22c55e'};background:${data.hasCancellationFee ? '#fef2f2' : '#f0fdf4'};">
+      <p style="margin:0;color:${data.hasCancellationFee ? '#991b1b' : '#166534'};font-size:14px;line-height:1.5;">
+        ${data.hasCancellationFee ? s.cancellationFeeNote : s.cancellationNoFee}
+      </p>
+    </div>
+
+    <!-- Rebook CTA -->
+    <div style="margin:24px 0;padding:20px;background:#fdf2f8;border-radius:12px;text-align:center;">
+      <h3 style="margin:0 0 6px;color:#1a1a1a;font-size:15px;font-weight:600;">${s.rebookTitle}</h3>
+      <p style="margin:0 0 16px;color:#666;font-size:13px;">${s.rebookText}</p>
+      <a href="${baseUrl}/rebook/${data.bookingId}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:#fff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:50px;">${s.rebookBtn}</a>
+    </div>
+
+    <p style="margin:0;color:#999;font-size:13px;text-align:center;">${s.contactUs} <a href="mailto:info@callanannycare.com" style="color:#f97316;">info@callanannycare.com</a></p>
+  `;
+
+  const fromAddress = process.env.RESEND_FROM_EMAIL || 'Call a Nanny <onboarding@resend.dev>';
+
+  try {
+    await resend.emails.send({
+      from: fromAddress,
+      to: data.clientEmail,
+      cc: ['info@callanannycare.com'],
+      subject: `${s.cancellationSubject} #${data.bookingId}`,
+      html: emailWrapper(content),
+    });
+    return true;
+  } catch (err) {
+    console.error('Failed to send cancellation email:', err);
     return false;
   }
 }

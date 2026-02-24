@@ -22,6 +22,8 @@ interface UpdateBookingBody {
   clock_out?: string | null;
   resend_invoice?: boolean;
   send_reminder?: boolean;
+  cancellation_reason?: string;
+  cancelled_by?: string;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -55,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     if (req.method === 'PUT') {
-      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder } = req.body as UpdateBookingBody;
+      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder, cancellation_reason, cancelled_by } = req.body as UpdateBookingBody;
 
       // ─── Conflict check when nanny/date/time changes ────────────
       if (nanny_id !== undefined || date || end_date !== undefined || start_time || end_time) {
@@ -110,6 +112,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           total_price = COALESCE(${total_price}, total_price),
           clock_in = COALESCE(${clock_in ? clock_in : null}, clock_in),
           clock_out = COALESCE(${clock_out ? clock_out : null}, clock_out),
+          cancelled_at = CASE WHEN ${status} = 'cancelled' AND cancelled_at IS NULL THEN NOW() ELSE cancelled_at END,
+          cancellation_reason = CASE WHEN ${status} = 'cancelled' THEN COALESCE(${cancellation_reason || ''}, cancellation_reason) ELSE cancellation_reason END,
+          cancelled_by = CASE WHEN ${status} = 'cancelled' THEN COALESCE(${cancelled_by || ''}, cancelled_by) ELSE cancelled_by END,
           updated_at = NOW()
         WHERE id = ${id}
         RETURNING *
@@ -133,6 +138,181 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         } catch (notifError: unknown) {
           console.error('Failed to create notification:', notifError);
+        }
+      }
+
+      // ─── Nanny confirmed → send parent a confirmation email with nanny profile ───
+      if (status === 'confirmed' && result[0] && result[0].nanny_id && result[0].client_email) {
+        try {
+          const nannyProfileRows = await sql`
+            SELECT name, image, bio, experience, rating, languages, specialties
+            FROM nannies WHERE id = ${result[0].nanny_id}
+          ` as { name: string; image: string; bio: string; experience: string; rating: number; languages: string | string[]; specialties: string | string[] }[];
+
+          if (nannyProfileRows[0]) {
+            const np = nannyProfileRows[0];
+            const parsedLangs = typeof np.languages === 'string' ? JSON.parse(np.languages || '[]') : np.languages;
+            const parsedSpecs = typeof np.specialties === 'string' ? JSON.parse(np.specialties || '[]') : np.specialties;
+
+            const { sendNannyConfirmedEmail } = await import('../_emailTemplates.js');
+            await sendNannyConfirmedEmail({
+              bookingId: result[0].id,
+              clientName: result[0].client_name,
+              clientEmail: result[0].client_email,
+              hotel: result[0].hotel || '',
+              date: result[0].date,
+              endDate: result[0].end_date || null,
+              startTime: result[0].start_time,
+              endTime: result[0].end_time || '',
+              childrenCount: result[0].children_count || 1,
+              childrenAges: result[0].children_ages || '',
+              totalPrice: result[0].total_price || 0,
+              nannyName: np.name,
+              nannyImage: np.image || '',
+              nannyBio: np.bio || '',
+              nannyExperience: np.experience || '',
+              nannyRating: np.rating || 5,
+              nannyLanguages: parsedLangs,
+              nannySpecialties: parsedSpecs,
+              locale: result[0].locale || 'en',
+            });
+          }
+        } catch (confirmedEmailError: unknown) {
+          console.error('Nanny confirmed email to parent failed:', confirmedEmailError);
+        }
+      }
+
+      // ─── Cancellation → email to parent + nanny + WhatsApp to business + parent ───
+      if (status === 'cancelled' && result[0]) {
+        const booking = result[0];
+        const bookingDateTime = new Date(`${booking.date}T${(booking.start_time || '09:00').replace('h', ':')}:00`);
+        const hoursUntilBooking = (bookingDateTime.getTime() - Date.now()) / 3600000;
+        const hasCancellationFee = hoursUntilBooking < 24;
+
+        // 1. Send cancellation email to parent
+        if (booking.client_email) {
+          try {
+            const { sendCancellationEmail } = await import('../_emailTemplates.js');
+            await sendCancellationEmail({
+              bookingId: booking.id,
+              clientName: booking.client_name,
+              clientEmail: booking.client_email,
+              hotel: booking.hotel || '',
+              date: booking.date,
+              startTime: booking.start_time,
+              endTime: booking.end_time || '',
+              childrenCount: booking.children_count || 1,
+              totalPrice: booking.total_price || 0,
+              cancellationReason: cancellation_reason || '',
+              cancelledBy: cancelled_by || 'admin',
+              hasCancellationFee,
+              locale: booking.locale || 'en',
+            });
+          } catch (cancelEmailErr: unknown) {
+            console.error('Cancellation email to parent failed:', cancelEmailErr);
+          }
+        }
+
+        // 2. Send cancellation email to nanny (inline)
+        if (booking.nanny_id) {
+          try {
+            const nannyRowsCancel = await sql`SELECT name, email FROM nannies WHERE id = ${booking.nanny_id}` as { name: string; email: string | null }[];
+            if (nannyRowsCancel[0]?.email) {
+              const resendModule = await import('resend');
+              const ResendClass = resendModule.Resend;
+              const apiKey = process.env.RESEND_API_KEY;
+              if (apiKey) {
+                const resendClient = new ResendClass(apiKey);
+                const fromAddr = process.env.RESEND_FROM_EMAIL || 'Call a Nanny <onboarding@resend.dev>';
+                await resendClient.emails.send({
+                  from: fromAddr,
+                  to: nannyRowsCancel[0].email,
+                  subject: `Booking Cancelled #${booking.id}`,
+                  html: `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:20px;">
+                    <h2 style="color:#ef4444;">Booking Cancelled</h2>
+                    <p>Hi ${nannyRowsCancel[0].name},</p>
+                    <p>The booking with <strong>${booking.client_name}</strong> on <strong>${booking.date}</strong> (${booking.start_time} - ${booking.end_time || ''}) has been cancelled.</p>
+                    ${cancellation_reason ? `<p><strong>Reason:</strong> ${cancellation_reason}</p>` : ''}
+                    <p style="color:#666;font-size:13px;">No action required on your end. Your schedule has been updated automatically.</p>
+                    <p style="color:#999;font-size:12px;">— Call a Nanny Team</p>
+                  </div>`,
+                });
+              }
+            }
+          } catch (nannyCancelErr: unknown) {
+            console.error('Cancellation email to nanny failed:', nannyCancelErr);
+          }
+        }
+
+        // 3. WhatsApp cancellation to business
+        const WA_TOKEN_C = process.env.WHATSAPP_TOKEN;
+        const WA_PHONE_ID_C = process.env.WHATSAPP_PHONE_ID;
+        const WA_BIZ_C = process.env.WHATSAPP_BUSINESS_NUMBER;
+
+        if (WA_TOKEN_C && WA_PHONE_ID_C && WA_BIZ_C) {
+          try {
+            const waCancelBiz = [
+              '❌ *Booking Cancelled*',
+              '',
+              `📋 *Booking #:* ${booking.id}`,
+              `👤 *Parent:* ${booking.client_name}`,
+              `📅 *Date:* ${booking.date}`,
+              `🕐 *Time:* ${booking.start_time} - ${booking.end_time || ''}`,
+              `💰 *Amount:* ${booking.total_price || 0}€`,
+              cancellation_reason ? `📝 *Reason:* ${cancellation_reason}` : '',
+              `👤 *Cancelled by:* ${cancelled_by || 'admin'}`,
+              hasCancellationFee ? '⚠️ *24h fee applies*' : '✅ *No fee (>24h)*',
+            ].filter(Boolean).join('\n');
+
+            await fetch(`https://graph.facebook.com/v18.0/${WA_PHONE_ID_C}/messages`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${WA_TOKEN_C}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ messaging_product: 'whatsapp', to: WA_BIZ_C, type: 'text', text: { body: waCancelBiz } }),
+            });
+          } catch (waCancelBizErr: unknown) {
+            console.error('WhatsApp cancel to business failed:', waCancelBizErr);
+          }
+        }
+
+        // 4. WhatsApp cancellation to parent
+        if (WA_TOKEN_C && WA_PHONE_ID_C && booking.client_phone) {
+          try {
+            let parentPhoneC = booking.client_phone.replace(/[\s\-\(\)]/g, '');
+            if (parentPhoneC.startsWith('0')) parentPhoneC = '212' + parentPhoneC.slice(1);
+            if (!parentPhoneC.startsWith('+') && !parentPhoneC.match(/^\d{10,}/)) parentPhoneC = '+' + parentPhoneC;
+            parentPhoneC = parentPhoneC.replace('+', '');
+
+            const locale = booking.locale || 'en';
+            const waCancelParent = locale === 'fr'
+              ? [
+                  '❌ *Réservation Annulée*',
+                  '',
+                  `Bonjour ${booking.client_name},`,
+                  `Votre réservation #${booking.id} du ${booking.date} a été annulée.`,
+                  cancellation_reason ? `📝 *Raison:* ${cancellation_reason}` : '',
+                  hasCancellationFee ? '⚠️ Des frais d\'annulation peuvent s\'appliquer (annulation <24h).' : '✅ Aucun frais d\'annulation.',
+                  '',
+                  '💕 Vous pouvez réserver à nouveau sur callanannycare.com',
+                ].filter(Boolean).join('\n')
+              : [
+                  '❌ *Booking Cancelled*',
+                  '',
+                  `Hi ${booking.client_name},`,
+                  `Your booking #${booking.id} on ${booking.date} has been cancelled.`,
+                  cancellation_reason ? `📝 *Reason:* ${cancellation_reason}` : '',
+                  hasCancellationFee ? '⚠️ A cancellation fee may apply (cancelled <24h before service).' : '✅ No cancellation fee applies.',
+                  '',
+                  '💕 You can rebook anytime at callanannycare.com',
+                ].filter(Boolean).join('\n');
+
+            await fetch(`https://graph.facebook.com/v18.0/${WA_PHONE_ID_C}/messages`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${WA_TOKEN_C}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ messaging_product: 'whatsapp', to: parentPhoneC, type: 'text', text: { body: waCancelParent } }),
+            });
+          } catch (waCancelParentErr: unknown) {
+            console.error('WhatsApp cancel to parent failed:', waCancelParentErr);
+          }
         }
       }
 

@@ -142,6 +142,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_nanny_blocked_unique ON nanny_blocked_dates(nanny_id, date)`;
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reminder_sent BOOLEAN DEFAULT false`;
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS locale VARCHAR(10) DEFAULT 'en'`;
+
+    // ─── Cancellation Tracking ────────────────────────────────────────
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancellation_reason TEXT DEFAULT ''`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_by VARCHAR(20) DEFAULT ''`;
     // ────────────────────────────────────────────────────────────────
 
     // ─── MAD → EUR Price Migration ──────────────────────────────────
