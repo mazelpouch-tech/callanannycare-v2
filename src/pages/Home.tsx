@@ -282,13 +282,13 @@ export default function Home() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+          <div className="flex flex-wrap justify-center gap-8">
             {pricingPlans.map((plan) => (
               <div
                 key={plan.id}
-                className={`bg-card rounded-xl p-8 relative ${
+                className={`bg-card rounded-xl p-8 relative w-full max-w-sm ${
                   plan.highlight
-                    ? "border-2 border-primary shadow-warm md:-mt-4 md:mb-0"
+                    ? "border-2 border-primary shadow-warm"
                     : "shadow-soft"
                 }`}
               >
