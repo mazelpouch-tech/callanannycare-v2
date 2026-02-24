@@ -28,6 +28,7 @@ import {
   ArrowRightLeft,
   Bell,
   Star,
+  Copy,
 } from "lucide-react";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -183,24 +184,46 @@ export default function AdminBookings() {
   };
 
   // Review link cooldown tracking
-  const [reviewSentBookings, setReviewSentBookings] = useState<Record<string, number>>({});
+  const [reviewSentBookings, setReviewSentBookings] = useState<Record<string, { sentAt: number; url: string }>>({});
   const [reviewLoading, setReviewLoading] = useState<number | string | null>(null);
+  const [copiedBookingId, setCopiedBookingId] = useState<number | string | null>(null);
 
   const handleSendReviewLink = async (bookingId: number | string) => {
     setReviewLoading(bookingId);
     try {
-      await sendReviewLink(bookingId);
-      setReviewSentBookings((prev) => ({ ...prev, [String(bookingId)]: Date.now() }));
+      const url = await sendReviewLink(bookingId);
+      setReviewSentBookings((prev) => ({ ...prev, [String(bookingId)]: { sentAt: Date.now(), url } }));
     } catch (err) {
       console.error("Send review link failed:", err);
     }
     setReviewLoading(null);
   };
 
+  const handleCopyReviewLink = async (bookingId: number | string) => {
+    const entry = reviewSentBookings[String(bookingId)];
+    if (entry?.url) {
+      await navigator.clipboard.writeText(entry.url);
+      setCopiedBookingId(bookingId);
+      setTimeout(() => setCopiedBookingId(null), 2000);
+      return;
+    }
+    setReviewLoading(bookingId);
+    try {
+      const url = await sendReviewLink(bookingId);
+      setReviewSentBookings((prev) => ({ ...prev, [String(bookingId)]: { sentAt: Date.now(), url } }));
+      await navigator.clipboard.writeText(url);
+      setCopiedBookingId(bookingId);
+      setTimeout(() => setCopiedBookingId(null), 2000);
+    } catch (err) {
+      console.error("Copy review link failed:", err);
+    }
+    setReviewLoading(null);
+  };
+
   const isReviewCooling = (bookingId: number | string) => {
-    const ts = reviewSentBookings[String(bookingId)];
-    if (!ts) return false;
-    return Date.now() - ts < 30 * 60 * 1000;
+    const entry = reviewSentBookings[String(bookingId)];
+    if (!entry) return false;
+    return Date.now() - entry.sentAt < 30 * 60 * 1000;
   };
 
   // New Booking Modal
@@ -859,20 +882,34 @@ export default function AdminBookings() {
                                 </button>
                               )}
 
-                              {/* Send Review Link */}
+                              {/* Send Review Link + Copy */}
                               {booking.status === "completed" && booking.nannyId && (
-                                <button
-                                  onClick={() => handleSendReviewLink(booking.id)}
-                                  disabled={isReviewCooling(booking.id) || reviewLoading === booking.id}
-                                  className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-colors disabled:opacity-40"
-                                  title={isReviewCooling(booking.id) ? "Review link sent" : "Send review link to parent"}
-                                >
-                                  {reviewLoading === booking.id ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <Star className="w-4 h-4" />
-                                  )}
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => handleSendReviewLink(booking.id)}
+                                    disabled={isReviewCooling(booking.id) || reviewLoading === booking.id}
+                                    className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-colors disabled:opacity-40"
+                                    title={isReviewCooling(booking.id) ? "Review link sent" : "Send review link to parent"}
+                                  >
+                                    {reviewLoading === booking.id ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <Star className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => handleCopyReviewLink(booking.id)}
+                                    disabled={reviewLoading === booking.id}
+                                    className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-colors disabled:opacity-40"
+                                    title={copiedBookingId === booking.id ? "Copied!" : "Copy review link"}
+                                  >
+                                    {copiedBookingId === booking.id ? (
+                                      <Check className="w-3.5 h-3.5 text-green-600" />
+                                    ) : (
+                                      <Copy className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                </>
                               )}
 
                               {/* Delete */}
@@ -1253,18 +1290,32 @@ export default function AdminBookings() {
                     )}
 
                     {booking.status === "completed" && booking.nannyId && (
-                      <button
-                        onClick={() => handleSendReviewLink(booking.id)}
-                        disabled={isReviewCooling(booking.id) || reviewLoading === booking.id}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-amber-500 hover:bg-amber-50 transition-colors disabled:opacity-40"
-                      >
-                        {reviewLoading === booking.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Star className="w-3.5 h-3.5" />
-                        )}
-                        {isReviewCooling(booking.id) ? "Sent" : "Review Link"}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleSendReviewLink(booking.id)}
+                          disabled={isReviewCooling(booking.id) || reviewLoading === booking.id}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-amber-500 hover:bg-amber-50 transition-colors disabled:opacity-40"
+                        >
+                          {reviewLoading === booking.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Star className="w-3.5 h-3.5" />
+                          )}
+                          {isReviewCooling(booking.id) ? "Sent" : "Review Link"}
+                        </button>
+                        <button
+                          onClick={() => handleCopyReviewLink(booking.id)}
+                          disabled={reviewLoading === booking.id}
+                          className="flex items-center justify-center gap-1.5 py-2.5 px-3 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-40"
+                        >
+                          {copiedBookingId === booking.id ? (
+                            <Check className="w-3.5 h-3.5 text-green-600" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                          {copiedBookingId === booking.id ? "Copied!" : "Copy Link"}
+                        </button>
+                      </>
                     )}
 
                     {deleteConfirm === booking.id ? (

@@ -17,6 +17,8 @@ import {
   Star,
   XCircle,
   AlertTriangle,
+  Pencil,
+  ChevronDown,
 } from "lucide-react";
 import { useParams, Link } from "react-router-dom";
 
@@ -101,6 +103,19 @@ const T = {
     yesCancelIt: "Yes, Cancel It",
     cancelling: "Cancelling...",
     cancelSuccess: "Booking cancelled successfully.",
+    modifyBooking: "Modify Booking",
+    modifyTitle: "Modify Your Booking",
+    saveChanges: "Save Changes",
+    date: "Date",
+    endDate: "End Date",
+    startTime: "Start Time",
+    endTime: "End Time",
+    select: "Select",
+    hotel: "Hotel / Location",
+    children: "Children",
+    ages: "Ages",
+    notes: "Notes",
+    modifySuccess: "Booking updated successfully!",
   },
   fr: {
     title: "Suivre Votre Réservation",
@@ -154,8 +169,34 @@ const T = {
     yesCancelIt: "Oui, Annuler",
     cancelling: "Annulation...",
     cancelSuccess: "Réservation annulée avec succès.",
+    modifyBooking: "Modifier la Réservation",
+    modifyTitle: "Modifier Votre Réservation",
+    saveChanges: "Enregistrer",
+    date: "Date",
+    endDate: "Date de fin",
+    startTime: "Heure de début",
+    endTime: "Heure de fin",
+    select: "Choisir",
+    hotel: "Hôtel / Lieu",
+    children: "Enfants",
+    ages: "Âges",
+    notes: "Notes",
+    modifySuccess: "Réservation mise à jour avec succès !",
   },
 };
+
+// 24h time slots from 06:00 to 05:30 (business-day ordering, 30-min steps)
+const TIME_SLOTS: { value: string; label: string }[] = [];
+for (let i = 0; i < 48; i++) {
+  const h = (6 + Math.floor(i / 2)) % 24;
+  const m = (i % 2) * 30;
+  const hh = String(h).padStart(2, "0");
+  const mm = m === 0 ? "00" : "30";
+  TIME_SLOTS.push({ value: `${h}:${mm}`, label: `${hh}h${mm}` });
+}
+
+const RATE = 10;
+const TAXI_FEE = 10;
 
 const statusConfig: Record<string, { color: string; bg: string; border: string }> = {
   pending: { color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200" },
@@ -196,6 +237,77 @@ export default function BookingStatus() {
   const [cancelReason, setCancelReason] = useState("");
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelSuccess, setCancelSuccess] = useState(false);
+
+  // Edit state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({ startDate: "", endDate: "", startTime: "", endTime: "", hotel: "", numChildren: "1", childrenAges: "", notes: "" });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editSuccess, setEditSuccess] = useState(false);
+
+  const openEditModal = () => {
+    if (!booking) return;
+    const parseTime = (t: string) => {
+      const m = t?.match(/^(\d{1,2})h(\d{2})$/i);
+      return m ? `${parseInt(m[1])}:${m[2]}` : "";
+    };
+    setEditForm({
+      startDate: booking.date || "",
+      endDate: booking.end_date || "",
+      startTime: parseTime(booking.start_time),
+      endTime: parseTime(booking.end_time),
+      hotel: booking.hotel || "",
+      numChildren: String(booking.children_count || 1),
+      childrenAges: booking.children_ages || "",
+      notes: booking.notes || "",
+    });
+    setEditSuccess(false);
+    setShowEditModal(true);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!booking || !id) return;
+    setEditLoading(true);
+    const startLabel = TIME_SLOTS.find(ts => ts.value === editForm.startTime)?.label || editForm.startTime;
+    const endLabel = TIME_SLOTS.find(ts => ts.value === editForm.endTime)?.label || editForm.endTime;
+
+    // Recalculate price
+    const [sh, sm] = (editForm.startTime || "0:0").split(":").map(Number);
+    const [eh, em] = (editForm.endTime || "0:0").split(":").map(Number);
+    const hours = Math.max(0, (eh + em / 60) - (sh + sm / 60));
+    const startDate = new Date(editForm.startDate);
+    const endDate = editForm.endDate ? new Date(editForm.endDate) : startDate;
+    const dayCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1);
+    const isEvening = eh > 19 || (eh === 19 && em > 0) || sh < 7;
+    const taxiFee = isEvening ? TAXI_FEE * dayCount : 0;
+    const totalPrice = RATE * hours * dayCount + taxiFee;
+
+    try {
+      const res = await fetch(`${API}/api/bookings/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: editForm.startDate,
+          end_date: editForm.endDate || null,
+          start_time: startLabel,
+          end_time: endLabel,
+          hotel: editForm.hotel,
+          children_count: parseInt(editForm.numChildren) || 1,
+          children_ages: editForm.childrenAges,
+          notes: editForm.notes,
+          total_price: totalPrice,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBooking(data);
+        setEditSuccess(true);
+        setShowEditModal(false);
+      }
+    } catch (err) {
+      console.error("Edit failed:", err);
+    }
+    setEditLoading(false);
+  };
 
   const handleParentCancel = async () => {
     if (!booking || !id) return;
@@ -615,8 +727,25 @@ export default function BookingStatus() {
               </div>
             )}
 
+            {/* Edit success message */}
+            {editSuccess && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+                <CheckCircle className="w-6 h-6 text-green-500 mx-auto mb-2" />
+                <p className="text-sm font-medium text-green-700">{s.modifySuccess}</p>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex flex-col gap-3">
+              {(booking.status === "pending" || booking.status === "confirmed") && !cancelSuccess && (
+                <button
+                  onClick={openEditModal}
+                  className="w-full py-3 bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-xl text-sm font-bold text-center hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                >
+                  <Pencil className="w-4 h-4" />
+                  {s.modifyBooking}
+                </button>
+              )}
               {(booking.status === "pending" || booking.status === "confirmed") && !cancelSuccess && (
                 <Link
                   to={`/extend/${booking.id}`}
@@ -719,6 +848,150 @@ export default function BookingStatus() {
                         <><Loader2 className="w-4 h-4 animate-spin" /> {s.cancelling}</>
                       ) : (
                         s.yesCancelIt
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Edit Booking Modal */}
+            {showEditModal && (
+              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowEditModal(false)}>
+                <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                  <div className="p-6 border-b border-gray-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center">
+                        <Pencil className="w-5 h-5 text-violet-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">{s.modifyTitle}</h3>
+                    </div>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    {/* Date Range */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">{s.date} *</label>
+                        <input
+                          type="date"
+                          required
+                          value={editForm.startDate}
+                          onChange={(e) => setEditForm(f => ({ ...f, startDate: e.target.value }))}
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-300/50"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">{s.endDate}</label>
+                        <input
+                          type="date"
+                          value={editForm.endDate}
+                          min={editForm.startDate}
+                          onChange={(e) => setEditForm(f => ({ ...f, endDate: e.target.value }))}
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-300/50"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Time */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">{s.startTime} *</label>
+                        <div className="relative">
+                          <select
+                            required
+                            value={editForm.startTime}
+                            onChange={(e) => setEditForm(f => ({ ...f, startTime: e.target.value }))}
+                            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-300/50 appearance-none"
+                          >
+                            <option value="">{s.select}</option>
+                            {TIME_SLOTS.map((ts) => (
+                              <option key={ts.value} value={ts.value}>{ts.label}</option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">{s.endTime}</label>
+                        <div className="relative">
+                          <select
+                            value={editForm.endTime}
+                            onChange={(e) => setEditForm(f => ({ ...f, endTime: e.target.value }))}
+                            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-300/50 appearance-none"
+                          >
+                            <option value="">{s.select}</option>
+                            {TIME_SLOTS.map((ts) => (
+                              <option key={ts.value} value={ts.value}>{ts.label}</option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Hotel */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">{s.hotel}</label>
+                      <input
+                        type="text"
+                        value={editForm.hotel}
+                        onChange={(e) => setEditForm(f => ({ ...f, hotel: e.target.value }))}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-300/50"
+                      />
+                    </div>
+
+                    {/* Children */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">{s.children}</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={editForm.numChildren}
+                          onChange={(e) => setEditForm(f => ({ ...f, numChildren: e.target.value }))}
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-300/50"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">{s.ages}</label>
+                        <input
+                          type="text"
+                          value={editForm.childrenAges}
+                          onChange={(e) => setEditForm(f => ({ ...f, childrenAges: e.target.value }))}
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-300/50"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Notes */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">{s.notes}</label>
+                      <textarea
+                        value={editForm.notes}
+                        onChange={(e) => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                        rows={2}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-300/50 resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 p-4 border-t border-gray-100">
+                    <button
+                      onClick={() => setShowEditModal(false)}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                    >
+                      {s.keepBooking}
+                    </button>
+                    <button
+                      onClick={handleEditSubmit}
+                      disabled={editLoading || !editForm.startDate || !editForm.startTime}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-violet-500 to-purple-500 hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {editLoading ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> {s.saveChanges}</>
+                      ) : (
+                        s.saveChanges
                       )}
                     </button>
                   </div>
