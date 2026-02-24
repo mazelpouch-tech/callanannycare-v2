@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, Fragment } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Search,
   Filter,
@@ -148,9 +149,13 @@ const statusFilters = ["all", "pending", "confirmed", "completed", "cancelled"];
 export default function AdminBookings() {
   const { bookings, fetchBookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking, sendBookingReminder } = useData();
   const { toDH } = useExchangeRate();
+  const [searchParams] = useSearchParams();
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const param = searchParams.get("status");
+    return param && statusFilters.includes(param) ? param : "all";
+  });
   const [sortOrder, setSortOrder] = useState("newest");
   const [expandedRow, setExpandedRow] = useState<number | string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | string | null>(null);
