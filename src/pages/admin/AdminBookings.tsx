@@ -156,6 +156,7 @@ export default function AdminBookings() {
     const param = searchParams.get("status");
     return param && statusFilters.includes(param) ? param : "all";
   });
+  const [nannyFilter, setNannyFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
   const [expandedRow, setExpandedRow] = useState<number | string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | string | null>(null);
@@ -436,6 +437,15 @@ export default function AdminBookings() {
     return getConflicts(newBooking.nannyId, newBooking.date, newBooking.startTime, newBooking.endTime);
   }, [newBooking.nannyId, newBooking.date, newBooking.startTime, newBooking.endTime, bookings]);
 
+  // Unique nanny names for filter dropdown
+  const uniqueNannyNames = useMemo(() => {
+    const names = new Set<string>();
+    bookings.forEach((b) => {
+      if (b.nannyName) names.add(b.nannyName);
+    });
+    return Array.from(names).sort();
+  }, [bookings]);
+
   // CSV export
   const exportCSV = () => {
     const headers = ["ID", "Client", "Email", "Phone", "Nanny", "Start Date", "End Date", "Time", "Plan", "Price", "Status", "Hotel", "Notes"];
@@ -483,6 +493,11 @@ export default function AdminBookings() {
       result = result.filter((b) => b.status === statusFilter);
     }
 
+    // Nanny filter
+    if (nannyFilter !== "all") {
+      result = result.filter((b) => b.nannyName === nannyFilter);
+    }
+
     // Sort
     result.sort((a, b) => {
       const dateA = new Date(a.createdAt || a.date);
@@ -491,7 +506,7 @@ export default function AdminBookings() {
     });
 
     return result;
-  }, [bookings, search, statusFilter, sortOrder]);
+  }, [bookings, search, statusFilter, nannyFilter, sortOrder]);
 
   // Find the boundary index between today's bookings and older bookings
   const todayDividerIndex = useMemo(() => {
@@ -593,6 +608,24 @@ export default function AdminBookings() {
             <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           </div>
 
+          {/* Nanny Filter */}
+          <div className="relative">
+            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <select
+              value={nannyFilter}
+              onChange={(e) => setNannyFilter(e.target.value)}
+              className="appearance-none pl-10 pr-10 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all cursor-pointer"
+            >
+              <option value="all">All Nannies</option>
+              {uniqueNannyNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          </div>
+
           {/* Sort */}
           <div className="relative">
             <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -615,7 +648,7 @@ export default function AdminBookings() {
           <Calendar className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <p className="font-medium text-foreground text-lg">No bookings found</p>
           <p className="text-sm text-muted-foreground mt-1">
-            {search || statusFilter !== "all"
+            {search || statusFilter !== "all" || nannyFilter !== "all"
               ? "Try adjusting your search or filters."
               : "Bookings will appear here once clients start booking."}
           </p>
