@@ -149,6 +149,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_by VARCHAR(20) DEFAULT ''`;
     // ────────────────────────────────────────────────────────────────
 
+    // ─── Nanny Reviews ─────────────────────────────────────────────
+    await sql`
+      CREATE TABLE IF NOT EXISTS nanny_reviews (
+        id SERIAL PRIMARY KEY,
+        booking_id INTEGER REFERENCES bookings(id) ON DELETE CASCADE,
+        nanny_id INTEGER REFERENCES nannies(id) ON DELETE CASCADE,
+        client_name VARCHAR(255) NOT NULL,
+        client_email VARCHAR(255),
+        rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+        comment TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_review_booking_unique ON nanny_reviews(booking_id)`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS review_token VARCHAR(64)`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS review_sent_at TIMESTAMPTZ`;
+    // ────────────────────────────────────────────────────────────────
+
     // ─── MAD → EUR Price Migration ──────────────────────────────────
     // Old pricing was in MAD (150 MAD/hr). New pricing is EUR (10€/hr).
     // Detect if migration is needed by checking nanny rates.

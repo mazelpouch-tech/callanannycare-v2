@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, Fragment } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Search,
   Filter,
@@ -26,6 +27,7 @@ import {
   TimerReset,
   ArrowRightLeft,
   Bell,
+  Star,
 } from "lucide-react";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -146,11 +148,15 @@ function UrgencyBadge({ booking }: { booking: Booking }) {
 const statusFilters = ["all", "pending", "confirmed", "completed", "cancelled"];
 
 export default function AdminBookings() {
-  const { bookings, fetchBookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking, sendBookingReminder } = useData();
+  const { bookings, fetchBookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking, sendBookingReminder, sendReviewLink } = useData();
   const { toDH } = useExchangeRate();
+  const [searchParams] = useSearchParams();
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const param = searchParams.get("status");
+    return param && statusFilters.includes(param) ? param : "all";
+  });
   const [sortOrder, setSortOrder] = useState("newest");
   const [expandedRow, setExpandedRow] = useState<number | string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | string | null>(null);
@@ -174,6 +180,27 @@ export default function AdminBookings() {
     const ts = remindedBookings[String(bookingId)];
     if (!ts) return false;
     return Date.now() - ts < 30 * 60 * 1000; // 30 minutes
+  };
+
+  // Review link cooldown tracking
+  const [reviewSentBookings, setReviewSentBookings] = useState<Record<string, number>>({});
+  const [reviewLoading, setReviewLoading] = useState<number | string | null>(null);
+
+  const handleSendReviewLink = async (bookingId: number | string) => {
+    setReviewLoading(bookingId);
+    try {
+      await sendReviewLink(bookingId);
+      setReviewSentBookings((prev) => ({ ...prev, [String(bookingId)]: Date.now() }));
+    } catch (err) {
+      console.error("Send review link failed:", err);
+    }
+    setReviewLoading(null);
+  };
+
+  const isReviewCooling = (bookingId: number | string) => {
+    const ts = reviewSentBookings[String(bookingId)];
+    if (!ts) return false;
+    return Date.now() - ts < 30 * 60 * 1000;
   };
 
   // New Booking Modal
@@ -832,6 +859,22 @@ export default function AdminBookings() {
                                 </button>
                               )}
 
+                              {/* Send Review Link */}
+                              {booking.status === "completed" && booking.nannyId && (
+                                <button
+                                  onClick={() => handleSendReviewLink(booking.id)}
+                                  disabled={isReviewCooling(booking.id) || reviewLoading === booking.id}
+                                  className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-colors disabled:opacity-40"
+                                  title={isReviewCooling(booking.id) ? "Review link sent" : "Send review link to parent"}
+                                >
+                                  {reviewLoading === booking.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Star className="w-4 h-4" />
+                                  )}
+                                </button>
+                              )}
+
                               {/* Delete */}
                               {deleteConfirm === booking.id ? (
                                 <div className="flex items-center gap-1">
@@ -1206,6 +1249,21 @@ export default function AdminBookings() {
                         className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-orange-600 hover:bg-orange-50 transition-colors"
                       >
                         <XCircle className="w-3.5 h-3.5" /> Cancel
+                      </button>
+                    )}
+
+                    {booking.status === "completed" && booking.nannyId && (
+                      <button
+                        onClick={() => handleSendReviewLink(booking.id)}
+                        disabled={isReviewCooling(booking.id) || reviewLoading === booking.id}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-amber-500 hover:bg-amber-50 transition-colors disabled:opacity-40"
+                      >
+                        {reviewLoading === booking.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Star className="w-3.5 h-3.5" />
+                        )}
+                        {isReviewCooling(booking.id) ? "Sent" : "Review Link"}
                       </button>
                     )}
 

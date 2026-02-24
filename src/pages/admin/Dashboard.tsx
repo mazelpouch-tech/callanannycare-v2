@@ -670,9 +670,9 @@ export default function Dashboard() {
       {/* ── Enhanced Stat Cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Bookings */}
-        <div className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm transition-shadow">
+        <Link to="/admin/bookings" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-primary/30 transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary/20 transition-colors">
               <CalendarDays className="w-5 h-5 text-primary" />
             </div>
             <MiniSparkline data={weeklySparkline} color="#cd6845" />
@@ -687,12 +687,12 @@ export default function Dashboard() {
               </span>
             )}
           </div>
-        </div>
+        </Link>
 
         {/* Revenue */}
-        <div className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm transition-shadow">
+        <Link to="/admin/invoices" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-green-300/50 transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center group-hover:bg-green-100 transition-colors">
               <DollarSign className="w-5 h-5 text-green-700" />
             </div>
             <MiniSparkline data={revenueSparkline} color="#4a9e6e" />
@@ -708,12 +708,12 @@ export default function Dashboard() {
               </span>
             )}
           </div>
-        </div>
+        </Link>
 
         {/* Pending */}
-        <div className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm transition-shadow">
+        <Link to="/admin/bookings?status=pending" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-orange-300/50 transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center group-hover:bg-orange-100 transition-colors">
               <Clock className="w-5 h-5 text-orange-700" />
             </div>
             <div className="text-right">
@@ -723,12 +723,12 @@ export default function Dashboard() {
           </div>
           <p className="text-2xl font-bold text-foreground">{stats.pendingBookings}</p>
           <p className="text-xs text-muted-foreground mt-1">Pending Bookings</p>
-        </div>
+        </Link>
 
         {/* Active Nannies */}
-        <div className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm transition-shadow">
+        <Link to="/admin/nannies" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-accent/30 transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center group-hover:bg-accent/20 transition-colors">
               <Users className="w-5 h-5 text-accent" />
             </div>
             <div className="text-right">
@@ -738,7 +738,7 @@ export default function Dashboard() {
           </div>
           <p className="text-2xl font-bold text-foreground">{activeNannies} <span className="text-sm font-normal text-muted-foreground">/ {nannies.length}</span></p>
           <p className="text-xs text-muted-foreground mt-1">Active Nannies</p>
-        </div>
+        </Link>
       </div>
 
       {/* ── Charts Row 1: Revenue + Bookings ── */}
