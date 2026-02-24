@@ -241,6 +241,24 @@ export default function AdminBookings() {
     return () => clearInterval(interval);
   }, [fetchBookings]);
 
+  /** Convert stored time label (e.g. "19h30") to TIME_SLOTS value (e.g. "19:30") */
+  const timeToSlotValue = (t: string): string => {
+    if (!t) return "";
+    // Already in value format (contains ":")
+    if (t.includes(":")) {
+      const match = TIME_SLOTS.find((s) => s.value === t);
+      return match ? match.value : "";
+    }
+    // Label format "09h00" / "19h30"
+    const m = t.match(/^(\d{1,2})h(\d{2})$/i);
+    if (m) {
+      const candidate = `${parseInt(m[1])}:${m[2]}`;
+      const match = TIME_SLOTS.find((s) => s.value === candidate);
+      return match ? match.value : "";
+    }
+    return "";
+  };
+
   const openEditModal = (booking: Booking) => {
     setEditBookingData({
       id: booking.id,
@@ -250,9 +268,9 @@ export default function AdminBookings() {
       clientPhone: booking.clientPhone || "",
       date: booking.date || "",
       endDate: booking.endDate || "",
-      startTime: "",
-      endTime: "",
-      plan: "hourly",
+      startTime: timeToSlotValue(booking.startTime),
+      endTime: timeToSlotValue(booking.endTime),
+      plan: booking.plan || "hourly",
       hotel: booking.hotel || "",
       numChildren: String(booking.childrenCount || "1"),
       childrenAges: booking.childrenAges || "",
