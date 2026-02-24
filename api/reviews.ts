@@ -191,7 +191,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // POST /api/reviews — submit a review
+    // POST /api/reviews?action=public — submit a public review (from nanny profile page)
+    if (req.method === 'POST' && req.query.action === 'public') {
+      const { nanny_id, client_name, rating, comment } = req.body as { nanny_id: number; client_name: string; rating: number; comment?: string };
+
+      if (!nanny_id || !client_name || !rating) {
+        return res.status(400).json({ error: 'nanny_id, client_name, and rating are required' });
+      }
+      if (rating < 1 || rating > 5) {
+        return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+      }
+      if (!client_name.trim() || client_name.trim().length < 2) {
+        return res.status(400).json({ error: 'Please enter your name' });
+      }
+
+      // Verify nanny exists
+      const nannyRows = await sql`SELECT id FROM nannies WHERE id = ${nanny_id}` as { id: number }[];
+      if (nannyRows.length === 0) {
+        return res.status(404).json({ error: 'Nanny not found' });
+      }
+
+      const sanitizedName = client_name.trim().slice(0, 100);
+      const sanitizedComment = (comment || '').trim().slice(0, 1000);
+
+      await sql`
+        INSERT INTO nanny_reviews (booking_id, nanny_id, client_name, client_email, rating, comment)
+        VALUES (${null}, ${nanny_id}, ${sanitizedName}, ${''},  ${rating}, ${sanitizedComment})
+      `;
+
+      // Update nanny average rating
+      const avgResult = await sql`
+        SELECT ROUND(AVG(rating)::numeric, 1) as avg_rating
+        FROM nanny_reviews WHERE nanny_id = ${nanny_id}
+      ` as { avg_rating: string }[];
+
+      if (avgResult[0]?.avg_rating) {
+        await sql`UPDATE nannies SET rating = ${parseFloat(avgResult[0].avg_rating)} WHERE id = ${nanny_id}`;
+      }
+
+      return res.status(201).json({ success: true, message: 'Review submitted successfully' });
+    }
+
+    // POST /api/reviews — submit a review (booking-based with token)
     if (req.method === 'POST') {
       const { booking_id, token, rating, comment } = req.body as ReviewBody;
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Star, Loader2 } from "lucide-react";
+import { Star, Loader2, Send, CheckCircle } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
@@ -19,31 +19,70 @@ export default function ReviewNannyPublic() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Review form state
+  const [clientName, setClientName] = useState("");
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  const fetchData = async () => {
+    if (!id) return;
+    try {
+      const [nannyRes, reviewsRes] = await Promise.all([
+        fetch(`${API_BASE}/api/nannies/${id}`),
+        fetch(`${API_BASE}/api/reviews?nanny_id=${id}`),
+      ]);
+      const nannyData = await nannyRes.json();
+      const reviewsData = await reviewsRes.json();
+      if (!nannyRes.ok || nannyData.error || !nannyData.id) {
+        setError("Nanny not found.");
+        return;
+      }
+      setNanny(nannyData);
+      setReviews(Array.isArray(reviewsData) ? reviewsData : []);
+    } catch {
+      setError("Failed to load nanny information.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!id) { setError("Invalid link."); setLoading(false); return; }
-
-    (async () => {
-      try {
-        const [nannyRes, reviewsRes] = await Promise.all([
-          fetch(`${API_BASE}/api/nannies/${id}`),
-          fetch(`${API_BASE}/api/reviews?nanny_id=${id}`),
-        ]);
-        const nannyData = await nannyRes.json();
-        const reviewsData = await reviewsRes.json();
-
-        if (!nannyRes.ok || nannyData.error || !nannyData.id) {
-          setError("Nanny not found.");
-          return;
-        }
-        setNanny(nannyData);
-        setReviews(Array.isArray(reviewsData) ? reviewsData : []);
-      } catch {
-        setError("Failed to load nanny information.");
-      } finally {
-        setLoading(false);
-      }
-    })();
+    fetchData();
   }, [id]);
+
+  const handleSubmit = async () => {
+    setFormError("");
+    if (!clientName.trim()) { setFormError("Please enter your name."); return; }
+    if (rating === 0) { setFormError("Please select a rating."); return; }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/reviews?action=public`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nanny_id: Number(id), client_name: clientName.trim(), rating, comment: comment.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFormError(data.error || "Failed to submit review.");
+      } else {
+        setSubmitted(true);
+        // Refresh reviews list
+        const reviewsRes = await fetch(`${API_BASE}/api/reviews?nanny_id=${id}`);
+        const reviewsData = await reviewsRes.json();
+        setReviews(Array.isArray(reviewsData) ? reviewsData : reviews);
+      }
+    } catch {
+      setFormError("Failed to submit. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -70,6 +109,8 @@ export default function ReviewNannyPublic() {
   const nannyRating = Number(nanny.rating) || 0;
   const languages = toArray(nanny.languages);
   const specialties = toArray(nanny.specialties);
+  const displayRating = hoverRating || rating;
+  const ratingLabels = ["", "Poor", "Fair", "Good", "Very Good", "Excellent"];
 
   const avgRating = reviews.length > 0
     ? reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / reviews.length
@@ -78,7 +119,7 @@ export default function ReviewNannyPublic() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-white">
       <div className="max-w-lg mx-auto px-4 py-8">
-        {/* Header */}
+        {/* Nanny Header */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
           <div className="bg-gradient-to-r from-orange-500 to-pink-500 px-6 py-8 text-center text-white">
             {image ? (
@@ -93,8 +134,7 @@ export default function ReviewNannyPublic() {
           </div>
 
           <div className="p-6">
-            {/* Rating summary */}
-            <div className="text-center mb-6">
+            <div className="text-center mb-4">
               <div className="flex items-center justify-center gap-1 mb-1">
                 {[1, 2, 3, 4, 5].map((s) => (
                   <Star key={s} className={`w-6 h-6 ${s <= Math.round(avgRating) ? "fill-amber-400 text-amber-400" : "text-gray-300"}`} />
@@ -105,10 +145,10 @@ export default function ReviewNannyPublic() {
               </p>
             </div>
 
-            {bio && <p className="text-sm text-gray-600 text-center mb-6">{bio}</p>}
+            {bio && <p className="text-sm text-gray-600 text-center mb-4">{bio}</p>}
 
             {(languages.length > 0 || specialties.length > 0) && (
-              <div className="flex flex-wrap gap-2 justify-center mb-6">
+              <div className="flex flex-wrap gap-2 justify-center">
                 {languages.map((l, i) => (
                   <span key={i} className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full">{l}</span>
                 ))}
@@ -120,12 +160,100 @@ export default function ReviewNannyPublic() {
           </div>
         </div>
 
-        {/* Reviews */}
-        <div className="mt-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">Reviews ({reviews.length})</h2>
-          {reviews.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm p-6 text-center text-gray-400">No reviews yet.</div>
-          ) : (
+        {/* Leave a Review Form */}
+        <div className="bg-white rounded-2xl shadow-lg mt-6 overflow-hidden">
+          <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4 text-white">
+            <h2 className="text-lg font-bold font-serif">Leave a Review</h2>
+            <p className="text-white/80 text-sm">Share your experience with {name}</p>
+          </div>
+
+          <div className="p-6 space-y-5">
+            {submitted ? (
+              <div className="text-center py-4">
+                <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <CheckCircle className="w-8 h-8 text-green-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-1">Thank You!</h3>
+                <p className="text-gray-600 text-sm">Your review for {name} has been submitted.</p>
+                <div className="flex justify-center gap-1 mt-3">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star key={s} className={`w-5 h-5 ${s <= rating ? "fill-amber-400 text-amber-400" : "text-gray-300"}`} />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Your name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Your name</label>
+                  <input
+                    type="text"
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    placeholder="Enter your name"
+                    maxLength={100}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300"
+                  />
+                </div>
+
+                {/* Star rating */}
+                <div className="text-center">
+                  <p className="text-sm text-gray-600 mb-3">How was your experience?</p>
+                  <div className="flex justify-center gap-2">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setRating(s)}
+                        onMouseEnter={() => setHoverRating(s)}
+                        onMouseLeave={() => setHoverRating(0)}
+                        className="transition-transform hover:scale-110 focus:outline-none"
+                      >
+                        <Star className={`w-10 h-10 transition-colors ${s <= displayRating ? "fill-amber-400 text-amber-400" : "text-gray-300 hover:text-amber-200"}`} />
+                      </button>
+                    ))}
+                  </div>
+                  {displayRating > 0 && (
+                    <p className="text-sm font-medium text-amber-600 mt-2">{ratingLabels[displayRating]}</p>
+                  )}
+                </div>
+
+                {/* Comment */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Your review <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <textarea
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="What did you like? Any suggestions?"
+                    rows={3}
+                    maxLength={1000}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 resize-none"
+                  />
+                  <p className="text-xs text-gray-400 text-right mt-1">{comment.length}/1000</p>
+                </div>
+
+                {formError && <p className="text-sm text-red-600 text-center">{formError}</p>}
+
+                {/* Submit */}
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 shadow-md hover:shadow-lg"
+                >
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  {submitting ? "Submitting..." : "Submit Review"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Existing Reviews */}
+        {reviews.length > 0 && (
+          <div className="mt-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Reviews ({reviews.length})</h2>
             <div className="space-y-3">
               {reviews.map((review, idx) => (
                 <div key={String(review.id || idx)} className="bg-white rounded-xl shadow-sm p-4">
@@ -144,8 +272,8 @@ export default function ReviewNannyPublic() {
                 </div>
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <p className="text-center text-xs text-gray-400 mt-8">Call a Nanny — Professional Childcare, Marrakech</p>
       </div>
