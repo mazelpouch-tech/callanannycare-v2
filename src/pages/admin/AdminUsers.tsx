@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   UserPlus, Shield, ShieldOff, Trash2, Key, Mail, User,
   AlertCircle, CheckCircle, Loader2, Eye, EyeOff, Clock,
-  LogIn, Copy, Search, X, ShieldCheck, Crown
+  LogIn, Copy, Search, X, ShieldCheck, Crown, Pencil
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import type { AdminUser, AdminRole } from "@/types";
@@ -52,6 +52,12 @@ export default function AdminUsers() {
 
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState<AdminUser | null>(null);
+
+  // Edit Name Modal
+  const [editUser, setEditUser] = useState<AdminUser | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState("");
 
   useEffect(() => {
     fetchAdminUsers().finally(() => setLoading(false));
@@ -158,6 +164,28 @@ export default function AdminUsers() {
       alert(result.error);
     }
     setDeleteConfirm(null);
+  };
+
+  // --- Edit Name ---
+  const openEditName = (user: AdminUser) => {
+    setEditUser(user);
+    setEditName(user.name);
+    setEditError("");
+  };
+
+  const handleEditName = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editUser || !editName.trim()) return;
+    setEditError("");
+    setEditLoading(true);
+    const result = await updateAdminUser(editUser.id, { name: editName.trim() });
+    if (result.success) {
+      setEditUser(null);
+      setEditName("");
+    } else {
+      setEditError(result.error);
+    }
+    setEditLoading(false);
   };
 
   const formatDate = (d: string | null | undefined) => {
@@ -294,6 +322,14 @@ export default function AdminUsers() {
                   </td>
                   <td className="px-5 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
+                      {/* Edit name button */}
+                      <button
+                        onClick={() => openEditName(user)}
+                        title="Edit name"
+                        className="p-2 rounded-lg text-muted-foreground hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
                       {/* Reset password button */}
                       <button
                         onClick={() => { setResetEmail(user.email); setShowResetModal(true); setResetLink(""); setResetError(""); }}
@@ -400,6 +436,13 @@ export default function AdminUsers() {
               </div>
 
               <div className="flex items-center gap-2 pt-2 border-t border-border">
+                <button
+                  onClick={() => openEditName(user)}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-border hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Edit Name
+                </button>
                 <button
                   onClick={() => { setResetEmail(user.email); setShowResetModal(true); setResetLink(""); setResetError(""); }}
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-border hover:bg-muted transition-colors"
@@ -668,6 +711,66 @@ export default function AdminUsers() {
                 </button>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== Edit Name Modal ===== */}
+      {editUser && (
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-serif text-lg font-bold text-foreground">Edit Admin Name</h2>
+              <button onClick={() => { setEditUser(null); setEditError(""); }} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {editError && (
+              <div className="mb-4 bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg border border-red-100 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>{editError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleEditName} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-muted-foreground" />
+                    Full Name
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
+                  placeholder="Enter new name"
+                  autoFocus
+                  required
+                />
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Editing: {editUser.email}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setEditUser(null); setEditError(""); }}
+                  className="flex-1 px-4 py-2.5 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editLoading || !editName.trim() || editName.trim() === editUser.name}
+                  className="flex-1 gradient-warm text-white rounded-lg px-4 py-2.5 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {editLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Pencil className="w-4 h-4" /> Save Name</>}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
