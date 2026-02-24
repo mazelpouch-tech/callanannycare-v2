@@ -10,6 +10,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
+    // Ensure table exists
+    await sql`
+      CREATE TABLE IF NOT EXISTS nanny_reviews (
+        id SERIAL PRIMARY KEY,
+        booking_id INTEGER,
+        nanny_id INTEGER,
+        client_name VARCHAR(255) NOT NULL,
+        client_email VARCHAR(255),
+        rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+        comment TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+
     // GET /api/reviews?nanny_id=123 — fetch all reviews for a nanny
     if (req.method === 'GET') {
       const { nanny_id } = req.query;
@@ -29,7 +43,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // POST /api/reviews?action=public — submit a public review (from nanny review page)
     if (req.method === 'POST' && req.query.action === 'public') {
-      const { nanny_id, client_name, rating, comment } = req.body as { nanny_id: number; client_name: string; rating: number; comment?: string };
+      const body = req.body as { nanny_id: number; client_name: string; rating: number; comment?: string };
+      const nanny_id = body.nanny_id;
+      const client_name = body.client_name;
+      const rating = body.rating;
+      const comment = body.comment;
 
       if (!nanny_id || !client_name || !rating) {
         return res.status(400).json({ error: 'nanny_id, client_name, and rating are required' });
@@ -49,11 +67,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const sanitizedName = client_name.trim().slice(0, 100);
       const sanitizedComment = (comment || '').trim().slice(0, 1000);
+      const emptyEmail = '';
 
-      // Insert without booking_id (defaults to NULL for public reviews)
       await sql`
         INSERT INTO nanny_reviews (nanny_id, client_name, client_email, rating, comment)
-        VALUES (${nanny_id}, ${sanitizedName}, ${''}, ${rating}, ${sanitizedComment})
+        VALUES (${nanny_id}, ${sanitizedName}, ${emptyEmail}, ${rating}, ${sanitizedComment})
       `;
 
       // Update nanny average rating
@@ -73,6 +91,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Reviews API error:', message);
-    return res.status(500).json({ error: 'Internal server error', details: message });
+    return res.status(500).json({ error: message });
   }
 }
