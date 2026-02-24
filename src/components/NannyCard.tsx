@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { MapPin, Star, Globe, Eye } from "lucide-react";
+import { MapPin, Star, Globe, Eye, MessageSquare } from "lucide-react";
 import type { Nanny } from "../types";
 import { useLanguage } from "../context/LanguageContext";
 
@@ -7,10 +7,11 @@ interface NannyCardProps {
   nanny: Nanny;
   showBookButton?: boolean;
   onViewDetails?: () => void;
+  reviews?: Record<string, unknown>[];
 }
 
-export default function NannyCard({ nanny, showBookButton = true, onViewDetails }: NannyCardProps) {
-  const { name, location, rate, rating, bio, available, languages, specialties, image } = nanny;
+export default function NannyCard({ nanny, showBookButton = true, onViewDetails, reviews }: NannyCardProps) {
+  const { name, location, rating, bio, available, languages, specialties, image } = nanny;
   const { t } = useLanguage();
 
   return (
@@ -83,6 +84,31 @@ export default function NannyCard({ nanny, showBookButton = true, onViewDetails 
         <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
           <Globe className="w-3.5 h-3.5 shrink-0" />
           <span>{languages.join(", ")}</span>
+        </div>
+      )}
+
+      {/* Reviews */}
+      {reviews && reviews.length > 0 && (
+        <div className="mt-3 space-y-2">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+            <span className="font-medium">{reviews.length} review{reviews.length !== 1 ? "s" : ""}</span>
+          </div>
+          {reviews.slice(0, 2).map((review, idx) => (
+            <div key={String(review.id || idx)} className="bg-muted/40 rounded-lg px-3 py-2">
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="font-medium text-card-foreground text-xs">{String(review.client_name || "Parent")}</span>
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star key={s} className={`w-2.5 h-2.5 ${s <= (Number(review.rating) || 0) ? "fill-yellow-500 text-yellow-500" : "text-gray-300"}`} />
+                  ))}
+                </div>
+              </div>
+              {review.comment && (
+                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{String(review.comment)}</p>
+              )}
+            </div>
+          ))}
         </div>
       )}
 

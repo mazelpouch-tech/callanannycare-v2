@@ -77,6 +77,23 @@ export default function Home() {
 
   const featuredNannies = nannies.filter((n) => n.available).slice(0, 3);
 
+  // Fetch reviews for all featured nannies
+  const [cardReviews, setCardReviews] = useState<Record<number, Record<string, unknown>[]>>({});
+
+  useEffect(() => {
+    if (featuredNannies.length === 0) return;
+    featuredNannies.forEach((n) => {
+      fetch(`${API_BASE}/api/reviews?nanny_id=${n.id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setCardReviews((prev) => ({ ...prev, [n.id]: data }));
+          }
+        })
+        .catch(() => {});
+    });
+  }, [nannies]);
+
   return (
     <div className="min-h-screen">
       {/* ===== Hero Title ===== */}
@@ -240,7 +257,7 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {featuredNannies.map((nanny) => (
-              <NannyCard key={nanny.id} nanny={nanny} onViewDetails={() => setSelectedNanny(nanny)} />
+              <NannyCard key={nanny.id} nanny={nanny} onViewDetails={() => setSelectedNanny(nanny)} reviews={cardReviews[nanny.id] || []} />
             ))}
           </div>
 
