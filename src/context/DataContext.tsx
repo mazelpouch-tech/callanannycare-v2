@@ -532,11 +532,12 @@ export function DataProvider({ children }: DataProviderProps) {
     });
   }, []);
 
-  const sendReviewLink = useCallback(async (id: number | string): Promise<void> => {
-    await apiFetch(`/reviews?action=send`, {
+  const sendReviewLink = useCallback(async (id: number | string): Promise<string> => {
+    const result = await apiFetch<{ success: boolean; reviewUrl: string }>(`/reviews?action=send`, {
       method: "POST",
       body: JSON.stringify({ booking_id: id }),
     });
+    return result.reviewUrl;
   }, []);
 
   // --- Nanny Portal Auth & Data ---
