@@ -216,6 +216,14 @@ export default function NannyBookings() {
     }
   };
 
+  // Manual complete
+  const handleComplete = async (id: number | string) => {
+    setActionLoading(id);
+    await updateBookingStatus(id, "completed");
+    await fetchNannyBookings();
+    setActionLoading(null);
+  };
+
   // New booking form state
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<BookingFormData>(emptyForm);
@@ -788,6 +796,22 @@ export default function NannyBookings() {
                                 {t("forward.forwardShift")}
                               </button>
                             )}
+                            {/* Mark Complete (confirmed bookings without clock-in) */}
+                            {booking.status === "confirmed" && !booking.clockIn && (
+                              <button
+                                onClick={() => handleComplete(booking.id)}
+                                disabled={actionLoading === booking.id}
+                                className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                                title="Mark as completed"
+                              >
+                                {actionLoading === booking.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                )}
+                                Complete
+                              </button>
+                            )}
                             {/* Edit booking (pending/confirmed only) */}
                             {(booking.status === "pending" || booking.status === "confirmed") && !booking.clockIn && (
                               <button
@@ -1047,6 +1071,21 @@ export default function NannyBookings() {
                       >
                         <ArrowRightLeft className="w-4 h-4" />
                         {t("forward.forwardShift")}
+                      </button>
+                    )}
+                    {/* Mark Complete (confirmed without clock-in) */}
+                    {booking.status === "confirmed" && !booking.clockIn && (
+                      <button
+                        onClick={() => handleComplete(booking.id)}
+                        disabled={actionLoading === booking.id}
+                        className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                      >
+                        {actionLoading === booking.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-4 h-4" />
+                        )}
+                        Complete
                       </button>
                     )}
                     {/* Edit booking (pending/confirmed, not mid-shift) */}
