@@ -748,9 +748,6 @@ export default function AdminBookings() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Created By
-                    </th>
                     <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Actions
                     </th>
@@ -857,20 +854,6 @@ export default function AdminBookings() {
                           </td>
                           <td className="px-4 py-3.5">
                             <UrgencyBadge booking={booking} />
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                              booking.createdBy === 'admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                              booking.createdBy === 'nanny' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                              'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            }`}>
-                              {booking.createdBy === 'admin' ? 'Admin' : booking.createdBy === 'nanny' ? 'Nanny' : 'Parent'}
-                            </span>
-                            {booking.createdByName && (
-                              <span className="block text-[10px] text-muted-foreground mt-0.5 truncate max-w-[80px]" title={booking.createdByName}>
-                                {booking.createdByName}
-                              </span>
-                            )}
                           </td>
                           <td className="px-4 py-3.5">
                             <div className="flex items-center justify-end gap-1.5">
@@ -1006,7 +989,7 @@ export default function AdminBookings() {
                         {isExpanded && (
                           <tr>
                             <td
-                              colSpan={12}
+                              colSpan={11}
                               className="px-4 py-4 bg-muted/20"
                             >
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -1109,6 +1092,26 @@ export default function AdminBookings() {
                                     </>
                                   );
                                 })()}
+                                <div className="flex items-center gap-2">
+                                  <User className="w-4 h-4 text-muted-foreground shrink-0" />
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">
+                                      Created By
+                                    </p>
+                                    <p className="font-medium text-foreground flex items-center gap-1.5">
+                                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                                        booking.createdBy === 'admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                                        booking.createdBy === 'nanny' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                        'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                      }`}>
+                                        {booking.createdBy === 'admin' ? 'Admin' : booking.createdBy === 'nanny' ? 'Nanny' : 'Parent'}
+                                      </span>
+                                      {booking.createdByName && (
+                                        <span className="text-muted-foreground text-xs">{booking.createdByName}</span>
+                                      )}
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
                               {/* Quick actions */}
                               <div className="flex gap-2 mt-3 pt-3 border-t border-border">
@@ -1174,21 +1177,9 @@ export default function AdminBookings() {
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           ID: {truncateId(booking.id)}
-                          {booking.createdBy && (
-                            <span className="text-[10px] text-muted-foreground/70 ml-1.5">· by {booking.createdBy}</span>
-                          )}
                         </p>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <UrgencyBadge booking={booking} />
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                          booking.createdBy === 'admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                          booking.createdBy === 'nanny' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                          'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                        }`}>
-                          {booking.createdBy === 'admin' ? 'Admin' : booking.createdBy === 'nanny' ? 'Nanny' : 'Parent'}
-                        </span>
-                      </div>
+                      <UrgencyBadge booking={booking} />
                     </div>
 
                     {/* Info Grid */}
@@ -1283,6 +1274,19 @@ export default function AdminBookings() {
                           <p className="font-medium text-foreground mt-0.5">
                             {booking.notes || "None"}
                           </p>
+                        </div>
+                        <div className="col-span-2 flex items-center gap-1.5">
+                          <p className="text-muted-foreground">Created by</p>
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                            booking.createdBy === 'admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                            booking.createdBy === 'nanny' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                            'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          }`}>
+                            {booking.createdBy === 'admin' ? 'Admin' : booking.createdBy === 'nanny' ? 'Nanny' : 'Parent'}
+                          </span>
+                          {booking.createdByName && (
+                            <span className="text-muted-foreground text-[10px]">{booking.createdByName}</span>
+                          )}
                         </div>
                       </div>
                     )}
