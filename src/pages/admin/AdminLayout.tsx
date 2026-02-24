@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   ChevronLeft,
+  User,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import AdminToast, { type AdminToastItem } from "../../components/AdminToast";
@@ -40,9 +41,24 @@ const sidebarLinks: SidebarLink[] = [
 export default function AdminLayout() {
   const { isAdmin, adminProfile, adminLogout, stats, bookings } = useData();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [toasts, setToasts] = useState<AdminToastItem[]>([]);
   const prevBookingsRef = useRef<Map<number | string, Booking> | null>(null);
   const dismissedIds = useRef(new Set<string>());
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target as Node)) {
+        setProfileDropdownOpen(false);
+      }
+    }
+    if (profileDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [profileDropdownOpen]);
 
   // Detect booking changes and create toasts
   useEffect(() => {
@@ -215,16 +231,61 @@ export default function AdminLayout() {
           {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Admin badge */}
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 gradient-warm rounded-full flex items-center justify-center">
-              <span className="text-white text-xs font-bold">
-                {adminProfile?.name?.charAt(0)?.toUpperCase() || "A"}
+          {/* Admin badge – clickable with dropdown */}
+          <div className="relative" ref={profileDropdownRef}>
+            <button
+              onClick={() => setProfileDropdownOpen((prev) => !prev)}
+              className="flex items-center gap-2 rounded-full hover:bg-muted/60 px-1.5 py-1 transition-colors cursor-pointer"
+            >
+              <div className="w-8 h-8 gradient-warm rounded-full flex items-center justify-center">
+                <span className="text-white text-xs font-bold">
+                  {adminProfile?.name?.charAt(0)?.toUpperCase() || "A"}
+                </span>
+              </div>
+              <span className="text-sm font-medium text-foreground hidden sm:inline">
+                {adminProfile?.name || "Admin"}
               </span>
-            </div>
-            <span className="text-sm font-medium text-foreground hidden sm:inline">
-              {adminProfile?.name || "Admin"}
-            </span>
+            </button>
+
+            {/* Profile dropdown */}
+            {profileDropdownOpen && (
+              <div className="absolute right-0 top-full mt-2 w-56 bg-card rounded-xl shadow-lg border border-border py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                {/* Profile info header */}
+                <div className="px-4 py-3 border-b border-border">
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    {adminProfile?.name || "Admin"}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {adminProfile?.email || "admin@callanannycare.com"}
+                  </p>
+                </div>
+
+                {/* Profile link */}
+                <NavLink
+                  to="/admin/users"
+                  onClick={() => setProfileDropdownOpen(false)}
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-muted/60 transition-colors"
+                >
+                  <User className="w-4 h-4 text-muted-foreground" />
+                  <span>My Profile</span>
+                </NavLink>
+
+                {/* Divider */}
+                <div className="border-t border-border my-1" />
+
+                {/* Log out */}
+                <button
+                  onClick={() => {
+                    setProfileDropdownOpen(false);
+                    adminLogout();
+                  }}
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors w-full"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Log Out</span>
+                </button>
+              </div>
+            )}
           </div>
         </header>
 

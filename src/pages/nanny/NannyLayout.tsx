@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Navigate, Outlet, NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -9,6 +9,7 @@ import {
   LogOut,
   Menu,
   Globe,
+  User,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -25,6 +26,21 @@ export default function NannyLayout() {
   const { isNanny, nannyProfile, nannyLogout, unreadNotifications, fetchNannyNotifications } = useData();
   const { t, locale, setLocale } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target as Node)) {
+        setProfileDropdownOpen(false);
+      }
+    }
+    if (profileDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [profileDropdownOpen]);
 
   // Check if nanny has been blocked since login
   useEffect(() => {
@@ -163,9 +179,71 @@ export default function NannyLayout() {
                 <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full" />
               </NavLink>
             )}
-            <span className="text-sm text-muted-foreground hidden sm:block">
-              {nannyProfile?.name}
-            </span>
+
+            {/* Nanny avatar – clickable with dropdown */}
+            <div className="relative" ref={profileDropdownRef}>
+              <button
+                onClick={() => setProfileDropdownOpen((prev) => !prev)}
+                className="flex items-center gap-2 rounded-full hover:bg-muted/60 px-1.5 py-1 transition-colors cursor-pointer"
+              >
+                <div className="bg-accent/10 w-8 h-8 rounded-full flex items-center justify-center shrink-0">
+                  {nannyProfile?.image ? (
+                    <img
+                      src={nannyProfile.image}
+                      alt={nannyProfile.name}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-accent text-xs font-bold">
+                      {nannyProfile?.name?.charAt(0)?.toUpperCase() || "N"}
+                    </span>
+                  )}
+                </div>
+                <span className="text-sm font-medium text-foreground hidden sm:inline">
+                  {nannyProfile?.name || "Nanny"}
+                </span>
+              </button>
+
+              {/* Profile dropdown */}
+              {profileDropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-card rounded-xl shadow-lg border border-border py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                  {/* Profile info header */}
+                  <div className="px-4 py-3 border-b border-border">
+                    <p className="text-sm font-semibold text-foreground truncate">
+                      {nannyProfile?.name || "Nanny"}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                      {nannyProfile?.email || ""}
+                    </p>
+                  </div>
+
+                  {/* Profile link */}
+                  <NavLink
+                    to="/nanny/profile"
+                    onClick={() => setProfileDropdownOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-muted/60 transition-colors"
+                  >
+                    <User className="w-4 h-4 text-muted-foreground" />
+                    <span>{t("nanny.layout.myProfile")}</span>
+                  </NavLink>
+
+                  {/* Divider */}
+                  <div className="border-t border-border my-1" />
+
+                  {/* Log out */}
+                  <button
+                    onClick={() => {
+                      setProfileDropdownOpen(false);
+                      nannyLogout();
+                    }}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors w-full"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>{t("nanny.layout.signOut")}</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
