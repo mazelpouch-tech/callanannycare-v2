@@ -274,10 +274,137 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `;
     }
 
+    // ─── Seed Reviews (French names, 5 stars) ──────────────────────
+    const reviewsExist = await sql`SELECT COUNT(*) as count FROM nanny_reviews` as CountRow[];
+    let seededReviews = 0;
+    if (parseInt(reviewsExist[0].count) === 0) {
+      // Look up nanny IDs by name
+      const nannyRows = await sql`SELECT id, name FROM nannies WHERE name IN ('Sanae','Fatima Zahra','Majda','Hayat','Naima','Laila','Samira')` as { id: number; name: string }[];
+      const nannyMap: Record<string, number> = {};
+      for (const n of nannyRows) nannyMap[n.name] = n.id;
+
+      const reviewData: { nanny: string; client: string; comment: string }[] = [
+        // ── Sanae (12 reviews) ──
+        { nanny: 'Sanae', client: 'Sophie Moreau', comment: 'Sanae was absolutely wonderful with our two children. She kept them entertained and happy the entire evening. Highly recommend!' },
+        { nanny: 'Sanae', client: 'Marie Dupont', comment: 'We booked Sanae for three nights during our stay in Marrakech. She was punctual, professional, and our kids adored her.' },
+        { nanny: 'Sanae', client: 'Isabelle Laurent', comment: 'Our baby was in the best hands with Sanae. She is incredibly gentle and attentive. We felt completely at ease.' },
+        { nanny: 'Sanae', client: 'Claire Fontaine', comment: 'Sanae made our holiday so much more relaxing. She played games, read stories, and our daughter did not want her to leave!' },
+        { nanny: 'Sanae', client: 'Camille Rousseau', comment: 'Fantastic experience! Sanae arrived on time, was very warm with the kids, and even tidied up after playtime.' },
+        { nanny: 'Sanae', client: 'Nathalie Bernard', comment: 'We used the service twice and requested Sanae both times. She is patient, kind, and truly loves what she does.' },
+        { nanny: 'Sanae', client: 'Élodie Petit', comment: 'Sanae took amazing care of our 8-month-old. She followed our routine perfectly. Will definitely book again!' },
+        { nanny: 'Sanae', client: 'Juliette Martin', comment: 'Our kids still talk about Sanae weeks later! She organized crafts and outdoor games. A true gem.' },
+        { nanny: 'Sanae', client: 'Céline Dubois', comment: 'Professional, reliable, and so sweet with children. Sanae made us feel confident leaving our little ones.' },
+        { nanny: 'Sanae', client: 'Aurélie Lefebvre', comment: 'Sanae was a lifesaver during our trip. She handled bedtime like a pro and our kids slept peacefully.' },
+        { nanny: 'Sanae', client: 'Charlotte Girard', comment: 'I cannot say enough good things. Sanae is warm, experienced, and our children felt safe and happy with her.' },
+        { nanny: 'Sanae', client: 'Pauline Mercier', comment: 'Excellent service from start to finish. Sanae communicated well and was flexible with our schedule changes.' },
+
+        // ── Fatima Zahra (11 reviews) ──
+        { nanny: 'Fatima Zahra', client: 'Valérie Simon', comment: 'Fatima Zahra is an exceptional nanny. Her Montessori approach kept our toddler engaged and learning through play.' },
+        { nanny: 'Fatima Zahra', client: 'Sandrine Bonnet', comment: 'We were so impressed by Fatima Zahra. She was calm, organized, and our baby bonded with her immediately.' },
+        { nanny: 'Fatima Zahra', client: 'Delphine Renaud', comment: 'Fatima Zahra speaks perfect French which was so reassuring. She took wonderful care of our newborn.' },
+        { nanny: 'Fatima Zahra', client: 'Émilie Garnier', comment: 'Absolutely outstanding! Fatima Zahra prepared activities for our children and they had the best time.' },
+        { nanny: 'Fatima Zahra', client: 'Stéphanie Leclerc', comment: 'Our third time booking Fatima Zahra and she never disappoints. The kids run to greet her every time!' },
+        { nanny: 'Fatima Zahra', client: 'Véronique Thomas', comment: 'Fatima Zahra has such a natural way with children. She is gentle yet firm when needed. Truly professional.' },
+        { nanny: 'Fatima Zahra', client: 'Anne-Sophie Blanc', comment: 'We felt completely at ease leaving our 3-month-old with Fatima Zahra. She has extensive newborn experience.' },
+        { nanny: 'Fatima Zahra', client: 'Laure Faure', comment: 'Fatima Zahra was incredible with our twins. She managed both beautifully and even gave us a full update after.' },
+        { nanny: 'Fatima Zahra', client: 'Mélanie Perrin', comment: 'Highly professional and caring. Fatima Zahra made our vacation worry-free. Could not recommend more!' },
+        { nanny: 'Fatima Zahra', client: 'Christine Morel', comment: 'From the moment she arrived, Fatima Zahra put everyone at ease. Our daughter loved every minute.' },
+        { nanny: 'Fatima Zahra', client: 'Florence André', comment: 'Fatima Zahra went above and beyond. She even helped with bath time and bedtime stories. A wonderful nanny!' },
+
+        // ── Majda (10 reviews) ──
+        { nanny: 'Majda', client: 'Brigitte Chevalier', comment: 'Majda took our kids on an amazing outdoor adventure in the garden. They came back tired and happy!' },
+        { nanny: 'Majda', client: 'Sophie Moreau', comment: 'We loved Majda! She was patient with our shy toddler and by the end of the evening they were best friends.' },
+        { nanny: 'Majda', client: 'Nathalie Bernard', comment: 'Majda is creative and fun. She organized painting and games that kept our three kids entertained for hours.' },
+        { nanny: 'Majda', client: 'Claire Fontaine', comment: 'Such a lovely person. Majda was gentle and attentive, and our little one was smiling the whole time.' },
+        { nanny: 'Majda', client: 'Juliette Martin', comment: 'Majda was fantastic with our two boys. She has so much energy and really knows how to engage children.' },
+        { nanny: 'Majda', client: 'Élodie Petit', comment: 'We booked Majda for an afternoon and she was perfect. Kind, responsible, and our kids had a blast.' },
+        { nanny: 'Majda', client: 'Camille Rousseau', comment: 'Majda adapted to our schedule beautifully. She brought coloring books and puzzles. Very thoughtful!' },
+        { nanny: 'Majda', client: 'Aurélie Lefebvre', comment: 'Great experience with Majda. She is warm, reliable, and made our holiday stress-free.' },
+        { nanny: 'Majda', client: 'Pauline Mercier', comment: 'Our children loved Majda! She played outdoor games and even taught them a few words in Arabic. So special.' },
+        { nanny: 'Majda', client: 'Marie Dupont', comment: 'Majda arrived with a big smile and instantly connected with our daughter. Would absolutely book her again.' },
+
+        // ── Hayat (12 reviews) ──
+        { nanny: 'Hayat', client: 'Isabelle Laurent', comment: 'Hayat is the best nanny we have ever had. Her experience with hotel families really shows. Impeccable service.' },
+        { nanny: 'Hayat', client: 'Sandrine Bonnet', comment: 'Hayat took care of our three children effortlessly. She is calm, organized, and incredibly professional.' },
+        { nanny: 'Hayat', client: 'Delphine Renaud', comment: 'We were staying at a luxury riad and Hayat fit right in. Discreet, elegant, and amazing with the kids.' },
+        { nanny: 'Hayat', client: 'Émilie Garnier', comment: 'Hayat has a gift with children. Our son, who is usually difficult with strangers, warmed up to her in minutes.' },
+        { nanny: 'Hayat', client: 'Stéphanie Leclerc', comment: 'Ten years of experience really makes a difference. Hayat handled every situation with grace and confidence.' },
+        { nanny: 'Hayat', client: 'Véronique Thomas', comment: 'We booked Hayat for a full week and it was the best decision. Our kids were happy and cared for every day.' },
+        { nanny: 'Hayat', client: 'Anne-Sophie Blanc', comment: 'Hayat is truly premium. She anticipated our needs and went above expectations. Thank you so much!' },
+        { nanny: 'Hayat', client: 'Laure Faure', comment: 'Hayat speaks excellent English and French. Communication was easy and she kept us informed throughout.' },
+        { nanny: 'Hayat', client: 'Mélanie Perrin', comment: 'We had an incredible experience. Hayat is patient, loving, and made our children feel completely at home.' },
+        { nanny: 'Hayat', client: 'Christine Morel', comment: 'Hayat managed our two toddlers and infant beautifully. She is experienced and it shows in everything she does.' },
+        { nanny: 'Hayat', client: 'Florence André', comment: 'Outstanding nanny! Hayat was flexible with last-minute changes and always had a positive attitude.' },
+        { nanny: 'Hayat', client: 'Brigitte Chevalier', comment: 'Hayat was recommended by our hotel concierge and she exceeded all expectations. Truly the best.' },
+
+        // ── Naima (10 reviews) ──
+        { nanny: 'Naima', client: 'Charlotte Girard', comment: 'Naima was amazing with our 4-month-old. She followed our feeding and sleep schedule perfectly.' },
+        { nanny: 'Naima', client: 'Sophie Moreau', comment: 'We needed someone for night care and Naima was perfect. Our baby slept through the night in her care.' },
+        { nanny: 'Naima', client: 'Valérie Simon', comment: 'Naima is so gentle and nurturing. Our infant was calm and content with her. We felt completely at peace.' },
+        { nanny: 'Naima', client: 'Nathalie Bernard', comment: 'Naima specializes in babies and it really shows. She knew exactly what to do and our little one loved her.' },
+        { nanny: 'Naima', client: 'Céline Dubois', comment: 'We booked Naima for evening care so we could enjoy dinner. Our baby was sound asleep when we returned!' },
+        { nanny: 'Naima', client: 'Isabelle Laurent', comment: 'Naima helped us with sleep training tips during our stay. She is knowledgeable and so patient.' },
+        { nanny: 'Naima', client: 'Camille Rousseau', comment: 'Wonderful experience! Naima has a calming presence that babies respond to instantly.' },
+        { nanny: 'Naima', client: 'Juliette Martin', comment: 'Naima took excellent care of our newborn. She is experienced, reliable, and genuinely caring.' },
+        { nanny: 'Naima', client: 'Marie Dupont', comment: 'Our first time leaving our baby with a sitter and Naima made it easy. She sent us photo updates too!' },
+        { nanny: 'Naima', client: 'Élodie Petit', comment: 'Naima is a true infant specialist. She handled colic, feeding, and diaper changes like a pro. Five stars!' },
+
+        // ── Laila (11 reviews) ──
+        { nanny: 'Laila', client: 'Delphine Renaud', comment: 'Laila taught our children Moroccan songs and stories. It was such a beautiful cultural experience!' },
+        { nanny: 'Laila', client: 'Émilie Garnier', comment: 'Our kids absolutely adored Laila. She is creative, fun, and so good at engaging school-age children.' },
+        { nanny: 'Laila', client: 'Stéphanie Leclerc', comment: 'Laila brought traditional Moroccan crafts for the kids to try. They were thrilled and so were we!' },
+        { nanny: 'Laila', client: 'Sandrine Bonnet', comment: 'Laila is multilingual and communicated perfectly with our French-speaking children. Very professional.' },
+        { nanny: 'Laila', client: 'Anne-Sophie Blanc', comment: 'We loved that Laila incorporated cultural activities. Our kids learned so much and had a wonderful time.' },
+        { nanny: 'Laila', client: 'Laure Faure', comment: 'Laila is a storyteller at heart. She captivated our children with tales and kept them engaged for hours.' },
+        { nanny: 'Laila', client: 'Mélanie Perrin', comment: 'Fantastic nanny! Laila was warm, punctual, and our children were so happy when we picked them up.' },
+        { nanny: 'Laila', client: 'Christine Morel', comment: 'Laila organized a mini treasure hunt in the hotel garden. Our kids said it was the highlight of their trip!' },
+        { nanny: 'Laila', client: 'Florence André', comment: 'We booked Laila three times and she was amazing every single time. Reliable, creative, and kind.' },
+        { nanny: 'Laila', client: 'Brigitte Chevalier', comment: 'Laila has seven years of experience and it shows. She is confident, capable, and our children loved her.' },
+        { nanny: 'Laila', client: 'Charlotte Girard', comment: 'Laila read bedtime stories in French and the kids fell asleep smiling. What more could you ask for?' },
+
+        // ── Samira (11 reviews) ──
+        { nanny: 'Samira', client: 'Pauline Mercier', comment: 'Samira was fantastic! She organized educational games and our kids learned while having fun.' },
+        { nanny: 'Samira', client: 'Aurélie Lefebvre', comment: 'Samira has a background in education and it really comes through. She was so good with our children.' },
+        { nanny: 'Samira', client: 'Sophie Moreau', comment: 'We booked Samira for two evenings and she was wonderful both times. The kids kept asking when she would come back!' },
+        { nanny: 'Samira', client: 'Valérie Simon', comment: 'Samira is energetic, warm, and engaging. She brought art supplies and the kids created beautiful drawings.' },
+        { nanny: 'Samira', client: 'Claire Fontaine', comment: 'Samira handled our three kids with ease. She was organized and had planned activities for each age group.' },
+        { nanny: 'Samira', client: 'Nathalie Bernard', comment: 'Wonderful nanny! Samira was patient with our toddler and creative with our older child. Perfect balance.' },
+        { nanny: 'Samira', client: 'Céline Dubois', comment: 'Samira made our vacation so enjoyable. We could relax knowing the kids were in excellent hands.' },
+        { nanny: 'Samira', client: 'Isabelle Laurent', comment: 'Samira speaks fluent English and French. She connected with our kids instantly and they had a great time.' },
+        { nanny: 'Samira', client: 'Camille Rousseau', comment: 'Samira is professional and caring. She sent us updates and photos during the evening. So thoughtful!' },
+        { nanny: 'Samira', client: 'Marie Dupont', comment: 'Our kids adored Samira. She played board games, did puzzles, and read stories. A truly wonderful nanny.' },
+        { nanny: 'Samira', client: 'Juliette Martin', comment: 'Samira went above and beyond. She even prepared a small snack for the kids. We will definitely book her again!' },
+      ];
+
+      for (const r of reviewData) {
+        const nannyId = nannyMap[r.nanny];
+        if (!nannyId) continue;
+        await sql`
+          INSERT INTO nanny_reviews (nanny_id, client_name, client_email, rating, comment)
+          VALUES (${nannyId}, ${r.client}, '', 5, ${r.comment})
+        `;
+        seededReviews++;
+      }
+
+      // Update nanny ratings to 5.0 since all reviews are 5 stars
+      for (const name of Object.keys(nannyMap)) {
+        const nId = nannyMap[name];
+        const avgResult = await sql`
+          SELECT ROUND(AVG(rating)::numeric, 1) as avg_rating
+          FROM nanny_reviews WHERE nanny_id = ${nId}
+        ` as { avg_rating: string }[];
+        if (avgResult[0]?.avg_rating) {
+          await sql`UPDATE nannies SET rating = ${parseFloat(avgResult[0].avg_rating)} WHERE id = ${nId}`;
+        }
+      }
+    }
+    // ────────────────────────────────────────────────────────────────
+
     const existing = await sql`SELECT COUNT(*) as count FROM nannies` as CountRow[];
     const parts: string[] = [];
     if (needsMigration) parts.push(`MAD→EUR migration: ${migrated} booking(s) converted, nanny rates updated to 10€/hr`);
     if (repaired > 0) parts.push(`Price repair: ${repaired} booking(s) recalculated`);
+    if (seededReviews > 0) parts.push(`Seeded ${seededReviews} nanny reviews`);
     if (parts.length === 0) parts.push('Database up to date');
 
     return res.status(200).json({
@@ -285,6 +412,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       nannies: parseInt(existing[0].count),
       migrated: needsMigration,
       repaired,
+      seededReviews,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
