@@ -338,7 +338,7 @@ export function DataProvider({ children }: DataProviderProps) {
             status: booking.status || undefined,
             clock_in: booking.clockIn || null,
             clock_out: booking.clockOut || null,
-            created_by: booking.createdBy || (adminProfile ? adminProfile.name : "Client (website)"),
+            created_by: booking.createdBy || (adminProfile ? `Admin (${adminProfile.name})` : nannyProfile ? `Nanny (${nannyProfile.name})` : "Parent"),
           }),
         });
 
@@ -383,7 +383,7 @@ export function DataProvider({ children }: DataProviderProps) {
           nannyName: nanny ? nanny.name : booking.nannyName || "Unknown",
           status: booking.status || "pending",
           createdAt: new Date().toISOString(),
-          createdBy: booking.createdBy || (adminProfile ? adminProfile.name : "Client (website)"),
+          createdBy: booking.createdBy || (adminProfile ? `Admin (${adminProfile.name})` : nannyProfile ? `Nanny (${nannyProfile.name})` : "Parent"),
         } as Booking;
         setBookings((prev) => {
           const updated = [...prev, newBooking];
@@ -393,7 +393,7 @@ export function DataProvider({ children }: DataProviderProps) {
         return newBooking;
       }
     },
-    [nannies]
+    [nannies, adminProfile, nannyProfile]
   );
 
   const updateBookingStatus = useCallback(async (
