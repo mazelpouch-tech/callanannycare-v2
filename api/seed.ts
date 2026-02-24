@@ -207,10 +207,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const REPAIR_TAXI = 10; // € flat fee per day for evening bookings
     let repaired = 0;
     const bookingsToCheck = await sql`
-      SELECT id, start_time, end_time, date, end_date, COALESCE(total_price, 0) as total_price
+      SELECT id, start_time, end_time, date, end_date, total_price
       FROM bookings
       WHERE start_time LIKE '%h%' AND end_time LIKE '%h%'
         AND start_time != '' AND end_time != ''
+        AND total_price > 0
     ` as BookingRow[];
 
     for (const b of bookingsToCheck) {
