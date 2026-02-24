@@ -32,12 +32,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'nanny_id is required' });
       }
 
-      const reviews = await sql`
+      const rows = await sql`
         SELECT id, nanny_id, client_name, rating, comment, created_at
         FROM nanny_reviews
         WHERE nanny_id = ${nanny_id}
         ORDER BY created_at DESC
       `;
+      // Spread to plain array — neon result may not serialize properly
+      const reviews = rows.map((r: Record<string, unknown>) => ({ ...r }));
       return res.status(200).json(reviews);
     }
 
