@@ -40,6 +40,7 @@ interface MyShiftSectionProps {
   bookings: Booking[];
   clockInBooking: (id: number | string) => Promise<void>;
   clockOutBooking: (id: number | string) => Promise<void>;
+  updateBookingStatus: (id: number | string, status: string) => Promise<void>;
   fetchNannyBookings: () => Promise<void>;
   onExtend: (booking: Booking) => void;
   t: (key: string) => string;
@@ -176,8 +177,9 @@ function DashboardSkeleton() {
 
 // ─── My Shift Section (prominent, always visible) ────────────────
 
-function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyBookings, onExtend, t }: MyShiftSectionProps) {
+function MyShiftSection({ bookings, clockInBooking, clockOutBooking, updateBookingStatus, fetchNannyBookings, onExtend, t }: MyShiftSectionProps) {
   const [actionLoading, setActionLoading] = useState(false);
+  const [completeLoading, setCompleteLoading] = useState<number | string | null>(null);
 
   // Find active shift (clocked in, not clocked out)
   const activeShift = useMemo(
@@ -209,6 +211,13 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
     await clockOutBooking(id);
     await fetchNannyBookings();
     setActionLoading(false);
+  };
+
+  const handleComplete = async (id: number | string) => {
+    setCompleteLoading(id);
+    await updateBookingStatus(id, "completed");
+    await fetchNannyBookings();
+    setCompleteLoading(null);
   };
 
   // ── STATE 1: Active shift in progress ──
@@ -284,18 +293,32 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
                 </span>
               </div>
 
-              <button
-                onClick={() => handleStartShift(booking.id)}
-                disabled={actionLoading}
-                className="w-full flex items-center justify-center gap-2 py-4 px-6 bg-green-600 text-white text-lg font-bold rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 shadow-lg"
-              >
-                {actionLoading ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                ) : (
-                  <PlayCircle className="w-6 h-6" />
-                )}
-                {t("nanny.dashboard.startShift")}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleStartShift(booking.id)}
+                  disabled={actionLoading}
+                  className="flex-1 flex items-center justify-center gap-2 py-4 px-6 bg-green-600 text-white text-lg font-bold rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 shadow-lg"
+                >
+                  {actionLoading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    <PlayCircle className="w-6 h-6" />
+                  )}
+                  {t("nanny.dashboard.startShift")}
+                </button>
+                <button
+                  onClick={() => handleComplete(booking.id)}
+                  disabled={completeLoading === booking.id}
+                  className="flex items-center justify-center gap-2 py-4 px-5 bg-emerald-50 text-emerald-700 text-base font-bold rounded-xl hover:bg-emerald-100 transition-colors disabled:opacity-50 border-2 border-emerald-200"
+                >
+                  {completeLoading === booking.id ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <CheckCircle className="w-5 h-5" />
+                  )}
+                  Complete
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -380,9 +403,18 @@ export default function NannyDashboard() {
     clockInBooking,
     clockOutBooking,
     updateBooking,
+    updateBookingStatus,
   } = useData();
   const { t, locale } = useLanguage();
   const [extendBooking, setExtendBooking] = useState<Booking | null>(null);
+  const [completeLoading, setCompleteLoading] = useState<number | string | null>(null);
+
+  const handleComplete = async (id: number | string) => {
+    setCompleteLoading(id);
+    await updateBookingStatus(id, "completed");
+    await fetchNannyBookings();
+    setCompleteLoading(null);
+  };
 
   useEffect(() => {
     fetchNannyStats();
@@ -468,6 +500,7 @@ export default function NannyDashboard() {
         bookings={nannyBookings}
         clockInBooking={clockInBooking}
         clockOutBooking={clockOutBooking}
+        updateBookingStatus={updateBookingStatus}
         fetchNannyBookings={fetchNannyBookings}
         onExtend={setExtendBooking}
         t={t}
@@ -555,6 +588,7 @@ export default function NannyDashboard() {
                     <th className="px-5 py-3 font-medium">{t("shared.plan")}</th>
                     <th className="px-5 py-3 font-medium">{t("shared.hotel")}</th>
                     <th className="px-5 py-3 font-medium">{t("shared.status")}</th>
+                    <th className="px-5 py-3 font-medium">{t("shared.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -598,6 +632,23 @@ export default function NannyDashboard() {
                           {booking.status}
                         </span>
                       </td>
+                      <td className="px-5 py-3">
+                        {booking.status === "confirmed" && !booking.clockIn && (
+                          <button
+                            onClick={() => handleComplete(booking.id)}
+                            disabled={completeLoading === booking.id}
+                            className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                            title="Mark as completed"
+                          >
+                            {completeLoading === booking.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <CheckCircle className="w-3.5 h-3.5" />
+                            )}
+                            Complete
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -633,6 +684,20 @@ export default function NannyDashboard() {
                       <MapPin className="w-3.5 h-3.5" />
                       {booking.hotel}
                     </div>
+                  )}
+                  {booking.status === "confirmed" && !booking.clockIn && (
+                    <button
+                      onClick={() => handleComplete(booking.id)}
+                      disabled={completeLoading === booking.id}
+                      className="mt-2 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50 border border-emerald-200"
+                    >
+                      {completeLoading === booking.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
+                      Mark as Complete
+                    </button>
                   )}
                 </div>
               ))}
