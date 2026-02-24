@@ -201,12 +201,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ────────────────────────────────────────────────────────────────
 
     // ─── Price Repair ─────────────────────────────────────────────
-    // Fix bookings corrupted by migration: new EUR-priced bookings that
-    // had price_migrated_to_eur=false (default) got divided by 15.
-    // Recalculate from stored times for any booking with a suspiciously
-    // low price (< 50% of expected).
+    // Recalculate the correct EUR price from stored times for every
+    // booking and fix any that don't match (too low OR too high).
     const REPAIR_RATE = 10; // €/hr
-    const REPAIR_TAXI = 10; // € flat fee for evening bookings
+    const REPAIR_TAXI = 10; // € flat fee per day for evening bookings
     let repaired = 0;
     const bookingsToCheck = await sql`
       SELECT id, start_time, end_time, date, end_date, total_price
@@ -237,8 +235,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const taxiFee = isEvening ? REPAIR_TAXI * dayCount : 0;
         const expectedPrice = Math.round(REPAIR_RATE * hours * dayCount + taxiFee);
 
-        // Only repair if price is way off (less than 50% of expected)
-        if (expectedPrice > 0 && b.total_price < expectedPrice * 0.5) {
+        // Repair if stored price doesn't match expected (too low or too high)
+        if (expectedPrice > 0 && b.total_price !== expectedPrice) {
           await sql`UPDATE bookings SET total_price = ${expectedPrice} WHERE id = ${b.id}`;
           repaired++;
         }
