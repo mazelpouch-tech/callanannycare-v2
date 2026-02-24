@@ -297,6 +297,7 @@ export interface DataContextValue {
   deleteBooking: (id: number | string) => Promise<void>;
   resendInvoice: (id: number | string) => Promise<void>;
   sendBookingReminder: (id: number | string) => Promise<void>;
+  sendReviewLink: (id: number | string) => Promise<void>;
 
   stats: DashboardStats;
 

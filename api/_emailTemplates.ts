@@ -981,3 +981,81 @@ export async function sendCancellationEmail(data: CancellationEmailData): Promis
     return false;
   }
 }
+
+// ============================================================
+// Review Request Email (sent to parent after booking completes)
+// ============================================================
+
+export interface ReviewRequestEmailData {
+  bookingId: number;
+  clientName: string;
+  clientEmail: string;
+  date: string;
+  nannyName: string;
+  reviewUrl: string;
+  locale: string;
+}
+
+export async function sendReviewRequestEmail(data: ReviewRequestEmailData): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log('RESEND_API_KEY not configured. Review request email skipped.');
+    return false;
+  }
+
+  const resend = new Resend(apiKey);
+  const locale: Locale = data.locale === 'fr' ? 'fr' : 'en';
+
+  const subjectText = locale === 'fr'
+    ? `Votre avis compte — Réservation #${data.bookingId}`
+    : `How was your experience? — Booking #${data.bookingId}`;
+
+  const greeting = locale === 'fr' ? 'Cher(e)' : 'Dear';
+  const introText = locale === 'fr'
+    ? `Nous espérons que vous avez apprécié le service de <strong>${data.nannyName}</strong> le ${data.date}. Votre avis nous aide à améliorer nos services !`
+    : `We hope you enjoyed the service from <strong>${data.nannyName}</strong> on ${data.date}. Your feedback helps us improve!`;
+  const ctaText = locale === 'fr' ? 'Laisser un Avis' : 'Leave a Review';
+  const thankYouText = locale === 'fr' ? 'Merci beaucoup pour votre confiance !' : 'Thank you so much for trusting us!';
+  const onlyMinute = locale === 'fr' ? 'Cela ne prend qu\'une minute !' : 'It only takes a minute!';
+
+  const content = `
+    <!-- Star banner -->
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:48px;margin-bottom:8px;">&#11088;</div>
+      <h2 style="margin:0 0 6px;color:#1a1a1a;font-size:24px;font-family:Georgia,'Times New Roman',serif;">${locale === 'fr' ? 'Votre Avis Compte !' : 'Your Feedback Matters!'}</h2>
+    </div>
+
+    <p style="margin:0 0 8px;color:#1a1a1a;font-size:16px;">${greeting} ${data.clientName},</p>
+    <p style="margin:0 0 24px;color:#666;font-size:15px;line-height:1.5;">${introText}</p>
+
+    <!-- CTA Button -->
+    <div style="text-align:center;margin:32px 0;">
+      <p style="margin:0 0 16px;color:#666;font-size:14px;">${onlyMinute}</p>
+      <a href="${data.reviewUrl}" style="display:inline-block;background:linear-gradient(135deg,#f97316,#ec4899);color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:50px;box-shadow:0 4px 14px rgba(249,115,22,0.3);">⭐ ${ctaText}</a>
+    </div>
+
+    <div style="margin:24px 0;padding:16px;background-color:#fff7ed;border-radius:12px;text-align:center;border:1px solid #fed7aa;">
+      <p style="margin:0;color:#666;font-size:13px;">${thankYouText}</p>
+    </div>
+
+    <p style="margin:0;color:#999;font-size:12px;text-align:center;">
+      ${locale === 'fr' ? 'Ou copiez ce lien dans votre navigateur :' : 'Or copy and paste this link in your browser:'}
+    </p>
+    <p style="margin:4px 0 0;color:#f97316;font-size:11px;text-align:center;word-break:break-all;">${data.reviewUrl}</p>
+  `;
+
+  const fromAddress = process.env.RESEND_FROM_EMAIL || 'Call a Nanny <onboarding@resend.dev>';
+
+  try {
+    await resend.emails.send({
+      from: fromAddress,
+      to: data.clientEmail,
+      subject: subjectText,
+      html: emailWrapper(content),
+    });
+    return true;
+  } catch (err) {
+    console.error('Failed to send review request email:', err);
+    return false;
+  }
+}

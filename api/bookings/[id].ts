@@ -586,6 +586,81 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             console.error('WhatsApp business notification failed:', waBizError);
           }
         }
+
+        // 4. Auto-send review link to parent (delayed conceptually — sent right after invoice)
+        try {
+          const crypto = await import('crypto');
+          const reviewToken = crypto.randomBytes(32).toString('hex');
+          await sql`UPDATE bookings SET review_token = ${reviewToken}, review_sent_at = NOW() WHERE id = ${id}`;
+
+          const reviewBaseUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
+          const reviewUrl = `${reviewBaseUrl}/review/${result[0].id}?token=${reviewToken}`;
+          const reviewLocale = result[0].locale || 'en';
+
+          // Email
+          if (result[0].client_email) {
+            try {
+              const { sendReviewRequestEmail } = await import('../_emailTemplates.js');
+              await sendReviewRequestEmail({
+                bookingId: result[0].id,
+                clientName: result[0].client_name,
+                clientEmail: result[0].client_email,
+                date: result[0].date,
+                nannyName: invoiceNannyName,
+                reviewUrl,
+                locale: reviewLocale,
+              });
+            } catch (reviewEmailErr: unknown) {
+              console.error('Review request email failed:', reviewEmailErr);
+            }
+          }
+
+          // WhatsApp
+          if (WA_TOKEN && WA_PHONE_ID && parentPhone) {
+            try {
+              let reviewPhone = parentPhone.replace(/[\s\-\(\)]/g, '');
+              if (reviewPhone.startsWith('0')) reviewPhone = '212' + reviewPhone.slice(1);
+              if (!reviewPhone.startsWith('+') && !reviewPhone.match(/^\d{10,}/)) reviewPhone = '+' + reviewPhone;
+              reviewPhone = reviewPhone.replace('+', '');
+
+              const waReviewMsg = reviewLocale === 'fr'
+                ? [
+                    '⭐ *Votre avis compte !*',
+                    '',
+                    `Bonjour ${result[0].client_name},`,
+                    `Nous espérons que vous avez apprécié le service de *${invoiceNannyName}*.`,
+                    '',
+                    `Pourriez-vous prendre un instant pour laisser un avis ?`,
+                    `📝 ${reviewUrl}`,
+                    '',
+                    '_Merci beaucoup !_',
+                    '💕 Call a Nanny',
+                  ].join('\n')
+                : [
+                    '⭐ *Your Feedback Matters!*',
+                    '',
+                    `Hi ${result[0].client_name},`,
+                    `We hope you enjoyed the service from *${invoiceNannyName}*.`,
+                    '',
+                    `Could you take a moment to leave a review?`,
+                    `📝 ${reviewUrl}`,
+                    '',
+                    '_Thank you!_',
+                    '💕 Call a Nanny',
+                  ].join('\n');
+
+              await fetch(`https://graph.facebook.com/v18.0/${WA_PHONE_ID}/messages`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messaging_product: 'whatsapp', to: reviewPhone, type: 'text', text: { body: waReviewMsg } }),
+              });
+            } catch (waReviewErr: unknown) {
+              console.error('WhatsApp review request failed:', waReviewErr);
+            }
+          }
+        } catch (reviewErr: unknown) {
+          console.error('Auto-send review link failed:', reviewErr);
+        }
       }
 
       // Resend invoice email on admin request
