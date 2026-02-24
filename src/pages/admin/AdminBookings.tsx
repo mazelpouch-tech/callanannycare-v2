@@ -674,8 +674,8 @@ export default function AdminBookings() {
                       <Fragment key={booking.id}>
                         {idx === todayDividerIndex && (
                           <tr>
-                            <td colSpan={12} className="px-4 py-4 bg-primary/5">
-                              <div className="flex items-center gap-4">
+                            <td colSpan={12} className="px-4 py-4 bg-primary/5 text-center">
+                              <div className="flex items-center justify-center gap-4">
                                 <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
                                 <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
                                   {sortOrder === "newest" ? "Older Bookings" : "Today\u2019s Bookings"}
