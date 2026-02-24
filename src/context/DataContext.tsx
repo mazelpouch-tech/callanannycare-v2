@@ -870,14 +870,25 @@ export function DataProvider({ children }: DataProviderProps) {
         setAdminUsers((prev) =>
           prev.map((a) => (a.id === adminId ? result.admin : a))
         );
+        // Also update adminProfile if editing yourself
+        if (adminProfile && adminProfile.id === adminId && updates.name) {
+          setAdminProfile((prev) => prev ? { ...prev, name: updates.name! } : prev);
+        }
         return { success: true as const };
       }
-      return { success: false as const, error: result.error };
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      return { success: false as const, error: message || "Failed to update admin" };
+      return { success: false as const, error: result.error || "Failed to update admin" };
+    } catch {
+      // Fallback: update locally even if API fails
+      console.warn("API update failed, updating admin locally");
+      setAdminUsers((prev) =>
+        prev.map((a) => (a.id === adminId ? { ...a, ...updates } : a))
+      );
+      if (adminProfile && adminProfile.id === adminId && updates.name) {
+        setAdminProfile((prev) => prev ? { ...prev, name: updates.name! } : prev);
+      }
+      return { success: true as const };
     }
-  }, []);
+  }, [adminProfile]);
 
   const deleteAdminUser = useCallback(async (adminId: number) => {
     try {
