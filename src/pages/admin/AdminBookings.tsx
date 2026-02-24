@@ -28,7 +28,7 @@ import {
   ArrowRightLeft,
   Bell,
 } from "lucide-react";
-import { format, parseISO, formatDistanceToNow } from "date-fns";
+import { format, parseISO, formatDistanceToNow, isToday } from "date-fns";
 import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
 import ExtendBookingModal from "../../components/ExtendBookingModal";
@@ -493,6 +493,16 @@ export default function AdminBookings() {
     return result;
   }, [bookings, search, statusFilter, sortOrder]);
 
+  // Find the boundary index between today's bookings and older bookings
+  const todayDividerIndex = useMemo(() => {
+    for (let i = 1; i < filteredBookings.length; i++) {
+      const currIsToday = (() => { try { return isToday(parseISO(filteredBookings[i].date)); } catch { return false; } })();
+      const prevIsToday = (() => { try { return isToday(parseISO(filteredBookings[i - 1].date)); } catch { return false; } })();
+      if (currIsToday !== prevIsToday) return i;
+    }
+    return -1;
+  }, [filteredBookings]);
+
   const formatDate = (dateStr: string) => {
     try {
       return format(parseISO(dateStr), "MMM dd, yyyy");
@@ -657,11 +667,24 @@ export default function AdminBookings() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filteredBookings.map((booking) => {
+                  {filteredBookings.map((booking, idx) => {
                     const isExpanded = expandedRow === booking.id;
 
                     return (
                       <Fragment key={booking.id}>
+                        {idx === todayDividerIndex && (
+                          <tr>
+                            <td colSpan={12} className="px-4 py-2">
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1 h-px bg-primary/40" />
+                                <span className="text-xs font-semibold text-primary whitespace-nowrap">
+                                  {sortOrder === "newest" ? "Older Bookings" : "Today\u2019s Bookings"}
+                                </span>
+                                <div className="flex-1 h-px bg-primary/40" />
+                              </div>
+                            </td>
+                          </tr>
+                        )}
                         <tr className="hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-3.5 text-xs font-mono text-muted-foreground">
                             {truncateId(booking.id)}
@@ -1008,12 +1031,21 @@ export default function AdminBookings() {
 
           {/* Mobile Cards */}
           <div className="lg:hidden space-y-3">
-            {filteredBookings.map((booking) => {
+            {filteredBookings.map((booking, idx) => {
               const isExpanded = expandedRow === booking.id;
 
               return (
+                <Fragment key={`mobile-${booking.id}`}>
+                {idx === todayDividerIndex && (
+                  <div className="flex items-center gap-3 py-1">
+                    <div className="flex-1 h-px bg-primary/40" />
+                    <span className="text-xs font-semibold text-primary whitespace-nowrap">
+                      {sortOrder === "newest" ? "Older Bookings" : "Today\u2019s Bookings"}
+                    </span>
+                    <div className="flex-1 h-px bg-primary/40" />
+                  </div>
+                )}
                 <div
-                  key={booking.id}
                   className="bg-card rounded-xl border border-border shadow-soft overflow-hidden"
                 >
                   {/* Card Header */}
@@ -1242,6 +1274,7 @@ export default function AdminBookings() {
                     )}
                   </div>
                 </div>
+                </Fragment>
               );
             })}
           </div>
