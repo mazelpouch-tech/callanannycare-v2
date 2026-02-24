@@ -5,7 +5,7 @@ import {
   Eye, TrendingUp, Users, Activity, Star,
   ArrowUpRight, ArrowDownRight, Timer, FileText, CheckCircle, AlertTriangle,
 } from "lucide-react";
-import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, subDays, isAfter, formatDistanceToNow } from "date-fns";
+import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, subDays, isAfter, formatDistanceToNow, isToday } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import type { Booking, Nanny, BookingStatus } from "@/types";
@@ -645,7 +645,8 @@ export default function Dashboard() {
     }
   };
 
-  const activeNannies = nannies.filter((n) => n.status === "active" && n.available).length;
+  const todaysBookings = bookings.filter((b) => { try { return isToday(parseISO(b.date)); } catch { return false; } });
+  const todaysBookingsCount = todaysBookings.length;
   const avgBookingValue = stats.totalBookings > 0 ? Math.round(stats.totalRevenue / Math.max(bookings.filter((b) => b.status === "confirmed" || b.status === "completed").length, 1)) : 0;
 
   const formatDate = (dateStr: string) => {
@@ -725,19 +726,19 @@ export default function Dashboard() {
           <p className="text-xs text-muted-foreground mt-1">Pending Bookings</p>
         </Link>
 
-        {/* Active Nannies */}
-        <Link to="/admin/nannies" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-accent/30 transition-all cursor-pointer group">
+        {/* Today's Bookings */}
+        <Link to="/admin/bookings" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-accent/30 transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-3">
             <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center group-hover:bg-accent/20 transition-colors">
-              <Users className="w-5 h-5 text-accent" />
+              <CalendarDays className="w-5 h-5 text-accent" />
             </div>
             <div className="text-right">
-              <p className="text-[10px] text-muted-foreground">Confirmed</p>
-              <p className="text-xs font-semibold text-foreground">{stats.confirmedBookings}</p>
+              <p className="text-[10px] text-muted-foreground">Pending Today</p>
+              <p className="text-xs font-semibold text-foreground">{todaysBookings.filter(b => b.status === "pending").length}</p>
             </div>
           </div>
-          <p className="text-2xl font-bold text-foreground">{activeNannies} <span className="text-sm font-normal text-muted-foreground">/ {nannies.length}</span></p>
-          <p className="text-xs text-muted-foreground mt-1">Active Nannies</p>
+          <p className="text-2xl font-bold text-foreground">{todaysBookingsCount}</p>
+          <p className="text-xs text-muted-foreground mt-1">Today&apos;s Bookings</p>
         </Link>
       </div>
 
