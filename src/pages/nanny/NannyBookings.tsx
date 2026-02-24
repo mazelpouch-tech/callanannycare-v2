@@ -291,6 +291,8 @@ export default function NannyBookings() {
         notes: formData.notes,
         totalPrice,
         status: "confirmed",
+        createdBy: 'nanny',
+        createdByName: nannyProfile?.name ?? '',
       });
       setShowForm(false);
       setFormData(emptyForm);

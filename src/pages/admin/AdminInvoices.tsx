@@ -72,7 +72,7 @@ const emptyForm: InvoiceForm = {
 // ─── Main Component ─────────────────────────────────────────
 
 export default function AdminInvoices() {
-  const { bookings, nannies, addBooking, updateBooking, deleteBooking, resendInvoice } = useData();
+  const { bookings, nannies, addBooking, updateBooking, deleteBooking, resendInvoice, adminProfile } = useData();
   const { toDH } = useExchangeRate();
 
   // Filters
@@ -275,6 +275,8 @@ export default function AdminInvoices() {
         totalPrice: Number(formData.totalPrice),
         notes: formData.notes.trim(),
         status: "completed" as const,
+        createdBy: 'admin' as const,
+        createdByName: adminProfile?.name || 'Admin',
       };
 
       if (isEditing && formData.id) {

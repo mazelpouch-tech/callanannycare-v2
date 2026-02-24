@@ -4,6 +4,7 @@
 
 export type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
 export type BookingPlan = 'hourly' | 'half-day' | 'full-day';
+export type BookingCreator = 'parent' | 'nanny' | 'admin';
 export type NannyStatus = 'active' | 'blocked' | 'invited';
 export type NotificationType = 'new_booking' | 'booking_confirmed' | 'booking_cancelled' | 'booking_completed';
 export type AdminRole = 'super_admin' | 'admin';
@@ -63,7 +64,8 @@ export interface DbBooking {
   cancelled_at: string | null;
   cancellation_reason: string;
   cancelled_by: string;
-  created_by: string;
+  created_by: BookingCreator;
+  created_by_name: string;
   created_at: string;
   updated_at: string;
 }
@@ -144,13 +146,14 @@ export interface Booking {
   notes: string;
   totalPrice: number;
   status: BookingStatus;
+  createdBy: BookingCreator;
+  createdByName: string;
   createdAt: string;
   clockIn: string | null;
   clockOut: string | null;
   cancelledAt: string | null;
   cancellationReason: string;
   cancelledBy: string;
-  createdBy: string;
 }
 
 export interface Notification {
