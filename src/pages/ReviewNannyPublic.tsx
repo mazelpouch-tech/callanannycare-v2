@@ -30,18 +30,25 @@ export default function ReviewNannyPublic() {
   const fetchData = async () => {
     if (!id) return;
     try {
-      const [nannyRes, reviewsRes] = await Promise.all([
-        fetch(`${API_BASE}/api/nannies/${id}`),
-        fetch(`${API_BASE}/api/reviews?nanny_id=${id}`),
-      ]);
+      // Fetch nanny info
+      const nannyRes = await fetch(`${API_BASE}/api/nannies/${id}`);
       const nannyData = await nannyRes.json();
-      const reviewsData = await reviewsRes.json();
       if (!nannyRes.ok || nannyData.error || !nannyData.id) {
         setError("Nanny not found.");
         return;
       }
       setNanny(nannyData);
-      setReviews(Array.isArray(reviewsData) ? reviewsData : []);
+
+      // Fetch reviews separately so nanny still shows if reviews fail
+      try {
+        const reviewsRes = await fetch(`${API_BASE}/api/reviews?nanny_id=${id}`);
+        const reviewsData = await reviewsRes.json();
+        if (Array.isArray(reviewsData)) {
+          setReviews(reviewsData);
+        }
+      } catch {
+        // Reviews fetch failed but page still works
+      }
     } catch {
       setError("Failed to load nanny information.");
     } finally {
@@ -159,12 +166,16 @@ export default function ReviewNannyPublic() {
         </div>
 
         {/* Parent Reviews — shown FIRST so new parents can read them */}
-        {reviews.length > 0 && (
-          <div className="mt-6">
-            <div className="flex items-center gap-2 mb-4">
-              <MessageSquare className="w-5 h-5 text-orange-500" />
-              <h2 className="text-lg font-bold text-gray-900">What Parents Say ({reviews.length})</h2>
+        <div className="mt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <MessageSquare className="w-5 h-5 text-orange-500" />
+            <h2 className="text-lg font-bold text-gray-900">What Parents Say ({reviews.length})</h2>
+          </div>
+          {reviews.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm p-6 text-center">
+              <p className="text-sm text-gray-400">No reviews yet. Be the first to share your experience!</p>
             </div>
+          ) : (
             <div className="space-y-3">
               {reviews.map((review, idx) => (
                 <div key={String(review.id || idx)} className="bg-white rounded-xl shadow-sm p-4">
@@ -183,8 +194,8 @@ export default function ReviewNannyPublic() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Leave a Review Form — after existing reviews */}
         <div className="bg-white rounded-2xl shadow-lg mt-6 overflow-hidden">
