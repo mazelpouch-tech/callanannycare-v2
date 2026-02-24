@@ -149,6 +149,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_by VARCHAR(20) DEFAULT ''`;
     // ────────────────────────────────────────────────────────────────
 
+    // ─── Created By Tracking ──────────────────────────────────────────
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS created_by VARCHAR(100) DEFAULT ''`;
+    // ────────────────────────────────────────────────────────────────
+
     // ─── Nanny Reviews ─────────────────────────────────────────────
     await sql`
       CREATE TABLE IF NOT EXISTS nanny_reviews (
