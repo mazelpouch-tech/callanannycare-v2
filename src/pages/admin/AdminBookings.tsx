@@ -280,10 +280,24 @@ export default function AdminBookings() {
     return Math.max(0, (eh + em / 60) - (sh + sm / 60));
   }, [editBookingData]);
 
+  const editBookingDays = useMemo(() => {
+    if (!editBookingData?.date) return 1;
+    if (!editBookingData.endDate || editBookingData.endDate === editBookingData.date) return 1;
+    const d1 = new Date(editBookingData.date).getTime();
+    const d2 = new Date(editBookingData.endDate).getTime();
+    return isNaN(d1) || isNaN(d2) ? 1 : Math.max(1, Math.round((d2 - d1) / 86400000) + 1);
+  }, [editBookingData]);
+
   const editBookingPrice = useMemo(() => {
     if (!editSelectedNanny) return 0;
-    return Math.round(editSelectedNanny.rate * editBookingHours);
-  }, [editSelectedNanny, editBookingHours]);
+    const hourlyTotal = Math.round(editSelectedNanny.rate * editBookingHours * editBookingDays);
+    // Taxi fee: 10€ per day if shift touches the 7PM–7AM window
+    const [sh] = (editBookingData?.startTime || "").split(":").map(Number);
+    const [eh, em] = (editBookingData?.endTime || "").split(":").map(Number);
+    const isEvening = (eh > 19 || (eh === 19 && em > 0)) || sh < 7;
+    const taxiFee = isEvening ? 10 * editBookingDays : 0;
+    return hourlyTotal + taxiFee;
+  }, [editSelectedNanny, editBookingHours, editBookingDays, editBookingData]);
 
   const editConflicts = useMemo(() => {
     if (!editBookingData?.nannyId || !editBookingData?.date) return [];
@@ -348,10 +362,23 @@ export default function AdminBookings() {
     return Math.max(0, (eh + em / 60) - (sh + sm / 60));
   }, [newBooking.startTime, newBooking.endTime]);
 
+  const newBookingDays = useMemo(() => {
+    if (!newBooking.date) return 1;
+    if (!newBooking.endDate || newBooking.endDate === newBooking.date) return 1;
+    const d1 = new Date(newBooking.date).getTime();
+    const d2 = new Date(newBooking.endDate).getTime();
+    return isNaN(d1) || isNaN(d2) ? 1 : Math.max(1, Math.round((d2 - d1) / 86400000) + 1);
+  }, [newBooking.date, newBooking.endDate]);
+
   const newBookingPrice = useMemo(() => {
     if (!selectedNanny) return 0;
-    return Math.round(selectedNanny.rate * newBookingHours);
-  }, [selectedNanny, newBookingHours]);
+    const hourlyTotal = Math.round(selectedNanny.rate * newBookingHours * newBookingDays);
+    const [sh] = (newBooking.startTime || "").split(":").map(Number);
+    const [eh, em] = (newBooking.endTime || "").split(":").map(Number);
+    const isEvening = (eh > 19 || (eh === 19 && em > 0)) || sh < 7;
+    const taxiFee = isEvening ? 10 * newBookingDays : 0;
+    return hourlyTotal + taxiFee;
+  }, [selectedNanny, newBookingHours, newBookingDays, newBooking.startTime, newBooking.endTime]);
 
   const handleNewBookingSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
