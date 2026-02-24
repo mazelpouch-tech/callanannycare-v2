@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb, timesOverlap, getDateRange } from '../_db.js';
-import type { DbBookingWithNanny, BookingStatus, BookingPlan } from '../../src/types/index.js';
+import type { DbBookingWithNanny, BookingStatus, BookingPlan } from '@/types';
 
 interface UpdateBookingBody {
   nanny_id?: number | null;
