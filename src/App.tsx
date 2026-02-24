@@ -48,8 +48,8 @@ export default function App() {
       <Route path="/extend/:id" element={<ExtendBooking />} />
       <Route path="/rebook/:id" element={<RebookBooking />} />
       <Route path="/booking/:id" element={<BookingStatus />} />
-      <Route path="/review/:id" element={<ReviewNanny />} />
       <Route path="/review/nanny/:id" element={<ReviewNannyPublic />} />
+      <Route path="/review/:id" element={<ReviewNanny />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
       {/* Admin routes */}
