@@ -34,7 +34,7 @@ import PhoneInput from "../../components/PhoneInput";
 import ExtendBookingModal from "../../components/ExtendBookingModal";
 import ForwardBookingModal from "../../components/ForwardBookingModal";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
-import { calcBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE } from "@/utils/shiftHelpers";
+import { calcBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE, isTomorrow as isTomorrowDate } from "@/utils/shiftHelpers";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 
 interface EditBookingForm {
@@ -508,15 +508,37 @@ export default function AdminBookings() {
     return result;
   }, [bookings, search, statusFilter, nannyFilter, sortOrder]);
 
-  // Find the boundary index between today's bookings and older bookings
-  const todayDividerIndex = useMemo(() => {
-    for (let i = 1; i < filteredBookings.length; i++) {
-      const currIsToday = (() => { try { return isToday(parseISO(filteredBookings[i].date)); } catch { return false; } })();
-      const prevIsToday = (() => { try { return isToday(parseISO(filteredBookings[i - 1].date)); } catch { return false; } })();
-      if (currIsToday !== prevIsToday) return i;
-    }
-    return -1;
+  // Classify each booking into a date group: tomorrow / today / older
+  type DateGroup = "tomorrow" | "today" | "older";
+  const bookingGroups = useMemo(() => {
+    return filteredBookings.map((b): DateGroup => {
+      try {
+        const d = b.date;
+        if (isToday(parseISO(d))) return "today";
+        if (isTomorrowDate(d)) return "tomorrow";
+      } catch { /* ignore */ }
+      return "older";
+    });
   }, [filteredBookings]);
+
+  // Find boundary indices where the group changes
+  const dividerIndices = useMemo(() => {
+    const indices: { index: number; labelAbove: string; labelBelow: string }[] = [];
+    for (let i = 1; i < bookingGroups.length; i++) {
+      if (bookingGroups[i] !== bookingGroups[i - 1]) {
+        const above = bookingGroups[i - 1];
+        const below = bookingGroups[i];
+        // Label describes what section is BELOW the divider
+        const labelMap: Record<DateGroup, string> = {
+          tomorrow: "Tomorrow\u2019s Bookings",
+          today: "Today\u2019s Bookings",
+          older: "Previous Bookings",
+        };
+        indices.push({ index: i, labelAbove: labelMap[above], labelBelow: labelMap[below] });
+      }
+    }
+    return indices;
+  }, [bookingGroups]);
 
   const formatDate = (dateStr: string) => {
     try {
@@ -705,18 +727,20 @@ export default function AdminBookings() {
 
                     return (
                       <Fragment key={booking.id}>
-                        {idx === todayDividerIndex && (
-                          <tr>
-                            <td colSpan={12} className="px-4 py-4 bg-primary/5 text-center">
-                              <div className="flex items-center justify-center gap-4">
-                                <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
-                                <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
-                                  {sortOrder === "newest" ? "Older Bookings" : "Today\u2019s Bookings"}
-                                </span>
-                                <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
-                              </div>
-                            </td>
-                          </tr>
+                        {dividerIndices.map((d) =>
+                          d.index === idx ? (
+                            <tr key={`divider-${idx}`}>
+                              <td colSpan={12} className="px-4 py-4 bg-primary/5 text-center">
+                                <div className="flex items-center justify-center gap-4">
+                                  <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
+                                  <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
+                                    {d.labelBelow}
+                                  </span>
+                                  <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
+                                </div>
+                              </td>
+                            </tr>
+                          ) : null
                         )}
                         <tr className="hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-3.5 text-xs font-mono text-muted-foreground">
@@ -1069,14 +1093,16 @@ export default function AdminBookings() {
 
               return (
                 <Fragment key={`mobile-${booking.id}`}>
-                {idx === todayDividerIndex && (
-                  <div className="flex items-center gap-4 py-3 px-2 my-1 bg-primary/5 rounded-xl">
-                    <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
-                    <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
-                      {sortOrder === "newest" ? "Older Bookings" : "Today\u2019s Bookings"}
-                    </span>
-                    <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
-                  </div>
+                {dividerIndices.map((d) =>
+                  d.index === idx ? (
+                    <div key={`m-divider-${idx}`} className="flex items-center gap-4 py-3 px-2 my-1 bg-primary/5 rounded-xl">
+                      <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
+                      <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
+                        {d.labelBelow}
+                      </span>
+                      <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
+                    </div>
+                  ) : null
                 )}
                 <div
                   className="bg-card rounded-xl border border-border shadow-soft overflow-hidden"

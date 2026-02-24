@@ -16,6 +16,14 @@ export function isToday(dateStr: string): boolean {
   return dateStr === todayStr;
 }
 
+export function isTomorrow(dateStr: string): boolean {
+  if (!dateStr) return false;
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+  return dateStr === tomorrowStr;
+}
+
 export function formatDuration(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
   const h = Math.floor(totalSec / 3600);
