@@ -143,6 +143,8 @@ export function DataProvider({ children }: DataProviderProps) {
             notes: b.notes,
             totalPrice: b.total_price,
             status: b.status,
+            createdBy: b.created_by || 'parent',
+            createdByName: b.created_by_name || '',
             createdAt: b.created_at,
             clockIn: b.clock_in,
             clockOut: b.clock_out,
@@ -284,6 +286,8 @@ export function DataProvider({ children }: DataProviderProps) {
             status: booking.status || undefined,
             clock_in: booking.clockIn || null,
             clock_out: booking.clockOut || null,
+            created_by: booking.createdBy || "parent",
+            created_by_name: booking.createdByName || "",
           }),
         });
 
@@ -306,6 +310,8 @@ export function DataProvider({ children }: DataProviderProps) {
           notes: created.notes,
           totalPrice: created.total_price,
           status: created.status,
+          createdBy: created.created_by || 'parent',
+          createdByName: created.created_by_name || '',
           createdAt: created.created_at,
           clockIn: created.clock_in ?? null,
           clockOut: created.clock_out ?? null,
@@ -323,6 +329,8 @@ export function DataProvider({ children }: DataProviderProps) {
           id: crypto.randomUUID(),
           nannyName: nanny ? nanny.name : booking.nannyName || "Unknown",
           status: booking.status || "pending",
+          createdBy: booking.createdBy || "parent",
+          createdByName: booking.createdByName || "",
           createdAt: new Date().toISOString(),
         } as Booking;
         setBookings((prev) => {
@@ -522,6 +530,8 @@ export function DataProvider({ children }: DataProviderProps) {
     notes: b.notes,
     totalPrice: b.total_price,
     status: b.status,
+    createdBy: b.created_by || 'parent',
+    createdByName: b.created_by_name || '',
     createdAt: b.created_at,
     clockIn: b.clock_in,
     clockOut: b.clock_out,

@@ -95,7 +95,7 @@ const statusConfig: Record<BookingStatus, { label: string; className: string }> 
 const statusFilters = ["all", "pending", "confirmed", "completed", "cancelled"];
 
 export default function AdminBookings() {
-  const { bookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking } = useData();
+  const { bookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking, adminProfile } = useData();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -265,6 +265,8 @@ export default function AdminBookings() {
       childrenAges: newBooking.childrenAges,
       notes: newBooking.notes,
       status: newBooking.status as BookingStatus,
+      createdBy: 'admin',
+      createdByName: adminProfile?.name || 'Admin',
     });
 
     setNewBookingLoading(false);
@@ -326,7 +328,7 @@ export default function AdminBookings() {
 
   // CSV export
   const exportCSV = () => {
-    const headers = ["ID", "Client", "Email", "Phone", "Nanny", "Start Date", "End Date", "Time", "Plan", "Price", "Status", "Hotel", "Notes"];
+    const headers = ["ID", "Client", "Email", "Phone", "Nanny", "Start Date", "End Date", "Time", "Plan", "Price", "Status", "Created By", "Created By Name", "Hotel", "Notes"];
     const rows = filteredBookings.map((b) => [
       b.id,
       b.clientName || "",
@@ -339,6 +341,8 @@ export default function AdminBookings() {
       b.plan || "",
       b.totalPrice || 0,
       b.status || "",
+      b.createdBy || "parent",
+      b.createdByName || "",
       b.hotel || "",
       (b.notes || "").replace(/,/g, ";"),
     ]);
@@ -539,6 +543,9 @@ export default function AdminBookings() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Status
                     </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Created By
+                    </th>
                     <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Actions
                     </th>
@@ -591,6 +598,20 @@ export default function AdminBookings() {
                             >
                               {status.label}
                             </span>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                              booking.createdBy === 'admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                              booking.createdBy === 'nanny' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                              'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            }`}>
+                              {booking.createdBy === 'admin' ? 'Admin' : booking.createdBy === 'nanny' ? 'Nanny' : 'Parent'}
+                            </span>
+                            {booking.createdByName && (
+                              <span className="block text-[10px] text-muted-foreground mt-0.5 truncate max-w-[80px]" title={booking.createdByName}>
+                                {booking.createdByName}
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3.5">
                             <div className="flex items-center justify-end gap-1.5">
@@ -794,11 +815,20 @@ export default function AdminBookings() {
                           ID: {truncateId(booking.id)}
                         </p>
                       </div>
-                      <span
-                        className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}
-                      >
-                        {status.label}
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span
+                          className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}
+                        >
+                          {status.label}
+                        </span>
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          booking.createdBy === 'admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                          booking.createdBy === 'nanny' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                          'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                        }`}>
+                          {booking.createdBy === 'admin' ? 'Admin' : booking.createdBy === 'nanny' ? 'Nanny' : 'Parent'}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Info Grid */}
