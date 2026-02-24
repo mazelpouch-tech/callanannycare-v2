@@ -521,20 +521,21 @@ export default function AdminBookings() {
     });
   }, [filteredBookings]);
 
-  // Find boundary indices where the group changes
+  // Find boundary indices where the group changes (including a header for the first group)
   const dividerIndices = useMemo(() => {
-    const indices: { index: number; labelAbove: string; labelBelow: string }[] = [];
+    const labelMap: Record<DateGroup, string> = {
+      tomorrow: "Tomorrow\u2019s Bookings",
+      today: "Today\u2019s Bookings",
+      older: "Previous Bookings",
+    };
+    const indices: { index: number; label: string }[] = [];
+    // Always show a header for the very first group
+    if (bookingGroups.length > 0) {
+      indices.push({ index: 0, label: labelMap[bookingGroups[0]] });
+    }
     for (let i = 1; i < bookingGroups.length; i++) {
       if (bookingGroups[i] !== bookingGroups[i - 1]) {
-        const above = bookingGroups[i - 1];
-        const below = bookingGroups[i];
-        // Label describes what section is BELOW the divider
-        const labelMap: Record<DateGroup, string> = {
-          tomorrow: "Tomorrow\u2019s Bookings",
-          today: "Today\u2019s Bookings",
-          older: "Previous Bookings",
-        };
-        indices.push({ index: i, labelAbove: labelMap[above], labelBelow: labelMap[below] });
+        indices.push({ index: i, label: labelMap[bookingGroups[i]] });
       }
     }
     return indices;
@@ -734,7 +735,7 @@ export default function AdminBookings() {
                                 <div className="flex items-center justify-center gap-4">
                                   <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
                                   <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
-                                    {d.labelBelow}
+                                    {d.label}
                                   </span>
                                   <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
                                 </div>
@@ -1098,7 +1099,7 @@ export default function AdminBookings() {
                     <div key={`m-divider-${idx}`} className="flex items-center gap-4 py-3 px-2 my-1 bg-primary/5 rounded-xl">
                       <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
                       <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
-                        {d.labelBelow}
+                        {d.label}
                       </span>
                       <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
                     </div>
