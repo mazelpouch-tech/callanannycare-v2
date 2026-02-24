@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   Search,
@@ -9,11 +9,15 @@ import {
   MapPin,
   Star,
   ArrowRight,
+  MessageSquare,
+  Loader2,
 } from "lucide-react";
 import { useData } from "../context/DataContext";
 import { useLanguage } from "../context/LanguageContext";
 import type { Nanny } from "../types";
 import NannyCard from "../components/NannyCard";
+
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 export default function Nannies() {
   const { nannies } = useData();
@@ -23,6 +27,24 @@ export default function Nannies() {
   const [sortBy, setSortBy] = useState("rating");
   const [languageFilter, setLanguageFilter] = useState("all");
   const [selectedNanny, setSelectedNanny] = useState<Nanny | null>(null);
+  const [nannyReviews, setNannyReviews] = useState<Record<string, unknown>[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+
+  // Fetch reviews when a nanny is selected
+  useEffect(() => {
+    if (!selectedNanny) {
+      setNannyReviews([]);
+      return;
+    }
+    setReviewsLoading(true);
+    fetch(`${API_BASE}/api/reviews?nanny_id=${selectedNanny.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setNannyReviews(data);
+      })
+      .catch(() => {})
+      .finally(() => setReviewsLoading(false));
+  }, [selectedNanny]);
 
   // Collect all unique languages from nannies
   const allLanguages = useMemo(() => {
@@ -322,6 +344,44 @@ export default function Nannies() {
                   </div>
                 </div>
               )}
+
+              {/* Parent Reviews */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <MessageSquare className="w-4 h-4 text-amber-500" />
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {t("nannies.reviews") || "Reviews"} ({nannyReviews.length})
+                  </h3>
+                </div>
+                {reviewsLoading ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : nannyReviews.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">{t("nannies.noReviews") || "No reviews yet."}</p>
+                ) : (
+                  <div className="space-y-2.5 max-h-48 overflow-y-auto">
+                    {nannyReviews.map((review, idx) => (
+                      <div key={String(review.id || idx)} className="bg-muted/40 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-foreground text-xs">{String(review.client_name || "Parent")}</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {review.created_at ? new Date(String(review.created_at)).toLocaleDateString() : ""}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-0.5 mb-1">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star key={s} className={`w-3 h-3 ${s <= (Number(review.rating) || 0) ? "fill-yellow-500 text-yellow-500" : "text-gray-300"}`} />
+                          ))}
+                        </div>
+                        {review.comment && (
+                          <p className="text-xs text-muted-foreground leading-relaxed">{String(review.comment)}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Rate & Book */}
               <div className="flex items-center justify-between pt-4 border-t border-border">
