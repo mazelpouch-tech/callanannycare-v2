@@ -773,8 +773,11 @@ export default function AdminBookings() {
                     return (
                       <Fragment key={booking.id}>
                         <tr className="hover:bg-muted/30 transition-colors">
-                          <td className="px-4 py-3.5 text-xs font-mono text-muted-foreground">
-                            {truncateId(booking.id)}
+                          <td className="px-4 py-3.5">
+                            <div className="text-xs font-mono text-muted-foreground">{truncateId(booking.id)}</div>
+                            {booking.createdBy && (
+                              <div className="text-[10px] text-muted-foreground/70 mt-0.5">by {booking.createdBy}</div>
+                            )}
                           </td>
                           <td className="px-4 py-3.5 text-sm font-medium text-foreground">
                             {booking.clientName || "N/A"}
@@ -1150,6 +1153,9 @@ export default function AdminBookings() {
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           ID: {truncateId(booking.id)}
+                          {booking.createdBy && (
+                            <span className="text-[10px] text-muted-foreground/70 ml-1.5">· by {booking.createdBy}</span>
+                          )}
                         </p>
                       </div>
                       <UrgencyBadge booking={booking} />

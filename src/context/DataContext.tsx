@@ -163,6 +163,7 @@ export function DataProvider({ children }: DataProviderProps) {
             cancelledAt: b.cancelled_at ?? null,
             cancellationReason: b.cancellation_reason || '',
             cancelledBy: b.cancelled_by || '',
+            createdBy: b.created_by || '',
           }));
           setBookings(normalizedBookings);
           saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -337,6 +338,7 @@ export function DataProvider({ children }: DataProviderProps) {
             status: booking.status || undefined,
             clock_in: booking.clockIn || null,
             clock_out: booking.clockOut || null,
+            created_by: booking.createdBy || (adminProfile ? adminProfile.name : "Client (website)"),
           }),
         });
 
@@ -365,6 +367,7 @@ export function DataProvider({ children }: DataProviderProps) {
           cancelledAt: created.cancelled_at ?? null,
           cancellationReason: created.cancellation_reason || '',
           cancelledBy: created.cancelled_by || '',
+          createdBy: created.created_by || '',
         };
         setBookings((prev) => {
           const updated = [...prev, normalized];
@@ -380,6 +383,7 @@ export function DataProvider({ children }: DataProviderProps) {
           nannyName: nanny ? nanny.name : booking.nannyName || "Unknown",
           status: booking.status || "pending",
           createdAt: new Date().toISOString(),
+          createdBy: booking.createdBy || (adminProfile ? adminProfile.name : "Client (website)"),
         } as Booking;
         setBookings((prev) => {
           const updated = [...prev, newBooking];
@@ -610,6 +614,7 @@ export function DataProvider({ children }: DataProviderProps) {
     cancelledAt: b.cancelled_at ?? null,
     cancellationReason: b.cancellation_reason || '',
     cancelledBy: b.cancelled_by || '',
+    createdBy: b.created_by || '',
   }), []);
 
   const fetchNannyBookings = useCallback(async () => {

@@ -63,6 +63,7 @@ export interface DbBooking {
   cancelled_at: string | null;
   cancellation_reason: string;
   cancelled_by: string;
+  created_by: string;
   created_at: string;
   updated_at: string;
 }
@@ -149,6 +150,7 @@ export interface Booking {
   cancelledAt: string | null;
   cancellationReason: string;
   cancelledBy: string;
+  createdBy: string;
 }
 
 export interface Notification {
