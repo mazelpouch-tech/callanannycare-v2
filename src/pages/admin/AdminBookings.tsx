@@ -200,24 +200,23 @@ export default function AdminBookings() {
   };
 
   const handleCopyReviewLink = async (bookingId: number | string) => {
-    const entry = reviewSentBookings[String(bookingId)];
-    if (entry?.url) {
-      await navigator.clipboard.writeText(entry.url);
-      setCopiedBookingId(bookingId);
-      setTimeout(() => setCopiedBookingId(null), 2000);
-      return;
-    }
-    setReviewLoading(bookingId);
+    const booking = bookings.find((b) => String(b.id) === String(bookingId));
+    if (!booking?.nannyId) return;
+    const reviewUrl = `${window.location.origin}/review/nanny/${booking.nannyId}`;
     try {
-      const url = await sendReviewLink(bookingId);
-      setReviewSentBookings((prev) => ({ ...prev, [String(bookingId)]: { sentAt: Date.now(), url } }));
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(reviewUrl);
       setCopiedBookingId(bookingId);
       setTimeout(() => setCopiedBookingId(null), 2000);
-    } catch (err) {
-      console.error("Copy review link failed:", err);
+    } catch {
+      const textArea = document.createElement("textarea");
+      textArea.value = reviewUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      setCopiedBookingId(bookingId);
+      setTimeout(() => setCopiedBookingId(null), 2000);
     }
-    setReviewLoading(null);
   };
 
   const isReviewCooling = (bookingId: number | string) => {

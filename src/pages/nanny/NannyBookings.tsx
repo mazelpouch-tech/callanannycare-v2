@@ -124,26 +124,24 @@ export default function NannyBookings() {
     setReviewLoading(null);
   };
 
-  const handleCopyReviewLink = async (bookingId: number | string) => {
-    const entry = reviewSentBookings[String(bookingId)];
-    if (entry?.url) {
-      await navigator.clipboard.writeText(entry.url);
-      setCopiedBookingId(bookingId);
-      setTimeout(() => setCopiedBookingId(null), 2000);
-      return;
-    }
-    // If no URL cached, send first then copy
-    setReviewLoading(bookingId);
+  const handleCopyReviewLink = async () => {
+    if (!nannyProfile?.id) return;
+    const reviewUrl = `${window.location.origin}/review/nanny/${nannyProfile.id}`;
     try {
-      const url = await sendReviewLink(bookingId);
-      setReviewSentBookings((prev) => ({ ...prev, [String(bookingId)]: { sentAt: Date.now(), url } }));
-      await navigator.clipboard.writeText(url);
-      setCopiedBookingId(bookingId);
+      await navigator.clipboard.writeText(reviewUrl);
+      setCopiedBookingId("nanny");
       setTimeout(() => setCopiedBookingId(null), 2000);
-    } catch (err) {
-      console.error("Copy review link failed:", err);
+    } catch {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea");
+      textArea.value = reviewUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      setCopiedBookingId("nanny");
+      setTimeout(() => setCopiedBookingId(null), 2000);
     }
-    setReviewLoading(null);
   };
 
   const isReviewCooling = (bookingId: number | string) => {
@@ -855,12 +853,11 @@ export default function NannyBookings() {
                                   {isReviewCooling(booking.id) ? "Sent" : "Review"}
                                 </button>
                                 <button
-                                  onClick={() => handleCopyReviewLink(booking.id)}
-                                  disabled={reviewLoading === booking.id}
-                                  className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-colors disabled:opacity-40"
-                                  title={copiedBookingId === booking.id ? "Copied!" : "Copy review link"}
+                                  onClick={() => handleCopyReviewLink()}
+                                  className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-colors"
+                                  title={copiedBookingId === "nanny" ? "Copied!" : "Copy my review link"}
                                 >
-                                  {copiedBookingId === booking.id ? (
+                                  {copiedBookingId === "nanny" ? (
                                     <Check className="w-3.5 h-3.5 text-green-600" />
                                   ) : (
                                     <Copy className="w-3.5 h-3.5" />
@@ -1114,16 +1111,15 @@ export default function NannyBookings() {
                           {isReviewCooling(booking.id) ? "Review Sent" : "Send Review Link"}
                         </button>
                         <button
-                          onClick={() => handleCopyReviewLink(booking.id)}
-                          disabled={reviewLoading === booking.id}
-                          className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg bg-gray-50 text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors disabled:opacity-40"
+                          onClick={() => handleCopyReviewLink()}
+                          className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg bg-gray-50 text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors"
                         >
-                          {copiedBookingId === booking.id ? (
+                          {copiedBookingId === "nanny" ? (
                             <Check className="w-4 h-4 text-green-600" />
                           ) : (
                             <Copy className="w-4 h-4" />
                           )}
-                          {copiedBookingId === booking.id ? "Copied!" : "Copy Link"}
+                          {copiedBookingId === "nanny" ? "Copied!" : "Copy My Review Link"}
                         </button>
                       </>
                     )}
