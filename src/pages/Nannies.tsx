@@ -383,15 +383,9 @@ export default function Nannies() {
                 )}
               </div>
 
-              {/* Rate & Book */}
-              <div className="flex items-center justify-between pt-4 border-t border-border">
-                <div>
-                  <p className="text-sm text-muted-foreground">{t("nannies.hourlyRate")}</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {selectedNanny.rate} <span className="text-sm font-normal text-muted-foreground">{t("common.madPerHour")}</span>
-                  </p>
-                </div>
-                {selectedNanny.available && (
+              {/* Book */}
+              {selectedNanny.available && (
+                <div className="flex justify-end pt-4 border-t border-border">
                   <Link
                     to="/book"
                     onClick={() => setSelectedNanny(null)}
@@ -400,8 +394,8 @@ export default function Nannies() {
                     {t("common.bookNow")}
                     <ArrowRight className="w-4 h-4" />
                   </Link>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

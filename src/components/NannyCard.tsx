@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { MapPin, Star, Clock, Globe, Eye } from "lucide-react";
+import { MapPin, Star, Globe, Eye } from "lucide-react";
 import type { Nanny } from "../types";
 import { useLanguage } from "../context/LanguageContext";
 
@@ -86,35 +86,25 @@ export default function NannyCard({ nanny, showBookButton = true, onViewDetails 
         </div>
       )}
 
-      {/* Rate + Buttons */}
-      <div className="mt-4 flex items-center justify-between pt-3 border-t border-border">
-        <div className="flex items-center gap-1.5">
-          <Clock className="w-4 h-4 text-muted-foreground" />
-          <span className="text-base font-semibold text-card-foreground">
-            {rate}€
-          </span>
-          <span className="text-sm text-muted-foreground">/hr</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {onViewDetails && (
-            <button
-              onClick={onViewDetails}
-              className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              {t("nannyCard.details")}
-            </button>
-          )}
-          {showBookButton && available && (
-            <Link
-              to="/book"
-              className="gradient-warm text-white text-sm font-semibold px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
-            >
-              {t("common.bookNow")}
-            </Link>
-          )}
-        </div>
+      {/* Buttons */}
+      <div className="mt-4 flex items-center justify-end gap-2 pt-3 border-t border-border">
+        {onViewDetails && (
+          <button
+            onClick={onViewDetails}
+            className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            {t("nannyCard.details")}
+          </button>
+        )}
+        {showBookButton && available && (
+          <Link
+            to="/book"
+            className="gradient-warm text-white text-sm font-semibold px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
+          >
+            {t("common.bookNow")}
+          </Link>
+        )}
       </div>
     </div>
   );
