@@ -19,10 +19,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const reviews = await sql`
-        SELECT r.id, r.nanny_id, r.client_name, r.rating, r.comment, r.created_at
-        FROM nanny_reviews r
-        WHERE r.nanny_id = ${nanny_id}
-        ORDER BY r.created_at DESC
+        SELECT id, nanny_id, client_name, rating, comment, created_at
+        FROM nanny_reviews
+        WHERE nanny_id = ${nanny_id}
+        ORDER BY created_at DESC
       `;
       return res.status(200).json(reviews);
     }
@@ -50,9 +50,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const sanitizedName = client_name.trim().slice(0, 100);
       const sanitizedComment = (comment || '').trim().slice(0, 1000);
 
+      // Insert without booking_id (defaults to NULL for public reviews)
       await sql`
-        INSERT INTO nanny_reviews (booking_id, nanny_id, client_name, client_email, rating, comment)
-        VALUES (${null}, ${nanny_id}, ${sanitizedName}, ${''}, ${rating}, ${sanitizedComment})
+        INSERT INTO nanny_reviews (nanny_id, client_name, client_email, rating, comment)
+        VALUES (${nanny_id}, ${sanitizedName}, ${''}, ${rating}, ${sanitizedComment})
       `;
 
       // Update nanny average rating
@@ -72,6 +73,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Reviews API error:', message);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error', details: message });
   }
 }
