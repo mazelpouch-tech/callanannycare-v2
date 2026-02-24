@@ -34,6 +34,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { nannyId } = req.query;
       if (!nannyId) return res.status(400).json({ error: 'nannyId is required' });
 
+      // Stats-only request (used by nanny dashboard)
+      if (req.query.include === 'stats') {
+        const statsResult = await sql`
+          SELECT
+            COUNT(*) FILTER (WHERE status = 'completed') as completed_bookings,
+            COUNT(*) FILTER (WHERE status = 'confirmed' AND date >= CURRENT_DATE::text) as upcoming_bookings,
+            COUNT(*) FILTER (WHERE status = 'pending') as pending_bookings,
+            COALESCE(SUM(total_price) FILTER (WHERE status = 'completed'), 0) as total_earnings,
+            COUNT(*) FILTER (WHERE status IN ('confirmed', 'completed') AND date >= to_char(date_trunc('week', CURRENT_DATE), 'YYYY-MM-DD') AND date < to_char(date_trunc('week', CURRENT_DATE) + interval '7 days', 'YYYY-MM-DD')) as this_week_bookings
+          FROM bookings
+          WHERE nanny_id = ${nannyId}
+        ` as { completed_bookings: string; upcoming_bookings: string; pending_bookings: string; total_earnings: string; this_week_bookings: string }[];
+
+        const hoursResult = await sql`
+          SELECT
+            COALESCE(SUM(
+              EXTRACT(EPOCH FROM (clock_out::timestamptz - clock_in::timestamptz)) / 3600
+            ), 0) as total_hours_worked
+          FROM bookings
+          WHERE nanny_id = ${nannyId}
+            AND status = 'completed'
+            AND clock_in IS NOT NULL
+            AND clock_out IS NOT NULL
+        ` as { total_hours_worked: string }[];
+
+        const stats = statsResult[0];
+        const hours = hoursResult[0];
+
+        return res.status(200).json({
+          totalHoursWorked: parseFloat(parseFloat(hours.total_hours_worked).toFixed(1)),
+          completedBookings: parseInt(stats.completed_bookings),
+          upcomingBookings: parseInt(stats.upcoming_bookings),
+          pendingBookings: parseInt(stats.pending_bookings),
+          totalEarnings: parseInt(stats.total_earnings),
+          thisWeekBookings: parseInt(stats.this_week_bookings),
+        });
+      }
+
       const result = await sql`
         SELECT id, name, email, location, rating, bio, specialties, languages, image, experience, available, created_at
         FROM nannies WHERE id = ${nannyId}
