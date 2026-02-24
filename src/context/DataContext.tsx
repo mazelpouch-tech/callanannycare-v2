@@ -533,7 +533,7 @@ export function DataProvider({ children }: DataProviderProps) {
   }, []);
 
   const sendReviewLink = useCallback(async (id: number | string): Promise<void> => {
-    await apiFetch(`/reviews/send`, {
+    await apiFetch(`/reviews?action=send`, {
       method: "POST",
       body: JSON.stringify({ booking_id: id }),
     });
@@ -628,7 +628,7 @@ export function DataProvider({ children }: DataProviderProps) {
   const fetchNannyStats = useCallback(async () => {
     if (!nannyProfile?.id) return;
     try {
-      const data = await apiFetch<NannyStats>(`/nanny/stats?nannyId=${nannyProfile.id}`);
+      const data = await apiFetch<NannyStats>(`/nanny/profile?nannyId=${nannyProfile.id}&include=stats`);
       setNannyStats(data);
     } catch {
       console.warn("Failed to fetch nanny stats");
