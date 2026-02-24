@@ -584,13 +584,6 @@ export default function AdminBookings() {
     return timeStr || "N/A";
   };
 
-  const truncateId = (id: number | string) => {
-    if (!id) return "N/A";
-    return typeof id === "string" && id.length > 8
-      ? `${id.slice(0, 8)}...`
-      : id;
-  };
-
   const handleDelete = (id: number | string) => {
     deleteBooking(id);
     setDeleteConfirm(null);
@@ -716,9 +709,6 @@ export default function AdminBookings() {
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      ID
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Client
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -761,7 +751,7 @@ export default function AdminBookings() {
                   ] as const).map((group) => group.items.length > 0 && (
                     <Fragment key={group.label}>
                       <tr>
-                        <td colSpan={12} className="px-4 py-4 bg-primary/5 text-center">
+                        <td colSpan={10} className="px-4 py-4 bg-primary/5 text-center">
                           <div className="flex items-center justify-center gap-4">
                             <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
                             <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
@@ -777,12 +767,6 @@ export default function AdminBookings() {
                     return (
                       <Fragment key={booking.id}>
                         <tr className="hover:bg-muted/30 transition-colors">
-                          <td className="px-4 py-3.5">
-                            <div className="text-xs font-mono text-muted-foreground">{truncateId(booking.id)}</div>
-                            {booking.createdBy && (
-                              <div className="text-[10px] text-muted-foreground/70 mt-0.5">by {booking.createdBy}</div>
-                            )}
-                          </td>
                           <td className="px-4 py-3.5 text-sm font-medium text-foreground">
                             {booking.clientName || "N/A"}
                           </td>
@@ -989,7 +973,7 @@ export default function AdminBookings() {
                         {isExpanded && (
                           <tr>
                             <td
-                              colSpan={11}
+                              colSpan={10}
                               className="px-4 py-4 bg-muted/20"
                             >
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -1176,7 +1160,7 @@ export default function AdminBookings() {
                           {booking.clientName || "N/A"}
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          ID: {truncateId(booking.id)}
+                          {booking.nannyName || "Unassigned"}
                         </p>
                       </div>
                       <UrgencyBadge booking={booking} />
