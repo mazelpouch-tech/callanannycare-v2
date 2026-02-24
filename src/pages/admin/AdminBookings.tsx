@@ -674,13 +674,13 @@ export default function AdminBookings() {
                       <Fragment key={booking.id}>
                         {idx === todayDividerIndex && (
                           <tr>
-                            <td colSpan={12} className="px-4 py-2">
-                              <div className="flex items-center gap-3">
-                                <div className="flex-1 h-px bg-primary/40" />
-                                <span className="text-xs font-semibold text-primary whitespace-nowrap">
+                            <td colSpan={12} className="px-4 py-4 bg-primary/5">
+                              <div className="flex items-center gap-4">
+                                <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
+                                <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
                                   {sortOrder === "newest" ? "Older Bookings" : "Today\u2019s Bookings"}
                                 </span>
-                                <div className="flex-1 h-px bg-primary/40" />
+                                <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
                               </div>
                             </td>
                           </tr>
@@ -1037,12 +1037,12 @@ export default function AdminBookings() {
               return (
                 <Fragment key={`mobile-${booking.id}`}>
                 {idx === todayDividerIndex && (
-                  <div className="flex items-center gap-3 py-1">
-                    <div className="flex-1 h-px bg-primary/40" />
-                    <span className="text-xs font-semibold text-primary whitespace-nowrap">
+                  <div className="flex items-center gap-4 py-3 px-2 my-1 bg-primary/5 rounded-xl">
+                    <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
+                    <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
                       {sortOrder === "newest" ? "Older Bookings" : "Today\u2019s Bookings"}
                     </span>
-                    <div className="flex-1 h-px bg-primary/40" />
+                    <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
                   </div>
                 )}
                 <div
