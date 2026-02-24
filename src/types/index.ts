@@ -7,6 +7,7 @@ export type BookingPlan = 'hourly' | 'half-day' | 'full-day';
 export type NannyStatus = 'active' | 'blocked' | 'invited';
 export type NotificationType = 'new_booking' | 'booking_confirmed' | 'booking_cancelled' | 'booking_completed';
 export type AdminRole = 'super_admin' | 'admin';
+export type MessageSenderType = 'admin' | 'nanny';
 
 // ============================================================
 // Database row types (snake_case, as returned from Neon SQL)
@@ -242,6 +243,19 @@ export interface DbLoginLog {
   created_at: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  senderType: MessageSenderType;
+  senderId: number;
+  senderName: string;
+  senderImage?: string;
+  recipientType: MessageSenderType;
+  recipientId: number;
+  content: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
 export interface PricingPlan {
   id: string;
   name: string;
@@ -329,4 +343,10 @@ export interface DataContextValue {
   fetchNannyNotifications: () => Promise<void>;
   markNotificationsRead: (notificationIds: number[]) => Promise<void>;
   updateNannyProfile: (updates: Partial<NannyProfile>) => Promise<ApiResult>;
+
+  // Messaging
+  chatMessages: ChatMessage[];
+  sendChatMessage: (recipientType: MessageSenderType, recipientId: number, content: string) => void;
+  markChatMessagesRead: (messageIds: string[]) => void;
+  unreadChatCount: number;
 }

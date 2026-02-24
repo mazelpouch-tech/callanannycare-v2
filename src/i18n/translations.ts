@@ -298,6 +298,7 @@ export const translations: Record<Locale, TranslationTree> = {
         myBookings: "My Bookings",
         notifications: "Notifications",
         myProfile: "My Profile",
+        messages: "Messages",
         signOut: "Sign Out",
       },
       login: {
@@ -800,6 +801,7 @@ export const translations: Record<Locale, TranslationTree> = {
         myBookings: "Mes Réservations",
         notifications: "Notifications",
         myProfile: "Mon Profil",
+        messages: "Messages",
         signOut: "Déconnexion",
       },
       login: {

@@ -14,6 +14,8 @@ import type {
   AdminUser,
   DashboardStats,
   BookingStatus,
+  ChatMessage,
+  MessageSenderType,
   DataContextValue,
 } from "../types";
 import type {
@@ -37,6 +39,7 @@ const STORAGE_KEYS = {
   admin: "callanannycare_admin",
   nanny: "callanannycare_nanny",
   nannyProfile: "callanannycare_nanny_profile",
+  chatMessages: "callanannycare_chat_messages",
 };
 
 function loadFromStorage<T>(key: string, fallback: T): T {
@@ -954,6 +957,67 @@ export function DataProvider({ children }: DataProviderProps) {
     }
   }, []);
 
+  // --- Chat Messaging ---
+
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() =>
+    loadFromStorage(STORAGE_KEYS.chatMessages, [])
+  );
+
+  // Persist chat messages to localStorage
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.chatMessages, chatMessages);
+  }, [chatMessages]);
+
+  // Poll for new messages from localStorage (enables cross-portal sync)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const stored = loadFromStorage<ChatMessage[]>(STORAGE_KEYS.chatMessages, []);
+      if (stored.length !== chatMessages.length) {
+        setChatMessages(stored);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [chatMessages.length]);
+
+  const sendChatMessage = useCallback((
+    recipientType: MessageSenderType,
+    recipientId: number,
+    content: string,
+  ) => {
+    const senderType: MessageSenderType = isAdmin ? "admin" : "nanny";
+    const senderId = isAdmin ? (adminProfile?.id ?? 0) : (nannyProfile?.id ?? 0);
+    const senderName = isAdmin ? (adminProfile?.name ?? "Admin") : (nannyProfile?.name ?? "Nanny");
+    const senderImage = isAdmin ? undefined : (nannyProfile?.image || undefined);
+
+    const msg: ChatMessage = {
+      id: crypto.randomUUID(),
+      senderType,
+      senderId,
+      senderName,
+      senderImage,
+      recipientType,
+      recipientId,
+      content,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+    };
+    setChatMessages((prev) => {
+      const updated = [...prev, msg];
+      saveToStorage(STORAGE_KEYS.chatMessages, updated);
+      return updated;
+    });
+  }, [isAdmin, adminProfile, nannyProfile]);
+
+  const markChatMessagesRead = useCallback((messageIds: string[]) => {
+    setChatMessages((prev) => {
+      const updated = prev.map((m) =>
+        messageIds.includes(m.id) ? { ...m, isRead: true } : m
+      );
+      saveToStorage(STORAGE_KEYS.chatMessages, updated);
+      return updated;
+    });
+  }, []);
+
   // --- Computed Stats ---
 
   const stats: DashboardStats = useMemo(() => {
@@ -978,6 +1042,16 @@ export function DataProvider({ children }: DataProviderProps) {
     () => nannyNotifications.filter((n) => !n.isRead).length,
     [nannyNotifications]
   );
+
+  const unreadChatCount = useMemo(() => {
+    if (isAdmin && adminProfile) {
+      return chatMessages.filter((m) => m.recipientType === "admin" && m.recipientId === adminProfile.id && !m.isRead).length;
+    }
+    if (isNanny && nannyProfile) {
+      return chatMessages.filter((m) => m.recipientType === "nanny" && m.recipientId === nannyProfile.id && !m.isRead).length;
+    }
+    return 0;
+  }, [chatMessages, isAdmin, adminProfile, isNanny, nannyProfile]);
 
   const value: DataContextValue = useMemo(
     () => ({
@@ -1028,6 +1102,11 @@ export function DataProvider({ children }: DataProviderProps) {
       fetchNannyNotifications,
       markNotificationsRead,
       updateNannyProfile,
+      // Messaging
+      chatMessages,
+      sendChatMessage,
+      markChatMessagesRead,
+      unreadChatCount,
     }),
     [
       nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability, inviteNanny, toggleNannyStatus, resendInvite,
@@ -1038,6 +1117,7 @@ export function DataProvider({ children }: DataProviderProps) {
       isNanny, nannyProfile, nannyBookings, nannyNotifications, nannyStats,
       unreadNotifications, nannyLogin, nannyLogout, fetchNannyBookings,
       fetchNannyStats, fetchNannyNotifications, markNotificationsRead, updateNannyProfile,
+      chatMessages, sendChatMessage, markChatMessagesRead, unreadChatCount,
     ]
   );
 

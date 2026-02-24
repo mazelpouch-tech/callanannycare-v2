@@ -21,6 +21,7 @@ import AdminCalendar from './pages/admin/AdminCalendar'
 import AdminQRCode from './pages/admin/AdminQRCode'
 import AdminInvoices from './pages/admin/AdminInvoices'
 import AdminLoginLogs from './pages/admin/AdminLoginLogs'
+import AdminMessages from './pages/admin/AdminMessages'
 import NannyLogin from './pages/nanny/NannyLogin'
 import NannyRegister from './pages/nanny/NannyRegister'
 import NannyLayout from './pages/nanny/NannyLayout'
@@ -29,6 +30,7 @@ import NannyCalendar from './pages/nanny/NannyCalendar'
 import NannyBookings from './pages/nanny/NannyBookings'
 import NannyNotifications from './pages/nanny/NannyNotifications'
 import NannyProfile from './pages/nanny/NannyProfile'
+import NannyMessages from './pages/nanny/NannyMessages'
 
 export default function App() {
   return (
@@ -61,6 +63,7 @@ export default function App() {
         <Route path="users" element={<AdminUsers />} />
         <Route path="qr-codes" element={<AdminQRCode />} />
         <Route path="login-logs" element={<AdminLoginLogs />} />
+        <Route path="messages" element={<AdminMessages />} />
       </Route>
 
       {/* Nanny portal routes */}
@@ -72,6 +75,7 @@ export default function App() {
         <Route path="bookings" element={<NannyBookings />} />
         <Route path="notifications" element={<NannyNotifications />} />
         <Route path="profile" element={<NannyProfile />} />
+        <Route path="messages" element={<NannyMessages />} />
       </Route>
     </Routes>
   )

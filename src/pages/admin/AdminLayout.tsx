@@ -14,6 +14,7 @@ import {
   X,
   ChevronLeft,
   User,
+  MessageCircle,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import AdminToast, { type AdminToastItem } from "../../components/AdminToast";
@@ -36,10 +37,11 @@ const sidebarLinks: SidebarLink[] = [
   { to: "/admin/users", label: "Admin Users", icon: ShieldCheck },
   { to: "/admin/qr-codes", label: "QR Codes", icon: QrCode },
   { to: "/admin/login-logs", label: "Login Logs", icon: ScrollText },
+  { to: "/admin/messages", label: "Messages", icon: MessageCircle },
 ];
 
 export default function AdminLayout() {
-  const { isAdmin, adminProfile, adminLogout, stats, bookings } = useData();
+  const { isAdmin, adminProfile, adminLogout, stats, bookings, unreadChatCount } = useData();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [toasts, setToasts] = useState<AdminToastItem[]>([]);
@@ -193,6 +195,11 @@ export default function AdminLayout() {
                   hasCriticalPending ? "bg-red-500 animate-pulse" : "bg-orange-500"
                 }`}>
                   {stats.pendingBookings > 9 ? "9+" : stats.pendingBookings}
+                </span>
+              )}
+              {label === "Messages" && unreadChatCount > 0 && (
+                <span className="ml-auto bg-primary text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
+                  {unreadChatCount > 9 ? "9+" : unreadChatCount}
                 </span>
               )}
             </NavLink>
