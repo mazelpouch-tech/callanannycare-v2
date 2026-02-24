@@ -4,16 +4,19 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { DataProvider } from './context/DataContext'
 import { LanguageProvider } from './context/LanguageContext'
+import ErrorBoundary from './components/ErrorBoundary'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <LanguageProvider>
-        <DataProvider>
-          <App />
-        </DataProvider>
-      </LanguageProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <LanguageProvider>
+          <DataProvider>
+            <App />
+          </DataProvider>
+        </LanguageProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>
 )

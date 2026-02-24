@@ -305,6 +305,7 @@ export function DataProvider({ children }: DataProviderProps) {
         cancelledAt: b.cancelled_at ?? null,
         cancellationReason: b.cancellation_reason || '',
         cancelledBy: b.cancelled_by || '',
+        createdBy: b.created_by || '',
       }));
       setBookings(normalizedBookings);
       saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -393,7 +394,7 @@ export function DataProvider({ children }: DataProviderProps) {
         return newBooking;
       }
     },
-    [nannies, adminProfile, nannyProfile]
+    [nannies]
   );
 
   const updateBookingStatus = useCallback(async (
