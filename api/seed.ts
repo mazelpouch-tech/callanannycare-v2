@@ -151,6 +151,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ─── Created By Tracking ──────────────────────────────────────────
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS created_by VARCHAR(100) DEFAULT ''`;
+    // Backfill: set empty created_by to 'Admin' for existing bookings
+    await sql`UPDATE bookings SET created_by = 'Admin' WHERE created_by = '' OR created_by IS NULL`;
     // ────────────────────────────────────────────────────────────────
 
     // ─── Nanny Reviews ─────────────────────────────────────────────
