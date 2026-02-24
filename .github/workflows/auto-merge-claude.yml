@@ -21,7 +21,7 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
-            // Check if a PR already exists for this branch
+            // Check if a PR already exists for this branch (open)
             const { data: existingPRs } = await github.rest.pulls.list({
               owner,
               repo,
@@ -32,8 +32,25 @@ jobs:
             let pr;
             if (existingPRs.length > 0) {
               pr = existingPRs[0];
-              console.log(`Found existing PR #${pr.number}`);
+              console.log(`Found existing open PR #${pr.number}`);
             } else {
+              // Check if branch is ahead of main
+              try {
+                const { data: comparison } = await github.rest.repos.compareCommits({
+                  owner,
+                  repo,
+                  base: 'main',
+                  head: branch
+                });
+                if (comparison.ahead_by === 0) {
+                  console.log('Branch is not ahead of main, nothing to merge');
+                  return;
+                }
+                console.log(`Branch is ${comparison.ahead_by} commits ahead of main`);
+              } catch (e) {
+                console.log('Could not compare branches:', e.message);
+              }
+
               // Get the latest commit message for the PR title
               const { data: commit } = await github.rest.repos.getCommit({
                 owner,
@@ -43,23 +60,59 @@ jobs:
               const title = commit.commit.message.split('\n')[0];
 
               // Create a new PR
-              const { data: newPR } = await github.rest.pulls.create({
-                owner,
-                repo,
-                title,
-                head: branch,
-                base: 'main',
-                body: `Auto-generated PR from branch \`${branch}\``
-              });
-              pr = newPR;
-              console.log(`Created PR #${pr.number}`);
+              try {
+                const { data: newPR } = await github.rest.pulls.create({
+                  owner,
+                  repo,
+                  title,
+                  head: branch,
+                  base: 'main',
+                  body: `Auto-generated PR from branch \`${branch}\``
+                });
+                pr = newPR;
+                console.log(`Created PR #${pr.number}`);
+              } catch (createErr) {
+                console.log(`PR creation failed: ${createErr.message}`);
+                // If PR creation fails due to "already exists" (merged), try direct merge via API
+                try {
+                  await github.rest.repos.merge({
+                    owner,
+                    repo,
+                    base: 'main',
+                    head: branch,
+                    commit_message: title
+                  });
+                  console.log('Merged directly via repos.merge');
+                  return;
+                } catch (mergeErr) {
+                  console.log(`Direct merge also failed: ${mergeErr.message}`);
+                  throw createErr;
+                }
+              }
             }
 
+            if (!pr) return;
+
+            // Small delay to let GitHub process the PR
+            await new Promise(r => setTimeout(r, 2000));
+
             // Merge the PR
-            await github.rest.pulls.merge({
-              owner,
-              repo,
-              pull_number: pr.number,
-              merge_method: 'squash'
-            });
-            console.log(`Merged PR #${pr.number}`);
+            try {
+              await github.rest.pulls.merge({
+                owner,
+                repo,
+                pull_number: pr.number,
+                merge_method: 'squash'
+              });
+              console.log(`Merged PR #${pr.number}`);
+            } catch (mergeErr) {
+              console.log(`PR merge failed: ${mergeErr.message}, trying direct merge`);
+              await github.rest.repos.merge({
+                owner,
+                repo,
+                base: 'main',
+                head: branch,
+                commit_message: pr.title
+              });
+              console.log('Merged via repos.merge fallback');
+            }
