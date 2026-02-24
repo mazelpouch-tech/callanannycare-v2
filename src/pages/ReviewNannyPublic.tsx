@@ -54,8 +54,8 @@ export default function ReviewNannyPublic() {
           bio: nannyData.bio,
           rating: nannyData.rating,
           location: nannyData.location,
-          languages: nannyData.languages || [],
-          specialties: nannyData.specialties || [],
+          languages: typeof nannyData.languages === "string" ? JSON.parse(nannyData.languages) : nannyData.languages || [],
+          specialties: typeof nannyData.specialties === "string" ? JSON.parse(nannyData.specialties) : nannyData.specialties || [],
         });
         setReviews(Array.isArray(reviewsData) ? reviewsData : []);
       })
