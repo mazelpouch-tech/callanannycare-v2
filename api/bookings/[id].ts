@@ -180,6 +180,110 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } catch (confirmedEmailError: unknown) {
           console.error('Nanny confirmed email to parent failed:', confirmedEmailError);
         }
+
+        // WhatsApp confirmation to parent (automatic — no button click needed)
+        const WA_TOKEN_CF = process.env.WHATSAPP_TOKEN;
+        const WA_PHONE_ID_CF = process.env.WHATSAPP_PHONE_ID;
+
+        if (WA_TOKEN_CF && WA_PHONE_ID_CF && result[0].client_phone) {
+          try {
+            let parentPhoneCF = result[0].client_phone.replace(/[\s\-\(\)]/g, '');
+            if (parentPhoneCF.startsWith('0')) parentPhoneCF = '212' + parentPhoneCF.slice(1);
+            if (!parentPhoneCF.startsWith('+') && !parentPhoneCF.match(/^\d{10,}/)) parentPhoneCF = '+' + parentPhoneCF;
+            parentPhoneCF = parentPhoneCF.replace('+', '');
+
+            // Fetch nanny name for the message
+            let confirmedNannyName = 'your nanny';
+            try {
+              const nnRows = await sql`SELECT name FROM nannies WHERE id = ${result[0].nanny_id}` as { name: string }[];
+              if (nnRows[0]) confirmedNannyName = nnRows[0].name;
+            } catch { /* ignore */ }
+
+            const bookingLocale = result[0].locale || 'en';
+            const baseUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
+            const trackUrl = `${baseUrl}/booking/${result[0].id}`;
+
+            const waConfirmMsg = bookingLocale === 'fr'
+              ? [
+                  '🎉 *Bonne Nouvelle — Nounou Confirmée !*',
+                  '',
+                  `Bonjour ${result[0].client_name},`,
+                  `Votre nounou *${confirmedNannyName}* a accepté votre réservation !`,
+                  '',
+                  `📋 *Réservation #:* ${result[0].id}`,
+                  `📅 *Date:* ${result[0].date}`,
+                  `🕐 *Heure:* ${result[0].start_time} - ${result[0].end_time || ''}`,
+                  `🏨 *Lieu:* ${result[0].hotel || 'N/A'}`,
+                  `👶 *Enfants:* ${result[0].children_count || 1}`,
+                  `💰 *Total:* ${result[0].total_price || 0}€`,
+                  '',
+                  `📍 Suivez votre réservation : ${trackUrl}`,
+                  '',
+                  '_Merci de votre confiance !_',
+                  '💕 Call a Nanny — Marrakech',
+                ].join('\n')
+              : [
+                  '🎉 *Great News — Nanny Confirmed!*',
+                  '',
+                  `Hi ${result[0].client_name},`,
+                  `Your nanny *${confirmedNannyName}* has accepted your booking!`,
+                  '',
+                  `📋 *Booking #:* ${result[0].id}`,
+                  `📅 *Date:* ${result[0].date}`,
+                  `🕐 *Time:* ${result[0].start_time} - ${result[0].end_time || ''}`,
+                  `🏨 *Location:* ${result[0].hotel || 'N/A'}`,
+                  `👶 *Children:* ${result[0].children_count || 1}`,
+                  `💰 *Total:* ${result[0].total_price || 0}€`,
+                  '',
+                  `📍 Track your booking: ${trackUrl}`,
+                  '',
+                  '_Thank you for choosing us!_',
+                  '💕 Call a Nanny — Marrakech',
+                ].join('\n');
+
+            await fetch(`https://graph.facebook.com/v18.0/${WA_PHONE_ID_CF}/messages`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${WA_TOKEN_CF}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ messaging_product: 'whatsapp', to: parentPhoneCF, type: 'text', text: { body: waConfirmMsg } }),
+            });
+          } catch (waConfirmErr: unknown) {
+            console.error('WhatsApp confirmation to parent failed:', waConfirmErr);
+          }
+        }
+
+        // WhatsApp confirmation to business
+        const WA_BIZ_CF = process.env.WHATSAPP_BUSINESS_NUMBER;
+        if (WA_TOKEN_CF && WA_PHONE_ID_CF && WA_BIZ_CF) {
+          try {
+            let bizNannyName = 'Unknown';
+            try {
+              const nnRows2 = await sql`SELECT name FROM nannies WHERE id = ${result[0].nanny_id}` as { name: string }[];
+              if (nnRows2[0]) bizNannyName = nnRows2[0].name;
+            } catch { /* ignore */ }
+
+            const waBizConfirm = [
+              '✅ *Nanny Confirmed Booking*',
+              '',
+              `📋 *Booking #:* ${result[0].id}`,
+              `👤 *Parent:* ${result[0].client_name}`,
+              `👩‍👧 *Nanny:* ${bizNannyName}`,
+              `📅 *Date:* ${result[0].date}`,
+              `🕐 *Time:* ${result[0].start_time} - ${result[0].end_time || ''}`,
+              `🏨 *Hotel:* ${result[0].hotel || 'N/A'}`,
+              `💰 *Amount:* ${result[0].total_price || 0}€`,
+              '',
+              '_Confirmation email + WhatsApp sent to parent._',
+            ].join('\n');
+
+            await fetch(`https://graph.facebook.com/v18.0/${WA_PHONE_ID_CF}/messages`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${WA_TOKEN_CF}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ messaging_product: 'whatsapp', to: WA_BIZ_CF, type: 'text', text: { body: waBizConfirm } }),
+            });
+          } catch (waBizConfirmErr: unknown) {
+            console.error('WhatsApp confirmation to business failed:', waBizConfirmErr);
+          }
+        }
       }
 
       // ─── Cancellation → email to parent + nanny + WhatsApp to business + parent ───
