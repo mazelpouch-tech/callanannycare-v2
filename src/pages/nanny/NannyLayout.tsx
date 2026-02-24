@@ -10,6 +10,7 @@ import {
   Menu,
   Globe,
   User,
+  MessageCircle,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -20,10 +21,11 @@ const sidebarLinks = [
   { to: "/nanny/bookings", labelKey: "nanny.layout.myBookings", icon: ClipboardList },
   { to: "/nanny/notifications", labelKey: "nanny.layout.notifications", icon: Bell },
   { to: "/nanny/profile", labelKey: "nanny.layout.myProfile", icon: UserCircle },
+  { to: "/nanny/messages", labelKey: "nanny.layout.messages", icon: MessageCircle },
 ];
 
 export default function NannyLayout() {
-  const { isNanny, nannyProfile, nannyLogout, unreadNotifications, fetchNannyNotifications } = useData();
+  const { isNanny, nannyProfile, nannyLogout, unreadNotifications, fetchNannyNotifications, unreadChatCount } = useData();
   const { t, locale, setLocale } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
@@ -132,6 +134,11 @@ export default function NannyLayout() {
                 {link.icon === Bell && unreadNotifications > 0 && (
                   <span className="ml-auto bg-red-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full">
                     {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                  </span>
+                )}
+                {link.icon === MessageCircle && unreadChatCount > 0 && (
+                  <span className="ml-auto bg-accent text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full">
+                    {unreadChatCount > 9 ? "9+" : unreadChatCount}
                   </span>
                 )}
               </NavLink>
