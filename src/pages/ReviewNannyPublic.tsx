@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Star, Loader2, Send, CheckCircle } from "lucide-react";
+import { Star, Loader2, Send, CheckCircle, MessageSquare } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
@@ -158,7 +158,35 @@ export default function ReviewNannyPublic() {
           </div>
         </div>
 
-        {/* Leave a Review Form */}
+        {/* Parent Reviews — shown FIRST so new parents can read them */}
+        {reviews.length > 0 && (
+          <div className="mt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <MessageSquare className="w-5 h-5 text-orange-500" />
+              <h2 className="text-lg font-bold text-gray-900">What Parents Say ({reviews.length})</h2>
+            </div>
+            <div className="space-y-3">
+              {reviews.map((review, idx) => (
+                <div key={String(review.id || idx)} className="bg-white rounded-xl shadow-sm p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-gray-900 text-sm">{String(review.client_name || "Parent")}</span>
+                    <span className="text-xs text-gray-400">
+                      {review.created_at ? new Date(String(review.created_at)).toLocaleDateString() : ""}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 mb-2">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star key={s} className={`w-4 h-4 ${s <= (Number(review.rating) || 0) ? "fill-amber-400 text-amber-400" : "text-gray-300"}`} />
+                    ))}
+                  </div>
+                  {review.comment && <p className="text-sm text-gray-600 leading-relaxed">{String(review.comment)}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Leave a Review Form — after existing reviews */}
         <div className="bg-white rounded-2xl shadow-lg mt-6 overflow-hidden">
           <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4 text-white">
             <h2 className="text-lg font-bold font-serif">Leave a Review</h2>
@@ -248,31 +276,6 @@ export default function ReviewNannyPublic() {
             )}
           </div>
         </div>
-
-        {/* Existing Reviews */}
-        {reviews.length > 0 && (
-          <div className="mt-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Reviews ({reviews.length})</h2>
-            <div className="space-y-3">
-              {reviews.map((review, idx) => (
-                <div key={String(review.id || idx)} className="bg-white rounded-xl shadow-sm p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-gray-900 text-sm">{String(review.client_name || "Client")}</span>
-                    <span className="text-xs text-gray-400">
-                      {String(review.date || (review.created_at ? new Date(String(review.created_at)).toLocaleDateString() : ""))}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 mb-2">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <Star key={s} className={`w-4 h-4 ${s <= (Number(review.rating) || 0) ? "fill-amber-400 text-amber-400" : "text-gray-300"}`} />
-                    ))}
-                  </div>
-                  {review.comment && <p className="text-sm text-gray-600">{String(review.comment)}</p>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         <p className="text-center text-xs text-gray-400 mt-8">Call a Nanny — Professional Childcare, Marrakech</p>
       </div>
