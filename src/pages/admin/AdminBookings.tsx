@@ -508,38 +508,20 @@ export default function AdminBookings() {
     return result;
   }, [bookings, search, statusFilter, nannyFilter, sortOrder]);
 
-  // Classify each booking into a date group: tomorrow / today / older
-  type DateGroup = "tomorrow" | "today" | "older";
-  const bookingGroups = useMemo(() => {
-    return filteredBookings.map((b): DateGroup => {
+  // Split bookings into grouped sections: today / tomorrow / previous
+  const groupedBookings = useMemo(() => {
+    const today: typeof filteredBookings = [];
+    const tomorrow: typeof filteredBookings = [];
+    const previous: typeof filteredBookings = [];
+    for (const b of filteredBookings) {
       try {
-        const d = b.date;
-        if (isToday(parseISO(d))) return "today";
-        if (isTomorrowDate(d)) return "tomorrow";
+        if (isToday(parseISO(b.date))) { today.push(b); continue; }
+        if (isTomorrowDate(b.date)) { tomorrow.push(b); continue; }
       } catch { /* ignore */ }
-      return "older";
-    });
+      previous.push(b);
+    }
+    return { today, tomorrow, previous };
   }, [filteredBookings]);
-
-  // Find boundary indices where the group changes (including a header for the first group)
-  const dividerIndices = useMemo(() => {
-    const labelMap: Record<DateGroup, string> = {
-      tomorrow: "Tomorrow\u2019s Bookings",
-      today: "Today\u2019s Bookings",
-      older: "Previous Bookings",
-    };
-    const indices: { index: number; label: string }[] = [];
-    // Always show a header for the very first group
-    if (bookingGroups.length > 0) {
-      indices.push({ index: 0, label: labelMap[bookingGroups[0]] });
-    }
-    for (let i = 1; i < bookingGroups.length; i++) {
-      if (bookingGroups[i] !== bookingGroups[i - 1]) {
-        indices.push({ index: i, label: labelMap[bookingGroups[i]] });
-      }
-    }
-    return indices;
-  }, [bookingGroups]);
 
   const formatDate = (dateStr: string) => {
     try {
@@ -723,26 +705,28 @@ export default function AdminBookings() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filteredBookings.map((booking, idx) => {
+                  {([
+                    { label: "Today\u2019s Bookings", items: groupedBookings.today },
+                    { label: "Tomorrow\u2019s Bookings", items: groupedBookings.tomorrow },
+                    { label: "Previous Bookings", items: groupedBookings.previous },
+                  ] as const).map((group) => group.items.length > 0 && (
+                    <Fragment key={group.label}>
+                      <tr>
+                        <td colSpan={12} className="px-4 py-4 bg-primary/5 text-center">
+                          <div className="flex items-center justify-center gap-4">
+                            <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
+                            <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
+                              {group.label}
+                            </span>
+                            <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
+                          </div>
+                        </td>
+                      </tr>
+                      {group.items.map((booking) => {
                     const isExpanded = expandedRow === booking.id;
 
                     return (
                       <Fragment key={booking.id}>
-                        {dividerIndices.map((d) =>
-                          d.index === idx ? (
-                            <tr key={`divider-${idx}`}>
-                              <td colSpan={12} className="px-4 py-4 bg-primary/5 text-center">
-                                <div className="flex items-center justify-center gap-4">
-                                  <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
-                                  <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
-                                    {d.label}
-                                  </span>
-                                  <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
-                                </div>
-                              </td>
-                            </tr>
-                          ) : null
-                        )}
                         <tr className="hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-3.5 text-xs font-mono text-muted-foreground">
                             {truncateId(booking.id)}
@@ -1082,6 +1066,8 @@ export default function AdminBookings() {
                       </Fragment>
                     );
                   })}
+                    </Fragment>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -1089,22 +1075,24 @@ export default function AdminBookings() {
 
           {/* Mobile Cards */}
           <div className="lg:hidden space-y-3">
-            {filteredBookings.map((booking, idx) => {
+            {([
+              { label: "Today\u2019s Bookings", items: groupedBookings.today },
+              { label: "Tomorrow\u2019s Bookings", items: groupedBookings.tomorrow },
+              { label: "Previous Bookings", items: groupedBookings.previous },
+            ] as const).map((group) => group.items.length > 0 && (
+              <Fragment key={`m-${group.label}`}>
+                <div className="flex items-center gap-4 py-3 px-2 my-1 bg-primary/5 rounded-xl">
+                  <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
+                  <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
+                    {group.label}
+                  </span>
+                  <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
+                </div>
+                {group.items.map((booking) => {
               const isExpanded = expandedRow === booking.id;
 
               return (
                 <Fragment key={`mobile-${booking.id}`}>
-                {dividerIndices.map((d) =>
-                  d.index === idx ? (
-                    <div key={`m-divider-${idx}`} className="flex items-center gap-4 py-3 px-2 my-1 bg-primary/5 rounded-xl">
-                      <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
-                      <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
-                        {d.label}
-                      </span>
-                      <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
-                    </div>
-                  ) : null
-                )}
                 <div
                   className="bg-card rounded-xl border border-border shadow-soft overflow-hidden"
                 >
@@ -1337,6 +1325,8 @@ export default function AdminBookings() {
                 </Fragment>
               );
             })}
+              </Fragment>
+            ))}
           </div>
         </>
       )}
