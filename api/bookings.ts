@@ -38,6 +38,7 @@ interface ExistingBookingRow {
   start_time: string;
   end_time: string;
   client_name: string;
+  hotel: string;
 }
 
 interface BlockedNannyRow { nanny_id: number }
@@ -231,13 +232,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ` as BlockedNannyRow[];
         const blockedIds = new Set(blockedRows.map(b => b.nanny_id));
 
-        // Check existing bookings for overlap
+        // Check existing bookings for overlap + same-hotel priority
         const existing = await sql`
-          SELECT id, nanny_id, date, start_time, end_time, client_name FROM bookings
+          SELECT id, nanny_id, date, start_time, end_time, client_name, hotel FROM bookings
           WHERE status != 'cancelled' AND date = ANY(${bookingDates})
         ` as ExistingBookingRow[];
 
-        let assigned = false;
+        // Build list of conflict-free candidates
+        const eligibleCandidates: { id: number; sameHotel: boolean }[] = [];
         for (const candidate of available) {
           if (blockedIds.has(candidate.id)) continue;
           const hasConflict = existing.some(
@@ -245,14 +247,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               timesOverlap(start_time, effectiveEndTime, eb.start_time, eb.end_time || '23h59')
           );
           if (!hasConflict) {
-            nanny_id = candidate.id;
-            assigned = true;
-            break;
+            // Check if this nanny already has a same-day booking at the same hotel
+            const sameHotel = !!(hotel && existing.some(
+              eb => eb.nanny_id === candidate.id &&
+                eb.hotel && eb.hotel.toLowerCase().trim() === hotel.toLowerCase().trim()
+            ));
+            eligibleCandidates.push({ id: candidate.id, sameHotel });
           }
         }
-        if (!assigned) {
+
+        if (eligibleCandidates.length === 0) {
           return res.status(400).json({ error: 'No nannies are currently available for this time slot. Please try a different time.' });
         }
+
+        // Prefer nanny already at the same hotel (saves transportation)
+        const sameHotelMatch = eligibleCandidates.find(c => c.sameHotel);
+        nanny_id = sameHotelMatch ? sameHotelMatch.id : eligibleCandidates[0].id;
       } else {
         // Manual assign: check for conflicts with the chosen nanny
         const conflicts = await sql`
