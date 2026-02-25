@@ -8,7 +8,6 @@ import {
   Clock,
   ClipboardList,
   CheckCircle,
-  XCircle,
   MessageCircle,
   Loader2,
   PlayCircle,
@@ -18,7 +17,6 @@ import {
   Plus,
   X,
   ArrowRightLeft,
-  AlertTriangle,
   Pencil,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
@@ -227,33 +225,6 @@ export default function NannyBookings() {
     await updateBookingStatus(id, "confirmed");
     await fetchNannyBookings();
     setActionLoading(null);
-  };
-
-  // Decline Confirmation Modal
-  const [declineTarget, setDeclineTarget] = useState<typeof nannyBookings[0] | null>(null);
-  const [declineReason, setDeclineReason] = useState("");
-  const [declineLoading, setDeclineLoading] = useState(false);
-
-  const handleDecline = (id: number | string) => {
-    const booking = nannyBookings.find((b) => String(b.id) === String(id));
-    if (booking) setDeclineTarget(booking);
-  };
-
-  const handleDeclineConfirm = async () => {
-    if (!declineTarget) return;
-    setDeclineLoading(true);
-    try {
-      await updateBookingStatus(declineTarget.id, "cancelled", {
-        reason: declineReason.trim(),
-        cancelledBy: "nanny",
-      });
-      await fetchNannyBookings();
-    } catch (err) {
-      console.error("Decline failed:", err);
-    }
-    setDeclineLoading(false);
-    setDeclineTarget(null);
-    setDeclineReason("");
   };
 
   const handleClockIn = async (id: number | string) => {
@@ -702,9 +673,8 @@ export default function NannyBookings() {
                         </td>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-1.5">
-                            {/* Accept/Decline for pending */}
+                            {/* Accept for pending */}
                             {booking.status === "pending" && (
-                              <>
                                 <button
                                   onClick={() => handleAccept(booking.id)}
                                   disabled={actionLoading === booking.id}
@@ -717,15 +687,6 @@ export default function NannyBookings() {
                                     <CheckCircle className="w-4 h-4" />
                                   )}
                                 </button>
-                                <button
-                                  onClick={() => handleDecline(booking.id)}
-                                  disabled={actionLoading === booking.id}
-                                  className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                                  title="Decline booking"
-                                >
-                                  <XCircle className="w-4 h-4" />
-                                </button>
-                              </>
                             )}
                             {/* Start Shift for confirmed bookings today, no active shift elsewhere */}
                             {booking.status === "confirmed" && !booking.clockIn && isToday(booking.date) && !activeShift && (
@@ -953,7 +914,6 @@ export default function NannyBookings() {
                   {/* Action buttons for mobile */}
                   <div className="flex flex-wrap gap-2 mt-3">
                     {booking.status === "pending" && (
-                      <>
                         <button
                           onClick={() => handleAccept(booking.id)}
                           disabled={actionLoading === booking.id}
@@ -966,15 +926,6 @@ export default function NannyBookings() {
                           )}
                           {t("nanny.bookings.accept")}
                         </button>
-                        <button
-                          onClick={() => handleDecline(booking.id)}
-                          disabled={actionLoading === booking.id}
-                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50 text-red-700 text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-50"
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                          {t("nanny.bookings.decline")}
-                        </button>
-                      </>
                     )}
 
                     {/* Start Shift for confirmed bookings today */}
@@ -1295,67 +1246,6 @@ export default function NannyBookings() {
         />
       )}
 
-      {/* Decline Confirmation Modal */}
-      {declineTarget && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setDeclineTarget(null); setDeclineReason(""); }}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{t("nanny.bookings.decline")} Booking</h3>
-                  <p className="text-sm text-gray-500">#{String(declineTarget.id)} — {declineTarget.clientName}</p>
-                </div>
-              </div>
-
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
-                <p className="text-sm text-red-800">
-                  <strong>⚠️ Declining will cancel this booking</strong> and notify the parent via email and WhatsApp.
-                </p>
-              </div>
-
-              <div className="mb-4 text-sm text-gray-600 space-y-1">
-                <p><span className="font-medium">{t("shared.date")}:</span> {declineTarget.date}</p>
-                <p><span className="font-medium">{t("shared.time")}:</span> {declineTarget.startTime} - {declineTarget.endTime}</p>
-                <p><span className="font-medium">{t("shared.hotel")}:</span> {declineTarget.hotel || 'N/A'}</p>
-              </div>
-
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Reason <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
-              <textarea
-                value={declineReason}
-                onChange={(e) => setDeclineReason(e.target.value)}
-                placeholder="e.g. Schedule conflict, personal reasons..."
-                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
-                rows={3}
-              />
-            </div>
-
-            <div className="flex gap-3 p-4 border-t border-gray-100">
-              <button
-                onClick={() => { setDeclineTarget(null); setDeclineReason(""); }}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
-              >
-                {t("shared.cancel")}
-              </button>
-              <button
-                onClick={handleDeclineConfirm}
-                disabled={declineLoading}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {declineLoading ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Declining...</>
-                ) : (
-                  <>Yes, {t("nanny.bookings.decline")}</>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
