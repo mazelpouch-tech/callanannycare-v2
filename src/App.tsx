@@ -31,7 +31,6 @@ import NannyBookings from './pages/nanny/NannyBookings'
 import NannyNotifications from './pages/nanny/NannyNotifications'
 import NannyMessages from './pages/nanny/NannyMessages'
 import NannyProfile from './pages/nanny/NannyProfile'
-import NannyMessages from './pages/nanny/NannyMessages'
 
 export default function App() {
   return (
@@ -77,7 +76,6 @@ export default function App() {
         <Route path="notifications" element={<NannyNotifications />} />
         <Route path="messages" element={<NannyMessages />} />
         <Route path="profile" element={<NannyProfile />} />
-        <Route path="messages" element={<NannyMessages />} />
       </Route>
     </Routes>
   )
