@@ -17,6 +17,17 @@ cleanupOutdatedCaches();
 // Workbox precaching (manifest injected at build time)
 precacheAndRoute(self.__WB_MANIFEST);
 
+// ─── API Bypass (iOS WKWebView fix) ──────────────────────────────
+// On iOS Safari / WKWebView in standalone PWA mode, the SW fetch event
+// fires for ALL requests, even when no Workbox route is registered.
+// We explicitly respondWith(fetch(...)) for every /api/ call to guarantee
+// a direct network request, bypassing any potential Workbox interference.
+self.addEventListener('fetch', (event: FetchEvent) => {
+  if (new URL(event.request.url).pathname.startsWith('/api/')) {
+    event.respondWith(fetch(event.request));
+  }
+});
+
 // ─── SPA Navigation Fallback ─────────────────────────────────────
 // Serve index.html for all navigation requests (SPA routing)
 // This is critical for the PWA to work when opened from home screen
@@ -27,12 +38,6 @@ const navigationRoute = new NavigationRoute(navigationHandler, {
 registerRoute(navigationRoute);
 
 // ─── Runtime Caching ─────────────────────────────────────────────
-
-// API calls: DO NOT cache — always go straight to the network.
-// iOS PWA / WKWebView can have issues when the SW intercepts API fetches
-// (NetworkFirst can fail silently, returning stale/empty cached data).
-// By not registering a route for /api/, fetch() calls bypass the SW
-// entirely and go directly through the browser's native network stack.
 
 // Images: Cache first with 30-day expiry
 registerRoute(

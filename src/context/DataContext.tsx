@@ -126,76 +126,77 @@ export function DataProvider({ children }: DataProviderProps) {
     let cancelled = false;
 
     async function loadData(isRetry = false) {
-      try {
-        const [apiNannies, apiBookings] = await Promise.all([
-          apiFetch<DbNanny[]>("/nannies"),
-          apiFetch<DbBookingWithNanny[]>("/bookings"),
-        ]);
+      // Use allSettled so a single failing endpoint doesn't wipe out all data
+      const [nanniesResult, bookingsResult] = await Promise.allSettled([
+        apiFetch<DbNanny[]>("/nannies"),
+        apiFetch<DbBookingWithNanny[]>("/bookings"),
+      ]);
 
-        if (!cancelled) {
-          // Normalize nanny data from DB (JSONB fields come as objects already)
-          const normalizedNannies: Nanny[] = apiNannies.map((n) => ({
-            ...n,
-            status: n.status || "active",
-            specialties: typeof n.specialties === "string" ? JSON.parse(n.specialties) : n.specialties || [],
-            languages: typeof n.languages === "string" ? JSON.parse(n.languages) : n.languages || [],
-          }));
-          setNannies(normalizedNannies);
-          saveToStorage(STORAGE_KEYS.nannies, normalizedNannies);
+      if (cancelled) return;
 
-          // Normalize bookings - map DB column names to frontend camelCase
-          const normalizedBookings: Booking[] = apiBookings.map((b) => ({
-            id: b.id,
-            nannyId: b.nanny_id,
-            nannyName: b.nanny_name || b.client_name,
-            nannyImage: b.nanny_image || "",
-            clientName: b.client_name,
-            clientEmail: b.client_email,
-            clientPhone: b.client_phone,
-            hotel: b.hotel,
-            date: b.date,
-            endDate: b.end_date ?? null,
-            startTime: b.start_time,
-            endTime: b.end_time,
-            plan: b.plan,
-            childrenCount: b.children_count,
-            childrenAges: b.children_ages,
-            notes: b.notes,
-            totalPrice: b.total_price,
-            status: b.status,
-            createdBy: b.created_by || 'parent',
-            createdByName: b.created_by_name || '',
-            createdAt: b.created_at,
-            clockIn: b.clock_in,
-            clockOut: b.clock_out,
-            cancelledAt: b.cancelled_at ?? null,
-            cancellationReason: b.cancellation_reason || '',
-            cancelledBy: b.cancelled_by || '',
-            collectedBy: b.collected_by || '',
-            collectedAt: b.collected_at ?? null,
-            collectionNote: b.collection_note || '',
-            paymentMethod: b.payment_method || '',
-            createdBy: b.created_by || '',
-            deletedAt: b.deleted_at ?? null,
-            deletedBy: b.deleted_by || '',
-          }));
-          setBookings(normalizedBookings);
-          saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
-          if (!cancelled) setLoading(false);
-        }
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        console.warn("API unavailable, using localStorage cache:", message);
-        if (!cancelled) {
-          if (!isRetry) {
-            // Retry once after 3s — handles iOS PWA cold-start where the service worker
-            // activating via skipWaiting/clientsClaim can interrupt the initial fetch
-            setTimeout(() => { if (!cancelled) loadData(true); }, 3000);
-          } else {
-            // Both attempts failed — stop loading and use localStorage fallback
-            setLoading(false);
-          }
-        }
+      let anySuccess = false;
+
+      if (nanniesResult.status === 'fulfilled') {
+        anySuccess = true;
+        const normalizedNannies: Nanny[] = nanniesResult.value.map((n) => ({
+          ...n,
+          status: n.status || "active",
+          specialties: typeof n.specialties === "string" ? JSON.parse(n.specialties) : n.specialties || [],
+          languages: typeof n.languages === "string" ? JSON.parse(n.languages) : n.languages || [],
+        }));
+        setNannies(normalizedNannies);
+        saveToStorage(STORAGE_KEYS.nannies, normalizedNannies);
+      } else {
+        console.warn("Nannies fetch failed:", nanniesResult.reason);
+      }
+
+      if (bookingsResult.status === 'fulfilled') {
+        anySuccess = true;
+        const normalizedBookings: Booking[] = bookingsResult.value.map((b) => ({
+          id: b.id,
+          nannyId: b.nanny_id,
+          nannyName: b.nanny_name || b.client_name,
+          nannyImage: b.nanny_image || "",
+          clientName: b.client_name,
+          clientEmail: b.client_email,
+          clientPhone: b.client_phone,
+          hotel: b.hotel,
+          date: b.date,
+          endDate: b.end_date ?? null,
+          startTime: b.start_time,
+          endTime: b.end_time,
+          plan: b.plan,
+          childrenCount: b.children_count,
+          childrenAges: b.children_ages,
+          notes: b.notes,
+          totalPrice: b.total_price,
+          status: b.status,
+          createdBy: b.created_by || 'parent',
+          createdByName: b.created_by_name || '',
+          createdAt: b.created_at,
+          clockIn: b.clock_in,
+          clockOut: b.clock_out,
+          cancelledAt: b.cancelled_at ?? null,
+          cancellationReason: b.cancellation_reason || '',
+          cancelledBy: b.cancelled_by || '',
+          collectedBy: b.collected_by || '',
+          collectedAt: b.collected_at ?? null,
+          collectionNote: b.collection_note || '',
+          paymentMethod: b.payment_method || '',
+          deletedAt: b.deleted_at ?? null,
+          deletedBy: b.deleted_by || '',
+        }));
+        setBookings(normalizedBookings);
+        saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
+      } else {
+        console.warn("Bookings fetch failed:", bookingsResult.reason);
+      }
+
+      if (!anySuccess && !isRetry) {
+        // Both failed — retry once after 3s (handles iOS PWA cold-start SW activation delay)
+        setTimeout(() => { if (!cancelled) loadData(true); }, 3000);
+      } else {
+        if (!cancelled) setLoading(false);
       }
     }
 
