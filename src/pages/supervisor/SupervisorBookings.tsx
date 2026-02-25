@@ -1,13 +1,13 @@
 import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  Search, Filter, Calendar, Clock, User, Mail, Phone, Hotel,
-  ChevronDown, ChevronUp, Eye, Baby, X,
+  Search, Calendar, Clock, User, Mail, Phone, Hotel,
+  ChevronDown, ChevronUp, Baby, X,
 } from "lucide-react";
-import { format, parseISO, formatDistanceToNow, isToday } from "date-fns";
+import { format } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
-import type { Booking, BookingStatus } from "@/types";
+import type { BookingStatus } from "@/types";
 
 const statusConfig: Record<BookingStatus, { label: string; className: string }> = {
   pending: { label: "Pending", className: "bg-orange-50 text-orange-700 border border-orange-200" },
@@ -28,8 +28,6 @@ export default function SupervisorBookings() {
   const [nannyFilter, setNannyFilter] = useState<string>("all");
   const [tab, setTab] = useState<TabKey>(searchParams.get("status") === "pending" ? "new" : "all");
   const [expandedId, setExpandedId] = useState<number | string | null>(null);
-
-  const today = new Date().toISOString().split("T")[0];
 
   // Separate new (upcoming/pending/confirmed) vs previous (completed/cancelled/past)
   const filteredBookings = useMemo(() => {

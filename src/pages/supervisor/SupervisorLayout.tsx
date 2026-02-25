@@ -8,7 +8,6 @@ import {
   Menu,
   X,
   ChevronLeft,
-  User,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import type { LucideIcon } from "lucide-react";

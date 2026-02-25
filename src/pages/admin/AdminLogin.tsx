@@ -4,7 +4,7 @@ import { Lock, Mail, LogIn, AlertCircle, CheckCircle, ArrowLeft, Key, Loader2, U
 import { useData } from "../../context/DataContext";
 
 export default function AdminLogin() {
-  const { isAdmin, isSupervisor, adminLogin, adminProfile, forgotAdminPassword, resetAdminPassword, registerAdmin } = useData();
+  const { isAdmin, isSupervisor, adminLogin, forgotAdminPassword, resetAdminPassword, registerAdmin } = useData();
   const [searchParams] = useSearchParams();
   const resetToken = searchParams.get("reset");
   const registerToken = searchParams.get("register");

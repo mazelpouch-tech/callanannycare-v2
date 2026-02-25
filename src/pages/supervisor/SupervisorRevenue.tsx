@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import {
   DollarSign, TrendingUp, CheckCircle, Clock,
   Phone, Mail, User, Calendar, ChevronDown, ChevronUp,
-  Hotel, Search, X, Filter,
+  Hotel, Search, X,
 } from "lucide-react";
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, subMonths } from "date-fns";
 import { useData } from "../../context/DataContext";

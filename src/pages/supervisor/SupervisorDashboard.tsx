@@ -4,13 +4,12 @@ import {
   CalendarDays, DollarSign, TrendingUp, Users, Clock,
   ArrowUpRight, ArrowDownRight, CheckCircle, AlertTriangle,
 } from "lucide-react";
-import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, isToday } from "date-fns";
+import { parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, isToday } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
-import type { Booking } from "@/types";
 
 export default function SupervisorDashboard() {
-  const { bookings, nannies, stats } = useData();
+  const { bookings, nannies } = useData();
   const { toDH } = useExchangeRate();
 
   const now = new Date();
