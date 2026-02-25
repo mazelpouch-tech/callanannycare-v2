@@ -165,10 +165,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       // ────────────────────────────────────────────────────────────
 
+      // ?deleted=true → return soft-deleted bookings for audit view
+      if (req.query.deleted === 'true') {
+        const deleted = await sql`
+          SELECT b.*, n.name as nanny_name, n.image as nanny_image
+          FROM bookings b
+          LEFT JOIN nannies n ON b.nanny_id = n.id
+          WHERE b.deleted_at IS NOT NULL
+          ORDER BY b.deleted_at DESC
+        ` as DbBookingWithNanny[];
+        return res.status(200).json(deleted);
+      }
+
       const bookings = await sql`
         SELECT b.*, n.name as nanny_name, n.image as nanny_image
         FROM bookings b
         LEFT JOIN nannies n ON b.nanny_id = n.id
+        WHERE b.deleted_at IS NULL
         ORDER BY b.created_at DESC
       ` as DbBookingWithNanny[];
       return res.status(200).json(bookings);

@@ -181,6 +181,11 @@ export default async function seedHandler(req: VercelRequest, res: VercelRespons
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS review_sent_at TIMESTAMPTZ`;
     // ────────────────────────────────────────────────────────────────
 
+    // ─── Deletion Tracking ───────────────────────────────────────
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(255) DEFAULT ''`;
+    // ────────────────────────────────────────────────────────────
+
     // ─── Push Subscriptions ─────────────────────────────────────────
     await sql`
       CREATE TABLE IF NOT EXISTS push_subscriptions (

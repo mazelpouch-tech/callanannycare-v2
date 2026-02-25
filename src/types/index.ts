@@ -72,6 +72,8 @@ export interface DbBooking {
   created_by_name: string;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
+  deleted_by: string;
 }
 
 /** Booking row from a JOIN with nannies (includes nanny_name, nanny_image) */
@@ -162,6 +164,8 @@ export interface Booking {
   collectedAt: string | null;
   collectionNote: string;
   paymentMethod: string;
+  deletedAt: string | null;
+  deletedBy: string;
 }
 
 export interface Notification {
@@ -377,7 +381,9 @@ export interface DataContextValue {
   updateBookingStatus: (id: number | string, status: BookingStatus, meta?: { reason?: string; cancelledBy?: string }) => Promise<void>;
   clockInBooking: (id: number | string) => Promise<void>;
   clockOutBooking: (id: number | string) => Promise<void>;
-  deleteBooking: (id: number | string) => Promise<void>;
+  deleteBooking: (id: number | string, deletedBy?: string) => Promise<void>;
+  fetchDeletedBookings: () => Promise<Booking[]>;
+  restoreBooking: (id: number | string) => Promise<void>;
   markAsCollected: (id: number | string, data: { collectedBy: string; paymentMethod: string; collectionNote?: string }) => Promise<void>;
   resendInvoice: (id: number | string) => Promise<void>;
   sendBookingReminder: (id: number | string) => Promise<void>;

@@ -172,6 +172,8 @@ export function DataProvider({ children }: DataProviderProps) {
             collectionNote: b.collection_note || '',
             paymentMethod: b.payment_method || '',
             createdBy: b.created_by || '',
+            deletedAt: b.deleted_at ?? null,
+            deletedBy: b.deleted_by || '',
           }));
           setBookings(normalizedBookings);
           saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -318,6 +320,8 @@ export function DataProvider({ children }: DataProviderProps) {
         collectionNote: b.collection_note || '',
         paymentMethod: b.payment_method || '',
         createdBy: b.created_by || '',
+        deletedAt: b.deleted_at ?? null,
+        deletedBy: b.deleted_by || '',
       }));
       setBookings(normalizedBookings);
       saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -388,6 +392,8 @@ export function DataProvider({ children }: DataProviderProps) {
           collectionNote: created.collection_note || '',
           paymentMethod: created.payment_method || '',
           createdBy: created.created_by || '',
+          deletedAt: created.deleted_at ?? null,
+          deletedBy: created.deleted_by || '',
         };
         setBookings((prev) => {
           const updated = [...prev, normalized];
@@ -534,9 +540,12 @@ export function DataProvider({ children }: DataProviderProps) {
     setNannyBookings((prev) => prev.map((b) => b.id === id ? { ...b, clockOut: clockTime, status: "completed" as BookingStatus } : b));
   }, []);
 
-  const deleteBooking = useCallback(async (id: number | string): Promise<void> => {
+  const deleteBooking = useCallback(async (id: number | string, deletedBy?: string): Promise<void> => {
     try {
-      await apiFetch(`/bookings/${id}`, { method: "DELETE" });
+      await apiFetch(`/bookings/${id}`, {
+        method: "DELETE",
+        body: JSON.stringify({ deleted_by: deletedBy || 'Admin' }),
+      });
     } catch {
       console.warn("API delete failed, deleting locally");
     }
@@ -546,6 +555,56 @@ export function DataProvider({ children }: DataProviderProps) {
       return updated;
     });
   }, []);
+
+  const fetchDeletedBookings = useCallback(async (): Promise<Booking[]> => {
+    try {
+      const data = await apiFetch<DbBookingWithNanny[]>('/bookings?deleted=true');
+      return data.map((b) => ({
+        id: b.id,
+        nannyId: b.nanny_id,
+        nannyName: b.nanny_name || '',
+        nannyImage: b.nanny_image || '',
+        clientName: b.client_name,
+        clientEmail: b.client_email,
+        clientPhone: b.client_phone || '',
+        hotel: b.hotel || '',
+        date: b.date,
+        endDate: b.end_date ?? null,
+        startTime: b.start_time,
+        endTime: b.end_time,
+        plan: b.plan,
+        childrenCount: b.children_count,
+        childrenAges: b.children_ages,
+        notes: b.notes,
+        totalPrice: b.total_price,
+        status: b.status,
+        createdBy: b.created_by || 'parent',
+        createdByName: b.created_by_name || '',
+        createdAt: b.created_at,
+        clockIn: b.clock_in ?? null,
+        clockOut: b.clock_out ?? null,
+        cancelledAt: b.cancelled_at ?? null,
+        cancellationReason: b.cancellation_reason || '',
+        cancelledBy: b.cancelled_by || '',
+        collectedBy: b.collected_by || '',
+        collectedAt: b.collected_at ?? null,
+        collectionNote: b.collection_note || '',
+        paymentMethod: b.payment_method || '',
+        deletedAt: b.deleted_at ?? null,
+        deletedBy: b.deleted_by || '',
+      }));
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const restoreBooking = useCallback(async (id: number | string): Promise<void> => {
+    await apiFetch(`/bookings/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ restore: true }),
+    });
+    await fetchBookings();
+  }, [fetchBookings]);
 
   const markAsCollected = useCallback(async (
     id: number | string,
@@ -701,6 +760,8 @@ export function DataProvider({ children }: DataProviderProps) {
     collectionNote: b.collection_note || '',
     paymentMethod: b.payment_method || '',
     createdBy: b.created_by || '',
+    deletedAt: b.deleted_at ?? null,
+    deletedBy: b.deleted_by || '',
   }), []);
 
   const fetchNannyBookings = useCallback(async () => {
@@ -1263,6 +1324,8 @@ export function DataProvider({ children }: DataProviderProps) {
       clockInBooking,
       clockOutBooking,
       deleteBooking,
+      fetchDeletedBookings,
+      restoreBooking,
       markAsCollected,
       resendInvoice,
       sendBookingReminder,
@@ -1309,7 +1372,7 @@ export function DataProvider({ children }: DataProviderProps) {
     }),
     [
       nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability, inviteNanny, toggleNannyStatus, resendInvite, bulkUpdateNannyRate,
-      bookings, fetchBookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking, resendInvoice, sendBookingReminder,
+      bookings, fetchBookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking, fetchDeletedBookings, restoreBooking, resendInvoice, sendBookingReminder,
       stats, isAdmin, adminProfile, adminUsers, adminLogin, adminLogout,
       fetchAdminUsers, addAdminUser, updateAdminUser, deleteAdminUser,
       changeAdminPassword, forgotAdminPassword, resetAdminPassword, registerAdmin, loading,

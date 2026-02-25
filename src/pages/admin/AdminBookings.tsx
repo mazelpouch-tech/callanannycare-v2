@@ -27,6 +27,8 @@ import {
   TimerReset,
   ArrowRightLeft,
   Bell,
+  RotateCcw,
+  History,
 } from "lucide-react";
 import { format, parseISO, formatDistanceToNow, isToday } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -148,7 +150,7 @@ function UrgencyBadge({ booking }: { booking: Booking }) {
 const statusFilters = ["all", "pending", "confirmed", "completed", "cancelled"];
 
 export default function AdminBookings() {
-  const { bookings, fetchBookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking, sendBookingReminder, adminProfile } = useData();
+  const { bookings, fetchBookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking, fetchDeletedBookings, restoreBooking, sendBookingReminder, adminProfile } = useData();
   const { toDH } = useExchangeRate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -614,13 +616,41 @@ export default function AdminBookings() {
   };
 
   const handleDelete = (id: number | string) => {
-    deleteBooking(id);
+    deleteBooking(id, adminProfile?.name || 'Admin');
     setDeleteConfirm(null);
   };
 
   const toggleExpand = (id: number | string) => {
     setExpandedRow(expandedRow === id ? null : id);
   };
+
+  // ─── Deleted bookings audit log ───────────────────────────────
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [deletedBookings, setDeletedBookings] = useState<typeof bookings>([]);
+  const [loadingDeleted, setLoadingDeleted] = useState(false);
+  const [restoring, setRestoring] = useState<number | string | null>(null);
+
+  const openDeletedLog = async () => {
+    setShowDeleted(true);
+    setLoadingDeleted(true);
+    try {
+      const data = await fetchDeletedBookings();
+      setDeletedBookings(data);
+    } finally {
+      setLoadingDeleted(false);
+    }
+  };
+
+  const handleRestore = async (id: number | string) => {
+    setRestoring(id);
+    try {
+      await restoreBooking(id);
+      setDeletedBookings((prev) => prev.filter((b) => b.id !== id));
+    } finally {
+      setRestoring(null);
+    }
+  };
+  // ─────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
@@ -635,6 +665,13 @@ export default function AdminBookings() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={openDeletedLog}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:bg-muted transition-colors"
+          >
+            <History className="w-4 h-4" />
+            <span className="hidden sm:inline">Deleted</span>
+          </button>
           <button
             onClick={exportCSV}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-border text-foreground hover:bg-muted transition-colors"
@@ -2122,6 +2159,92 @@ export default function AdminBookings() {
                   <>Yes, Cancel It</>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Deleted Bookings Audit Log Modal ─────────────────── */}
+      {showDeleted && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowDeleted(false)}
+        >
+          <div
+            className="bg-white dark:bg-card rounded-2xl shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <div className="flex items-center gap-2">
+                <History className="w-5 h-5 text-muted-foreground" />
+                <h2 className="text-lg font-semibold text-foreground">Deleted Bookings</h2>
+                {!loadingDeleted && (
+                  <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
+                    {deletedBookings.length}
+                  </span>
+                )}
+              </div>
+              <button onClick={() => setShowDeleted(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto flex-1 p-4">
+              {loadingDeleted ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : deletedBookings.length === 0 ? (
+                <p className="text-center text-muted-foreground py-12 text-sm">No deleted bookings found.</p>
+              ) : (
+                <div className="space-y-3">
+                  {deletedBookings.map((b) => (
+                    <div key={b.id} className="bg-muted/40 rounded-xl border border-border p-4 space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-foreground text-sm">
+                            #{b.id} — {b.clientName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {b.date}{b.endDate ? ` → ${b.endDate}` : ""} · {b.startTime}{b.endTime ? ` - ${b.endTime}` : ""}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{b.hotel || "No hotel"} · {b.nannyName || "Unassigned"}</p>
+                        </div>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize shrink-0 ${
+                          b.status === 'completed' ? 'bg-green-100 text-green-700' :
+                          b.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
+                          b.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {b.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-border/50">
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-medium text-red-600">Deleted by {b.deletedBy || 'Unknown'}</span>
+                          {b.deletedAt && (
+                            <span> · {formatDistanceToNow(new Date(b.deletedAt), { addSuffix: true })}</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleRestore(b.id)}
+                          disabled={restoring === b.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors disabled:opacity-50"
+                        >
+                          {restoring === b.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          )}
+                          Restore
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

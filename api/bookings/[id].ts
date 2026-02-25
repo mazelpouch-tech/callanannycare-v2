@@ -28,6 +28,7 @@ interface UpdateBookingBody {
   collected_at?: string | null;
   collection_note?: string;
   payment_method?: string;
+  restore?: boolean; // Restore a soft-deleted booking
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -45,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         SELECT b.*, n.name as nanny_name, n.image as nanny_image
         FROM bookings b
         LEFT JOIN nannies n ON b.nanny_id = n.id
-        WHERE b.id = ${id}
+        WHERE b.id = ${id} AND b.deleted_at IS NULL
       ` as DbBookingWithNanny[];
       if (result.length === 0) return res.status(404).json({ error: 'Booking not found' });
 
@@ -61,7 +62,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     if (req.method === 'PUT') {
-      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder, cancellation_reason, cancelled_by, collected_by, collected_at, collection_note, payment_method } = req.body as UpdateBookingBody;
+      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder, cancellation_reason, cancelled_by, collected_by, collected_at, collection_note, payment_method, restore } = req.body as UpdateBookingBody;
+
+      // Restore a soft-deleted booking
+      if (restore) {
+        const restored = await sql`
+          UPDATE bookings SET deleted_at = NULL, deleted_by = '', updated_at = NOW()
+          WHERE id = ${id} RETURNING *
+        ` as DbBookingWithNanny[];
+        if (restored.length === 0) return res.status(404).json({ error: 'Booking not found' });
+        return res.status(200).json(restored[0]);
+      }
 
       // ─── Conflict check when nanny/date/time changes ────────────
       if (nanny_id !== undefined || date || end_date !== undefined || start_time || end_time) {
@@ -792,7 +803,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'DELETE') {
-      await sql`DELETE FROM bookings WHERE id = ${id}`;
+      const { deleted_by } = (req.body || {}) as { deleted_by?: string };
+      await sql`
+        UPDATE bookings SET deleted_at = NOW(), deleted_by = ${deleted_by || 'Admin'}, updated_at = NOW()
+        WHERE id = ${id}
+      `;
       return res.status(200).json({ success: true });
     }
     
