@@ -82,6 +82,20 @@ function isEveningShift(startHour: number, endHour: number): boolean {
   return endHour <= startHour || startHour >= 19 || startHour < 7 || endHour > 19 || endHour <= 7;
 }
 
+/** Check if two time ranges overlap, handling overnight shifts (e.g. 20h00-02h00) */
+export function timesOverlap(start1: string, end1: string, start2: string, end2: string): boolean {
+  const s1 = parseTimeToHours(start1);
+  const e1 = parseTimeToHours(end1);
+  const s2 = parseTimeToHours(start2);
+  const e2 = parseTimeToHours(end2);
+  if (s1 === null || e1 === null || s2 === null || e2 === null) return false;
+  const overnight1 = e1 <= s1;
+  const overnight2 = e2 <= s2;
+  if (!overnight1 && !overnight2) return s1 < e2 && s2 < e1;
+  if (overnight1 && overnight2) return true;
+  return s1 < e2 || s2 < e1;
+}
+
 /** Pay breakdown: base hourly pay + taxi fee */
 export interface PayBreakdown {
   basePay: number;    // hours × HOURLY_RATE

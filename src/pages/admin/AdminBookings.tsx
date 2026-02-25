@@ -36,7 +36,7 @@ import PhoneInput from "../../components/PhoneInput";
 import ExtendBookingModal from "../../components/ExtendBookingModal";
 import ForwardBookingModal from "../../components/ForwardBookingModal";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
-import { calcBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE, isTomorrow as isTomorrowDate } from "@/utils/shiftHelpers";
+import { calcBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE, isTomorrow as isTomorrowDate, timesOverlap } from "@/utils/shiftHelpers";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 
 interface EditBookingForm {
@@ -361,7 +361,7 @@ export default function AdminBookings() {
         b.status !== "cancelled" &&
         b.startTime &&
         editBookingData.startTime &&
-        !(b.endTime && editBookingData.endTime && (editBookingData.endTime <= b.startTime || editBookingData.startTime >= b.endTime))
+        timesOverlap(editBookingData.startTime, editBookingData.endTime || "23:59", b.startTime, b.endTime || "23:59")
     );
   }, [editBookingData, bookings]);
 
@@ -504,15 +504,14 @@ export default function AdminBookings() {
 
   // Conflict detection
   const getConflicts = (nannyId: string, date: string, startTime: string, endTime: string) => {
-    if (!nannyId || !date) return [];
+    if (!nannyId || !date || !startTime) return [];
     return bookings.filter(
       (b) =>
         b.nannyId === Number(nannyId) &&
         b.date === date &&
         b.status !== "cancelled" &&
         b.startTime &&
-        startTime &&
-        !(b.endTime && endTime && (endTime <= b.startTime || startTime >= b.endTime))
+        timesOverlap(startTime, endTime || "23:59", b.startTime, b.endTime || "23:59")
     );
   };
 
