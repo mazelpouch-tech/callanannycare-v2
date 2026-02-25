@@ -1,10 +1,18 @@
 /// <reference lib="webworker" />
-import { precacheAndRoute } from 'workbox-precaching';
+import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
 import { NetworkFirst, CacheFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
+import { clientsClaim } from 'workbox-core';
 
 declare let self: ServiceWorkerGlobalScope;
+
+// Take control immediately on install & activate
+self.skipWaiting();
+clientsClaim();
+
+// Clean up caches from older SW versions
+cleanupOutdatedCaches();
 
 // Workbox precaching (manifest injected at build time)
 precacheAndRoute(self.__WB_MANIFEST);
