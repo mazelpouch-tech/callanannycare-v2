@@ -203,6 +203,19 @@ export function DataProvider({ children }: DataProviderProps) {
     return () => { cancelled = true; };
   }, []);
 
+  // Refetch data when the PWA is foregrounded (tab/app becomes visible again).
+  // Critical for iOS PWA: when the user switches back to the app after it was
+  // in the background, data may be stale or the initial fetch may have failed.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchBookings().catch(() => { /* best effort */ });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [fetchBookings]);
+
   // Persist admin auth to localStorage (admin stays local)
   useEffect(() => {
     saveToStorage(STORAGE_KEYS.admin, isAdmin);

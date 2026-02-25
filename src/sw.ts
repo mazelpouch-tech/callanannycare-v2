@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
-import { NetworkFirst, CacheFirst } from 'workbox-strategies';
+import { CacheFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { clientsClaim } from 'workbox-core';
 
@@ -26,16 +26,13 @@ const navigationRoute = new NavigationRoute(navigationHandler, {
 });
 registerRoute(navigationRoute);
 
-// ─── Runtime Caching (replicating previous generateSW config) ────
+// ─── Runtime Caching ─────────────────────────────────────────────
 
-// API calls: Network first with 5-minute cache
-registerRoute(
-  ({ url }) => url.pathname.startsWith('/api/'),
-  new NetworkFirst({
-    cacheName: 'api-cache',
-    plugins: [new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 300 })],
-  })
-);
+// API calls: DO NOT cache — always go straight to the network.
+// iOS PWA / WKWebView can have issues when the SW intercepts API fetches
+// (NetworkFirst can fail silently, returning stale/empty cached data).
+// By not registering a route for /api/, fetch() calls bypass the SW
+// entirely and go directly through the browser's native network stack.
 
 // Images: Cache first with 30-day expiry
 registerRoute(
