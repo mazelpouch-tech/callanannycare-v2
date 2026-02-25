@@ -64,6 +64,10 @@ export interface DbBooking {
   cancelled_at: string | null;
   cancellation_reason: string;
   cancelled_by: string;
+  collected_by: string;
+  collected_at: string | null;
+  collection_note: string;
+  payment_method: string;
   created_by: BookingCreator;
   created_by_name: string;
   created_at: string;
@@ -154,6 +158,10 @@ export interface Booking {
   cancelledAt: string | null;
   cancellationReason: string;
   cancelledBy: string;
+  collectedBy: string;
+  collectedAt: string | null;
+  collectionNote: string;
+  paymentMethod: string;
 }
 
 export interface Notification {
@@ -340,6 +348,7 @@ export interface DataContextValue {
   clockInBooking: (id: number | string) => Promise<void>;
   clockOutBooking: (id: number | string) => Promise<void>;
   deleteBooking: (id: number | string) => Promise<void>;
+  markAsCollected: (id: number | string, data: { collectedBy: string; paymentMethod: string; collectionNote?: string }) => Promise<void>;
   resendInvoice: (id: number | string) => Promise<void>;
   sendBookingReminder: (id: number | string) => Promise<void>;
 

@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   CalendarDays,
   DollarSign,
+  Users,
   LogOut,
   Menu,
   X,
@@ -22,7 +23,8 @@ interface SidebarLink {
 const sidebarLinks: SidebarLink[] = [
   { to: "/supervisor", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/supervisor/bookings", label: "Bookings", icon: CalendarDays },
-  { to: "/supervisor/revenue", label: "Revenue & Collections", icon: DollarSign },
+  { to: "/supervisor/assignments", label: "Nanny Schedule", icon: Users },
+  { to: "/supervisor/revenue", label: "Collections", icon: DollarSign },
 ];
 
 export default function SupervisorLayout() {

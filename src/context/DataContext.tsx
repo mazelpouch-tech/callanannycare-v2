@@ -166,6 +166,10 @@ export function DataProvider({ children }: DataProviderProps) {
             cancelledAt: b.cancelled_at ?? null,
             cancellationReason: b.cancellation_reason || '',
             cancelledBy: b.cancelled_by || '',
+            collectedBy: b.collected_by || '',
+            collectedAt: b.collected_at ?? null,
+            collectionNote: b.collection_note || '',
+            paymentMethod: b.payment_method || '',
             createdBy: b.created_by || '',
           }));
           setBookings(normalizedBookings);
@@ -308,6 +312,10 @@ export function DataProvider({ children }: DataProviderProps) {
         cancelledAt: b.cancelled_at ?? null,
         cancellationReason: b.cancellation_reason || '',
         cancelledBy: b.cancelled_by || '',
+        collectedBy: b.collected_by || '',
+        collectedAt: b.collected_at ?? null,
+        collectionNote: b.collection_note || '',
+        paymentMethod: b.payment_method || '',
         createdBy: b.created_by || '',
       }));
       setBookings(normalizedBookings);
@@ -374,6 +382,10 @@ export function DataProvider({ children }: DataProviderProps) {
           cancelledAt: created.cancelled_at ?? null,
           cancellationReason: created.cancellation_reason || '',
           cancelledBy: created.cancelled_by || '',
+          collectedBy: created.collected_by || '',
+          collectedAt: created.collected_at ?? null,
+          collectionNote: created.collection_note || '',
+          paymentMethod: created.payment_method || '',
           createdBy: created.created_by || '',
         };
         setBookings((prev) => {
@@ -534,6 +546,39 @@ export function DataProvider({ children }: DataProviderProps) {
     });
   }, []);
 
+  const markAsCollected = useCallback(async (
+    id: number | string,
+    data: { collectedBy: string; paymentMethod: string; collectionNote?: string }
+  ): Promise<void> => {
+    const collectedAt = new Date().toISOString();
+    try {
+      await apiFetch(`/bookings/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          collected_by: data.collectedBy,
+          collected_at: collectedAt,
+          collection_note: data.collectionNote || '',
+          payment_method: data.paymentMethod,
+        }),
+      });
+    } catch {
+      console.warn("API mark-collected failed, updating locally");
+    }
+    setBookings((prev) => {
+      const updated = prev.map((b) =>
+        b.id === id ? {
+          ...b,
+          collectedBy: data.collectedBy,
+          collectedAt: collectedAt,
+          collectionNote: data.collectionNote || '',
+          paymentMethod: data.paymentMethod,
+        } : b
+      );
+      saveToStorage(STORAGE_KEYS.bookings, updated);
+      return updated;
+    });
+  }, []);
+
   const resendInvoice = useCallback(async (id: number | string): Promise<void> => {
     await apiFetch(`/bookings/${id}`, {
       method: "PUT",
@@ -635,6 +680,10 @@ export function DataProvider({ children }: DataProviderProps) {
     cancelledAt: b.cancelled_at ?? null,
     cancellationReason: b.cancellation_reason || '',
     cancelledBy: b.cancelled_by || '',
+    collectedBy: b.collected_by || '',
+    collectedAt: b.collected_at ?? null,
+    collectionNote: b.collection_note || '',
+    paymentMethod: b.payment_method || '',
     createdBy: b.created_by || '',
   }), []);
 
@@ -1141,6 +1190,7 @@ export function DataProvider({ children }: DataProviderProps) {
       clockInBooking,
       clockOutBooking,
       deleteBooking,
+      markAsCollected,
       resendInvoice,
       sendBookingReminder,
       stats,

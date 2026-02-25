@@ -26,6 +26,7 @@ import SupervisorLayout from './pages/supervisor/SupervisorLayout'
 import SupervisorDashboard from './pages/supervisor/SupervisorDashboard'
 import SupervisorBookings from './pages/supervisor/SupervisorBookings'
 import SupervisorRevenue from './pages/supervisor/SupervisorRevenue'
+import SupervisorAssignments from './pages/supervisor/SupervisorAssignments'
 import NannyLogin from './pages/nanny/NannyLogin'
 import NannyRegister from './pages/nanny/NannyRegister'
 import NannyLayout from './pages/nanny/NannyLayout'
@@ -74,6 +75,7 @@ export default function App() {
       <Route path="/supervisor" element={<SupervisorLayout />}>
         <Route index element={<SupervisorDashboard />} />
         <Route path="bookings" element={<SupervisorBookings />} />
+        <Route path="assignments" element={<SupervisorAssignments />} />
         <Route path="revenue" element={<SupervisorRevenue />} />
       </Route>
 
