@@ -1221,8 +1221,9 @@ export default function Book() {
     const startHour = parseInt(startTime.split(":")[0], 10);
     const endHour = parseInt(endTime.split(":")[0], 10);
     const endMin = parseInt(endTime.split(":")[1], 10);
-    // Taxi fee if session ends after 7 PM or starts before 7 AM
-    return (endHour > NIGHT_START || (endHour === NIGHT_START && endMin > 0)) || startHour < NIGHT_END;
+    // Taxi fee if session touches 7 PM – 7 AM window (including overnight)
+    const isOvernight = endHour < startHour || (endHour === startHour && endMin === 0);
+    return isOvernight || startHour >= NIGHT_START || startHour < NIGHT_END || endHour > NIGHT_START || (endHour === NIGHT_START && endMin > 0);
   }, [startTime, endTime]);
 
   const taxiFeeTotal = useMemo(() => {

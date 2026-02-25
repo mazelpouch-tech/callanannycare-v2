@@ -174,7 +174,7 @@ export default function NannyBookings() {
     const startDate = new Date(editForm.startDate);
     const endDate = editForm.endDate ? new Date(editForm.endDate) : startDate;
     const dayCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1);
-    const isEvening = eh > 19 || (eh === 19 && em > 0) || sh < 7;
+    const isEvening = endH <= startH || sh >= 19 || sh < 7 || eh > 19 || (eh === 19 && em > 0);
     const taxiFee = isEvening ? TAXI_FEE * dayCount : 0;
     const totalPrice = RATE * hours * dayCount + taxiFee;
 
@@ -269,7 +269,7 @@ export default function NannyBookings() {
     const startDate = new Date(formData.startDate);
     const endDate = formData.endDate ? new Date(formData.endDate) : startDate;
     const dayCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1);
-    const isEvening = eh > 19 || (eh === 19 && em > 0) || sh < 7;
+    const isEvening = endH <= startH || sh >= 19 || sh < 7 || eh > 19 || (eh === 19 && em > 0);
     const taxiFee = isEvening ? TAXI_FEE * dayCount : 0;
     const totalPrice = RATE * hours * dayCount + taxiFee;
 

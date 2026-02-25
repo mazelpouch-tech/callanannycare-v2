@@ -345,7 +345,8 @@ export default function AdminBookings() {
     // Taxi fee: 10€ per day if shift touches the 7PM–7AM window
     const [sh] = (editBookingData?.startTime || "").split(":").map(Number);
     const [eh, em] = (editBookingData?.endTime || "").split(":").map(Number);
-    const isEvening = (eh > 19 || (eh === 19 && em > 0)) || sh < 7;
+    const isOvernight = (eh + em / 60) <= (sh + 0);
+    const isEvening = isOvernight || sh >= 19 || sh < 7 || eh > 19 || (eh === 19 && em > 0);
     const taxiFee = isEvening ? 10 * editBookingDays : 0;
     return hourlyTotal + taxiFee;
   }, [editSelectedNanny, editBookingHours, editBookingDays, editBookingData]);
@@ -428,7 +429,8 @@ export default function AdminBookings() {
     const hourlyTotal = Math.round(selectedNanny.rate * newBookingHours * newBookingDays);
     const [sh] = (newBooking.startTime || "").split(":").map(Number);
     const [eh, em] = (newBooking.endTime || "").split(":").map(Number);
-    const isEvening = (eh > 19 || (eh === 19 && em > 0)) || sh < 7;
+    const isOvernight = (eh + em / 60) <= (sh + 0);
+    const isEvening = isOvernight || sh >= 19 || sh < 7 || eh > 19 || (eh === 19 && em > 0);
     const taxiFee = isEvening ? 10 * newBookingDays : 0;
     return hourlyTotal + taxiFee;
   }, [selectedNanny, newBookingHours, newBookingDays, newBooking.startTime, newBooking.endTime]);
