@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb } from '../_db.js';
-import type { DbNanny } from '@/types';
+import type { DbNanny, DbAdminUser } from '@/types';
 
 interface NannyLoginBody {
   email: string;
@@ -41,6 +41,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(403).json({ error: 'Please complete your registration using your invitation link.' });
     }
 
+    // Check for linked admin account (same email) — enables dual-role access
+    let linkedAdmin: { id: number; name: string; email: string; role: string; lastLogin: string | null; loginCount: number } | null = null;
+    try {
+      const adminResult = await sql`
+        SELECT id, name, email, role, last_login, login_count
+        FROM admin_users
+        WHERE LOWER(email) = LOWER(${email}) AND is_active = true
+      ` as DbAdminUser[];
+      if (adminResult.length > 0) {
+        const a = adminResult[0];
+        linkedAdmin = {
+          id: a.id,
+          name: a.name,
+          email: a.email,
+          role: a.role,
+          lastLogin: a.last_login,
+          loginCount: a.login_count || 0,
+        };
+      }
+    } catch { /* Non-critical — ignore if admin table lookup fails */ }
+
     return res.status(200).json({
       success: true,
       nanny: {
@@ -52,7 +73,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         rating: nanny.rating,
         experience: nanny.experience,
         status: nanny.status || 'active',
-      }
+      },
+      ...(linkedAdmin ? { linkedAdmin } : {}),
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';

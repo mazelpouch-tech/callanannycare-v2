@@ -26,6 +26,7 @@ import type {
   DbChatChannel,
   NannyLoginResponse,
   AdminLoginResponse,
+  LinkedNannyInfo,
   InviteResponse,
   ResendInviteResponse,
   ApiResult,
@@ -625,6 +626,21 @@ export function DataProvider({ children }: DataProviderProps) {
         setNannyProfile(profile);
         saveToStorage(STORAGE_KEYS.nannyProfile, profile);
 
+        // If this nanny also has a linked admin/supervisor account, activate it too
+        if (result.linkedAdmin) {
+          const la = result.linkedAdmin;
+          const adminProf: AdminProfile = {
+            id: la.id,
+            name: la.name,
+            email: la.email,
+            role: la.role,
+            lastLogin: la.lastLogin,
+            loginCount: la.loginCount,
+          };
+          setIsAdmin(true);
+          setAdminProfile(adminProf);
+        }
+
         // Auto-resubscribe push if permission was previously granted
         try {
           const { isPushSupported, isSubscribedToPush, subscribeToPush } = await import('../utils/pushNotifications');
@@ -892,6 +908,31 @@ export function DataProvider({ children }: DataProviderProps) {
         };
         setIsAdmin(true);
         setAdminProfile(profile);
+
+        // If this admin also has a linked nanny account, activate it too
+        if (result.linkedNanny) {
+          const ln = result.linkedNanny as LinkedNannyInfo;
+          const nannyProf: NannyProfile = {
+            id: ln.id,
+            name: ln.name,
+            email: ln.email ?? '',
+            image: ln.image,
+            location: ln.location,
+            rating: ln.rating,
+            experience: ln.experience,
+            status: ln.status,
+            bio: ln.bio,
+            specialties: ln.specialties,
+            languages: ln.languages,
+            rate: ln.rate,
+            available: ln.available,
+            phone: ln.phone,
+            age: ln.age ?? null,
+          };
+          setIsNanny(true);
+          setNannyProfile(nannyProf);
+          saveToStorage(STORAGE_KEYS.nannyProfile, nannyProf);
+        }
 
         // Auto-resubscribe push if permission was previously granted
         try {

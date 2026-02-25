@@ -320,8 +320,37 @@ export type ApiResult<T = void> =
   | ({ success: true } & T)
   | { success: false; error: string };
 
-export interface NannyLoginResponse { nanny: DbNanny }
-export interface AdminLoginResponse { admin: DbAdminUser; token?: string }
+/** Minimal admin info returned when a nanny has a linked admin account */
+export interface LinkedAdminInfo {
+  id: number;
+  name: string;
+  email: string;
+  role: AdminRole;
+  lastLogin: string | null;
+  loginCount: number;
+}
+
+/** Minimal nanny info returned when an admin has a linked nanny account */
+export interface LinkedNannyInfo {
+  id: number;
+  name: string;
+  email: string | null;
+  image: string;
+  location: string;
+  rating: number;
+  experience: string;
+  bio: string;
+  specialties: string[];
+  languages: string[];
+  rate: number;
+  available: boolean;
+  status: NannyStatus;
+  phone: string;
+  age: string | null;
+}
+
+export interface NannyLoginResponse { nanny: DbNanny; linkedAdmin?: LinkedAdminInfo }
+export interface AdminLoginResponse { admin: DbAdminUser; token?: string; linkedNanny?: LinkedNannyInfo }
 export interface InviteResponse { inviteLink: string; emailSent: boolean; nanny: { id: number; name: string; email: string } }
 export interface ResendInviteResponse { inviteLink: string; emailSent: boolean }
 export interface ProfileUpdateResponse { nanny: DbNanny }
