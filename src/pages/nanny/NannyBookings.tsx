@@ -165,10 +165,12 @@ export default function NannyBookings() {
     const startLabel = TIME_SLOTS.find(s => s.value === editForm.startTime)?.label || editForm.startTime;
     const endLabel = TIME_SLOTS.find(s => s.value === editForm.endTime)?.label || editForm.endTime;
 
-    // Recalculate price
+    // Recalculate price (handles overnight e.g. 18:00→01:00)
     const [sh, sm] = (editForm.startTime || "0:0").split(":").map(Number);
     const [eh, em] = (editForm.endTime || "0:0").split(":").map(Number);
-    const hours = Math.max(0, (eh + em / 60) - (sh + sm / 60));
+    const startH = sh + sm / 60;
+    const endH = eh + em / 60;
+    const hours = endH > startH ? endH - startH : (24 - startH) + endH;
     const startDate = new Date(editForm.startDate);
     const endDate = editForm.endDate ? new Date(editForm.endDate) : startDate;
     const dayCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1);
@@ -258,10 +260,12 @@ export default function NannyBookings() {
     if (!formData.clientName || !formData.startDate || !formData.startTime) return;
     setFormLoading(true);
 
-    // Calculate price (hidden from nanny, stored for admin)
+    // Calculate price (hidden from nanny, stored for admin) — handles overnight
     const [sh, sm] = (formData.startTime || "0:0").split(":").map(Number);
     const [eh, em] = (formData.endTime || "0:0").split(":").map(Number);
-    const hours = Math.max(0, (eh + em / 60) - (sh + sm / 60));
+    const startH = sh + sm / 60;
+    const endH = eh + em / 60;
+    const hours = endH > startH ? endH - startH : (24 - startH) + endH;
     const startDate = new Date(formData.startDate);
     const endDate = formData.endDate ? new Date(formData.endDate) : startDate;
     const dayCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1);

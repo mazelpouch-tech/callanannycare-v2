@@ -228,7 +228,8 @@ export default function RebookBooking() {
     if (!startTime || !endTime) return 0;
     const start = parseTimeValue(startTime);
     const end = parseTimeValue(endTime);
-    return Math.max(0, end - start);
+    // Handle overnight bookings (e.g. 18:00 → 01:00 = 7h)
+    return end > start ? end - start : (24 - start) + end;
   }, [startTime, endTime]);
 
   const isEveningBooking = useMemo(() => {

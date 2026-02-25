@@ -326,7 +326,9 @@ export default function AdminBookings() {
     if (!editBookingData.startTime || !editBookingData.endTime) return 0;
     const [sh, sm] = editBookingData.startTime.split(":").map(Number);
     const [eh, em] = editBookingData.endTime.split(":").map(Number);
-    return Math.max(0, (eh + em / 60) - (sh + sm / 60));
+    const startH = sh + sm / 60;
+    const endH = eh + em / 60;
+    return endH > startH ? endH - startH : (24 - startH) + endH;
   }, [editBookingData]);
 
   const editBookingDays = useMemo(() => {
@@ -408,7 +410,9 @@ export default function AdminBookings() {
     if (!newBooking.startTime || !newBooking.endTime) return 0;
     const [sh, sm] = newBooking.startTime.split(":").map(Number);
     const [eh, em] = newBooking.endTime.split(":").map(Number);
-    return Math.max(0, (eh + em / 60) - (sh + sm / 60));
+    const startH = sh + sm / 60;
+    const endH = eh + em / 60;
+    return endH > startH ? endH - startH : (24 - startH) + endH;
   }, [newBooking.startTime, newBooking.endTime]);
 
   const newBookingDays = useMemo(() => {

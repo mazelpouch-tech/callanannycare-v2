@@ -58,12 +58,15 @@ export function parseTimeToHours(t: string): number | null {
   return null;
 }
 
-/** Calculate booked hours from start/end time strings, with optional day count */
+/** Calculate booked hours from start/end time strings, with optional day count.
+ *  Handles overnight bookings (e.g. 18h00-01h00 = 7 hours). */
 export function calcBookedHours(startTime: string, endTime: string, startDate?: string, endDate?: string | null): number {
   const s = parseTimeToHours(startTime);
   const e = parseTimeToHours(endTime);
-  if (s === null || e === null || e <= s) return 0;
-  const hoursPerDay = e - s;
+  if (s === null || e === null) return 0;
+  // If end <= start, the shift crosses midnight (e.g. 18:00 → 01:00 = 7h)
+  const hoursPerDay = e > s ? e - s : (24 - s) + e;
+  if (hoursPerDay <= 0) return 0;
   let days = 1;
   if (startDate && endDate) {
     const d1 = new Date(startDate).getTime();

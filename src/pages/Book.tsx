@@ -158,7 +158,9 @@ function parseTimeValue(val: string) {
 function calculateHours(startTime: string, endTime: string) {
   const start = parseTimeValue(startTime);
   const end = parseTimeValue(endTime);
-  return Math.max(0, end - start);
+  // Handle overnight bookings (e.g. 18:00 → 01:00 = 7h)
+  if (end <= start) return (24 - start) + end;
+  return end - start;
 }
 
 // --- Progress Bar ---
