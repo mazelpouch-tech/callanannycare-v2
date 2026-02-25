@@ -550,7 +550,7 @@ export function DataProvider({ children }: DataProviderProps) {
   const fetchNannyStats = useCallback(async () => {
     if (!nannyProfile?.id) return;
     try {
-      const data = await apiFetch<NannyStats>(`/nanny/stats?nannyId=${nannyProfile.id}`);
+      const data = await apiFetch<NannyStats>(`/nanny/profile?nannyId=${nannyProfile.id}&include=stats`);
       setNannyStats(data);
     } catch {
       console.warn("Failed to fetch nanny stats");
@@ -560,7 +560,7 @@ export function DataProvider({ children }: DataProviderProps) {
   const fetchNannyNotifications = useCallback(async () => {
     if (!nannyProfile?.id) return;
     try {
-      const data = await apiFetch<DbNotification[]>(`/nanny/notifications?nannyId=${nannyProfile.id}`);
+      const data = await apiFetch<DbNotification[]>(`/nanny/profile?nannyId=${nannyProfile.id}&include=notifications`);
       setNannyNotifications(data.map((n): Notification => ({
         id: n.id,
         nannyId: n.nanny_id,
@@ -578,9 +578,9 @@ export function DataProvider({ children }: DataProviderProps) {
 
   const markNotificationsRead = useCallback(async (notificationIds: number[]) => {
     try {
-      await apiFetch("/nanny/notifications", {
+      await apiFetch("/nanny/profile", {
         method: "PUT",
-        body: JSON.stringify({ notificationIds }),
+        body: JSON.stringify({ nannyId: nannyProfile?.id, action: "mark_notifications_read", notificationIds }),
       });
       setNannyNotifications((prev) =>
         prev.map((n) => notificationIds.includes(n.id) ? { ...n, isRead: true } : n)

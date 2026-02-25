@@ -9,6 +9,7 @@ import {
   QrCode,
   FileText,
   ScrollText,
+  MessageCircle,
   LogOut,
   Menu,
   X,
@@ -32,11 +33,12 @@ const sidebarLinks: SidebarLink[] = [
   { to: "/admin/nannies", label: "Nannies", icon: Users },
   { to: "/admin/users", label: "Admin Users", icon: ShieldCheck },
   { to: "/admin/qr-codes", label: "QR Codes", icon: QrCode },
+  { to: "/admin/messages", label: "Messages", icon: MessageCircle },
   { to: "/admin/login-logs", label: "Login Logs", icon: ScrollText },
 ];
 
 export default function AdminLayout() {
-  const { isAdmin, adminProfile, adminLogout, stats } = useData();
+  const { isAdmin, adminProfile, adminLogout, stats, unreadChatCount } = useData();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [prevPending, setPrevPending] = useState(0);
   const [, setNewBookingAlert] = useState(false);
@@ -114,6 +116,11 @@ export default function AdminLayout() {
               {label === "Bookings" && (stats?.pendingBookings || 0) > 0 && (
                 <span className="ml-auto bg-orange-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
                   {stats.pendingBookings > 9 ? "9+" : stats.pendingBookings}
+                </span>
+              )}
+              {label === "Messages" && unreadChatCount > 0 && (
+                <span className="ml-auto bg-accent text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
+                  {unreadChatCount > 9 ? "9+" : unreadChatCount}
                 </span>
               )}
             </NavLink>
