@@ -302,7 +302,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Send push notifications (best-effort, non-blocking)
       try {
         const { sendPushToUser, sendPushToAllAdmins } = await import('./_pushUtils.js');
+        let pushNannyName = '';
         if (nanny_id) {
+          try {
+            const nr = await sql`SELECT name FROM nannies WHERE id = ${nanny_id}` as { name: string }[];
+            pushNannyName = nr[0]?.name || '';
+          } catch { /* ignore */ }
           await sendPushToUser('nanny', nanny_id, {
             title: 'New Booking Request',
             body: `New booking from ${client_name} on ${date}`,
@@ -312,7 +317,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         await sendPushToAllAdmins({
           title: 'New Booking',
-          body: `${client_name} booked for ${date}`,
+          body: pushNannyName ? `${client_name} booked for ${date} — ${pushNannyName}` : `${client_name} booked for ${date}`,
           url: `/admin/bookings?booking=${result[0].id}`,
           tag: `admin-booking-new-${result[0].id}`,
         });

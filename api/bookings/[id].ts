@@ -165,6 +165,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
           const { sendPushToUser, sendPushToAllAdmins } = await import('../_pushUtils.js');
 
+          // Fetch nanny name (RETURNING * doesn't include the JOIN)
+          let pushNannyName = '';
+          if (result[0].nanny_id) {
+            try {
+              const nr = await sql`SELECT name FROM nannies WHERE id = ${result[0].nanny_id}` as { name: string }[];
+              pushNannyName = nr[0]?.name || '';
+            } catch { /* ignore */ }
+          }
+
           if (result[0].nanny_id) {
             const pushMessages: Record<string, { title: string; body: string }> = {
               confirmed: { title: 'Booking Confirmed', body: `Booking with ${result[0].client_name} on ${result[0].date} confirmed` },
@@ -181,9 +190,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
           }
 
+          const nannyLabel = pushNannyName ? ` — ${pushNannyName}` : '';
           await sendPushToAllAdmins({
             title: `Booking ${status.charAt(0).toUpperCase() + status.slice(1)}`,
-            body: `Booking #${id} with ${result[0].client_name} is now ${status}`,
+            body: `${result[0].client_name}${nannyLabel} booking is now ${status}`,
             url: `/admin/bookings?booking=${id}`,
             tag: `admin-booking-status-${id}`,
           });
