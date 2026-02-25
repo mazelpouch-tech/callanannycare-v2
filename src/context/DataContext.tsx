@@ -125,7 +125,7 @@ export function DataProvider({ children }: DataProviderProps) {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadData() {
+    async function loadData(isRetry = false) {
       try {
         const [apiNannies, apiBookings] = await Promise.all([
           apiFetch<DbNanny[]>("/nannies"),
@@ -181,13 +181,21 @@ export function DataProvider({ children }: DataProviderProps) {
           }));
           setBookings(normalizedBookings);
           saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
+          if (!cancelled) setLoading(false);
         }
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Unknown error';
         console.warn("API unavailable, using localStorage cache:", message);
-        // Keep localStorage data as fallback
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          if (!isRetry) {
+            // Retry once after 3s — handles iOS PWA cold-start where the service worker
+            // activating via skipWaiting/clientsClaim can interrupt the initial fetch
+            setTimeout(() => { if (!cancelled) loadData(true); }, 3000);
+          } else {
+            // Both attempts failed — stop loading and use localStorage fallback
+            setLoading(false);
+          }
+        }
       }
     }
 
@@ -1046,6 +1054,10 @@ export function DataProvider({ children }: DataProviderProps) {
         setIsAdmin(true);
         setAdminProfile(profile);
 
+        // Re-fetch all data after login — handles iOS PWA cold-start where the
+        // initial fetch (on app open) may have failed before the SW settled
+        fetchBookings().catch(() => { /* best effort */ });
+
         // If this admin also has a linked nanny account, activate it too
         if (result.linkedNanny) {
           const ln = result.linkedNanny as LinkedNannyInfo;
@@ -1087,7 +1099,7 @@ export function DataProvider({ children }: DataProviderProps) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       return { success: false as const, error: message || "Invalid email or password" };
     }
-  }, []);
+  }, [fetchBookings]);
 
   const adminLogout = useCallback(() => {
     setIsAdmin(false);
