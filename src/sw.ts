@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
-import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
-import { registerRoute } from 'workbox-routing';
+import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching';
+import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { NetworkFirst, CacheFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { clientsClaim } from 'workbox-core';
@@ -16,6 +16,15 @@ cleanupOutdatedCaches();
 
 // Workbox precaching (manifest injected at build time)
 precacheAndRoute(self.__WB_MANIFEST);
+
+// ─── SPA Navigation Fallback ─────────────────────────────────────
+// Serve index.html for all navigation requests (SPA routing)
+// This is critical for the PWA to work when opened from home screen
+const navigationHandler = createHandlerBoundToURL('/index.html');
+const navigationRoute = new NavigationRoute(navigationHandler, {
+  denylist: [/^\/api\//], // Don't intercept API calls
+});
+registerRoute(navigationRoute);
 
 // ─── Runtime Caching (replicating previous generateSW config) ────
 
