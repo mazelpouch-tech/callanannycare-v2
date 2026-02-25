@@ -10,6 +10,7 @@ import RebookBooking from './pages/RebookBooking'
 import BookingStatus from './pages/BookingStatus'
 import ReviewNannyPublic from './pages/ReviewNannyPublic'
 import PrivacyPolicy from './pages/PrivacyPolicy'
+import PartnerDemo from './pages/PartnerDemo'
 import NotFound from './pages/NotFound'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminLayout from './pages/admin/AdminLayout'
@@ -48,6 +49,9 @@ export default function App() {
         <Route path="/book" element={<Book />} />
         <Route path="*" element={<NotFound />} />
       </Route>
+
+      {/* Partner demo page */}
+      <Route path="/partner" element={<PartnerDemo />} />
 
       {/* Public standalone pages (no navbar/footer) */}
       <Route path="/parent-form" element={<ParentForm />} />
