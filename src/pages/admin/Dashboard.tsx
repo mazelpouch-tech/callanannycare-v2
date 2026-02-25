@@ -9,7 +9,7 @@ import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import type { Booking, Nanny, BookingStatus } from "@/types";
-import { calcShiftPayBreakdown, HOURLY_RATE } from "@/utils/shiftHelpers";
+import { calcShiftPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE } from "@/utils/shiftHelpers";
 
 // ─── Chart Data Types ────────────────────────────────────────────
 
@@ -491,7 +491,7 @@ const PLAN_COLORS = {
 
 export default function Dashboard() {
   const { bookings, nannies, stats, adminProfile, updateBookingStatus } = useData();
-  const { toDH } = useExchangeRate();
+  const { toDH, rate } = useExchangeRate();
 
   // ── Compute monthly revenue data (last 7 months) ──
   const monthlyRevenue = useMemo(() => {
@@ -649,6 +649,22 @@ export default function Dashboard() {
   const todaysBookingsCount = todaysBookings.length;
   const avgBookingValue = stats.totalBookings > 0 ? Math.round(stats.totalRevenue / Math.max(bookings.filter((b) => b.status === "confirmed" || b.status === "completed").length, 1)) : 0;
 
+  // Total nanny expense in DH (actual clock data if available, otherwise estimated from booked hours)
+  const totalExpenseDH = useMemo(() => {
+    return bookings
+      .filter((b) => b.status === "confirmed" || b.status === "completed")
+      .reduce((sum, b) => {
+        if (b.clockIn && b.clockOut) {
+          return sum + calcShiftPayBreakdown(b.clockIn, b.clockOut).total;
+        }
+        return sum + estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate).total;
+      }, 0);
+  }, [bookings]);
+
+  // Convert expense DH → EUR, then compute net income
+  const totalExpenseEUR = rate > 0 ? Math.round(totalExpenseDH / rate) : 0;
+  const netIncomeEUR = stats.totalRevenue - totalExpenseEUR;
+
   const formatDate = (dateStr: string) => {
     try { return format(parseISO(dateStr), "MMM dd, yyyy"); } catch { return dateStr || "N/A"; }
   };
@@ -799,28 +815,68 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Total Revenue */}
+        {/* Financial Summary */}
         <div className="bg-card rounded-xl border border-border shadow-soft p-5">
           <div className="mb-4">
-            <h3 className="font-serif text-base font-semibold text-foreground">Total Revenue</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">All bookings (hourly plan)</p>
+            <h3 className="font-serif text-base font-semibold text-foreground">Financial Summary</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Revenue, expenses & net income</p>
           </div>
-          {stats.totalRevenue > 0 ? (
-            <div className="flex flex-col items-center justify-center py-6">
-              <div className="w-28 h-28 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <DollarSign className="w-10 h-10 text-primary" />
+          {stats.totalRevenue > 0 || totalExpenseDH > 0 ? (
+            <div className="space-y-3">
+              {/* Revenue */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900/30">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
+                    <ArrowUpRight className="w-4 h-4 text-green-700 dark:text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-green-800 dark:text-green-300">Total Revenue</p>
+                    <p className="text-[10px] text-green-600/70 dark:text-green-500/70">Collected from clients</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-green-800 dark:text-green-300">{stats.totalRevenue.toLocaleString()}€</p>
+                  <p className="text-[10px] text-green-600/70 dark:text-green-500/70">{toDH(stats.totalRevenue).toLocaleString()} DH</p>
+                </div>
               </div>
-              <p className="text-3xl font-bold text-foreground">{stats.totalRevenue.toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground mt-1">€</p>
-              <p className="text-xs text-muted-foreground">{toDH(stats.totalRevenue).toLocaleString()} DH</p>
-              <div className="mt-4 flex items-center gap-2 text-xs">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLAN_COLORS.hourly }} />
-                <span className="text-muted-foreground">Hourly Plan</span>
+
+              {/* Expense */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
+                    <ArrowDownRight className="w-4 h-4 text-orange-700 dark:text-orange-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-orange-800 dark:text-orange-300">Total Expense</p>
+                    <p className="text-[10px] text-orange-600/70 dark:text-orange-500/70">Nanny pay ({HOURLY_RATE} DH/hr)</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-orange-800 dark:text-orange-300">{totalExpenseEUR.toLocaleString()}€</p>
+                  <p className="text-[10px] text-orange-600/70 dark:text-orange-500/70">{totalExpenseDH.toLocaleString()} DH</p>
+                </div>
+              </div>
+
+              {/* Net Income */}
+              <div className={`flex items-center justify-between p-3 rounded-lg border ${netIncomeEUR >= 0 ? "bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30" : "bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900/30"}`}>
+                <div className="flex items-center gap-2">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center ${netIncomeEUR >= 0 ? "bg-blue-100 dark:bg-blue-900/40" : "bg-red-100 dark:bg-red-900/40"}`}>
+                    <DollarSign className={`w-4 h-4 ${netIncomeEUR >= 0 ? "text-blue-700 dark:text-blue-400" : "text-red-700 dark:text-red-400"}`} />
+                  </div>
+                  <div>
+                    <p className={`text-xs font-medium ${netIncomeEUR >= 0 ? "text-blue-800 dark:text-blue-300" : "text-red-800 dark:text-red-300"}`}>Net Income</p>
+                    <p className={`text-[10px] ${netIncomeEUR >= 0 ? "text-blue-600/70 dark:text-blue-500/70" : "text-red-600/70 dark:text-red-500/70"}`}>Revenue − Expenses</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className={`text-sm font-bold ${netIncomeEUR >= 0 ? "text-blue-800 dark:text-blue-300" : "text-red-800 dark:text-red-300"}`}>{netIncomeEUR.toLocaleString()}€</p>
+                  <p className={`text-[10px] ${netIncomeEUR >= 0 ? "text-blue-600/70 dark:text-blue-500/70" : "text-red-600/70 dark:text-red-500/70"}`}>{(toDH(stats.totalRevenue) - totalExpenseDH).toLocaleString()} DH</p>
+                </div>
               </div>
             </div>
           ) : (
             <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-              No revenue data yet
+              No financial data yet
             </div>
           )}
         </div>
