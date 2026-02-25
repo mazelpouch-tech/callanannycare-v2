@@ -12,7 +12,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // GET: Return VAPID public key (read env directly — no web-push dependency)
     if (req.method === 'GET') {
-      const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
+      const vapidPublicKey = (process.env.VAPID_PUBLIC_KEY || '').trim();
       return res.status(200).json({ vapidPublicKey });
     }
 

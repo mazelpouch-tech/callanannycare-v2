@@ -1,8 +1,8 @@
 import { getDb } from './_db.js';
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:info@callanannycare.com';
+const VAPID_PUBLIC_KEY = (process.env.VAPID_PUBLIC_KEY || '').trim();
+const VAPID_PRIVATE_KEY = (process.env.VAPID_PRIVATE_KEY || '').trim();
+const VAPID_SUBJECT = (process.env.VAPID_SUBJECT || 'mailto:info@callanannycare.com').trim();
 
 // Lazy-load web-push to avoid CJS/ESM import crashes on Vercel
 let webpushInstance: typeof import('web-push') extends Promise<infer T> ? T : never;
