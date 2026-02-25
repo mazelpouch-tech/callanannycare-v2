@@ -1,12 +1,20 @@
-import webpush from 'web-push';
 import { getDb } from './_db.js';
 
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:info@callanannycare.com';
 
-if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+// Lazy-load web-push to avoid CJS/ESM import crashes on Vercel
+let webpushInstance: typeof import('web-push') extends Promise<infer T> ? T : never;
+async function getWebPush() {
+  if (!webpushInstance) {
+    const mod = await import('web-push');
+    webpushInstance = mod.default || mod;
+    if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+      webpushInstance.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+    }
+  }
+  return webpushInstance;
 }
 
 interface PushPayload {
@@ -33,6 +41,7 @@ export async function sendPushToUser(
 ): Promise<void> {
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
 
+  const webpush = await getWebPush();
   const sql = getDb();
   const subs = await sql`
     SELECT id, endpoint, p256dh, auth FROM push_subscriptions

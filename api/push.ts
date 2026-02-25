@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb } from './_db.js';
-import { getVapidPublicKey } from './_pushUtils.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const sql = getDb();
@@ -11,9 +10,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    // GET: Return VAPID public key
+    // GET: Return VAPID public key (read env directly — no web-push dependency)
     if (req.method === 'GET') {
-      return res.status(200).json({ vapidPublicKey: getVapidPublicKey() });
+      const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
+      return res.status(200).json({ vapidPublicKey });
     }
 
     // POST: Save push subscription (upsert by endpoint)

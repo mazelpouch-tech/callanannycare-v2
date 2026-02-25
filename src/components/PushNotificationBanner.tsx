@@ -24,6 +24,7 @@ export default function PushNotificationBanner({ userType, userId }: Props) {
   const [dismissed, setDismissed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [needsInstall, setNeedsInstall] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const check = async () => {
@@ -50,8 +51,12 @@ export default function PushNotificationBanner({ userType, userId }: Props) {
 
   const handleSubscribe = async () => {
     setLoading(true);
-    const success = await subscribeToPush(userType, userId);
-    setSubscribed(success);
+    setError(null);
+    const result = await subscribeToPush(userType, userId);
+    setSubscribed(result.ok);
+    if (!result.ok && result.error) {
+      setError(result.error);
+    }
     setLoading(false);
   };
 
@@ -134,26 +139,33 @@ export default function PushNotificationBanner({ userType, userId }: Props) {
   }
 
   return (
-    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <Bell className="w-5 h-5 text-orange-500" />
-        <div>
-          <p className="text-sm font-medium text-orange-800">Enable push notifications</p>
-          <p className="text-xs text-orange-600">Get instant alerts for bookings & updates</p>
+    <div className="mb-4">
+      <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Bell className="w-5 h-5 text-orange-500" />
+          <div>
+            <p className="text-sm font-medium text-orange-800">Enable push notifications</p>
+            <p className="text-xs text-orange-600">Get instant alerts for bookings & updates</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSubscribe}
+            disabled={loading}
+            className="px-3 py-1.5 bg-orange-500 text-white text-sm rounded-md hover:bg-orange-600 disabled:opacity-50"
+          >
+            {loading ? 'Enabling...' : 'Enable'}
+          </button>
+          <button onClick={handleDismiss} className="p-1 text-orange-400 hover:text-orange-600">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={handleSubscribe}
-          disabled={loading}
-          className="px-3 py-1.5 bg-orange-500 text-white text-sm rounded-md hover:bg-orange-600 disabled:opacity-50"
-        >
-          {loading ? 'Enabling...' : 'Enable'}
-        </button>
-        <button onClick={handleDismiss} className="p-1 text-orange-400 hover:text-orange-600">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-2 mt-2">
+          <p className="text-xs text-red-700">{error}</p>
+        </div>
+      )}
     </div>
   );
 }

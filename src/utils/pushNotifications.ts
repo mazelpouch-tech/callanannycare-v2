@@ -44,17 +44,30 @@ async function getVapidKey(): Promise<string> {
 /**
  * Subscribe to push notifications.
  * MUST be called on a user gesture (click handler) for iOS compliance.
+ * Returns { ok: true } on success, or { ok: false, error: string } on failure.
  */
 export async function subscribeToPush(
   userType: 'admin' | 'nanny',
   userId: number
-): Promise<boolean> {
+): Promise<{ ok: boolean; error?: string }> {
   try {
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return false;
+    if (permission !== 'granted') {
+      return { ok: false, error: `Permission ${permission}. Go to Settings > Notifications > Call a Nanny and allow notifications.` };
+    }
 
     const registration = await navigator.serviceWorker.ready;
-    const vapidKey = await getVapidKey();
+
+    let vapidKey: string;
+    try {
+      vapidKey = await getVapidKey();
+    } catch {
+      return { ok: false, error: 'Could not fetch server key. Check your connection.' };
+    }
+
+    if (!vapidKey) {
+      return { ok: false, error: 'Server VAPID key is empty. Contact admin.' };
+    }
 
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
@@ -71,10 +84,15 @@ export async function subscribeToPush(
       }),
     });
 
-    return res.ok;
-  } catch (err) {
+    if (!res.ok) {
+      return { ok: false, error: `Server error ${res.status}. Try again.` };
+    }
+
+    return { ok: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
     console.error('Push subscription failed:', err);
-    return false;
+    return { ok: false, error: msg };
   }
 }
 
