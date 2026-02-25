@@ -108,21 +108,31 @@ export default function NannyBookings() {
     const bookingParam = searchParams.get("booking");
     return bookingParam ? Number(bookingParam) : null;
   });
+  // Track the booking ID we need to scroll to (from push notification)
+  const [scrollToBooking, setScrollToBooking] = useState<string | null>(() => searchParams.get("booking"));
   const [actionLoading, setActionLoading] = useState<number | string | null>(null);
 
-  // Auto-scroll to booking from push notification deep link
+  // Extract booking deep-link param and clean up URL on mount
   useEffect(() => {
     const bookingParam = searchParams.get("booking");
     if (bookingParam) {
       setExpandedId(Number(bookingParam));
+      setScrollToBooking(bookingParam);
+      setStatusFilter("all"); // Clear filters so the booking is always visible
       searchParams.delete("booking");
       setSearchParams(searchParams, { replace: true });
-      setTimeout(() => {
-        const el = document.getElementById(`booking-row-${bookingParam}`);
-        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 300);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Scroll to the target booking once it appears in the DOM (retries as bookings load)
+  useEffect(() => {
+    if (!scrollToBooking) return;
+    const el = document.getElementById(`booking-row-${scrollToBooking}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setScrollToBooking(null);
+    }
+  }, [nannyBookings, scrollToBooking]);
 
   const [extendBooking, setExtendBooking] = useState<typeof nannyBookings[0] | null>(null);
   const [forwardBooking, setForwardBooking] = useState<typeof nannyBookings[0] | null>(null);

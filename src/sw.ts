@@ -86,13 +86,17 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Focus existing window if already open
-      for (const client of clientList) {
-        if (client.url === fullUrl && 'focus' in client) {
-          return client.focus();
-        }
+      // Find any open window from our origin (don't require exact URL match)
+      const appClient = clientList.find(
+        (c) => new URL(c.url).origin === self.location.origin
+      );
+
+      if (appClient) {
+        // Navigate the existing window to the booking URL, then focus it
+        return (appClient as WindowClient).navigate(fullUrl).then((c) => c?.focus());
       }
-      // Otherwise open new window
+
+      // No existing window — open a new one
       return self.clients.openWindow(fullUrl);
     })
   );

@@ -154,6 +154,8 @@ export default function AdminBookings() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState(() => {
+    // If opening from a notification deep link, clear filters so the booking is visible
+    if (searchParams.get("booking")) return "all";
     const param = searchParams.get("status");
     return param && statusFilters.includes(param) ? param : "all";
   });
@@ -163,23 +165,30 @@ export default function AdminBookings() {
     const bookingParam = searchParams.get("booking");
     return bookingParam ? Number(bookingParam) : null;
   });
+  // Track the booking ID we need to scroll to (from push notification)
+  const [scrollToBooking, setScrollToBooking] = useState<string | null>(() => searchParams.get("booking"));
   const [deleteConfirm, setDeleteConfirm] = useState<number | string | null>(null);
 
-  // Auto-scroll to booking from push notification deep link
+  // Extract booking deep-link param and clean up URL on mount
   useEffect(() => {
     const bookingParam = searchParams.get("booking");
     if (bookingParam) {
       setExpandedRow(Number(bookingParam));
-      // Clean up the URL param
+      setScrollToBooking(bookingParam);
       searchParams.delete("booking");
       setSearchParams(searchParams, { replace: true });
-      // Scroll to the booking row after render
-      setTimeout(() => {
-        const el = document.getElementById(`booking-row-${bookingParam}`);
-        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 300);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Scroll to the target booking once it appears in the DOM (retries as bookings load)
+  useEffect(() => {
+    if (!scrollToBooking) return;
+    const el = document.getElementById(`booking-row-${scrollToBooking}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setScrollToBooking(null);
+    }
+  }, [bookings, scrollToBooking]);
 
   // Reminder cooldown tracking (booking ID → timestamp)
   const [remindedBookings, setRemindedBookings] = useState<Record<string, number>>({});
