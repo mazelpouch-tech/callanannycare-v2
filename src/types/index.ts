@@ -8,6 +8,7 @@ export type BookingCreator = 'parent' | 'nanny' | 'admin';
 export type NannyStatus = 'active' | 'blocked' | 'invited';
 export type NotificationType = 'new_booking' | 'booking_confirmed' | 'booking_cancelled' | 'booking_completed';
 export type AdminRole = 'super_admin' | 'admin';
+export type MessageSenderType = 'admin' | 'nanny';
 
 // ============================================================
 // Database row types (snake_case, as returned from Neon SQL)
@@ -60,6 +61,9 @@ export interface DbBooking {
   clock_in: string | null;
   clock_out: string | null;
   locale: string;
+  cancelled_at: string | null;
+  cancellation_reason: string;
+  cancelled_by: string;
   created_by: BookingCreator;
   created_by_name: string;
   created_at: string;
@@ -147,6 +151,9 @@ export interface Booking {
   createdAt: string;
   clockIn: string | null;
   clockOut: string | null;
+  cancelledAt: string | null;
+  cancellationReason: string;
+  cancelledBy: string;
 }
 
 export interface Notification {
@@ -241,6 +248,45 @@ export interface DbLoginLog {
   created_at: string;
 }
 
+/** Raw chat_messages table row */
+export interface DbChatMessage {
+  id: number;
+  channel: string;
+  sender_type: MessageSenderType;
+  sender_id: number;
+  sender_name: string;
+  content: string;
+  created_at: string;
+}
+
+/** Frontend chat message (camelCase) */
+export interface ChatMessage {
+  id: number;
+  channel: string;
+  senderType: MessageSenderType;
+  senderId: number;
+  senderName: string;
+  content: string;
+  createdAt: string;
+}
+
+/** Channel info for conversation list */
+export interface DbChatChannel {
+  channel: string;
+  last_message: string | null;
+  last_sender: string | null;
+  last_at: string | null;
+  unread_count: string;
+}
+
+export interface ChatChannel {
+  channel: string;
+  lastMessage: string | null;
+  lastSender: string | null;
+  lastAt: string | null;
+  unreadCount: number;
+}
+
 export interface PricingPlan {
   id: string;
   name: string;
@@ -287,13 +333,15 @@ export interface DataContextValue {
   resendInvite: (nannyId: number) => Promise<ApiResult<ResendInviteResponse>>;
 
   bookings: Booking[];
+  fetchBookings: () => Promise<void>;
   addBooking: (booking: Partial<Booking>, meta?: { locale?: string }) => Promise<Booking>;
   updateBooking: (id: number | string, updates: Partial<Booking>) => Promise<void>;
-  updateBookingStatus: (id: number | string, status: BookingStatus) => Promise<void>;
+  updateBookingStatus: (id: number | string, status: BookingStatus, meta?: { reason?: string; cancelledBy?: string }) => Promise<void>;
   clockInBooking: (id: number | string) => Promise<void>;
   clockOutBooking: (id: number | string) => Promise<void>;
   deleteBooking: (id: number | string) => Promise<void>;
   resendInvoice: (id: number | string) => Promise<void>;
+  sendBookingReminder: (id: number | string) => Promise<void>;
 
   stats: DashboardStats;
 
@@ -326,4 +374,15 @@ export interface DataContextValue {
   fetchNannyNotifications: () => Promise<void>;
   markNotificationsRead: (notificationIds: number[]) => Promise<void>;
   updateNannyProfile: (updates: Partial<NannyProfile>) => Promise<ApiResult>;
+
+  // Messaging
+  chatChannels: ChatChannel[];
+  chatMessages: Record<string, ChatMessage[]>;
+  activeChannel: string | null;
+  unreadChatCount: number;
+  fetchChatChannels: () => Promise<void>;
+  fetchChatMessages: (channel: string) => Promise<void>;
+  sendChatMessage: (channel: string, content: string) => Promise<void>;
+  markChatRead: (channel: string) => Promise<void>;
+  setActiveChannel: (channel: string | null) => void;
 }

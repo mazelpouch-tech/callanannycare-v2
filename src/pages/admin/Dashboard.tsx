@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 import {
   CalendarDays, Clock, DollarSign, ArrowRight,
   Eye, TrendingUp, Users, Activity, Star,
-  ArrowUpRight, ArrowDownRight, Timer, FileText, CheckCircle,
+  ArrowUpRight, ArrowDownRight, Timer, FileText, CheckCircle, AlertTriangle,
 } from "lucide-react";
-import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, subDays, isAfter } from "date-fns";
+import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, subDays, isAfter, formatDistanceToNow, isToday } from "date-fns";
 import { useData } from "../../context/DataContext";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
 import type { Booking, Nanny, BookingStatus } from "@/types";
-import { calcShiftPay, HOURLY_RATE } from "@/utils/shiftHelpers";
+import { calcShiftPayBreakdown, HOURLY_RATE } from "@/utils/shiftHelpers";
 
 // ─── Chart Data Types ────────────────────────────────────────────
 
@@ -103,7 +104,7 @@ function AreaChart({ data, width = 600, height = 220, color = "#cd6845", id = "a
           </circle>
           {/* Tooltip hover area */}
           <circle cx={p.x} cy={p.y} r="16" fill="transparent" className="cursor-pointer">
-            <title>{`${data[i].label}: ${data[i].value.toLocaleString()} MAD`}</title>
+            <title>{`${data[i].label}: ${data[i].value.toLocaleString()}€`}</title>
           </circle>
         </g>
       ))}
@@ -287,21 +288,23 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
     const clockedBookings = bookings.filter((b) => b.clockIn && b.clockOut);
     if (clockedBookings.length === 0) return [];
 
-    const nannyMap: Record<string, { name: string; shifts: number; totalHours: number; totalPay: number }> = {};
+    const nannyMap: Record<string, { name: string; shifts: number; totalHours: number; basePay: number; taxiFee: number; totalPay: number }> = {};
     clockedBookings.forEach((b) => {
       const nannyId = b.nannyId;
       if (nannyId == null) return;
       const nannyName = b.nannyName || "Unknown";
       if (!nannyMap[nannyId]) {
-        nannyMap[nannyId] = { name: nannyName, shifts: 0, totalHours: 0, totalPay: 0 };
+        nannyMap[nannyId] = { name: nannyName, shifts: 0, totalHours: 0, basePay: 0, taxiFee: 0, totalPay: 0 };
       }
       const ms = new Date(b.clockOut!).getTime() - new Date(b.clockIn!).getTime();
       const hours = ms / 3600000;
-      const pay = calcShiftPay(b.clockIn!, b.clockOut!);
+      const bd = calcShiftPayBreakdown(b.clockIn!, b.clockOut!);
 
       nannyMap[nannyId].shifts += 1;
       nannyMap[nannyId].totalHours += hours;
-      nannyMap[nannyId].totalPay += pay;
+      nannyMap[nannyId].basePay += bd.basePay;
+      nannyMap[nannyId].taxiFee += bd.taxiFee;
+      nannyMap[nannyId].totalPay += bd.total;
     });
 
     return Object.values(nannyMap)
@@ -310,6 +313,8 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
   }, [bookings]);
 
   const totalAllHours = nannyHours.reduce((s, n) => s + n.totalHours, 0);
+  const totalAllBasePay = nannyHours.reduce((s, n) => s + n.basePay, 0);
+  const totalAllTaxi = nannyHours.reduce((s, n) => s + n.taxiFee, 0);
   const totalAllPay = nannyHours.reduce((s, n) => s + n.totalPay, 0);
   const totalAllShifts = nannyHours.reduce((s, n) => s + n.shifts, 0);
 
@@ -324,7 +329,8 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span>{totalAllShifts} shifts</span>
             <span>{totalAllHours.toFixed(1)} hrs</span>
-            <span className="font-semibold text-foreground">{totalAllPay.toLocaleString()} MAD</span>
+            <span className="font-semibold text-foreground">{totalAllPay.toLocaleString()} DH</span>
+            <span className="text-muted-foreground/70">({totalAllBasePay.toLocaleString()} + {totalAllTaxi} taxi)</span>
           </div>
         )}
       </div>
@@ -351,7 +357,9 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
                   <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Shifts</th>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hours</th>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Avg/Shift</th>
-                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pay</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hourly Pay</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Taxi Fee</th>
+                  <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Pay</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -365,8 +373,18 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
                     <td className="px-6 py-3 text-sm text-muted-foreground">
                       {(nanny.totalHours / nanny.shifts).toFixed(1)}h
                     </td>
+                    <td className="px-6 py-3 text-sm text-muted-foreground text-right">
+                      {nanny.basePay.toLocaleString()} DH
+                    </td>
+                    <td className="px-6 py-3 text-sm text-right">
+                      {nanny.taxiFee > 0 ? (
+                        <span className="text-orange-600 font-medium">+{nanny.taxiFee} DH</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
                     <td className="px-6 py-3 text-sm font-semibold text-foreground text-right">
-                      {nanny.totalPay.toLocaleString()} MAD
+                      {nanny.totalPay.toLocaleString()} DH
                     </td>
                   </tr>
                 ))}
@@ -379,7 +397,11 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
                   <td className="px-6 py-3 text-sm font-bold text-foreground">
                     {totalAllShifts > 0 ? (totalAllHours / totalAllShifts).toFixed(1) : 0}h
                   </td>
-                  <td className="px-6 py-3 text-sm font-bold text-foreground text-right">{totalAllPay.toLocaleString()} MAD</td>
+                  <td className="px-6 py-3 text-sm font-bold text-foreground text-right">{totalAllBasePay.toLocaleString()} DH</td>
+                  <td className="px-6 py-3 text-sm font-bold text-orange-600 text-right">
+                    {totalAllTaxi > 0 ? `+${totalAllTaxi.toLocaleString()} DH` : "—"}
+                  </td>
+                  <td className="px-6 py-3 text-sm font-bold text-foreground text-right">{totalAllPay.toLocaleString()} DH</td>
                 </tr>
               </tfoot>
             </table>
@@ -391,19 +413,25 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
               <div key={i} className="px-5 py-4 space-y-1">
                 <div className="flex items-center justify-between">
                   <p className="font-medium text-foreground text-sm">{nanny.name}</p>
-                  <span className="text-sm font-semibold text-foreground">{nanny.totalPay.toLocaleString()} MAD</span>
+                  <span className="text-sm font-semibold text-foreground">{nanny.totalPay.toLocaleString()} DH</span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <span>{nanny.shifts} shifts</span>
                   <span>{nanny.totalHours}h total</span>
                   <span>{(nanny.totalHours / nanny.shifts).toFixed(1)}h avg</span>
                 </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span>Hourly: {nanny.basePay} DH</span>
+                  {nanny.taxiFee > 0 && (
+                    <span className="text-orange-600">Taxi: +{nanny.taxiFee} DH</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>
 
           <div className="px-6 py-3 border-t border-border text-[10px] text-muted-foreground">
-            Rate: {HOURLY_RATE} MAD/hr ({Math.round(HOURLY_RATE * 8)} MAD/8h) · +100 MAD for evening shifts (7 PM - 7 AM)
+            Rate: {HOURLY_RATE} DH/hr ({Math.round(HOURLY_RATE * 8)} DH/8h) · +100 DH for evening shifts (7 PM - 7 AM)
           </div>
         </>
       )}
@@ -420,6 +448,34 @@ const statusConfig: Record<BookingStatus, { label: string; className: string }> 
   cancelled: { label: "Cancelled", className: "bg-red-50 text-red-700 border border-red-200" },
 };
 
+function DashboardUrgencyBadge({ booking }: { booking: Booking }) {
+  const status = statusConfig[booking.status] || statusConfig.pending;
+  if (booking.status !== "pending") {
+    return <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}>{status.label}</span>;
+  }
+  const hoursElapsed = (Date.now() - new Date(booking.createdAt).getTime()) / 3600000;
+  const elapsed = formatDistanceToNow(new Date(booking.createdAt), { addSuffix: true });
+  if (hoursElapsed > 3) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-300 animate-pulse">
+        <AlertTriangle className="w-3 h-3" />
+        Needs Attention
+        <span className="text-[10px] font-normal opacity-70">({elapsed})</span>
+      </span>
+    );
+  }
+  if (hoursElapsed > 1) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-300">
+        <Clock className="w-3 h-3" />
+        Awaiting
+        <span className="text-[10px] font-normal opacity-70">({elapsed})</span>
+      </span>
+    );
+  }
+  return <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}>{status.label}</span>;
+}
+
 const STATUS_COLORS: Record<BookingStatus, string> = {
   confirmed: "#4a9e6e",
   completed: "#4a7fbf",
@@ -435,6 +491,7 @@ const PLAN_COLORS = {
 
 export default function Dashboard() {
   const { bookings, nannies, stats, adminProfile, updateBookingStatus } = useData();
+  const { toDH } = useExchangeRate();
 
   // ── Compute monthly revenue data (last 7 months) ──
   const monthlyRevenue = useMemo(() => {
@@ -588,7 +645,8 @@ export default function Dashboard() {
     }
   };
 
-  const activeNannies = nannies.filter((n) => n.status === "active" && n.available).length;
+  const todaysBookings = bookings.filter((b) => { try { return isToday(parseISO(b.date)); } catch { return false; } });
+  const todaysBookingsCount = todaysBookings.length;
   const avgBookingValue = stats.totalBookings > 0 ? Math.round(stats.totalRevenue / Math.max(bookings.filter((b) => b.status === "confirmed" || b.status === "completed").length, 1)) : 0;
 
   const formatDate = (dateStr: string) => {
@@ -613,9 +671,9 @@ export default function Dashboard() {
       {/* ── Enhanced Stat Cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Bookings */}
-        <div className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm transition-shadow">
+        <Link to="/admin/bookings" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-primary/30 transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary/20 transition-colors">
               <CalendarDays className="w-5 h-5 text-primary" />
             </div>
             <MiniSparkline data={weeklySparkline} color="#cd6845" />
@@ -630,17 +688,18 @@ export default function Dashboard() {
               </span>
             )}
           </div>
-        </div>
+        </Link>
 
         {/* Revenue */}
-        <div className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm transition-shadow">
+        <Link to="/admin/invoices" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-green-300/50 transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center group-hover:bg-green-100 transition-colors">
               <DollarSign className="w-5 h-5 text-green-700" />
             </div>
             <MiniSparkline data={revenueSparkline} color="#4a9e6e" />
           </div>
-          <p className="text-2xl font-bold text-foreground">{stats.totalRevenue.toLocaleString()} <span className="text-sm font-medium text-muted-foreground">MAD</span></p>
+          <p className="text-2xl font-bold text-foreground">{stats.totalRevenue.toLocaleString()} <span className="text-sm font-medium text-muted-foreground">€</span></p>
+          <p className="text-[10px] text-muted-foreground">{toDH(stats.totalRevenue).toLocaleString()} DH</p>
           <div className="flex items-center justify-between mt-1">
             <p className="text-xs text-muted-foreground">Total Revenue</p>
             {trends.revenueTrend !== 0 && (
@@ -650,37 +709,37 @@ export default function Dashboard() {
               </span>
             )}
           </div>
-        </div>
+        </Link>
 
         {/* Pending */}
-        <div className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm transition-shadow">
+        <Link to="/admin/bookings?status=pending" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-orange-300/50 transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center group-hover:bg-orange-100 transition-colors">
               <Clock className="w-5 h-5 text-orange-700" />
             </div>
             <div className="text-right">
               <p className="text-[10px] text-muted-foreground">Avg Value</p>
-              <p className="text-xs font-semibold text-foreground">{avgBookingValue.toLocaleString()} MAD</p>
+              <p className="text-xs font-semibold text-foreground">{avgBookingValue.toLocaleString()}€ <span className="text-[10px] font-normal text-muted-foreground">({toDH(avgBookingValue).toLocaleString()} DH)</span></p>
             </div>
           </div>
           <p className="text-2xl font-bold text-foreground">{stats.pendingBookings}</p>
           <p className="text-xs text-muted-foreground mt-1">Pending Bookings</p>
-        </div>
+        </Link>
 
-        {/* Active Nannies */}
-        <div className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm transition-shadow">
+        {/* Today's Bookings */}
+        <Link to="/admin/bookings" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-accent/30 transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center">
-              <Users className="w-5 h-5 text-accent" />
+            <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center group-hover:bg-accent/20 transition-colors">
+              <CalendarDays className="w-5 h-5 text-accent" />
             </div>
             <div className="text-right">
-              <p className="text-[10px] text-muted-foreground">Confirmed</p>
-              <p className="text-xs font-semibold text-foreground">{stats.confirmedBookings}</p>
+              <p className="text-[10px] text-muted-foreground">Pending Today</p>
+              <p className="text-xs font-semibold text-foreground">{todaysBookings.filter(b => b.status === "pending").length}</p>
             </div>
           </div>
-          <p className="text-2xl font-bold text-foreground">{activeNannies} <span className="text-sm font-normal text-muted-foreground">/ {nannies.length}</span></p>
-          <p className="text-xs text-muted-foreground mt-1">Active Nannies</p>
-        </div>
+          <p className="text-2xl font-bold text-foreground">{todaysBookingsCount}</p>
+          <p className="text-xs text-muted-foreground mt-1">Today&apos;s Bookings</p>
+        </Link>
       </div>
 
       {/* ── Charts Row 1: Revenue + Bookings ── */}
@@ -694,7 +753,7 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center gap-1.5 text-xs font-medium text-accent bg-accent/10 px-2.5 py-1 rounded-full">
               <TrendingUp className="w-3.5 h-3.5" />
-              {trends.thisRevenue.toLocaleString()} MAD this month
+              {trends.thisRevenue.toLocaleString()}€ <span className="text-accent/70">({toDH(trends.thisRevenue).toLocaleString()} DH)</span>
             </div>
           </div>
           <AreaChart data={monthlyRevenue} id="revenue" />
@@ -752,7 +811,8 @@ export default function Dashboard() {
                 <DollarSign className="w-10 h-10 text-primary" />
               </div>
               <p className="text-3xl font-bold text-foreground">{stats.totalRevenue.toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground mt-1">MAD</p>
+              <p className="text-sm text-muted-foreground mt-1">€</p>
+              <p className="text-xs text-muted-foreground">{toDH(stats.totalRevenue).toLocaleString()} DH</p>
               <div className="mt-4 flex items-center gap-2 text-xs">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLAN_COLORS.hourly }} />
                 <span className="text-muted-foreground">Hourly Plan</span>
@@ -797,7 +857,8 @@ export default function Dashboard() {
           {allInvoices.length > 0 && (
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span>{allInvoices.length} invoice{allInvoices.length !== 1 ? "s" : ""}</span>
-              <span className="font-semibold text-foreground">{totalInvoiced.toLocaleString()} MAD</span>
+              <span className="font-semibold text-foreground">{totalInvoiced.toLocaleString()}€</span>
+              <span className="text-muted-foreground/70">({toDH(totalInvoiced).toLocaleString()} DH)</span>
             </div>
           )}
         </div>
@@ -842,7 +903,10 @@ export default function Dashboard() {
                         <p className="text-xs text-muted-foreground/70">{formatTime(inv.clockIn)} – {formatTime(inv.clockOut)}</p>
                       </td>
                       <td className="px-6 py-4 text-sm text-muted-foreground">{calcWorkedHours(inv.clockIn, inv.clockOut)}h</td>
-                      <td className="px-6 py-4 text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()} MAD</td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</div>
+                        <div className="text-[10px] text-muted-foreground">{toDH(inv.totalPrice || 0).toLocaleString()} DH</div>
+                      </td>
                       <td className="px-6 py-4">
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
                           <CheckCircle className="w-3 h-3" />
@@ -871,7 +935,10 @@ export default function Dashboard() {
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">Billed To</p>
                       <p className="font-medium text-foreground text-sm">{inv.clientName || "N/A"}</p>
                     </div>
-                    <span className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()} MAD</span>
+                    <div className="text-right">
+                      <span className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</span>
+                      <div className="text-[10px] text-muted-foreground">{toDH(inv.totalPrice || 0).toLocaleString()} DH</div>
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span>Caregiver: {inv.nannyName || "Unassigned"}</span>
@@ -930,18 +997,35 @@ export default function Dashboard() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {recentBookings.map((booking) => {
-                    const status = statusConfig[booking.status] || statusConfig.pending;
                     return (
                       <tr key={booking.id} className="hover:bg-muted/50 transition-colors">
                         <td className="px-6 py-4">
                           <p className="text-sm font-medium text-foreground">{booking.clientName || "N/A"}</p>
                           <p className="text-xs text-muted-foreground">{booking.clientEmail || ""}</p>
                         </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">{booking.nannyName || "N/A"}</td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(booking.date)}</td>
-                        <td className="px-6 py-4 text-sm font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()} MAD</td>
                         <td className="px-6 py-4">
-                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}>{status.label}</span>
+                          {booking.nannyName ? (
+                            <div className="flex items-center gap-2">
+                              {booking.nannyImage ? (
+                                <img src={booking.nannyImage} alt={booking.nannyName} className="w-7 h-7 rounded-full object-cover border border-border" />
+                              ) : (
+                                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                                  {booking.nannyName.charAt(0)}
+                                </div>
+                              )}
+                              <span className="text-sm font-medium text-foreground">{booking.nannyName}</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground italic">Unassigned</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(booking.date)}</td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()}€</div>
+                          <div className="text-[10px] text-muted-foreground">{toDH(booking.totalPrice || 0).toLocaleString()} DH</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <DashboardUrgencyBadge booking={booking} />
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
@@ -970,17 +1054,31 @@ export default function Dashboard() {
             {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-border">
               {recentBookings.map((booking) => {
-                const status = statusConfig[booking.status] || statusConfig.pending;
                 return (
                   <div key={booking.id} className="px-5 py-4 space-y-2">
                     <div className="flex items-center justify-between">
                       <p className="font-medium text-foreground text-sm">{booking.clientName || "N/A"}</p>
-                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}>{status.label}</span>
+                      <DashboardUrgencyBadge booking={booking} />
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>{booking.nannyName || "N/A"}</span>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {booking.nannyName ? (
+                        <div className="flex items-center gap-1.5">
+                          {booking.nannyImage ? (
+                            <img src={booking.nannyImage} alt={booking.nannyName} className="w-5 h-5 rounded-full object-cover border border-border" />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                              {booking.nannyName.charAt(0)}
+                            </div>
+                          )}
+                          <span className="font-medium text-foreground">{booking.nannyName}</span>
+                        </div>
+                      ) : (
+                        <span className="italic">Unassigned</span>
+                      )}
+                      <span>·</span>
                       <span>{formatDate(booking.date)}</span>
-                      <span className="font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()} MAD</span>
+                      <span>·</span>
+                      <span className="font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()}€ <span className="text-[10px] text-muted-foreground">({toDH(booking.totalPrice || 0).toLocaleString()} DH)</span></span>
                     </div>
                     <div className="flex items-center gap-2">
                       {booking.status === "pending" && (

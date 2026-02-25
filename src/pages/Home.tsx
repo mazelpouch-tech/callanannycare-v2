@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   Shield,
@@ -8,15 +9,35 @@ import {
   Users,
   Heart,
   ChevronRight,
+  X,
+  MapPin,
+  MessageSquare,
+  Loader2,
 } from "lucide-react";
 import { useData } from "../context/DataContext";
 import { pricingPlans } from "../data/initialData";
 import NannyCard from "../components/NannyCard";
 import { useLanguage } from "../context/LanguageContext";
+import type { Nanny } from "../types";
+
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 export default function Home() {
   const { nannies } = useData();
   const { t } = useLanguage();
+  const [selectedNanny, setSelectedNanny] = useState<Nanny | null>(null);
+  const [nannyReviews, setNannyReviews] = useState<Record<string, unknown>[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selectedNanny) { setNannyReviews([]); return; }
+    setReviewsLoading(true);
+    fetch(`${API_BASE}/api/reviews?nanny_id=${selectedNanny.id}`)
+      .then((res) => res.json())
+      .then((data) => { if (Array.isArray(data)) setNannyReviews(data); })
+      .catch(() => {})
+      .finally(() => setReviewsLoading(false));
+  }, [selectedNanny]);
 
   const features = [
     {
@@ -55,6 +76,23 @@ export default function Home() {
   ];
 
   const featuredNannies = nannies.filter((n) => n.available).slice(0, 3);
+
+  // Fetch reviews for all featured nannies
+  const [cardReviews, setCardReviews] = useState<Record<number, Record<string, unknown>[]>>({});
+
+  useEffect(() => {
+    if (featuredNannies.length === 0) return;
+    featuredNannies.forEach((n) => {
+      fetch(`${API_BASE}/api/reviews?nanny_id=${n.id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setCardReviews((prev) => ({ ...prev, [n.id]: data }));
+          }
+        })
+        .catch(() => {});
+    });
+  }, [nannies]);
 
   return (
     <div className="min-h-screen">
@@ -219,7 +257,7 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {featuredNannies.map((nanny) => (
-              <NannyCard key={nanny.id} nanny={nanny} />
+              <NannyCard key={nanny.id} nanny={nanny} onViewDetails={() => setSelectedNanny(nanny)} reviews={cardReviews[nanny.id] || []} />
             ))}
           </div>
 
@@ -244,13 +282,13 @@ export default function Home() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+          <div className="flex flex-wrap justify-center gap-8">
             {pricingPlans.map((plan) => (
               <div
                 key={plan.id}
-                className={`bg-card rounded-xl p-8 relative ${
+                className={`bg-card rounded-xl p-8 relative w-full max-w-sm ${
                   plan.highlight
-                    ? "border-2 border-primary shadow-warm md:-mt-4 md:mb-0"
+                    ? "border-2 border-primary shadow-warm"
                     : "shadow-soft"
                 }`}
               >
@@ -271,7 +309,7 @@ export default function Home() {
                       {plan.price}
                     </span>
                     <span className="text-muted-foreground text-lg">
-                      MAD / {plan.unit}
+                      € / {plan.unit}
                     </span>
                   </div>
 
@@ -328,6 +366,141 @@ export default function Home() {
           </Link>
         </div>
       </section>
+
+      {/* Nanny Detail Modal */}
+      {selectedNanny && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setSelectedNanny(null)}
+          />
+          <div className="relative bg-card rounded-2xl border border-border shadow-warm w-full max-w-lg max-h-[85vh] overflow-y-auto">
+            <button
+              onClick={() => setSelectedNanny(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-full bg-muted/80 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors z-10"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="relative">
+              {selectedNanny.image ? (
+                <img src={selectedNanny.image} alt={selectedNanny.name} className="w-full h-56 object-cover rounded-t-2xl" />
+              ) : (
+                <div className="w-full h-56 bg-gradient-to-br from-primary/20 to-accent/20 rounded-t-2xl flex items-center justify-center">
+                  <span className="text-5xl font-bold text-primary/30">{selectedNanny.name?.charAt(0)}</span>
+                </div>
+              )}
+              {!selectedNanny.available && (
+                <span className="absolute top-4 left-4 bg-muted text-muted-foreground text-xs font-semibold px-3 py-1 rounded-full">
+                  {t("nannies.currentlyUnavailable")}
+                </span>
+              )}
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div>
+                <h2 className="font-serif text-2xl font-bold text-foreground">{selectedNanny.name}</h2>
+                <div className="flex flex-wrap items-center gap-3 mt-2">
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <MapPin className="w-3.5 h-3.5" />
+                    {selectedNanny.location || "Marrakech"}
+                  </div>
+                  <div className="flex items-center gap-1 text-sm">
+                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                    <span className="font-medium text-foreground">{selectedNanny.rating}</span>
+                  </div>
+                  {selectedNanny.experience && (
+                    <span className="text-sm text-muted-foreground">
+                      {selectedNanny.experience} {t("nannies.experience")}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {selectedNanny.bio && (
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-1.5">{t("nannies.about")}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{selectedNanny.bio}</p>
+                </div>
+              )}
+
+              {selectedNanny.specialties?.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">{t("nannies.specialties")}</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedNanny.specialties.map((s) => (
+                      <span key={s} className="bg-primary/10 text-primary text-xs font-medium px-2.5 py-1 rounded-full">{s}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedNanny.languages?.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-2">{t("nannies.languages")}</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedNanny.languages.map((l) => (
+                      <span key={l} className="bg-accent/10 text-accent text-xs font-medium px-2.5 py-1 rounded-full">{l}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Parent Reviews */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <MessageSquare className="w-4 h-4 text-amber-500" />
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {t("nannies.reviews") || "Reviews"} ({nannyReviews.length})
+                  </h3>
+                </div>
+                {reviewsLoading ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : nannyReviews.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">{t("nannies.noReviews") || "No reviews yet."}</p>
+                ) : (
+                  <div className="space-y-2.5 max-h-48 overflow-y-auto">
+                    {nannyReviews.map((review, idx) => (
+                      <div key={String(review.id || idx)} className="bg-muted/40 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-foreground text-xs">{String(review.client_name || "Parent")}</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {review.created_at ? new Date(String(review.created_at)).toLocaleDateString() : ""}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-0.5 mb-1">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star key={s} className={`w-3 h-3 ${s <= (Number(review.rating) || 0) ? "fill-yellow-500 text-yellow-500" : "text-gray-300"}`} />
+                          ))}
+                        </div>
+                        {review.comment && (
+                          <p className="text-xs text-muted-foreground leading-relaxed">{String(review.comment)}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Book */}
+              {selectedNanny.available && (
+                <div className="flex justify-end pt-4 border-t border-border">
+                  <Link
+                    to="/book"
+                    onClick={() => setSelectedNanny(null)}
+                    className="gradient-warm text-white font-semibold px-6 py-2.5 rounded-full hover:opacity-90 transition-opacity shadow-warm flex items-center gap-2"
+                  >
+                    {t("common.bookNow")}
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

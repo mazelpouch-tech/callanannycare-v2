@@ -14,6 +14,7 @@ import {
   Timer,
   Loader2,
   Coffee,
+  TimerReset,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -23,10 +24,12 @@ import {
   isToday,
   formatDuration,
   formatHoursWorked,
-  calcShiftPay,
-  calcNannyPay,
+  calcShiftPayBreakdown,
+  calcNannyPayBreakdown,
+  calcActualHoursWorked,
   HOURLY_RATE,
 } from "@/utils/shiftHelpers";
+import ExtendBookingModal from "../../components/ExtendBookingModal";
 
 const MONTHS_SHORT_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MONTHS_SHORT_FR = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
@@ -37,7 +40,9 @@ interface MyShiftSectionProps {
   bookings: Booking[];
   clockInBooking: (id: number | string) => Promise<void>;
   clockOutBooking: (id: number | string) => Promise<void>;
+  updateBookingStatus: (id: number | string, status: string) => Promise<void>;
   fetchNannyBookings: () => Promise<void>;
+  onExtend: (booking: Booking) => void;
   t: (key: string) => string;
 }
 
@@ -59,17 +64,19 @@ function LiveTimer({ clockIn, large }: LiveTimerProps) {
   );
 }
 
-// Simple bar chart for nanny pay
+// Simple bar chart for nanny pay with breakdown
 function PayChart({ bookings, t, locale }: PayChartProps) {
   const MONTHS = locale === "fr" ? MONTHS_SHORT_FR : MONTHS_SHORT_EN;
   const monthlyPay = useMemo(() => {
     const now = new Date();
-    const months: { key: string; label: string; total: number }[] = [];
+    const months: { key: string; label: string; basePay: number; taxiFee: number; total: number }[] = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       months.push({
         key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
         label: MONTHS[d.getMonth()],
+        basePay: 0,
+        taxiFee: 0,
         total: 0,
       });
     }
@@ -77,7 +84,12 @@ function PayChart({ bookings, t, locale }: PayChartProps) {
       if (b.status === "cancelled" || !b.date) return;
       const monthKey = b.date.substring(0, 7);
       const month = months.find((m) => m.key === monthKey);
-      if (month) month.total += calcNannyPay(b);
+      if (month) {
+        const bd = calcNannyPayBreakdown(b);
+        month.basePay += bd.basePay;
+        month.taxiFee += bd.taxiFee;
+        month.total += bd.total;
+      }
     });
     return months;
   }, [bookings]);
@@ -95,6 +107,8 @@ function PayChart({ bookings, t, locale }: PayChartProps) {
       <div className="flex items-end gap-2 h-32">
         {monthlyPay.map((month) => {
           const heightPct = maxVal > 0 ? (month.total / maxVal) * 100 : 0;
+          const baseHPct = maxVal > 0 ? (month.basePay / maxVal) * 100 : 0;
+          const taxiHPct = maxVal > 0 ? (month.taxiFee / maxVal) * 100 : 0;
           return (
             <div key={month.key} className="flex-1 flex flex-col items-center gap-1">
               <span className="text-[10px] text-muted-foreground font-medium">
@@ -102,16 +116,32 @@ function PayChart({ bookings, t, locale }: PayChartProps) {
               </span>
               <div className="w-full flex justify-center">
                 <div
-                  className="w-full max-w-[32px] rounded-t-md gradient-warm transition-all duration-500"
+                  className="w-full max-w-[32px] flex flex-col-reverse overflow-hidden rounded-t-md"
                   style={{ height: `${Math.max(heightPct, 2)}%`, minHeight: "4px" }}
-                />
+                >
+                  <div className="w-full gradient-warm" style={{ height: baseHPct > 0 ? `${(baseHPct / Math.max(heightPct, 1)) * 100}%` : "100%" }} />
+                  {taxiHPct > 0 && (
+                    <div className="w-full bg-orange-400" style={{ height: `${(taxiHPct / Math.max(heightPct, 1)) * 100}%` }} />
+                  )}
+                </div>
               </div>
               <span className="text-[10px] text-muted-foreground font-medium">{month.label}</span>
             </div>
           );
         })}
       </div>
-      <p className="text-[10px] text-muted-foreground mt-3 text-center">
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 mt-3">
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-2 rounded-sm gradient-warm inline-block" />
+          <span className="text-[10px] text-muted-foreground">{t("nanny.dashboard.hourlyPay")}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-2 rounded-sm bg-orange-400 inline-block" />
+          <span className="text-[10px] text-muted-foreground">{t("nanny.dashboard.taxiFee")}</span>
+        </div>
+      </div>
+      <p className="text-[10px] text-muted-foreground mt-2 text-center">
         {t("nanny.dashboard.payInfo").replace("{rate}", String(Math.round(HOURLY_RATE)))}
       </p>
     </div>
@@ -147,8 +177,9 @@ function DashboardSkeleton() {
 
 // ─── My Shift Section (prominent, always visible) ────────────────
 
-function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyBookings, t }: MyShiftSectionProps) {
+function MyShiftSection({ bookings, clockInBooking, clockOutBooking, updateBookingStatus, fetchNannyBookings, onExtend, t }: MyShiftSectionProps) {
   const [actionLoading, setActionLoading] = useState(false);
+  const [completeLoading, setCompleteLoading] = useState<number | string | null>(null);
 
   // Find active shift (clocked in, not clocked out)
   const activeShift = useMemo(
@@ -182,6 +213,13 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
     setActionLoading(false);
   };
 
+  const handleComplete = async (id: number | string) => {
+    setCompleteLoading(id);
+    await updateBookingStatus(id, "completed");
+    await fetchNannyBookings();
+    setCompleteLoading(null);
+  };
+
   // ── STATE 1: Active shift in progress ──
   if (activeShift) {
     return (
@@ -203,18 +241,27 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
           </p>
         </div>
 
-        <button
-          onClick={() => handleEndShift(activeShift.id)}
-          disabled={actionLoading}
-          className="w-full mt-4 flex items-center justify-center gap-2 py-4 px-6 bg-red-600 text-white text-lg font-bold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 shadow-lg"
-        >
-          {actionLoading ? (
-            <Loader2 className="w-6 h-6 animate-spin" />
-          ) : (
-            <StopCircle className="w-6 h-6" />
-          )}
-          {t("nanny.dashboard.endShift")}
-        </button>
+        <div className="flex gap-3 mt-4">
+          <button
+            onClick={() => onExtend(activeShift)}
+            className="flex-1 flex items-center justify-center gap-2 py-4 px-4 bg-blue-600 text-white text-base font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-lg"
+          >
+            <TimerReset className="w-5 h-5" />
+            {t("extend.extendShift")}
+          </button>
+          <button
+            onClick={() => handleEndShift(activeShift.id)}
+            disabled={actionLoading}
+            className="flex-1 flex items-center justify-center gap-2 py-4 px-4 bg-red-600 text-white text-base font-bold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 shadow-lg"
+          >
+            {actionLoading ? (
+              <Loader2 className="w-6 h-6 animate-spin" />
+            ) : (
+              <StopCircle className="w-5 h-5" />
+            )}
+            {t("nanny.dashboard.endShift")}
+          </button>
+        </div>
       </div>
     );
   }
@@ -246,18 +293,32 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
                 </span>
               </div>
 
-              <button
-                onClick={() => handleStartShift(booking.id)}
-                disabled={actionLoading}
-                className="w-full flex items-center justify-center gap-2 py-4 px-6 bg-green-600 text-white text-lg font-bold rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 shadow-lg"
-              >
-                {actionLoading ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                ) : (
-                  <PlayCircle className="w-6 h-6" />
-                )}
-                {t("nanny.dashboard.startShift")}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleStartShift(booking.id)}
+                  disabled={actionLoading}
+                  className="flex-1 flex items-center justify-center gap-2 py-4 px-6 bg-green-600 text-white text-lg font-bold rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 shadow-lg"
+                >
+                  {actionLoading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    <PlayCircle className="w-6 h-6" />
+                  )}
+                  {t("nanny.dashboard.startShift")}
+                </button>
+                <button
+                  onClick={() => handleComplete(booking.id)}
+                  disabled={completeLoading === booking.id}
+                  className="flex items-center justify-center gap-2 py-4 px-5 bg-emerald-50 text-emerald-700 text-base font-bold rounded-xl hover:bg-emerald-100 transition-colors disabled:opacity-50 border-2 border-emerald-200"
+                >
+                  {completeLoading === booking.id ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <CheckCircle className="w-5 h-5" />
+                  )}
+                  Complete
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -267,7 +328,13 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
 
   // ── STATE 3: Today's shift completed ──
   if (todayCompleted.length > 0) {
-    const totalPayToday = todayCompleted.reduce((sum: number, b: Booking) => sum + calcShiftPay(b.clockIn!, b.clockOut!), 0);
+    const todayBreakdown = todayCompleted.reduce(
+      (acc, b) => {
+        const bd = calcShiftPayBreakdown(b.clockIn!, b.clockOut!);
+        return { basePay: acc.basePay + bd.basePay, taxiFee: acc.taxiFee + bd.taxiFee, total: acc.total + bd.total };
+      },
+      { basePay: 0, taxiFee: 0, total: 0 }
+    );
 
     return (
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 sm:p-8">
@@ -288,9 +355,17 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, fetchNannyB
             <p className="text-xs text-blue-600">{t("nanny.dashboard.hoursLabel")}</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-blue-800">{totalPayToday}</p>
+            <p className="text-2xl font-bold text-blue-800">{todayBreakdown.total}</p>
             <p className="text-xs text-blue-600">{t("nanny.dashboard.madEarned")}</p>
           </div>
+        </div>
+
+        {/* Pay breakdown */}
+        <div className="mt-4 flex items-center justify-center gap-4 text-xs text-blue-700">
+          <span>{t("nanny.dashboard.hourlyPay")}: {todayBreakdown.basePay} DH</span>
+          {todayBreakdown.taxiFee > 0 && (
+            <span>{t("nanny.dashboard.taxiFee")}: +{todayBreakdown.taxiFee} DH</span>
+          )}
         </div>
       </div>
     );
@@ -327,8 +402,19 @@ export default function NannyDashboard() {
     fetchNannyBookings,
     clockInBooking,
     clockOutBooking,
+    updateBooking,
+    updateBookingStatus,
   } = useData();
   const { t, locale } = useLanguage();
+  const [extendBooking, setExtendBooking] = useState<Booking | null>(null);
+  const [completeLoading, setCompleteLoading] = useState<number | string | null>(null);
+
+  const handleComplete = async (id: number | string) => {
+    setCompleteLoading(id);
+    await updateBookingStatus(id, "completed");
+    await fetchNannyBookings();
+    setCompleteLoading(null);
+  };
 
   useEffect(() => {
     fetchNannyStats();
@@ -340,6 +426,26 @@ export default function NannyDashboard() {
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
     .slice(0, 5);
 
+  // Calculate hours & pay ONLY from actual clock in/out data
+  // (must be before any early return to respect React hooks rules)
+  const totalActualHours = useMemo(() => {
+    return nannyBookings
+      .filter((b) => b.clockIn && b.clockOut && b.status !== "cancelled")
+      .reduce((sum, b) => sum + calcActualHoursWorked(b.clockIn!, b.clockOut!), 0);
+  }, [nannyBookings]);
+
+  const payBreakdown = useMemo(() => {
+    return nannyBookings
+      .filter((b) => b.status !== "cancelled")
+      .reduce(
+        (acc, b) => {
+          const bd = calcNannyPayBreakdown(b);
+          return { basePay: acc.basePay + bd.basePay, taxiFee: acc.taxiFee + bd.taxiFee, total: acc.total + bd.total };
+        },
+        { basePay: 0, taxiFee: 0, total: 0 }
+      );
+  }, [nannyBookings]);
+
   const isLoading = !nannyStats && nannyBookings.length === 0;
 
   if (isLoading) return <DashboardSkeleton />;
@@ -347,7 +453,7 @@ export default function NannyDashboard() {
   const statCards = [
     {
       label: t("nanny.dashboard.hoursWorked"),
-      value: nannyStats?.totalHoursWorked ?? 0,
+      value: parseFloat(totalActualHours.toFixed(1)),
       suffix: t("nanny.dashboard.hrs"),
       icon: Clock,
       bg: "bg-primary/10",
@@ -369,10 +475,8 @@ export default function NannyDashboard() {
     },
     {
       label: t("nanny.dashboard.myPay"),
-      value: nannyBookings
-        .filter((b) => b.status !== "cancelled")
-        .reduce((sum, b) => sum + calcNannyPay(b), 0),
-      suffix: "MAD",
+      value: payBreakdown.total,
+      suffix: "DH",
       icon: DollarSign,
       bg: "bg-orange-50",
       color: "text-orange-600",
@@ -396,7 +500,9 @@ export default function NannyDashboard() {
         bookings={nannyBookings}
         clockInBooking={clockInBooking}
         clockOutBooking={clockOutBooking}
+        updateBookingStatus={updateBookingStatus}
         fetchNannyBookings={fetchNannyBookings}
+        onExtend={setExtendBooking}
         t={t}
       />
 
@@ -431,6 +537,21 @@ export default function NannyDashboard() {
           );
         })}
       </div>
+
+      {/* Pay Breakdown */}
+      {payBreakdown.total > 0 && (
+        <div className="bg-orange-50/50 border border-orange-200/60 rounded-xl px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+          <span className="font-medium text-foreground">{t("nanny.dashboard.payBreakdown")}:</span>
+          <span className="text-muted-foreground">
+            {t("nanny.dashboard.hourlyPay")}: <span className="font-semibold text-foreground">{payBreakdown.basePay} DH</span>
+          </span>
+          {payBreakdown.taxiFee > 0 && (
+            <span className="text-muted-foreground">
+              {t("nanny.dashboard.taxiFee")}: <span className="font-semibold text-orange-600">+{payBreakdown.taxiFee} DH</span>
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Pay Chart */}
       <PayChart bookings={nannyBookings} t={t} locale={locale} />
@@ -467,6 +588,7 @@ export default function NannyDashboard() {
                     <th className="px-5 py-3 font-medium">{t("shared.plan")}</th>
                     <th className="px-5 py-3 font-medium">{t("shared.hotel")}</th>
                     <th className="px-5 py-3 font-medium">{t("shared.status")}</th>
+                    <th className="px-5 py-3 font-medium">{t("shared.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -510,6 +632,23 @@ export default function NannyDashboard() {
                           {booking.status}
                         </span>
                       </td>
+                      <td className="px-5 py-3">
+                        {booking.status === "confirmed" && !booking.clockIn && (
+                          <button
+                            onClick={() => handleComplete(booking.id)}
+                            disabled={completeLoading === booking.id}
+                            className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                            title="Mark as completed"
+                          >
+                            {completeLoading === booking.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <CheckCircle className="w-3.5 h-3.5" />
+                            )}
+                            Complete
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -545,6 +684,20 @@ export default function NannyDashboard() {
                       <MapPin className="w-3.5 h-3.5" />
                       {booking.hotel}
                     </div>
+                  )}
+                  {booking.status === "confirmed" && !booking.clockIn && (
+                    <button
+                      onClick={() => handleComplete(booking.id)}
+                      disabled={completeLoading === booking.id}
+                      className="mt-2 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50 border border-emerald-200"
+                    >
+                      {completeLoading === booking.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
+                      Mark as Complete
+                    </button>
                   )}
                 </div>
               ))}
@@ -587,6 +740,19 @@ export default function NannyDashboard() {
           <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto" />
         </Link>
       </div>
+
+      {/* Extend Booking Modal */}
+      {extendBooking && (
+        <ExtendBookingModal
+          booking={extendBooking}
+          onConfirm={async (newEndTime, newTotalPrice) => {
+            await updateBooking(extendBooking.id, { endTime: newEndTime, totalPrice: newTotalPrice });
+            await fetchNannyBookings();
+          }}
+          onClose={() => setExtendBooking(null)}
+          t={t}
+        />
+      )}
     </div>
   );
 }

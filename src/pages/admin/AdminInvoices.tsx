@@ -7,17 +7,19 @@ import {
 } from "lucide-react";
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, subMonths } from "date-fns";
 import { useData } from "../../context/DataContext";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
 import PhoneInput from "../../components/PhoneInput";
 import type { Booking } from "@/types";
 
-const SERVICE_RATE = 150; // MAD/hr — client rate (same as booking page)
-const TAXI_FEE = 100;
+const SERVICE_RATE = 10; // €/hr — client rate (same as booking page)
+const TAXI_FEE = 10;
 
-// 24h time slots from 07:00 to 23:30 (30-min steps)
+// 24h time slots from 06:00 to 05:30 (business-day ordering, 30-min steps)
 const TIME_SLOTS: string[] = [];
-for (let h = 7; h <= 23; h++) {
-  TIME_SLOTS.push(`${String(h).padStart(2, "0")}:00`);
-  TIME_SLOTS.push(`${String(h).padStart(2, "0")}:30`);
+for (let i = 0; i < 48; i++) {
+  const h = (6 + Math.floor(i / 2)) % 24;
+  const m = (i % 2) * 30;
+  TIME_SLOTS.push(`${String(h).padStart(2, "0")}:${m === 0 ? "00" : "30"}`);
 }
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -71,6 +73,7 @@ const emptyForm: InvoiceForm = {
 
 export default function AdminInvoices() {
   const { bookings, nannies, addBooking, updateBooking, deleteBooking, resendInvoice, adminProfile } = useData();
+  const { toDH } = useExchangeRate();
 
   // Filters
   const [search, setSearch] = useState("");
@@ -306,7 +309,7 @@ export default function AdminInvoices() {
   };
 
   const exportCSV = () => {
-    const headers = ["Invoice #", "Billed To (Parent)", "Email", "Phone", "Caregiver", "Date", "Clock In", "Clock Out", "Hours", "Amount (MAD)"];
+    const headers = ["Invoice #", "Billed To (Parent)", "Email", "Phone", "Caregiver", "Date", "Clock In", "Clock Out", "Hours", "Amount (€)", "Amount (DH)"];
     const rows = filteredInvoices.map((inv) => [
       `INV-${inv.id}`,
       inv.clientName || "",
@@ -318,6 +321,7 @@ export default function AdminInvoices() {
       inv.clockOut ? formatClockTime(inv.clockOut) : "",
       calcWorkedHours(inv.clockIn, inv.clockOut),
       String(inv.totalPrice || 0),
+      String(toDH(inv.totalPrice || 0)),
     ]);
     const csv = [headers, ...rows].map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -380,7 +384,8 @@ export default function AdminInvoices() {
               <DollarSign className="w-5 h-5 text-green-700" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground">{totalAmount.toLocaleString()} <span className="text-sm font-medium text-muted-foreground">MAD</span></p>
+              <p className="text-2xl font-bold text-foreground">{totalAmount.toLocaleString()} <span className="text-sm font-medium text-muted-foreground">€</span></p>
+              <p className="text-[10px] text-muted-foreground">{toDH(totalAmount).toLocaleString()} DH</p>
               <p className="text-xs text-muted-foreground">Total Invoiced</p>
             </div>
           </div>
@@ -391,7 +396,8 @@ export default function AdminInvoices() {
               <DollarSign className="w-5 h-5 text-blue-700" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground">{thisMonthAmount.toLocaleString()} <span className="text-sm font-medium text-muted-foreground">MAD</span></p>
+              <p className="text-2xl font-bold text-foreground">{thisMonthAmount.toLocaleString()} <span className="text-sm font-medium text-muted-foreground">€</span></p>
+              <p className="text-[10px] text-muted-foreground">{toDH(thisMonthAmount).toLocaleString()} DH</p>
               <p className="text-xs text-muted-foreground">This Month</p>
             </div>
           </div>
@@ -483,7 +489,10 @@ export default function AdminInvoices() {
                         <p className="text-xs text-muted-foreground/70">{inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : fmtDate(inv.date)}</p>
                       </td>
                       <td className="px-5 py-4 text-sm text-muted-foreground">{calcWorkedHours(inv.clockIn, inv.clockOut)}h</td>
-                      <td className="px-5 py-4 text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()} MAD</td>
+                      <td className="px-5 py-4">
+                        <div className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</div>
+                        <div className="text-[10px] text-muted-foreground">{toDH(inv.totalPrice || 0).toLocaleString()} DH</div>
+                      </td>
                       <td className="px-5 py-4">
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
                           <CheckCircle className="w-3 h-3" />
@@ -546,7 +555,10 @@ export default function AdminInvoices() {
                       <p className="font-medium text-foreground text-sm">{inv.clientName || "N/A"}</p>
                       <p className="text-xs text-muted-foreground">{inv.clientEmail || ""}</p>
                     </div>
-                    <span className="text-sm font-bold text-foreground">{(inv.totalPrice || 0).toLocaleString()} MAD</span>
+                    <div className="text-right">
+                      <span className="text-sm font-bold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</span>
+                      <div className="text-[10px] text-muted-foreground">{toDH(inv.totalPrice || 0).toLocaleString()} DH</div>
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                     <span>Caregiver: {inv.nannyName || "Unassigned"}</span>
@@ -663,13 +675,13 @@ export default function AdminInvoices() {
                   </div>
                   <div className="divide-y divide-border">
                     <div className="flex justify-between px-4 py-2.5">
-                      <span className="text-sm text-muted-foreground">{hours}h × {SERVICE_RATE} MAD/hr</span>
-                      <span className="text-sm font-medium text-foreground">{basePay} MAD</span>
+                      <span className="text-sm text-muted-foreground">{hours}h × {SERVICE_RATE}€/hr</span>
+                      <span className="text-sm font-medium text-foreground">{basePay}€</span>
                     </div>
                     {hasTaxi && (
                       <div className="flex justify-between px-4 py-2.5">
                         <span className="text-sm text-amber-700 flex items-center gap-1.5"><Car className="w-3.5 h-3.5" />Taxi fee (7 PM – 7 AM)</span>
-                        <span className="text-sm font-medium text-amber-700">+{TAXI_FEE} MAD</span>
+                        <span className="text-sm font-medium text-amber-700">+{TAXI_FEE}€</span>
                       </div>
                     )}
                   </div>
@@ -678,7 +690,8 @@ export default function AdminInvoices() {
                 {/* Total */}
                 <div className="bg-gradient-to-r from-orange-50 to-pink-50 rounded-xl p-5 text-center">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total Amount</p>
-                  <p className="text-3xl font-bold text-foreground">{(inv.totalPrice || 0).toLocaleString()} <span className="text-lg text-muted-foreground">MAD</span></p>
+                  <p className="text-3xl font-bold text-foreground">{(inv.totalPrice || 0).toLocaleString()} <span className="text-lg text-muted-foreground">€</span></p>
+                  <p className="text-sm text-muted-foreground mt-1">{toDH(inv.totalPrice || 0).toLocaleString()} DH</p>
                 </div>
 
                 {inv.notes && (
@@ -870,18 +883,18 @@ export default function AdminInvoices() {
                         Auto-calculated breakdown
                       </div>
                       <div className="flex items-center justify-between">
-                        <span>{hours.toFixed(1)}h × {SERVICE_RATE} MAD/hr</span>
-                        <span className="font-medium">{base} MAD</span>
+                        <span>{hours.toFixed(1)}h × {SERVICE_RATE}€/hr</span>
+                        <span className="font-medium">{base}€</span>
                       </div>
                       {isNight && (
                         <div className="flex items-center justify-between text-amber-700">
                           <span className="flex items-center gap-1"><Car className="w-3 h-3" /> Taxi fee (7 PM – 7 AM)</span>
-                          <span className="font-medium">+{TAXI_FEE} MAD</span>
+                          <span className="font-medium">+{TAXI_FEE}€</span>
                         </div>
                       )}
                       <div className="flex items-center justify-between font-bold border-t border-blue-200 pt-1 mt-1">
                         <span>Total</span>
-                        <span>{isNight ? base + TAXI_FEE : base} MAD</span>
+                        <span>{isNight ? base + TAXI_FEE : base}€ <span className="font-normal text-blue-600/70">({toDH(isNight ? base + TAXI_FEE : base).toLocaleString()} DH)</span></span>
                       </div>
                     </div>
                   );
@@ -912,7 +925,7 @@ export default function AdminInvoices() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Total (MAD) *</label>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Total (€) *</label>
                   <input
                     type="number"
                     min={0}

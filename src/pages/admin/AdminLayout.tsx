@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Outlet, NavLink, Navigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -14,9 +14,12 @@ import {
   Menu,
   X,
   ChevronLeft,
+  User,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
+import AdminToast, { type AdminToastItem } from "../../components/AdminToast";
 import type { LucideIcon } from "lucide-react";
+import type { Booking } from "@/types";
 
 interface SidebarLink {
   to: string;
@@ -33,25 +36,99 @@ const sidebarLinks: SidebarLink[] = [
   { to: "/admin/nannies", label: "Nannies", icon: Users },
   { to: "/admin/users", label: "Admin Users", icon: ShieldCheck },
   { to: "/admin/qr-codes", label: "QR Codes", icon: QrCode },
-  { to: "/admin/messages", label: "Messages", icon: MessageCircle },
   { to: "/admin/login-logs", label: "Login Logs", icon: ScrollText },
+  { to: "/admin/messages", label: "Messages", icon: MessageCircle },
 ];
 
 export default function AdminLayout() {
-  const { isAdmin, adminProfile, adminLogout, stats, unreadChatCount } = useData();
+  const { isAdmin, adminProfile, adminLogout, stats, bookings, unreadChatCount } = useData();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [prevPending, setPrevPending] = useState(0);
-  const [, setNewBookingAlert] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [toasts, setToasts] = useState<AdminToastItem[]>([]);
+  const prevBookingsRef = useRef<Map<number | string, Booking> | null>(null);
+  const dismissedIds = useRef(new Set<string>());
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Track new pending bookings for notification badge
+  // Close profile dropdown on outside click
   useEffect(() => {
-    const pending = stats?.pendingBookings || 0;
-    if (pending > prevPending && prevPending > 0) {
-      setNewBookingAlert(true);
-      setTimeout(() => setNewBookingAlert(false), 5000);
+    function handleClickOutside(e: MouseEvent) {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target as Node)) {
+        setProfileDropdownOpen(false);
+      }
     }
-    setPrevPending(pending);
-  }, [stats?.pendingBookings]);
+    if (profileDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [profileDropdownOpen]);
+
+  // Detect booking changes and create toasts
+  useEffect(() => {
+    if (!bookings || bookings.length === 0) return;
+
+    const currentMap = new Map(bookings.map((b) => [b.id, b]));
+
+    if (prevBookingsRef.current !== null) {
+      const prev = prevBookingsRef.current;
+      const newToasts: AdminToastItem[] = [];
+
+      for (const [id, booking] of currentMap) {
+        const prevBooking = prev.get(id);
+
+        if (!prevBooking) {
+          // New booking appeared
+          const toastId = `new-${id}-${Date.now()}`;
+          if (!dismissedIds.current.has(toastId)) {
+            newToasts.push({
+              id: toastId,
+              message: `New booking #${id}`,
+              detail: `From ${booking.clientName} · ${booking.date}`,
+              type: "new_booking",
+              timestamp: Date.now(),
+            });
+          }
+        } else if (prevBooking.status === "pending" && booking.status === "confirmed") {
+          // Nanny confirmed a booking
+          const toastId = `confirmed-${id}-${Date.now()}`;
+          newToasts.push({
+            id: toastId,
+            message: `Booking #${id} confirmed`,
+            detail: `${booking.nannyName} confirmed for ${booking.clientName}`,
+            type: "confirmation",
+            timestamp: Date.now(),
+          });
+        } else if (booking.status === "cancelled" && prevBooking.status !== "cancelled") {
+          // Booking cancelled
+          const toastId = `cancelled-${id}-${Date.now()}`;
+          newToasts.push({
+            id: toastId,
+            message: `Booking #${id} cancelled`,
+            detail: booking.clientName,
+            type: "cancelled",
+            timestamp: Date.now(),
+          });
+        }
+      }
+
+      if (newToasts.length > 0) {
+        setToasts((prev) => [...newToasts.slice(0, 3), ...prev].slice(0, 5));
+      }
+    }
+
+    prevBookingsRef.current = currentMap;
+  }, [bookings]);
+
+  const handleDismissToast = useCallback((id: string) => {
+    dismissedIds.current.add(id);
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  // Check for critical pending bookings (> 3 hours old)
+  const hasCriticalPending = bookings.some((b) => {
+    if (b.status !== "pending") return false;
+    const hoursElapsed = (Date.now() - new Date(b.createdAt).getTime()) / 3600000;
+    return hoursElapsed > 3;
+  });
 
   if (!isAdmin) {
     return <Navigate to="/admin/login" replace />;
@@ -114,8 +191,10 @@ export default function AdminLayout() {
               <Icon className="w-5 h-5 shrink-0" />
               <span>{label}</span>
               {label === "Bookings" && (stats?.pendingBookings || 0) > 0 && (
-                <span className="ml-auto bg-orange-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
-                  {stats.pendingBookings > 9 ? "9+" : stats.pendingBookings}
+                <span className={`ml-auto text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full ${
+                  hasCriticalPending ? "bg-red-500 animate-pulse" : "bg-orange-500"
+                }`}>
+                  {stats?.pendingBookings && stats.pendingBookings > 9 ? "9+" : stats?.pendingBookings}
                 </span>
               )}
               {label === "Messages" && unreadChatCount > 0 && (
@@ -159,18 +238,66 @@ export default function AdminLayout() {
           {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Admin badge */}
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 gradient-warm rounded-full flex items-center justify-center">
-              <span className="text-white text-xs font-bold">
-                {adminProfile?.name?.charAt(0)?.toUpperCase() || "A"}
+          {/* Admin badge – clickable with dropdown */}
+          <div className="relative" ref={profileDropdownRef}>
+            <button
+              onClick={() => setProfileDropdownOpen((prev) => !prev)}
+              className="flex items-center gap-2 rounded-full hover:bg-muted/60 px-1.5 py-1 transition-colors cursor-pointer"
+            >
+              <div className="w-8 h-8 gradient-warm rounded-full flex items-center justify-center">
+                <span className="text-white text-xs font-bold">
+                  {adminProfile?.name?.charAt(0)?.toUpperCase() || "A"}
+                </span>
+              </div>
+              <span className="text-sm font-medium text-foreground hidden sm:inline">
+                {adminProfile?.name || "Admin"}
               </span>
-            </div>
-            <span className="text-sm font-medium text-foreground hidden sm:inline">
-              {adminProfile?.name || "Admin"}
-            </span>
+            </button>
+
+            {/* Profile dropdown */}
+            {profileDropdownOpen && (
+              <div className="absolute right-0 top-full mt-2 w-56 bg-card rounded-xl shadow-lg border border-border py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                {/* Profile info header */}
+                <div className="px-4 py-3 border-b border-border">
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    {adminProfile?.name || "Admin"}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {adminProfile?.email || "admin@callanannycare.com"}
+                  </p>
+                </div>
+
+                {/* Profile link */}
+                <NavLink
+                  to="/admin/users"
+                  onClick={() => setProfileDropdownOpen(false)}
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-muted/60 transition-colors"
+                >
+                  <User className="w-4 h-4 text-muted-foreground" />
+                  <span>My Profile</span>
+                </NavLink>
+
+                {/* Divider */}
+                <div className="border-t border-border my-1" />
+
+                {/* Log out */}
+                <button
+                  onClick={() => {
+                    setProfileDropdownOpen(false);
+                    adminLogout();
+                  }}
+                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors w-full"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Log Out</span>
+                </button>
+              </div>
+            )}
           </div>
         </header>
+
+        {/* Toast Notifications */}
+        <AdminToast toasts={toasts} onDismiss={handleDismissToast} />
 
         {/* Page Content */}
         <main className="flex-1 p-4 lg:p-8">

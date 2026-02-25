@@ -5,6 +5,11 @@ import Nannies from './pages/Nannies'
 import HowItWorks from './pages/HowItWorks'
 import Book from './pages/Book'
 import ParentForm from './pages/ParentForm'
+import ExtendBooking from './pages/ExtendBooking'
+import RebookBooking from './pages/RebookBooking'
+import BookingStatus from './pages/BookingStatus'
+import ReviewNannyPublic from './pages/ReviewNannyPublic'
+import PrivacyPolicy from './pages/PrivacyPolicy'
 import NotFound from './pages/NotFound'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminLayout from './pages/admin/AdminLayout'
@@ -26,6 +31,7 @@ import NannyBookings from './pages/nanny/NannyBookings'
 import NannyNotifications from './pages/nanny/NannyNotifications'
 import NannyMessages from './pages/nanny/NannyMessages'
 import NannyProfile from './pages/nanny/NannyProfile'
+import NannyMessages from './pages/nanny/NannyMessages'
 
 export default function App() {
   return (
@@ -39,8 +45,13 @@ export default function App() {
         <Route path="*" element={<NotFound />} />
       </Route>
 
-      {/* Public standalone form (no navbar/footer) */}
+      {/* Public standalone pages (no navbar/footer) */}
       <Route path="/parent-form" element={<ParentForm />} />
+      <Route path="/extend/:id" element={<ExtendBooking />} />
+      <Route path="/rebook/:id" element={<RebookBooking />} />
+      <Route path="/booking/:id" element={<BookingStatus />} />
+      <Route path="/review/nanny/:id" element={<ReviewNannyPublic />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
       {/* Admin routes */}
       <Route path="/admin/login" element={<AdminLogin />} />
@@ -66,6 +77,7 @@ export default function App() {
         <Route path="notifications" element={<NannyNotifications />} />
         <Route path="messages" element={<NannyMessages />} />
         <Route path="profile" element={<NannyProfile />} />
+        <Route path="messages" element={<NannyMessages />} />
       </Route>
     </Routes>
   )

@@ -1,4 +1,5 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Search,
   Filter,
@@ -23,12 +24,18 @@ import {
   AlertTriangle,
   Download,
   Pencil,
+  TimerReset,
+  ArrowRightLeft,
+  Bell,
 } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, formatDistanceToNow, isToday } from "date-fns";
 import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
+import ExtendBookingModal from "../../components/ExtendBookingModal";
+import ForwardBookingModal from "../../components/ForwardBookingModal";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
-import { calcBookedHours } from "@/utils/shiftHelpers";
+import { calcBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE, isTomorrow as isTomorrowDate } from "@/utils/shiftHelpers";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
 
 interface EditBookingForm {
   id: number | string;
@@ -65,12 +72,14 @@ interface NewBookingForm {
   status: string;
 }
 
-// 24h time slots from 07:00 to 23:30 (30-min steps)
+// 24h time slots from 06:00 to 05:30 (business-day ordering, 30-min steps)
 const TIME_SLOTS: { value: string; label: string }[] = [];
-for (let h = 7; h <= 23; h++) {
+for (let i = 0; i < 48; i++) {
+  const h = (6 + Math.floor(i / 2)) % 24;
+  const m = (i % 2) * 30;
   const hh = String(h).padStart(2, "0");
-  TIME_SLOTS.push({ value: `${h}:00`, label: `${hh}h00` });
-  TIME_SLOTS.push({ value: `${h}:30`, label: `${hh}h30` });
+  const mm = m === 0 ? "00" : "30";
+  TIME_SLOTS.push({ value: `${h}:${mm}`, label: `${hh}h${mm}` });
 }
 
 const statusConfig: Record<BookingStatus, { label: string; className: string }> = {
@@ -92,16 +101,87 @@ const statusConfig: Record<BookingStatus, { label: string; className: string }> 
   },
 };
 
+type UrgencyLevel = "normal" | "warning" | "critical";
+
+function getUrgencyLevel(createdAt: string, status: string): UrgencyLevel {
+  if (status !== "pending") return "normal";
+  const hoursElapsed = (Date.now() - new Date(createdAt).getTime()) / 3600000;
+  if (hoursElapsed > 3) return "critical";
+  if (hoursElapsed > 1) return "warning";
+  return "normal";
+}
+
+function UrgencyBadge({ booking }: { booking: Booking }) {
+  const urgency = getUrgencyLevel(booking.createdAt, booking.status);
+  if (booking.status !== "pending" || urgency === "normal") {
+    const status = statusConfig[booking.status] || statusConfig.pending;
+    return (
+      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}>
+        {status.label}
+      </span>
+    );
+  }
+
+  const elapsed = formatDistanceToNow(new Date(booking.createdAt), { addSuffix: true });
+
+  if (urgency === "critical") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-300 animate-pulse">
+        <AlertTriangle className="w-3 h-3" />
+        Needs Attention
+        <span className="text-[10px] font-normal opacity-70">({elapsed})</span>
+      </span>
+    );
+  }
+
+  // warning
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-300">
+      <Clock className="w-3 h-3" />
+      Awaiting Confirmation
+      <span className="text-[10px] font-normal opacity-70">({elapsed})</span>
+    </span>
+  );
+}
+
 const statusFilters = ["all", "pending", "confirmed", "completed", "cancelled"];
 
 export default function AdminBookings() {
-  const { bookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking, adminProfile } = useData();
+  const { bookings, fetchBookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking, sendBookingReminder, adminProfile } = useData();
+  const { toDH } = useExchangeRate();
+  const [searchParams] = useSearchParams();
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const param = searchParams.get("status");
+    return param && statusFilters.includes(param) ? param : "all";
+  });
+  const [nannyFilter, setNannyFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
   const [expandedRow, setExpandedRow] = useState<number | string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | string | null>(null);
+
+  // Reminder cooldown tracking (booking ID → timestamp)
+  const [remindedBookings, setRemindedBookings] = useState<Record<string, number>>({});
+  const [reminderLoading, setReminderLoading] = useState<number | string | null>(null);
+
+  const handleSendReminder = async (bookingId: number | string) => {
+    setReminderLoading(bookingId);
+    try {
+      await sendBookingReminder(bookingId);
+      setRemindedBookings((prev) => ({ ...prev, [String(bookingId)]: Date.now() }));
+    } catch (err) {
+      console.error("Reminder failed:", err);
+    }
+    setReminderLoading(null);
+  };
+
+  const isReminderCooling = (bookingId: number | string) => {
+    const ts = remindedBookings[String(bookingId)];
+    if (!ts) return false;
+    return Date.now() - ts < 30 * 60 * 1000; // 30 minutes
+  };
+
 
   // New Booking Modal
   const [showNewBooking, setShowNewBooking] = useState(false);
@@ -128,6 +208,57 @@ export default function AdminBookings() {
   const [editBookingLoading, setEditBookingLoading] = useState(false);
   const [editBookingData, setEditBookingData] = useState<EditBookingForm | null>(null);
 
+  // Extend Booking Modal
+  const [extendBooking, setExtendBooking] = useState<Booking | null>(null);
+
+  // Forward Booking Modal
+  const [forwardBooking, setForwardBooking] = useState<Booking | null>(null);
+
+  // Cancel Confirmation Modal
+  const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
+
+  const handleCancelConfirm = async () => {
+    if (!cancelTarget) return;
+    setCancelLoading(true);
+    try {
+      await updateBookingStatus(cancelTarget.id, "cancelled", {
+        reason: cancelReason.trim(),
+        cancelledBy: "admin",
+      });
+    } catch (err) {
+      console.error("Cancel failed:", err);
+    }
+    setCancelLoading(false);
+    setCancelTarget(null);
+    setCancelReason("");
+  };
+
+  // Auto-refresh bookings every 30s to pick up nanny confirmations
+  useEffect(() => {
+    const interval = setInterval(fetchBookings, 30000);
+    return () => clearInterval(interval);
+  }, [fetchBookings]);
+
+  /** Convert stored time label (e.g. "19h30") to TIME_SLOTS value (e.g. "19:30") */
+  const timeToSlotValue = (t: string): string => {
+    if (!t) return "";
+    // Already in value format (contains ":")
+    if (t.includes(":")) {
+      const match = TIME_SLOTS.find((s) => s.value === t);
+      return match ? match.value : "";
+    }
+    // Label format "09h00" / "19h30"
+    const m = t.match(/^(\d{1,2})h(\d{2})$/i);
+    if (m) {
+      const candidate = `${parseInt(m[1])}:${m[2]}`;
+      const match = TIME_SLOTS.find((s) => s.value === candidate);
+      return match ? match.value : "";
+    }
+    return "";
+  };
+
   const openEditModal = (booking: Booking) => {
     setEditBookingData({
       id: booking.id,
@@ -137,9 +268,9 @@ export default function AdminBookings() {
       clientPhone: booking.clientPhone || "",
       date: booking.date || "",
       endDate: booking.endDate || "",
-      startTime: "",
-      endTime: "",
-      plan: "hourly",
+      startTime: timeToSlotValue(booking.startTime),
+      endTime: timeToSlotValue(booking.endTime),
+      plan: booking.plan || "hourly",
       hotel: booking.hotel || "",
       numChildren: String(booking.childrenCount || "1"),
       childrenAges: booking.childrenAges || "",
@@ -167,10 +298,24 @@ export default function AdminBookings() {
     return Math.max(0, (eh + em / 60) - (sh + sm / 60));
   }, [editBookingData]);
 
+  const editBookingDays = useMemo(() => {
+    if (!editBookingData?.date) return 1;
+    if (!editBookingData.endDate || editBookingData.endDate === editBookingData.date) return 1;
+    const d1 = new Date(editBookingData.date).getTime();
+    const d2 = new Date(editBookingData.endDate).getTime();
+    return isNaN(d1) || isNaN(d2) ? 1 : Math.max(1, Math.round((d2 - d1) / 86400000) + 1);
+  }, [editBookingData]);
+
   const editBookingPrice = useMemo(() => {
     if (!editSelectedNanny) return 0;
-    return Math.round(editSelectedNanny.rate * editBookingHours);
-  }, [editSelectedNanny, editBookingHours]);
+    const hourlyTotal = Math.round(editSelectedNanny.rate * editBookingHours * editBookingDays);
+    // Taxi fee: 10€ per day if shift touches the 7PM–7AM window
+    const [sh] = (editBookingData?.startTime || "").split(":").map(Number);
+    const [eh, em] = (editBookingData?.endTime || "").split(":").map(Number);
+    const isEvening = (eh > 19 || (eh === 19 && em > 0)) || sh < 7;
+    const taxiFee = isEvening ? 10 * editBookingDays : 0;
+    return hourlyTotal + taxiFee;
+  }, [editSelectedNanny, editBookingHours, editBookingDays, editBookingData]);
 
   const editConflicts = useMemo(() => {
     if (!editBookingData?.nannyId || !editBookingData?.date) return [];
@@ -235,10 +380,23 @@ export default function AdminBookings() {
     return Math.max(0, (eh + em / 60) - (sh + sm / 60));
   }, [newBooking.startTime, newBooking.endTime]);
 
+  const newBookingDays = useMemo(() => {
+    if (!newBooking.date) return 1;
+    if (!newBooking.endDate || newBooking.endDate === newBooking.date) return 1;
+    const d1 = new Date(newBooking.date).getTime();
+    const d2 = new Date(newBooking.endDate).getTime();
+    return isNaN(d1) || isNaN(d2) ? 1 : Math.max(1, Math.round((d2 - d1) / 86400000) + 1);
+  }, [newBooking.date, newBooking.endDate]);
+
   const newBookingPrice = useMemo(() => {
     if (!selectedNanny) return 0;
-    return Math.round(selectedNanny.rate * newBookingHours);
-  }, [selectedNanny, newBookingHours]);
+    const hourlyTotal = Math.round(selectedNanny.rate * newBookingHours * newBookingDays);
+    const [sh] = (newBooking.startTime || "").split(":").map(Number);
+    const [eh, em] = (newBooking.endTime || "").split(":").map(Number);
+    const isEvening = (eh > 19 || (eh === 19 && em > 0)) || sh < 7;
+    const taxiFee = isEvening ? 10 * newBookingDays : 0;
+    return hourlyTotal + taxiFee;
+  }, [selectedNanny, newBookingHours, newBookingDays, newBooking.startTime, newBooking.endTime]);
 
   const handleNewBookingSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -326,6 +484,15 @@ export default function AdminBookings() {
     return getConflicts(newBooking.nannyId, newBooking.date, newBooking.startTime, newBooking.endTime);
   }, [newBooking.nannyId, newBooking.date, newBooking.startTime, newBooking.endTime, bookings]);
 
+  // Unique nanny names for filter dropdown
+  const uniqueNannyNames = useMemo(() => {
+    const names = new Set<string>();
+    bookings.forEach((b) => {
+      if (b.nannyName) names.add(b.nannyName);
+    });
+    return Array.from(names).sort();
+  }, [bookings]);
+
   // CSV export
   const exportCSV = () => {
     const headers = ["ID", "Client", "Email", "Phone", "Nanny", "Start Date", "End Date", "Time", "Plan", "Price", "Status", "Created By", "Created By Name", "Hotel", "Notes"];
@@ -375,6 +542,11 @@ export default function AdminBookings() {
       result = result.filter((b) => b.status === statusFilter);
     }
 
+    // Nanny filter
+    if (nannyFilter !== "all") {
+      result = result.filter((b) => b.nannyName === nannyFilter);
+    }
+
     // Sort
     result.sort((a, b) => {
       const dateA = new Date(a.createdAt || a.date);
@@ -383,7 +555,22 @@ export default function AdminBookings() {
     });
 
     return result;
-  }, [bookings, search, statusFilter, sortOrder]);
+  }, [bookings, search, statusFilter, nannyFilter, sortOrder]);
+
+  // Split bookings into grouped sections: today / tomorrow / previous
+  const groupedBookings = useMemo(() => {
+    const today: typeof filteredBookings = [];
+    const tomorrow: typeof filteredBookings = [];
+    const previous: typeof filteredBookings = [];
+    for (const b of filteredBookings) {
+      try {
+        if (isToday(parseISO(b.date))) { today.push(b); continue; }
+        if (isTomorrowDate(b.date)) { tomorrow.push(b); continue; }
+      } catch { /* ignore */ }
+      previous.push(b);
+    }
+    return { today, tomorrow, previous };
+  }, [filteredBookings]);
 
   const formatDate = (dateStr: string) => {
     try {
@@ -395,13 +582,6 @@ export default function AdminBookings() {
 
   const formatTime = (timeStr: string) => {
     return timeStr || "N/A";
-  };
-
-  const truncateId = (id: number | string) => {
-    if (!id) return "N/A";
-    return typeof id === "string" && id.length > 8
-      ? `${id.slice(0, 8)}...`
-      : id;
   };
 
   const handleDelete = (id: number | string) => {
@@ -475,6 +655,24 @@ export default function AdminBookings() {
             <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           </div>
 
+          {/* Nanny Filter */}
+          <div className="relative">
+            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <select
+              value={nannyFilter}
+              onChange={(e) => setNannyFilter(e.target.value)}
+              className="appearance-none pl-10 pr-10 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all cursor-pointer"
+            >
+              <option value="all">All Nannies</option>
+              {uniqueNannyNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          </div>
+
           {/* Sort */}
           <div className="relative">
             <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -497,7 +695,7 @@ export default function AdminBookings() {
           <Calendar className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <p className="font-medium text-foreground text-lg">No bookings found</p>
           <p className="text-sm text-muted-foreground mt-1">
-            {search || statusFilter !== "all"
+            {search || statusFilter !== "all" || nannyFilter !== "all"
               ? "Try adjusting your search or filters."
               : "Bookings will appear here once clients start booking."}
           </p>
@@ -510,9 +708,6 @@ export default function AdminBookings() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      ID
-                    </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Client
                     </th>
@@ -538,13 +733,10 @@ export default function AdminBookings() {
                       Plan
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Price
+                      Price / Nanny Pay
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Status
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Created By
                     </th>
                     <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Actions
@@ -552,16 +744,29 @@ export default function AdminBookings() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filteredBookings.map((booking) => {
-                    const status = statusConfig[booking.status] || statusConfig.pending;
+                  {([
+                    { label: "Today\u2019s Bookings", items: groupedBookings.today },
+                    { label: "Tomorrow\u2019s Bookings", items: groupedBookings.tomorrow },
+                    { label: "Previous Bookings", items: groupedBookings.previous },
+                  ] as const).map((group) => group.items.length > 0 && (
+                    <Fragment key={group.label}>
+                      <tr>
+                        <td colSpan={10} className="px-4 py-4 bg-primary/5 text-center">
+                          <div className="flex items-center justify-center gap-4">
+                            <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
+                            <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
+                              {group.label}
+                            </span>
+                            <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
+                          </div>
+                        </td>
+                      </tr>
+                      {group.items.map((booking) => {
                     const isExpanded = expandedRow === booking.id;
 
                     return (
                       <Fragment key={booking.id}>
                         <tr className="hover:bg-muted/30 transition-colors">
-                          <td className="px-4 py-3.5 text-xs font-mono text-muted-foreground">
-                            {truncateId(booking.id)}
-                          </td>
                           <td className="px-4 py-3.5 text-sm font-medium text-foreground">
                             {booking.clientName || "N/A"}
                           </td>
@@ -589,29 +794,50 @@ export default function AdminBookings() {
                           <td className="px-4 py-3.5 text-sm text-muted-foreground capitalize">
                             {booking.plan || "N/A"}
                           </td>
-                          <td className="px-4 py-3.5 text-sm font-medium text-foreground">
-                            {booking.totalPrice ? `${booking.totalPrice} MAD` : "N/A"}
+                          <td className="px-4 py-3.5">
+                            {(() => {
+                              const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                              const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 150;
+                              const actualPay = calcNannyPayBreakdown(booking);
+                              const estPay = actualPay.total > 0
+                                ? actualPay
+                                : estimateNannyPayBreakdown(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                              const isActual = actualPay.total > 0;
+
+                              return (
+                                <>
+                                  <div className="text-sm font-medium text-foreground">
+                                    {booking.totalPrice ? `${booking.totalPrice.toLocaleString()}€` : "N/A"}
+                                  </div>
+                                  {booking.totalPrice && (
+                                    <div className="text-[10px] text-muted-foreground">{toDH(booking.totalPrice).toLocaleString()} DH</div>
+                                  )}
+                                  {hours > 0 && (
+                                    <div className="text-[11px] text-muted-foreground">
+                                      {nannyRate}/hr × {hours}h
+                                    </div>
+                                  )}
+                                  {estPay.total > 0 && (
+                                    <div className="text-[11px] mt-0.5">
+                                      <span className={isActual ? "text-emerald-600 font-medium" : "text-emerald-600/70"}>
+                                        {estPay.basePay} DH
+                                      </span>
+                                      {estPay.taxiFee > 0 && (
+                                        <span className={isActual ? "text-orange-500 font-medium" : "text-orange-500/70"}>
+                                          {" "}+ {estPay.taxiFee} DH taxi
+                                        </span>
+                                      )}
+                                      {!isActual && (
+                                        <span className="text-muted-foreground/50 italic ml-0.5">est.</span>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </td>
                           <td className="px-4 py-3.5">
-                            <span
-                              className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}
-                            >
-                              {status.label}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                              booking.createdBy === 'admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                              booking.createdBy === 'nanny' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                              'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            }`}>
-                              {booking.createdBy === 'admin' ? 'Admin' : booking.createdBy === 'nanny' ? 'Nanny' : 'Parent'}
-                            </span>
-                            {booking.createdByName && (
-                              <span className="block text-[10px] text-muted-foreground mt-0.5 truncate max-w-[80px]" title={booking.createdByName}>
-                                {booking.createdByName}
-                              </span>
-                            )}
+                            <UrgencyBadge booking={booking} />
                           </td>
                           <td className="px-4 py-3.5">
                             <div className="flex items-center justify-end gap-1.5">
@@ -637,6 +863,28 @@ export default function AdminBookings() {
                                 <Pencil className="w-4 h-4" />
                               </button>
 
+                              {/* Extend */}
+                              {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
+                                <button
+                                  onClick={() => setExtendBooking(booking)}
+                                  className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                                  title="Extend booking"
+                                >
+                                  <TimerReset className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {/* Forward */}
+                              {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
+                                <button
+                                  onClick={() => setForwardBooking(booking)}
+                                  className="p-1.5 rounded-lg text-orange-600 hover:bg-orange-50 transition-colors"
+                                  title="Forward to another nanny"
+                                >
+                                  <ArrowRightLeft className="w-4 h-4" />
+                                </button>
+                              )}
+
                               {/* Confirm */}
                               {booking.status === "pending" && (
                                 <button
@@ -647,6 +895,22 @@ export default function AdminBookings() {
                                   title="Confirm booking"
                                 >
                                   <Check className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {/* Send Reminder */}
+                              {booking.status === "pending" && (
+                                <button
+                                  onClick={() => handleSendReminder(booking.id)}
+                                  disabled={isReminderCooling(booking.id) || reminderLoading === booking.id}
+                                  className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
+                                  title={isReminderCooling(booking.id) ? "Reminder sent" : "Send reminder to nanny"}
+                                >
+                                  {reminderLoading === booking.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Bell className="w-4 h-4" />
+                                  )}
                                 </button>
                               )}
 
@@ -667,15 +931,14 @@ export default function AdminBookings() {
                               {(booking.status === "pending" ||
                                 booking.status === "confirmed") && (
                                 <button
-                                  onClick={() =>
-                                    updateBookingStatus(booking.id, "cancelled")
-                                  }
+                                  onClick={() => setCancelTarget(booking)}
                                   className="p-1.5 rounded-lg text-orange-600 hover:bg-orange-50 transition-colors"
                                   title="Cancel booking"
                                 >
                                   <XCircle className="w-4 h-4" />
                                 </button>
                               )}
+
 
                               {/* Delete */}
                               {deleteConfirm === booking.id ? (
@@ -710,7 +973,7 @@ export default function AdminBookings() {
                         {isExpanded && (
                           <tr>
                             <td
-                              colSpan={12}
+                              colSpan={10}
                               className="px-4 py-4 bg-muted/20"
                             >
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -762,6 +1025,77 @@ export default function AdminBookings() {
                                     </p>
                                   </div>
                                 </div>
+                                {(() => {
+                                  const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                                  const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 150;
+                                  const actualPay = calcNannyPayBreakdown(booking);
+                                  const estPay = actualPay.total > 0
+                                    ? actualPay
+                                    : estimateNannyPayBreakdown(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                                  const isActual = actualPay.total > 0;
+
+                                  return (
+                                    <>
+                                      {hours > 0 && (
+                                        <div className="flex items-center gap-2">
+                                          <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+                                          <div>
+                                            <p className="text-xs text-muted-foreground">
+                                              Client Price
+                                            </p>
+                                            <p className="font-medium text-foreground">
+                                              {nannyRate}€/hr × {hours}h = <span className="font-bold">{booking.totalPrice?.toLocaleString()}€</span>
+                                            </p>
+                                            {booking.totalPrice && (
+                                              <p className="text-xs text-muted-foreground mt-0.5">≈ {toDH(booking.totalPrice).toLocaleString()} DH</p>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {estPay.total > 0 && (
+                                        <div className="flex items-center gap-2">
+                                          <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+                                          <div>
+                                            <p className="text-xs text-muted-foreground">
+                                              Nanny Pay {!isActual && <span className="italic">(estimated)</span>}
+                                            </p>
+                                            <p className="font-medium text-foreground">
+                                              <span className="text-emerald-600">{estPay.basePay} DH</span>
+                                              <span className="text-muted-foreground mx-1">hourly ({HOURLY_RATE} DH/hr)</span>
+                                              {estPay.taxiFee > 0 && (
+                                                <>
+                                                  <span className="text-orange-500">+ {estPay.taxiFee} DH</span>
+                                                  <span className="text-muted-foreground ml-1">taxi</span>
+                                                </>
+                                              )}
+                                              <span className="text-foreground ml-2 font-bold">= {estPay.total} DH</span>
+                                            </p>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                                <div className="flex items-center gap-2">
+                                  <User className="w-4 h-4 text-muted-foreground shrink-0" />
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">
+                                      Created By
+                                    </p>
+                                    <p className="font-medium text-foreground flex items-center gap-1.5">
+                                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                                        booking.createdBy === 'admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                                        booking.createdBy === 'nanny' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                        'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                      }`}>
+                                        {booking.createdBy === 'admin' ? 'Admin' : booking.createdBy === 'nanny' ? 'Nanny' : 'Parent'}
+                                      </span>
+                                      {booking.createdByName && (
+                                        <span className="text-muted-foreground text-xs">{booking.createdByName}</span>
+                                      )}
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
                               {/* Quick actions */}
                               <div className="flex gap-2 mt-3 pt-3 border-t border-border">
@@ -788,6 +1122,8 @@ export default function AdminBookings() {
                       </Fragment>
                     );
                   })}
+                    </Fragment>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -795,13 +1131,25 @@ export default function AdminBookings() {
 
           {/* Mobile Cards */}
           <div className="lg:hidden space-y-3">
-            {filteredBookings.map((booking) => {
-              const status = statusConfig[booking.status] || statusConfig.pending;
+            {([
+              { label: "Today\u2019s Bookings", items: groupedBookings.today },
+              { label: "Tomorrow\u2019s Bookings", items: groupedBookings.tomorrow },
+              { label: "Previous Bookings", items: groupedBookings.previous },
+            ] as const).map((group) => group.items.length > 0 && (
+              <Fragment key={`m-${group.label}`}>
+                <div className="flex items-center gap-4 py-3 px-2 my-1 bg-primary/5 rounded-xl">
+                  <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
+                  <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
+                    {group.label}
+                  </span>
+                  <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
+                </div>
+                {group.items.map((booking) => {
               const isExpanded = expandedRow === booking.id;
 
               return (
+                <Fragment key={`mobile-${booking.id}`}>
                 <div
-                  key={booking.id}
                   className="bg-card rounded-xl border border-border shadow-soft overflow-hidden"
                 >
                   {/* Card Header */}
@@ -812,23 +1160,10 @@ export default function AdminBookings() {
                           {booking.clientName || "N/A"}
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          ID: {truncateId(booking.id)}
+                          {booking.nannyName || "Unassigned"}
                         </p>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <span
-                          className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}
-                        >
-                          {status.label}
-                        </span>
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                          booking.createdBy === 'admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                          booking.createdBy === 'nanny' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                          'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                        }`}>
-                          {booking.createdBy === 'admin' ? 'Admin' : booking.createdBy === 'nanny' ? 'Nanny' : 'Parent'}
-                        </span>
-                      </div>
+                      <UrgencyBadge booking={booking} />
                     </div>
 
                     {/* Info Grid */}
@@ -863,9 +1198,37 @@ export default function AdminBookings() {
                       </div>
                       <div className="text-muted-foreground">
                         <span className="font-medium text-foreground">
-                          {booking.totalPrice ? `${booking.totalPrice} MAD` : "N/A"}
+                          {booking.totalPrice ? `${booking.totalPrice.toLocaleString()}€` : "N/A"}
                         </span>
-                        <span className="ml-1 capitalize">({booking.plan || "N/A"})</span>
+                        {booking.totalPrice && (
+                          <span className="text-[10px] text-muted-foreground ml-1">({toDH(booking.totalPrice).toLocaleString()} DH)</span>
+                        )}
+                        {(() => {
+                          const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                          const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 150;
+                          const actualPay = calcNannyPayBreakdown(booking);
+                          const estPay = actualPay.total > 0
+                            ? actualPay
+                            : estimateNannyPayBreakdown(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                          const isActual = actualPay.total > 0;
+
+                          return (
+                            <>
+                              {hours > 0 && (
+                                <div className="text-[10px]">{nannyRate}/hr × {hours}h</div>
+                              )}
+                              {estPay.total > 0 && (
+                                <div className="text-[10px] mt-0.5">
+                                  Nanny: <span className={isActual ? "text-emerald-600 font-medium" : "text-emerald-600/70"}>{estPay.basePay}</span>
+                                  {estPay.taxiFee > 0 && (
+                                    <span className={isActual ? "text-orange-500 font-medium" : "text-orange-500/70"}> + {estPay.taxiFee} taxi</span>
+                                  )}
+                                  {!isActual && <span className="text-muted-foreground/50 italic ml-0.5">est.</span>}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -896,6 +1259,19 @@ export default function AdminBookings() {
                             {booking.notes || "None"}
                           </p>
                         </div>
+                        <div className="col-span-2 flex items-center gap-1.5">
+                          <p className="text-muted-foreground">Created by</p>
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                            booking.createdBy === 'admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                            booking.createdBy === 'nanny' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                            'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          }`}>
+                            {booking.createdBy === 'admin' ? 'Admin' : booking.createdBy === 'nanny' ? 'Nanny' : 'Parent'}
+                          </span>
+                          {booking.createdByName && (
+                            <span className="text-muted-foreground text-[10px]">{booking.createdByName}</span>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -924,6 +1300,24 @@ export default function AdminBookings() {
                       <Pencil className="w-3.5 h-3.5" /> Edit
                     </button>
 
+                    {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
+                      <button
+                        onClick={() => setExtendBooking(booking)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors"
+                      >
+                        <TimerReset className="w-3.5 h-3.5" /> Extend
+                      </button>
+                    )}
+
+                    {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
+                      <button
+                        onClick={() => setForwardBooking(booking)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-orange-600 hover:bg-orange-50 transition-colors"
+                      >
+                        <ArrowRightLeft className="w-3.5 h-3.5" /> Forward
+                      </button>
+                    )}
+
                     {booking.status === "pending" && (
                       <button
                         onClick={() =>
@@ -932,6 +1326,21 @@ export default function AdminBookings() {
                         className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-accent hover:bg-accent/10 transition-colors"
                       >
                         <Check className="w-3.5 h-3.5" /> Confirm
+                      </button>
+                    )}
+
+                    {booking.status === "pending" && (
+                      <button
+                        onClick={() => handleSendReminder(booking.id)}
+                        disabled={isReminderCooling(booking.id) || reminderLoading === booking.id}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
+                      >
+                        {reminderLoading === booking.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Bell className="w-3.5 h-3.5" />
+                        )}
+                        {isReminderCooling(booking.id) ? "Reminded" : "Remind"}
                       </button>
                     )}
 
@@ -949,14 +1358,13 @@ export default function AdminBookings() {
                     {(booking.status === "pending" ||
                       booking.status === "confirmed") && (
                       <button
-                        onClick={() =>
-                          updateBookingStatus(booking.id, "cancelled")
-                        }
+                        onClick={() => setCancelTarget(booking)}
                         className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-orange-600 hover:bg-orange-50 transition-colors"
                       >
                         <XCircle className="w-3.5 h-3.5" /> Cancel
                       </button>
                     )}
+
 
                     {deleteConfirm === booking.id ? (
                       <div className="flex-1 flex items-center justify-center gap-1.5 py-2.5">
@@ -983,8 +1391,11 @@ export default function AdminBookings() {
                     )}
                   </div>
                 </div>
+                </Fragment>
               );
             })}
+              </Fragment>
+            ))}
           </div>
         </>
       )}
@@ -1019,7 +1430,7 @@ export default function AdminBookings() {
                   <option value="">Choose a nanny...</option>
                   {availableNannies.map((n) => (
                     <option key={n.id} value={n.id}>
-                      {n.name} — {n.rate} MAD/hr ({n.location})
+                      {n.name} — {n.rate}€/hr ({n.location})
                     </option>
                   ))}
                 </select>
@@ -1232,10 +1643,11 @@ export default function AdminBookings() {
                   <div className="text-sm text-muted-foreground">
                     <span className="font-medium text-foreground">{selectedNanny.name}</span>
                     <span className="mx-1.5">·</span>
-                    {selectedNanny.rate} MAD/hr × {newBookingHours} hrs
+                    {selectedNanny.rate}€/hr × {newBookingHours} hrs
                   </div>
-                  <div className="text-lg font-bold text-foreground">
-                    {newBookingPrice.toLocaleString()} MAD
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-foreground">{newBookingPrice.toLocaleString()}€</div>
+                    <div className="text-xs text-muted-foreground">{toDH(newBookingPrice).toLocaleString()} DH</div>
                   </div>
                 </div>
               )}
@@ -1299,7 +1711,7 @@ export default function AdminBookings() {
                   <option value="">Choose a nanny...</option>
                   {allActiveNannies.map((n) => (
                     <option key={n.id} value={n.id}>
-                      {n.name} — {n.rate} MAD/hr ({n.location})
+                      {n.name} — {n.rate}€/hr ({n.location})
                     </option>
                   ))}
                 </select>
@@ -1513,10 +1925,11 @@ export default function AdminBookings() {
                   <div className="text-sm text-muted-foreground">
                     <span className="font-medium text-foreground">{editSelectedNanny.name}</span>
                     <span className="mx-1.5">·</span>
-                    {editSelectedNanny.rate} MAD/hr × {editBookingHours} hrs
+                    {editSelectedNanny.rate}€/hr × {editBookingHours} hrs
                   </div>
-                  <div className="text-lg font-bold text-foreground">
-                    {editBookingPrice.toLocaleString()} MAD
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-foreground">{editBookingPrice.toLocaleString()}€</div>
+                    <div className="text-xs text-muted-foreground">{toDH(editBookingPrice).toLocaleString()} DH</div>
                   </div>
                 </div>
               )}
@@ -1546,6 +1959,132 @@ export default function AdminBookings() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Extend Booking Modal */}
+      {extendBooking && (
+        <ExtendBookingModal
+          booking={extendBooking}
+          rate={nannies.find((n) => n.id === extendBooking.nannyId)?.rate || 150}
+          onConfirm={async (newEndTime, newTotalPrice) => {
+            await updateBooking(extendBooking.id, { endTime: newEndTime, totalPrice: newTotalPrice });
+            await fetchBookings();
+          }}
+          onClose={() => setExtendBooking(null)}
+          t={(key: string) => {
+            const map: Record<string, string> = {
+              "extend.extendBooking": "Extend Booking",
+              "extend.newEndTime": "New End Time",
+              "extend.selectNewEnd": "Select new end time",
+              "extend.additionalHours": "Additional Hours",
+              "extend.additionalCost": "Additional Cost",
+              "extend.newTotal": "New Total",
+              "extend.confirmExtend": "Confirm Extension",
+              "extend.extending": "Extending...",
+              "extend.extendSuccess": "Booking extended successfully!",
+              "extend.noLaterSlots": "No later time slots available",
+              "extend.summary": "Extension Summary",
+              "shared.cancel": "Cancel",
+            };
+            return map[key] || key;
+          }}
+        />
+      )}
+
+      {/* Forward Booking Modal */}
+      {forwardBooking && (
+        <ForwardBookingModal
+          booking={forwardBooking}
+          nannies={nannies}
+          currentNannyId={forwardBooking.nannyId}
+          onConfirm={async (newNannyId) => {
+            const newNanny = nannies.find((n) => n.id === newNannyId);
+            await updateBooking(forwardBooking.id, {
+              nannyId: newNannyId,
+              nannyName: newNanny?.name || "",
+            });
+            await fetchBookings();
+          }}
+          onClose={() => setForwardBooking(null)}
+          t={(key: string) => {
+            const map: Record<string, string> = {
+              "forward.forwardBooking": "Forward Booking",
+              "forward.forwardShift": "Forward",
+              "forward.selectNanny": "Select a nanny...",
+              "forward.forwardTo": "Forward to",
+              "forward.confirmForward": "Confirm Forward",
+              "forward.forwarding": "Forwarding...",
+              "forward.forwardSuccess": "Booking forwarded successfully!",
+              "forward.noOtherNannies": "No other active nannies available",
+              "forward.forwardNote": "The new nanny will be notified by email about this assignment.",
+              "forward.currentNanny": "Current Nanny",
+              "shared.cancel": "Cancel",
+            };
+            return map[key] || key;
+          }}
+        />
+      )}
+
+      {/* Cancel Confirmation Modal */}
+      {cancelTarget && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setCancelTarget(null); setCancelReason(""); }}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Cancel Booking</h3>
+                  <p className="text-sm text-gray-500">#{String(cancelTarget.id)} — {cancelTarget.clientName}</p>
+                </div>
+              </div>
+
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-4">
+                <p className="text-sm text-orange-800">
+                  <strong>⚠️ This will notify the parent and nanny</strong> via email and WhatsApp that this booking has been cancelled.
+                </p>
+              </div>
+
+              <div className="mb-4 text-sm text-gray-600 space-y-1">
+                <p><span className="font-medium">Date:</span> {cancelTarget.date}</p>
+                <p><span className="font-medium">Time:</span> {cancelTarget.startTime} - {cancelTarget.endTime}</p>
+                <p><span className="font-medium">Hotel:</span> {cancelTarget.hotel || 'N/A'}</p>
+              </div>
+
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Reason for cancellation <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="e.g. Client requested cancellation, nanny unavailable..."
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                rows={3}
+              />
+            </div>
+
+            <div className="flex gap-3 p-4 border-t border-gray-100">
+              <button
+                onClick={() => { setCancelTarget(null); setCancelReason(""); }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+              >
+                Keep Booking
+              </button>
+              <button
+                onClick={handleCancelConfirm}
+                disabled={cancelLoading}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {cancelLoading ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Cancelling...</>
+                ) : (
+                  <>Yes, Cancel It</>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

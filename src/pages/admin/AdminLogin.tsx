@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams, Link } from "react-router-dom";
 import { Lock, Mail, LogIn, AlertCircle, CheckCircle, ArrowLeft, Key, Loader2, UserPlus } from "lucide-react";
 import { useData } from "../../context/DataContext";
 
@@ -512,11 +512,15 @@ export default function AdminLogin() {
               )}
             </button>
           </form>
-        </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          Authorized personnel only
-        </p>
+          <div className="text-center text-sm text-muted-foreground mt-6">
+            <p>
+              <Link to="/nanny/login" className="text-accent hover:underline font-medium">
+                Nanny Login
+              </Link>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

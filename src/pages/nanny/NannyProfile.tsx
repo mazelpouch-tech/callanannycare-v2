@@ -17,14 +17,17 @@ import {
   X,
   Eye,
   EyeOff,
+  Link,
+  Check,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
 import ImageUpload from "../../components/ImageUpload";
+import { calcActualHoursWorked, calcNannyPayBreakdown } from "@/utils/shiftHelpers";
 import type { NannyProfile as NannyProfileType } from "@/types";
 
 export default function NannyProfile() {
-  const { nannyProfile, updateNannyProfile } = useData();
+  const { nannyProfile, updateNannyProfile, nannyBookings, fetchNannyBookings } = useData();
   const { t } = useLanguage();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -43,8 +46,28 @@ export default function NannyProfile() {
   const [pinMessage, setPinMessage] = useState("");
   const [pinSaving, setPinSaving] = useState(false);
   const [showPins, setShowPins] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const [fullProfile, setFullProfile] = useState<NannyProfileType | null>(null);
+
+  useEffect(() => {
+    fetchNannyBookings();
+  }, [fetchNannyBookings]);
+
+  // Calculate total hours & pay breakdown from actual clock data
+  const totalHoursWorked = nannyBookings
+    .filter((b) => b.clockIn && b.clockOut && b.status !== "cancelled")
+    .reduce((sum, b) => sum + calcActualHoursWorked(b.clockIn!, b.clockOut!), 0);
+
+  const payBreakdown = nannyBookings
+    .filter((b) => b.status !== "cancelled")
+    .reduce(
+      (acc, b) => {
+        const bd = calcNannyPayBreakdown(b);
+        return { basePay: acc.basePay + bd.basePay, taxiFee: acc.taxiFee + bd.taxiFee, total: acc.total + bd.total };
+      },
+      { basePay: 0, taxiFee: 0, total: 0 }
+    );
 
   useEffect(() => {
     if (nannyProfile?.id) {
@@ -218,6 +241,26 @@ export default function NannyProfile() {
                 {profile.experience}
               </span>
             </div>
+            {/* Hours & Pay summary */}
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 text-center">
+                <p className="text-2xl font-bold text-primary">{parseFloat(totalHoursWorked.toFixed(1))}<span className="text-sm font-normal ml-1">hrs</span></p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t("nanny.dashboard.hoursWorked")}</p>
+              </div>
+              <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 text-center">
+                <p className="text-2xl font-bold text-orange-600">{payBreakdown.total}<span className="text-sm font-normal ml-1">DH</span></p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t("nanny.dashboard.myPay")}</p>
+              </div>
+            </div>
+            {/* Pay breakdown detail */}
+            {payBreakdown.total > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span>{t("nanny.dashboard.hourlyPay")}: <span className="font-semibold text-foreground">{payBreakdown.basePay} DH</span></span>
+                {payBreakdown.taxiFee > 0 && (
+                  <span>{t("nanny.dashboard.taxiFee")}: <span className="font-semibold text-orange-600">+{payBreakdown.taxiFee} DH</span></span>
+                )}
+              </div>
+            )}
             {/* Nanny pay info */}
             <div className="mt-3 flex items-start gap-2 text-xs bg-accent/5 border border-accent/20 rounded-lg px-3 py-2.5">
               <DollarSign className="w-3.5 h-3.5 mt-0.5 shrink-0 text-accent" />
@@ -233,6 +276,55 @@ export default function NannyProfile() {
               </span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Review Link Section */}
+      <div className="bg-card rounded-xl border border-border p-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center">
+              <Star className="w-4.5 h-4.5 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground text-sm">Review Link</h3>
+              <p className="text-xs text-muted-foreground">Copy & share with parents to collect reviews</p>
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              const reviewUrl = `${window.location.origin}/review/nanny/${profile.id}`;
+              try {
+                await navigator.clipboard.writeText(reviewUrl);
+              } catch {
+                const textArea = document.createElement("textarea");
+                textArea.value = reviewUrl;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand("copy");
+                document.body.removeChild(textArea);
+              }
+              setLinkCopied(true);
+              setTimeout(() => setLinkCopied(false), 2000);
+            }}
+            className={`flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${
+              linkCopied
+                ? "bg-green-50 text-green-600"
+                : "bg-amber-50 text-amber-600 hover:bg-amber-100"
+            }`}
+          >
+            {linkCopied ? (
+              <>
+                <Check className="w-4 h-4" />
+                Copied!
+              </>
+            ) : (
+              <>
+                <Link className="w-4 h-4" />
+                Copy Link
+              </>
+            )}
+          </button>
         </div>
       </div>
 

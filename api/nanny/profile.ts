@@ -85,6 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json(notifications);
       }
 
+
       const result = await sql`
         SELECT id, name, email, location, rating, bio, specialties, languages, image, experience, available, created_at
         FROM nannies WHERE id = ${nannyId}
@@ -115,6 +116,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         `;
         return res.status(200).json({ success: true });
       }
+
 
       // ─── Blocked date actions ────────────────────────────────────
       if (action === 'block_date' && date) {

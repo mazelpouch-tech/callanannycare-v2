@@ -246,7 +246,7 @@ export default function AdminCalendar() {
                       </div>
                       <div className="flex items-center justify-between pt-1">
                         <span className="text-sm font-bold text-foreground">
-                          {booking.totalPrice} MAD
+                          {booking.totalPrice}€
                         </span>
                         {booking.clientPhone && (
                           <button

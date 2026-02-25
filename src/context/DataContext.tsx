@@ -14,12 +14,16 @@ import type {
   AdminUser,
   DashboardStats,
   BookingStatus,
+  ChatMessage,
+  ChatChannel,
   DataContextValue,
 } from "../types";
 import type {
   DbNanny,
   DbBookingWithNanny,
   DbNotification,
+  DbChatMessage,
+  DbChatChannel,
   NannyLoginResponse,
   AdminLoginResponse,
   InviteResponse,
@@ -57,6 +61,17 @@ function saveToStorage(key: string, value: unknown): void {
   }
 }
 
+export class ApiError extends Error {
+  status: number;
+  conflicts?: { bookingId: number; date: string; startTime: string; endTime: string; clientName: string }[];
+  constructor(message: string, status: number, conflicts?: ApiError['conflicts']) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.conflicts = conflicts;
+  }
+}
+
 async function apiFetch<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
   try {
     const res = await fetch(`${API_BASE}${path}`, {
@@ -65,7 +80,7 @@ async function apiFetch<T = unknown>(path: string, options: RequestInit = {}): P
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `API error ${res.status}`);
+      throw new ApiError(err.error || `API error ${res.status}`, res.status, err.conflicts);
     }
     return await res.json();
   } catch (error) {
@@ -148,6 +163,10 @@ export function DataProvider({ children }: DataProviderProps) {
             createdAt: b.created_at,
             clockIn: b.clock_in,
             clockOut: b.clock_out,
+            cancelledAt: b.cancelled_at ?? null,
+            cancellationReason: b.cancellation_reason || '',
+            cancelledBy: b.cancelled_by || '',
+            createdBy: b.created_by || '',
           }));
           setBookings(normalizedBookings);
           saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -261,6 +280,43 @@ export function DataProvider({ children }: DataProviderProps) {
 
   // --- Booking CRUD ---
 
+  const fetchBookings = useCallback(async () => {
+    try {
+      const apiBookings = await apiFetch<DbBookingWithNanny[]>("/bookings");
+      const normalizedBookings: Booking[] = apiBookings.map((b) => ({
+        id: b.id,
+        nannyId: b.nanny_id,
+        nannyName: b.nanny_name || b.client_name,
+        nannyImage: b.nanny_image || "",
+        clientName: b.client_name,
+        clientEmail: b.client_email,
+        clientPhone: b.client_phone,
+        hotel: b.hotel,
+        date: b.date,
+        endDate: b.end_date ?? null,
+        startTime: b.start_time,
+        endTime: b.end_time,
+        plan: b.plan,
+        childrenCount: b.children_count,
+        childrenAges: b.children_ages,
+        notes: b.notes,
+        totalPrice: b.total_price,
+        status: b.status,
+        createdAt: b.created_at,
+        clockIn: b.clock_in,
+        clockOut: b.clock_out,
+        cancelledAt: b.cancelled_at ?? null,
+        cancellationReason: b.cancellation_reason || '',
+        cancelledBy: b.cancelled_by || '',
+        createdBy: b.created_by || '',
+      }));
+      setBookings(normalizedBookings);
+      saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
+    } catch {
+      console.warn("Failed to refresh bookings");
+    }
+  }, []);
+
   const addBooking = useCallback(
     async (booking: Partial<Booking>, meta?: { locale?: string }): Promise<Booking> => {
       const nanny = nannies.find((n) => n.id === booking.nannyId);
@@ -315,6 +371,10 @@ export function DataProvider({ children }: DataProviderProps) {
           createdAt: created.created_at,
           clockIn: created.clock_in ?? null,
           clockOut: created.clock_out ?? null,
+          cancelledAt: created.cancelled_at ?? null,
+          cancellationReason: created.cancellation_reason || '',
+          cancelledBy: created.cancelled_by || '',
+          createdBy: created.created_by || '',
         };
         setBookings((prev) => {
           const updated = [...prev, normalized];
@@ -332,6 +392,7 @@ export function DataProvider({ children }: DataProviderProps) {
           createdBy: booking.createdBy || "parent",
           createdByName: booking.createdByName || "",
           createdAt: new Date().toISOString(),
+          createdBy: booking.createdBy || (adminProfile ? `Admin (${adminProfile.name})` : nannyProfile ? `Nanny (${nannyProfile.name})` : "Parent"),
         } as Booking;
         setBookings((prev) => {
           const updated = [...prev, newBooking];
@@ -344,7 +405,11 @@ export function DataProvider({ children }: DataProviderProps) {
     [nannies]
   );
 
-  const updateBookingStatus = useCallback(async (id: number | string, status: BookingStatus): Promise<void> => {
+  const updateBookingStatus = useCallback(async (
+    id: number | string,
+    status: BookingStatus,
+    meta?: { reason?: string; cancelledBy?: string }
+  ): Promise<void> => {
     const validStatuses: BookingStatus[] = ["pending", "confirmed", "completed", "cancelled"];
     if (!validStatuses.includes(status)) {
       console.error(`Invalid booking status: ${status}`);
@@ -353,14 +418,28 @@ export function DataProvider({ children }: DataProviderProps) {
     try {
       await apiFetch(`/bookings/${id}`, {
         method: "PUT",
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({
+          status,
+          ...(status === "cancelled" && meta ? {
+            cancellation_reason: meta.reason || "",
+            cancelled_by: meta.cancelledBy || "admin",
+          } : {}),
+        }),
       });
     } catch {
       console.warn("API status update failed, updating locally");
     }
     setBookings((prev) => {
       const updated = prev.map((b) =>
-        b.id === id ? { ...b, status } : b
+        b.id === id ? {
+          ...b,
+          status,
+          ...(status === "cancelled" ? {
+            cancelledAt: new Date().toISOString(),
+            cancellationReason: meta?.reason || "",
+            cancelledBy: meta?.cancelledBy || "",
+          } : {}),
+        } : b
       );
       saveToStorage(STORAGE_KEYS.bookings, updated);
       return updated;
@@ -462,6 +541,14 @@ export function DataProvider({ children }: DataProviderProps) {
     });
   }, []);
 
+  const sendBookingReminder = useCallback(async (id: number | string): Promise<void> => {
+    await apiFetch(`/bookings/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ send_reminder: true }),
+    });
+  }, []);
+
+
   // --- Nanny Portal Auth & Data ---
 
   const nannyLogin = useCallback(async (email: string, pin: string) => {
@@ -535,6 +622,10 @@ export function DataProvider({ children }: DataProviderProps) {
     createdAt: b.created_at,
     clockIn: b.clock_in,
     clockOut: b.clock_out,
+    cancelledAt: b.cancelled_at ?? null,
+    cancellationReason: b.cancellation_reason || '',
+    cancelledBy: b.cancelled_by || '',
+    createdBy: b.created_by || '',
   }), []);
 
   const fetchNannyBookings = useCallback(async () => {
@@ -795,14 +886,25 @@ export function DataProvider({ children }: DataProviderProps) {
         setAdminUsers((prev) =>
           prev.map((a) => (a.id === adminId ? result.admin : a))
         );
+        // Also update adminProfile if editing yourself
+        if (adminProfile && adminProfile.id === adminId && updates.name) {
+          setAdminProfile((prev) => prev ? { ...prev, name: updates.name! } : prev);
+        }
         return { success: true as const };
       }
-      return { success: false as const, error: result.error };
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      return { success: false as const, error: message || "Failed to update admin" };
+      return { success: false as const, error: result.error || "Failed to update admin" };
+    } catch {
+      // Fallback: update locally even if API fails
+      console.warn("API update failed, updating admin locally");
+      setAdminUsers((prev) =>
+        prev.map((a) => (a.id === adminId ? { ...a, ...updates } : a))
+      );
+      if (adminProfile && adminProfile.id === adminId && updates.name) {
+        setAdminProfile((prev) => prev ? { ...prev, name: updates.name! } : prev);
+      }
+      return { success: true as const };
     }
-  }, []);
+  }, [adminProfile]);
 
   const deleteAdminUser = useCallback(async (adminId: number) => {
     try {
@@ -882,6 +984,96 @@ export function DataProvider({ children }: DataProviderProps) {
     }
   }, []);
 
+  // --- Chat Messaging (API-backed) ---
+
+  const [chatChannels, setChatChannels] = useState<ChatChannel[]>([]);
+  const [chatMessages, setChatMessages] = useState<Record<string, ChatMessage[]>>({});
+  const [activeChannel, setActiveChannel] = useState<string | null>(null);
+
+  const fetchChatChannels = useCallback(async () => {
+    try {
+      const readerType = isAdmin ? "admin" : "nanny";
+      const readerId = isAdmin ? adminProfile?.id : nannyProfile?.id;
+      if (!readerId) return;
+      const data = await apiFetch<DbChatChannel[]>(`/messages?channel=list&readerType=${readerType}&readerId=${readerId}`);
+      setChatChannels(data.map((ch): ChatChannel => ({
+        channel: ch.channel,
+        lastMessage: ch.last_message,
+        lastSender: ch.last_sender,
+        lastAt: ch.last_at,
+        unreadCount: parseInt(String(ch.unread_count)) || 0,
+      })));
+    } catch {
+      // silent
+    }
+  }, [isAdmin, adminProfile, nannyProfile]);
+
+  const fetchChatMessages = useCallback(async (channel: string) => {
+    try {
+      const data = await apiFetch<DbChatMessage[]>(`/messages?channel=${encodeURIComponent(channel)}`);
+      setChatMessages((prev) => ({
+        ...prev,
+        [channel]: data.map((m): ChatMessage => ({
+          id: m.id,
+          channel: m.channel,
+          senderType: m.sender_type,
+          senderId: m.sender_id,
+          senderName: m.sender_name,
+          content: m.content,
+          createdAt: m.created_at,
+        })),
+      }));
+    } catch {
+      // silent
+    }
+  }, []);
+
+  const sendChatMessage = useCallback(async (channel: string, content: string) => {
+    const senderType = isAdmin ? "admin" : "nanny";
+    const senderId = isAdmin ? (adminProfile?.id ?? 0) : (nannyProfile?.id ?? 0);
+    const senderName = isAdmin ? (adminProfile?.name ?? "Admin") : (nannyProfile?.name ?? "Nanny");
+
+    try {
+      const msg = await apiFetch<DbChatMessage>("/messages", {
+        method: "POST",
+        body: JSON.stringify({ channel, senderType, senderId, senderName, content }),
+      });
+      // Append to local state
+      setChatMessages((prev) => ({
+        ...prev,
+        [channel]: [...(prev[channel] || []), {
+          id: msg.id,
+          channel: msg.channel,
+          senderType: msg.sender_type,
+          senderId: msg.sender_id,
+          senderName: msg.sender_name,
+          content: msg.content,
+          createdAt: msg.created_at,
+        }],
+      }));
+      // Refresh channel list for last message preview
+      fetchChatChannels();
+    } catch {
+      console.warn("Failed to send message");
+    }
+  }, [isAdmin, adminProfile, nannyProfile, fetchChatChannels]);
+
+  const markChatRead = useCallback(async (channel: string) => {
+    const readerType = isAdmin ? "admin" : "nanny";
+    const readerId = isAdmin ? (adminProfile?.id ?? 0) : (nannyProfile?.id ?? 0);
+    try {
+      await apiFetch("/messages", {
+        method: "PUT",
+        body: JSON.stringify({ channel, readerType, readerId }),
+      });
+      setChatChannels((prev) => prev.map((ch) =>
+        ch.channel === channel ? { ...ch, unreadCount: 0 } : ch
+      ));
+    } catch {
+      // silent
+    }
+  }, [isAdmin, adminProfile, nannyProfile]);
+
   // --- Computed Stats ---
 
   const stats: DashboardStats = useMemo(() => {
@@ -907,6 +1099,10 @@ export function DataProvider({ children }: DataProviderProps) {
     [nannyNotifications]
   );
 
+  const unreadChatCount = useMemo(() => {
+    return chatChannels.reduce((sum, ch) => sum + ch.unreadCount, 0);
+  }, [chatChannels]);
+
   const value: DataContextValue = useMemo(
     () => ({
       nannies,
@@ -918,6 +1114,7 @@ export function DataProvider({ children }: DataProviderProps) {
       toggleNannyStatus,
       resendInvite,
       bookings,
+      fetchBookings,
       addBooking,
       updateBooking,
       updateBookingStatus,
@@ -925,6 +1122,7 @@ export function DataProvider({ children }: DataProviderProps) {
       clockOutBooking,
       deleteBooking,
       resendInvoice,
+      sendBookingReminder,
       stats,
       isAdmin,
       adminProfile,
@@ -954,16 +1152,28 @@ export function DataProvider({ children }: DataProviderProps) {
       fetchNannyNotifications,
       markNotificationsRead,
       updateNannyProfile,
+      // Messaging
+      chatChannels,
+      chatMessages,
+      activeChannel,
+      unreadChatCount,
+      fetchChatChannels,
+      fetchChatMessages,
+      sendChatMessage,
+      markChatRead,
+      setActiveChannel,
     }),
     [
       nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability, inviteNanny, toggleNannyStatus, resendInvite,
-      bookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking, resendInvoice,
+      bookings, fetchBookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking, resendInvoice, sendBookingReminder,
       stats, isAdmin, adminProfile, adminUsers, adminLogin, adminLogout,
       fetchAdminUsers, addAdminUser, updateAdminUser, deleteAdminUser,
       changeAdminPassword, forgotAdminPassword, resetAdminPassword, registerAdmin, loading,
       isNanny, nannyProfile, nannyBookings, nannyNotifications, nannyStats,
       unreadNotifications, nannyLogin, nannyLogout, fetchNannyBookings,
       fetchNannyStats, fetchNannyNotifications, markNotificationsRead, updateNannyProfile,
+      chatChannels, chatMessages, activeChannel, unreadChatCount,
+      fetchChatChannels, fetchChatMessages, sendChatMessage, markChatRead, setActiveChannel,
     ]
   );
 
