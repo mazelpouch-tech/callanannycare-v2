@@ -509,6 +509,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Bookings API error:', message);
-    return res.status(500).json({ error: message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
