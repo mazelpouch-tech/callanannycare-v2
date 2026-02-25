@@ -17,6 +17,7 @@ import {
   Check,
   RefreshCw,
   UserPlus,
+  DollarSign,
 } from "lucide-react";
 import ImageUpload from "../../components/ImageUpload";
 import { useData } from "../../context/DataContext";
@@ -47,7 +48,7 @@ const STATUS_BADGES: Record<NannyStatus, { label: string; bg: string; text: stri
 export default function AdminNannies() {
   const {
     nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability,
-    inviteNanny, toggleNannyStatus, resendInvite,
+    inviteNanny, toggleNannyStatus, resendInvite, bulkUpdateNannyRate,
   } = useData();
 
   const [search, setSearch] = useState("");
@@ -203,6 +204,29 @@ export default function AdminNannies() {
     }
   };
 
+  // --- Bulk Rate Modal ---
+  const [bulkRateModalOpen, setBulkRateModalOpen] = useState(false);
+  const [bulkRateValue, setBulkRateValue] = useState("");
+  const [bulkRateLoading, setBulkRateLoading] = useState(false);
+  const [bulkRateError, setBulkRateError] = useState("");
+  const [bulkRateSuccess, setBulkRateSuccess] = useState("");
+
+  const handleBulkRateSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const rate = Number(bulkRateValue);
+    if (!rate || rate <= 0) { setBulkRateError("Please enter a valid positive rate."); return; }
+    setBulkRateLoading(true);
+    setBulkRateError("");
+    const result = await bulkUpdateNannyRate(rate);
+    setBulkRateLoading(false);
+    if (result.success) {
+      setBulkRateSuccess(`Rate updated to ${rate} €/hr for ${result.nannyCount} nannies.`);
+      setTimeout(() => { setBulkRateModalOpen(false); setBulkRateSuccess(""); setBulkRateValue(""); }, 2000);
+    } else {
+      setBulkRateError(result.error || "Failed to update rates.");
+    }
+  };
+
   // Resend invite handler
   const [resendLoading, setResendLoading] = useState<number | null>(null);
   const [resendLink, setResendLink] = useState<{ id: number; link: string } | null>(null);
@@ -241,7 +265,14 @@ export default function AdminNannies() {
             {nannies.length} nann{nannies.length !== 1 ? "ies" : "y"} registered
           </p>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <button
+            onClick={() => { setBulkRateValue(""); setBulkRateError(""); setBulkRateSuccess(""); setBulkRateModalOpen(true); }}
+            className="bg-emerald-600 text-white font-semibold px-5 py-2.5 rounded-xl hover:opacity-90 transition-all flex items-center gap-2"
+          >
+            <DollarSign className="w-4 h-4" />
+            Set All Rates
+          </button>
           <button
             onClick={openInviteModal}
             className="bg-accent text-white font-semibold px-5 py-2.5 rounded-xl hover:opacity-90 transition-all flex items-center gap-2"
@@ -959,6 +990,61 @@ export default function AdminNannies() {
                 <button
                   type="button"
                   onClick={closeModal}
+                  className="flex-1 bg-muted text-muted-foreground font-semibold py-2.5 rounded-xl hover:bg-muted/80 transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Rate Modal */}
+      {bulkRateModalOpen && (
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
+                  <DollarSign className="w-5 h-5 text-emerald-600" />
+                </div>
+                <h2 className="font-serif text-lg font-bold text-foreground">Set All Nanny Rates</h2>
+              </div>
+              <button onClick={() => setBulkRateModalOpen(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              This will update the hourly rate for all <strong>active</strong> and <strong>invited</strong> nannies at once.
+            </p>
+            <form onSubmit={handleBulkRateSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">New Hourly Rate (€/hr)</label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={bulkRateValue}
+                  onChange={(e) => setBulkRateValue(e.target.value)}
+                  placeholder="e.g. 150"
+                  required
+                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                />
+              </div>
+              {bulkRateError && <p className="text-sm text-destructive">{bulkRateError}</p>}
+              {bulkRateSuccess && <p className="text-sm text-emerald-600 font-medium">{bulkRateSuccess}</p>}
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="submit"
+                  disabled={bulkRateLoading}
+                  className="flex-1 bg-emerald-600 text-white font-semibold py-2.5 rounded-xl hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {bulkRateLoading ? "Updating..." : "Apply to All"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkRateModalOpen(false)}
                   className="flex-1 bg-muted text-muted-foreground font-semibold py-2.5 rounded-xl hover:bg-muted/80 transition-all"
                 >
                   Cancel

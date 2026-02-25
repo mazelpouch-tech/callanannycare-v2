@@ -874,6 +874,37 @@ export function DataProvider({ children }: DataProviderProps) {
     }
   }, []);
 
+  const bulkUpdateNannyRate = useCallback(async (
+    newRate: number,
+    opts?: { notifyAdmin?: boolean; updatedByName?: string; updatedByEmail?: string }
+  ): Promise<ApiResult<{ nannyCount: number }>> => {
+    try {
+      const result = await apiFetch<{ success: boolean; nannyCount?: number; error?: string }>("/nannies", {
+        method: "PUT",
+        body: JSON.stringify({
+          action: "bulk_update_rate",
+          newRate,
+          notifyAdmin: opts?.notifyAdmin ?? false,
+          updatedByName: opts?.updatedByName,
+          updatedByEmail: opts?.updatedByEmail,
+        }),
+      });
+      if (!result.success) {
+        return { success: false, error: result.error || "Failed to update rates" };
+      }
+      // Update local state
+      setNannies((prev) => {
+        const updated = prev.map((n) => n.status !== "blocked" ? { ...n, rate: newRate } : n);
+        saveToStorage(STORAGE_KEYS.nannies, updated);
+        return updated;
+      });
+      return { success: true, nannyCount: result.nannyCount ?? 0 };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return { success: false, error: message };
+    }
+  }, []);
+
   // --- Admin Auth & User Management ---
 
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(() =>
@@ -1223,6 +1254,7 @@ export function DataProvider({ children }: DataProviderProps) {
       inviteNanny,
       toggleNannyStatus,
       resendInvite,
+      bulkUpdateNannyRate,
       bookings,
       fetchBookings,
       addBooking,
@@ -1276,7 +1308,7 @@ export function DataProvider({ children }: DataProviderProps) {
       setActiveChannel,
     }),
     [
-      nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability, inviteNanny, toggleNannyStatus, resendInvite,
+      nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability, inviteNanny, toggleNannyStatus, resendInvite, bulkUpdateNannyRate,
       bookings, fetchBookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking, resendInvoice, sendBookingReminder,
       stats, isAdmin, adminProfile, adminUsers, adminLogin, adminLogout,
       fetchAdminUsers, addAdminUser, updateAdminUser, deleteAdminUser,

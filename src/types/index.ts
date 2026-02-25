@@ -368,6 +368,7 @@ export interface DataContextValue {
   inviteNanny: (data: { name: string; email: string }) => Promise<ApiResult<InviteResponse>>;
   toggleNannyStatus: (id: number) => Promise<void>;
   resendInvite: (nannyId: number) => Promise<ApiResult<ResendInviteResponse>>;
+  bulkUpdateNannyRate: (newRate: number, opts?: { notifyAdmin?: boolean; updatedByName?: string; updatedByEmail?: string }) => Promise<ApiResult<{ nannyCount: number }>>;
 
   bookings: Booking[];
   fetchBookings: () => Promise<void>;
