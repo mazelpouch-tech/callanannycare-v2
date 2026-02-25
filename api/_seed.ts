@@ -5,11 +5,8 @@ interface CountRow { count: string }
 interface RateRow { rate: number }
 interface BookingRow { id: number; start_time: string; end_time: string; date: string; end_date: string | null; total_price: number }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function seedHandler(req: VercelRequest, res: VercelResponse) {
   const sql = getDb();
-
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
   try {
     // Create tables
@@ -195,11 +192,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ────────────────────────────────────────────────────────────────
 
     // ─── MAD → EUR Price Migration ──────────────────────────────────
-    // Old pricing was in MAD (150 MAD/hr). New pricing is EUR (10€/hr).
-    // Detect if migration is needed by checking nanny rates.
-    // If any nanny has rate > 50, it means rates are still in MAD.
-    // Convert booking prices (÷15 because 150MAD/hr → 10€/hr)
-    // and update nanny rates to 10€.
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS price_migrated_to_eur BOOLEAN DEFAULT true`;
     await sql`ALTER TABLE bookings ALTER COLUMN price_migrated_to_eur SET DEFAULT true`;
 
@@ -208,8 +200,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let migrated = 0;
     if (needsMigration) {
-      // Convert old MAD booking prices to EUR (divide by 15: 150MAD/hr → 10€/hr)
-      // Only convert bookings that haven't been migrated yet
       const result = await sql`
         UPDATE bookings
         SET total_price = GREATEST(ROUND(total_price::numeric / 15), 1),
@@ -219,19 +209,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `;
       migrated = (result as unknown as { count?: number })?.count || 0;
 
-      // Mark any remaining bookings as migrated (e.g., price = 0)
       await sql`UPDATE bookings SET price_migrated_to_eur = true WHERE price_migrated_to_eur = false`;
-
-      // Update all nanny rates from MAD to EUR
       await sql`UPDATE nannies SET rate = 10 WHERE rate > 50`;
     }
     // ────────────────────────────────────────────────────────────────
 
     // ─── Price Repair ─────────────────────────────────────────────
-    // Recalculate the correct EUR price from stored times for every
-    // booking and fix any that don't match (too low OR too high).
-    const REPAIR_RATE = 10; // €/hr
-    const REPAIR_TAXI = 10; // € flat fee per day for evening bookings
+    const REPAIR_RATE = 10;
+    const REPAIR_TAXI = 10;
     let repaired = 0;
     const bookingsToCheck = await sql`
       SELECT id, start_time, end_time, date, end_date, COALESCE(total_price, 0) as total_price
@@ -261,7 +246,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const taxiFee = isEvening ? REPAIR_TAXI * dayCount : 0;
         const expectedPrice = Math.round(REPAIR_RATE * hours * dayCount + taxiFee);
 
-        // Repair if stored price doesn't match expected (too low or too high)
         if (expectedPrice > 0 && b.total_price !== expectedPrice) {
           await sql`UPDATE bookings SET total_price = ${expectedPrice} WHERE id = ${b.id}`;
           repaired++;

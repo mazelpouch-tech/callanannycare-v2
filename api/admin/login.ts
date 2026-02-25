@@ -3,6 +3,7 @@ import { getDb } from '../_db.js';
 import crypto from 'crypto';
 import type { DbAdminUser } from '@/types';
 import { sendAdminInviteEmail } from '../_emailTemplates.js';
+import seedHandler from '../_seed.js';
 
 interface AdminLoginBody {
   action?: string;
@@ -34,6 +35,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // POST: Admin Login
     if (req.method === 'POST') {
       const { action, email, password, name, adminId, currentPassword, newPassword, resetToken } = (req.body || {}) as AdminLoginBody;
+
+      // --- Seed (DB migrations & data) ---
+      if (action === 'seed') {
+        return seedHandler(req, res);
+      }
 
       // --- Login ---
       if (!action || action === 'login') {
