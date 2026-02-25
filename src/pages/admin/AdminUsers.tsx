@@ -10,6 +10,7 @@ import type { AdminUser, AdminRole } from "@/types";
 const ROLE_BADGES: Record<AdminRole, { label: string; color: string; icon: typeof Crown }> = {
   super_admin: { label: "Super Admin", color: "bg-purple-50 text-purple-700 border-purple-200", icon: Crown },
   admin: { label: "Admin", color: "bg-blue-50 text-blue-700 border-blue-200", icon: ShieldCheck },
+  supervisor: { label: "Supervisor", color: "bg-violet-50 text-violet-700 border-violet-200", icon: Eye },
 };
 
 export default function AdminUsers() {

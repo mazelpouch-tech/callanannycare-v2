@@ -7,7 +7,7 @@ export type BookingPlan = 'hourly' | 'half-day' | 'full-day';
 export type BookingCreator = 'parent' | 'nanny' | 'admin';
 export type NannyStatus = 'active' | 'blocked' | 'invited';
 export type NotificationType = 'new_booking' | 'booking_confirmed' | 'booking_cancelled' | 'booking_completed';
-export type AdminRole = 'super_admin' | 'admin';
+export type AdminRole = 'super_admin' | 'admin' | 'supervisor';
 export type MessageSenderType = 'admin' | 'nanny';
 
 // ============================================================
@@ -346,6 +346,7 @@ export interface DataContextValue {
   stats: DashboardStats;
 
   isAdmin: boolean;
+  isSupervisor: boolean;
   adminProfile: AdminProfile | null;
   adminUsers: AdminUser[];
   adminLogin: (email: string, password: string) => Promise<ApiResult>;

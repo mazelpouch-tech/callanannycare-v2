@@ -22,6 +22,10 @@ import AdminQRCode from './pages/admin/AdminQRCode'
 import AdminInvoices from './pages/admin/AdminInvoices'
 import AdminLoginLogs from './pages/admin/AdminLoginLogs'
 import AdminMessages from './pages/admin/AdminMessages'
+import SupervisorLayout from './pages/supervisor/SupervisorLayout'
+import SupervisorDashboard from './pages/supervisor/SupervisorDashboard'
+import SupervisorBookings from './pages/supervisor/SupervisorBookings'
+import SupervisorRevenue from './pages/supervisor/SupervisorRevenue'
 import NannyLogin from './pages/nanny/NannyLogin'
 import NannyRegister from './pages/nanny/NannyRegister'
 import NannyLayout from './pages/nanny/NannyLayout'
@@ -64,6 +68,13 @@ export default function App() {
         <Route path="qr-codes" element={<AdminQRCode />} />
         <Route path="login-logs" element={<AdminLoginLogs />} />
         <Route path="messages" element={<AdminMessages />} />
+      </Route>
+
+      {/* Supervisor routes */}
+      <Route path="/supervisor" element={<SupervisorLayout />}>
+        <Route index element={<SupervisorDashboard />} />
+        <Route path="bookings" element={<SupervisorBookings />} />
+        <Route path="revenue" element={<SupervisorRevenue />} />
       </Route>
 
       {/* Nanny portal routes */}

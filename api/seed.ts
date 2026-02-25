@@ -279,6 +279,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `;
     }
 
+    // Seed supervisor account (Doha) if none exists
+    const supervisorExists = await sql`SELECT COUNT(*) as count FROM admin_users WHERE role = 'supervisor'` as CountRow[];
+    if (parseInt(supervisorExists[0].count) === 0) {
+      await sql`
+        INSERT INTO admin_users (name, email, password, role, is_active)
+        VALUES ('Doha', 'doha@callanannycare.com', 'doha2024', 'supervisor', true)
+      `;
+    }
+
     // Delete old generic nannies and replace with real ones
     await sql`DELETE FROM nannies WHERE name IN ('Fatima Zahra', 'Amina Benali', 'Sara Tazi', 'Khadija Alami', 'Nadia Moussaoui', 'Houda El Fassi', 'Fatima Zahra El Idrissi', 'Amina Bouziane', 'Sara Lamrani', 'Khadija Ait Ouahmane', 'Nadia Berrada', 'Houda Chraibi')`;
 

@@ -1145,6 +1145,7 @@ export function DataProvider({ children }: DataProviderProps) {
       sendBookingReminder,
       stats,
       isAdmin,
+      isSupervisor: isAdmin && adminProfile?.role === 'supervisor',
       adminProfile,
       adminUsers,
       adminLogin,
