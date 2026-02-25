@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
+import PushNotificationBanner from "../../components/PushNotificationBanner";
 
 const sidebarLinks = [
   { to: "/nanny", labelKey: "nanny.layout.dashboard", icon: LayoutDashboard, end: true },
@@ -256,6 +257,9 @@ export default function NannyLayout() {
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+          {nannyProfile && (
+            <PushNotificationBanner userType="nanny" userId={nannyProfile.id} />
+          )}
           <Outlet />
         </main>
       </div>

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import AdminToast, { type AdminToastItem } from "../../components/AdminToast";
+import PushNotificationBanner from "../../components/PushNotificationBanner";
 import type { LucideIcon } from "lucide-react";
 import type { Booking } from "@/types";
 
@@ -301,6 +302,9 @@ export default function AdminLayout() {
 
         {/* Page Content */}
         <main className="flex-1 p-4 lg:p-8">
+          {adminProfile && (
+            <PushNotificationBanner userType="admin" userId={adminProfile.id} />
+          )}
           <Outlet />
         </main>
       </div>

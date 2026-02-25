@@ -579,6 +579,16 @@ export function DataProvider({ children }: DataProviderProps) {
         setIsNanny(true);
         setNannyProfile(profile);
         saveToStorage(STORAGE_KEYS.nannyProfile, profile);
+
+        // Auto-resubscribe push if permission was previously granted
+        try {
+          const { isPushSupported, isSubscribedToPush, subscribeToPush } = await import('../utils/pushNotifications');
+          if (isPushSupported() && Notification.permission === 'granted') {
+            const alreadySub = await isSubscribedToPush();
+            if (!alreadySub) await subscribeToPush('nanny', n.id);
+          }
+        } catch { /* push resubscribe is best-effort */ }
+
         return { success: true as const };
       }
       return { success: false as const, error: "Invalid email or PIN" };
@@ -833,6 +843,16 @@ export function DataProvider({ children }: DataProviderProps) {
         };
         setIsAdmin(true);
         setAdminProfile(profile);
+
+        // Auto-resubscribe push if permission was previously granted
+        try {
+          const { isPushSupported, isSubscribedToPush, subscribeToPush } = await import('../utils/pushNotifications');
+          if (isPushSupported() && Notification.permission === 'granted') {
+            const alreadySub = await isSubscribedToPush();
+            if (!alreadySub) await subscribeToPush('admin', a.id);
+          }
+        } catch { /* push resubscribe is best-effort */ }
+
         return { success: true as const };
       }
       return { success: false as const, error: "Invalid email or password" };

@@ -286,6 +286,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // Send push notifications (best-effort, non-blocking)
+      try {
+        const { sendPushToUser, sendPushToAllAdmins } = await import('./_pushUtils.js');
+        if (nanny_id) {
+          await sendPushToUser('nanny', nanny_id, {
+            title: 'New Booking Request',
+            body: `New booking from ${client_name} on ${date}`,
+            url: '/nanny/bookings',
+            tag: `booking-new-${result[0].id}`,
+          });
+        }
+        await sendPushToAllAdmins({
+          title: 'New Booking',
+          body: `${client_name} booked for ${date}`,
+          url: '/admin/bookings',
+          tag: `admin-booking-new-${result[0].id}`,
+        });
+      } catch (pushError: unknown) {
+        console.error('Push notification failed:', pushError);
+      }
+
       // Send WhatsApp Business notification (best-effort, non-blocking)
       const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
       const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID;
