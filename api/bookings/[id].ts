@@ -141,6 +141,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // Send push notifications on status change (best-effort)
+      if (status && result[0]) {
+        try {
+          const { sendPushToUser, sendPushToAllAdmins } = await import('../_pushUtils.js');
+
+          if (result[0].nanny_id) {
+            const pushMessages: Record<string, { title: string; body: string }> = {
+              confirmed: { title: 'Booking Confirmed', body: `Booking with ${result[0].client_name} on ${result[0].date} confirmed` },
+              cancelled: { title: 'Booking Cancelled', body: `Booking with ${result[0].client_name} on ${result[0].date} was cancelled` },
+              completed: { title: 'Booking Completed', body: `Booking with ${result[0].client_name} marked as completed` },
+            };
+            const pushMsg = pushMessages[status];
+            if (pushMsg) {
+              await sendPushToUser('nanny', result[0].nanny_id, {
+                ...pushMsg,
+                url: '/nanny/bookings',
+                tag: `booking-${status}-${id}`,
+              });
+            }
+          }
+
+          await sendPushToAllAdmins({
+            title: `Booking ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+            body: `Booking #${id} with ${result[0].client_name} is now ${status}`,
+            url: '/admin/bookings',
+            tag: `admin-booking-status-${id}`,
+          });
+        } catch (pushError: unknown) {
+          console.error('Push notification (status) failed:', pushError);
+        }
+      }
+
       // ─── Nanny confirmed → send parent a confirmation email with nanny profile ───
       if (status === 'confirmed' && result[0] && result[0].nanny_id && result[0].client_email) {
         try {
@@ -442,6 +474,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         } catch (nannyEmailError: unknown) {
           console.error('Nanny assignment email failed:', nannyEmailError);
+        }
+
+        // Push notification to newly assigned nanny
+        try {
+          const { sendPushToUser } = await import('../_pushUtils.js');
+          await sendPushToUser('nanny', nanny_id, {
+            title: 'New Booking Assigned',
+            body: `You've been assigned a booking with ${result[0].client_name} on ${result[0].date}`,
+            url: '/nanny/bookings',
+            tag: `booking-assigned-${result[0].id}`,
+          });
+        } catch (pushErr: unknown) {
+          console.error('Push (reassign) failed:', pushErr);
         }
       }
 

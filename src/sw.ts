@@ -1,0 +1,82 @@
+/// <reference lib="webworker" />
+import { precacheAndRoute } from 'workbox-precaching';
+import { registerRoute } from 'workbox-routing';
+import { NetworkFirst, CacheFirst } from 'workbox-strategies';
+import { ExpirationPlugin } from 'workbox-expiration';
+
+declare let self: ServiceWorkerGlobalScope;
+
+// Workbox precaching (manifest injected at build time)
+precacheAndRoute(self.__WB_MANIFEST);
+
+// ─── Runtime Caching (replicating previous generateSW config) ────
+
+// API calls: Network first with 5-minute cache
+registerRoute(
+  ({ url }) => url.pathname.startsWith('/api/'),
+  new NetworkFirst({
+    cacheName: 'api-cache',
+    plugins: [new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 300 })],
+  })
+);
+
+// Images: Cache first with 30-day expiry
+registerRoute(
+  ({ request }) => request.destination === 'image',
+  new CacheFirst({
+    cacheName: 'image-cache',
+    plugins: [new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 })],
+  })
+);
+
+// Google Fonts: Cache first with 1-year expiry
+registerRoute(
+  ({ url }) => url.origin === 'https://fonts.googleapis.com' || url.origin === 'https://fonts.gstatic.com',
+  new CacheFirst({
+    cacheName: 'google-fonts-cache',
+    plugins: [new ExpirationPlugin({ maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 })],
+  })
+);
+
+// ─── Push Notification Handlers ──────────────────────────────────
+
+self.addEventListener('push', (event: PushEvent) => {
+  if (!event.data) return;
+
+  try {
+    const payload = event.data.json();
+    const { title, body, icon, badge, data, tag } = payload;
+
+    event.waitUntil(
+      self.registration.showNotification(title || 'Call a Nanny', {
+        body: body || '',
+        icon: icon || '/pwa-192x192.png',
+        badge: badge || '/pwa-192x192.png',
+        tag: tag || undefined,
+        data: data || {},
+      })
+    );
+  } catch (err) {
+    console.error('Push event parse error:', err);
+  }
+});
+
+self.addEventListener('notificationclick', (event: NotificationEvent) => {
+  event.notification.close();
+
+  const url = event.notification.data?.url || '/';
+  const fullUrl = new URL(url, self.location.origin).href;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Focus existing window if already open
+      for (const client of clientList) {
+        if (client.url === fullUrl && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Otherwise open new window
+      return self.clients.openWindow(fullUrl);
+    })
+  );
+});

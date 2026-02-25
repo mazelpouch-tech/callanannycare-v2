@@ -177,6 +177,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS review_sent_at TIMESTAMPTZ`;
     // ────────────────────────────────────────────────────────────────
 
+    // ─── Push Subscriptions ─────────────────────────────────────────
+    await sql`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id SERIAL PRIMARY KEY,
+        user_type VARCHAR(20) NOT NULL,
+        user_id INTEGER NOT NULL,
+        endpoint TEXT NOT NULL UNIQUE,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        user_agent TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_type, user_id)`;
+    // ────────────────────────────────────────────────────────────────
+
     // ─── MAD → EUR Price Migration ──────────────────────────────────
     // Old pricing was in MAD (150 MAD/hr). New pricing is EUR (10€/hr).
     // Detect if migration is needed by checking nanny rates.
