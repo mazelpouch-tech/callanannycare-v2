@@ -156,7 +156,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (pushMsg) {
               await sendPushToUser('nanny', result[0].nanny_id, {
                 ...pushMsg,
-                url: '/nanny/bookings',
+                url: `/nanny/bookings?booking=${id}`,
                 tag: `booking-${status}-${id}`,
               });
             }
@@ -165,7 +165,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await sendPushToAllAdmins({
             title: `Booking ${status.charAt(0).toUpperCase() + status.slice(1)}`,
             body: `Booking #${id} with ${result[0].client_name} is now ${status}`,
-            url: '/admin/bookings',
+            url: `/admin/bookings?booking=${id}`,
             tag: `admin-booking-status-${id}`,
           });
         } catch (pushError: unknown) {
@@ -482,7 +482,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await sendPushToUser('nanny', nanny_id, {
             title: 'New Booking Assigned',
             body: `You've been assigned a booking with ${result[0].client_name} on ${result[0].date}`,
-            url: '/nanny/bookings',
+            url: `/nanny/bookings?booking=${result[0].id}`,
             tag: `booking-assigned-${result[0].id}`,
           });
         } catch (pushErr: unknown) {

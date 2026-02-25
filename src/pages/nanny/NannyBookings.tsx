@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Search,
   ChevronDown,
@@ -99,11 +100,29 @@ function LiveTimer({ clockIn }: LiveTimerProps) {
 export default function NannyBookings() {
   const { nannyBookings, fetchNannyBookings, updateBookingStatus, updateBooking, clockInBooking, clockOutBooking, addBooking, nannyProfile, nannies } = useData();
   const { t } = useLanguage();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
-  const [expandedId, setExpandedId] = useState<number | string | null>(null);
+  const [expandedId, setExpandedId] = useState<number | string | null>(() => {
+    const bookingParam = searchParams.get("booking");
+    return bookingParam ? Number(bookingParam) : null;
+  });
   const [actionLoading, setActionLoading] = useState<number | string | null>(null);
+
+  // Auto-scroll to booking from push notification deep link
+  useEffect(() => {
+    const bookingParam = searchParams.get("booking");
+    if (bookingParam) {
+      setExpandedId(Number(bookingParam));
+      searchParams.delete("booking");
+      setSearchParams(searchParams, { replace: true });
+      setTimeout(() => {
+        const el = document.getElementById(`booking-row-${bookingParam}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 300);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [extendBooking, setExtendBooking] = useState<typeof nannyBookings[0] | null>(null);
   const [forwardBooking, setForwardBooking] = useState<typeof nannyBookings[0] | null>(null);
@@ -622,7 +641,7 @@ export default function NannyBookings() {
                 <tbody>
                   {filtered.map((booking) => (
                     <Fragment key={booking.id}>
-                      <tr className="border-b border-border hover:bg-muted/30">
+                      <tr id={`booking-row-${booking.id}`} className="border-b border-border hover:bg-muted/30">
                         <td className="px-5 py-3 font-medium text-foreground">
                           {booking.clientName}
                         </td>
@@ -868,7 +887,7 @@ export default function NannyBookings() {
             {/* Mobile cards */}
             <div className="md:hidden divide-y divide-border">
               {filtered.map((booking) => (
-                <div key={booking.id} className="p-4">
+                <div key={booking.id} id={`booking-row-${booking.id}`} className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium text-foreground">
                       {booking.clientName}

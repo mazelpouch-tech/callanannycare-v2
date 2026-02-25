@@ -293,14 +293,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await sendPushToUser('nanny', nanny_id, {
             title: 'New Booking Request',
             body: `New booking from ${client_name} on ${date}`,
-            url: '/nanny/bookings',
+            url: `/nanny/bookings?booking=${result[0].id}`,
             tag: `booking-new-${result[0].id}`,
           });
         }
         await sendPushToAllAdmins({
           title: 'New Booking',
           body: `${client_name} booked for ${date}`,
-          url: '/admin/bookings',
+          url: `/admin/bookings?booking=${result[0].id}`,
           tag: `admin-booking-new-${result[0].id}`,
         });
       } catch (pushError: unknown) {

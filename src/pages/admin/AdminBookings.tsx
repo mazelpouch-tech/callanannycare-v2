@@ -149,7 +149,7 @@ const statusFilters = ["all", "pending", "confirmed", "completed", "cancelled"];
 export default function AdminBookings() {
   const { bookings, fetchBookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking, sendBookingReminder, adminProfile } = useData();
   const { toDH } = useExchangeRate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState(() => {
@@ -158,8 +158,27 @@ export default function AdminBookings() {
   });
   const [nannyFilter, setNannyFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
-  const [expandedRow, setExpandedRow] = useState<number | string | null>(null);
+  const [expandedRow, setExpandedRow] = useState<number | string | null>(() => {
+    const bookingParam = searchParams.get("booking");
+    return bookingParam ? Number(bookingParam) : null;
+  });
   const [deleteConfirm, setDeleteConfirm] = useState<number | string | null>(null);
+
+  // Auto-scroll to booking from push notification deep link
+  useEffect(() => {
+    const bookingParam = searchParams.get("booking");
+    if (bookingParam) {
+      setExpandedRow(Number(bookingParam));
+      // Clean up the URL param
+      searchParams.delete("booking");
+      setSearchParams(searchParams, { replace: true });
+      // Scroll to the booking row after render
+      setTimeout(() => {
+        const el = document.getElementById(`booking-row-${bookingParam}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 300);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reminder cooldown tracking (booking ID → timestamp)
   const [remindedBookings, setRemindedBookings] = useState<Record<string, number>>({});
@@ -766,7 +785,7 @@ export default function AdminBookings() {
 
                     return (
                       <Fragment key={booking.id}>
-                        <tr className="hover:bg-muted/30 transition-colors">
+                        <tr id={`booking-row-${booking.id}`} className="hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-3.5 text-sm font-medium text-foreground">
                             {booking.clientName || "N/A"}
                           </td>
@@ -1150,6 +1169,7 @@ export default function AdminBookings() {
               return (
                 <Fragment key={`mobile-${booking.id}`}>
                 <div
+                  id={`booking-row-${booking.id}`}
                   className="bg-card rounded-xl border border-border shadow-soft overflow-hidden"
                 >
                   {/* Card Header */}
