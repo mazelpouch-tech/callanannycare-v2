@@ -408,6 +408,9 @@ export interface DataContextValue {
   loading: boolean;
 
   isNanny: boolean;
+  isImpersonating: boolean;
+  impersonateNanny: (nanny: Nanny) => void;
+  stopImpersonating: () => void;
   nannyProfile: NannyProfile | null;
   nannyBookings: Booking[];
   nannyNotifications: Notification[];

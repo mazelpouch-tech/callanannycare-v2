@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Plus,
   Edit,
@@ -18,6 +19,7 @@ import {
   RefreshCw,
   UserPlus,
   DollarSign,
+  Eye,
 } from "lucide-react";
 import ImageUpload from "../../components/ImageUpload";
 import { useData } from "../../context/DataContext";
@@ -49,7 +51,9 @@ export default function AdminNannies() {
   const {
     nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability,
     inviteNanny, toggleNannyStatus, resendInvite, bulkUpdateNannyRate,
+    impersonateNanny,
   } = useData();
+  const navigate = useNavigate();
 
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -457,6 +461,17 @@ export default function AdminNannies() {
                             </button>
                           )}
 
+                          {/* View as Nanny */}
+                          {nanny.status === "active" && (
+                            <button
+                              onClick={() => { impersonateNanny(nanny); navigate("/nanny"); }}
+                              className="p-2 rounded-lg text-muted-foreground hover:text-violet-600 hover:bg-violet-50 transition-colors"
+                              title={`View portal as ${nanny.name}`}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          )}
+
                           {/* Edit */}
                           <button
                             onClick={() => openEditModal(nanny)}
@@ -605,6 +620,14 @@ export default function AdminNannies() {
 
                 {/* Card Actions */}
                 <div className="flex border-t border-border divide-x divide-border">
+                  {nanny.status === "active" && (
+                    <button
+                      onClick={() => { impersonateNanny(nanny); navigate("/nanny"); }}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-violet-600 hover:bg-violet-50 transition-colors"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> View as
+                    </button>
+                  )}
                   <button
                     onClick={() => openEditModal(nanny)}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"

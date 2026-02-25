@@ -42,6 +42,7 @@ const STORAGE_KEYS = {
   admin: "callanannycare_admin",
   nanny: "callanannycare_nanny",
   nannyProfile: "callanannycare_nanny_profile",
+  impersonating: "callanannycare_impersonating",
 };
 
 function loadFromStorage<T>(key: string, fallback: T): T {
@@ -112,6 +113,9 @@ export function DataProvider({ children }: DataProviderProps) {
   );
   const [nannyProfile, setNannyProfile] = useState<NannyProfile | null>(() =>
     loadFromStorage(STORAGE_KEYS.nannyProfile, null)
+  );
+  const [isImpersonating, setIsImpersonating] = useState<boolean>(() =>
+    loadFromStorage(STORAGE_KEYS.impersonating, false)
   );
   const [nannyBookings, setNannyBookings] = useState<Booking[]>([]);
   const [nannyNotifications, setNannyNotifications] = useState<Notification[]>([]);
@@ -725,7 +729,48 @@ export function DataProvider({ children }: DataProviderProps) {
     setNannyBookings([]);
     setNannyNotifications([]);
     setNannyStats(null);
+    setIsImpersonating(false);
     localStorage.removeItem(STORAGE_KEYS.nannyProfile);
+    localStorage.removeItem(STORAGE_KEYS.impersonating);
+  }, []);
+
+  /** Admin impersonates a nanny — no credentials needed. */
+  const impersonateNanny = useCallback((nanny: Nanny) => {
+    const profile: NannyProfile = {
+      id: nanny.id,
+      name: nanny.name,
+      email: nanny.email || '',
+      image: nanny.image || '',
+      location: nanny.location || '',
+      rating: nanny.rating ?? 5,
+      experience: nanny.experience || '',
+      status: nanny.status,
+      bio: nanny.bio || '',
+      specialties: Array.isArray(nanny.specialties) ? nanny.specialties : [],
+      languages: Array.isArray(nanny.languages) ? nanny.languages : [],
+      rate: nanny.rate ?? 0,
+      available: nanny.available,
+      phone: nanny.phone || '',
+    };
+    setNannyProfile(profile);
+    setIsNanny(true);
+    setIsImpersonating(true);
+    saveToStorage(STORAGE_KEYS.nannyProfile, profile);
+    saveToStorage(STORAGE_KEYS.nanny, true);
+    saveToStorage(STORAGE_KEYS.impersonating, true);
+  }, []);
+
+  /** Stop impersonating — return to admin-only state. */
+  const stopImpersonating = useCallback(() => {
+    setIsNanny(false);
+    setNannyProfile(null);
+    setNannyBookings([]);
+    setNannyNotifications([]);
+    setNannyStats(null);
+    setIsImpersonating(false);
+    localStorage.removeItem(STORAGE_KEYS.nannyProfile);
+    localStorage.removeItem(STORAGE_KEYS.impersonating);
+    saveToStorage(STORAGE_KEYS.nanny, false);
   }, []);
 
   const normalizeBooking = useCallback((b: DbBookingWithNanny): Booking => ({
@@ -1347,6 +1392,9 @@ export function DataProvider({ children }: DataProviderProps) {
       loading,
       // Nanny portal
       isNanny,
+      isImpersonating,
+      impersonateNanny,
+      stopImpersonating,
       nannyProfile,
       nannyBookings,
       nannyNotifications,
@@ -1376,7 +1424,7 @@ export function DataProvider({ children }: DataProviderProps) {
       stats, isAdmin, adminProfile, adminUsers, adminLogin, adminLogout,
       fetchAdminUsers, addAdminUser, updateAdminUser, deleteAdminUser,
       changeAdminPassword, forgotAdminPassword, resetAdminPassword, registerAdmin, loading,
-      isNanny, nannyProfile, nannyBookings, nannyNotifications, nannyStats,
+      isNanny, isImpersonating, impersonateNanny, stopImpersonating, nannyProfile, nannyBookings, nannyNotifications, nannyStats,
       unreadNotifications, nannyLogin, nannyLogout, fetchNannyBookings,
       fetchNannyStats, fetchNannyNotifications, markNotificationsRead, updateNannyProfile,
       chatChannels, chatMessages, activeChannel, unreadChatCount,
