@@ -103,8 +103,9 @@ const statusConfig: Record<BookingStatus, { label: string; className: string }> 
 
 type UrgencyLevel = "normal" | "warning" | "critical";
 
-function getUrgencyLevel(createdAt: string, status: string): UrgencyLevel {
+function getUrgencyLevel(createdAt: string, status: string, nannyId?: number | null): UrgencyLevel {
   if (status !== "pending") return "normal";
+  if (nannyId) return "normal"; // already assigned to a nanny, no action needed
   const hoursElapsed = (Date.now() - new Date(createdAt).getTime()) / 3600000;
   if (hoursElapsed > 3) return "critical";
   if (hoursElapsed > 1) return "warning";
@@ -112,7 +113,7 @@ function getUrgencyLevel(createdAt: string, status: string): UrgencyLevel {
 }
 
 function UrgencyBadge({ booking }: { booking: Booking }) {
-  const urgency = getUrgencyLevel(booking.createdAt, booking.status);
+  const urgency = getUrgencyLevel(booking.createdAt, booking.status, booking.nannyId);
   if (booking.status !== "pending" || urgency === "normal") {
     const status = statusConfig[booking.status] || statusConfig.pending;
     return (
@@ -2020,11 +2021,19 @@ export default function AdminBookings() {
           nannies={nannies}
           currentNannyId={forwardBooking.nannyId}
           onConfirm={async (newNannyId) => {
-            const newNanny = nannies.find((n) => n.id === newNannyId);
-            await updateBooking(forwardBooking.id, {
-              nannyId: newNannyId,
-              nannyName: newNanny?.name || "",
+            const res = await fetch(`/api/bookings/${forwardBooking.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ nanny_id: newNannyId }),
             });
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}));
+              const err: Error & { status?: number } = new Error(
+                data.error || `Failed to forward booking (${res.status})`
+              );
+              err.status = res.status;
+              throw err;
+            }
             await fetchBookings();
           }}
           onClose={() => setForwardBooking(null)}
