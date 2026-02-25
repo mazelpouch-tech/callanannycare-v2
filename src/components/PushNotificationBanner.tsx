@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, X } from 'lucide-react';
+import { Bell, X, Share, Plus } from 'lucide-react';
 import {
   isPushSupported,
   isInstalledPWA,
@@ -14,16 +14,29 @@ interface Props {
   userId: number;
 }
 
+function isIOS(): boolean {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
 export default function PushNotificationBanner({ userType, userId }: Props) {
   const [supported, setSupported] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [needsInstall, setNeedsInstall] = useState(false);
 
   useEffect(() => {
     const check = async () => {
       const isSupp = isPushSupported();
       setSupported(isSupp);
+
+      // On iOS Safari (not installed as PWA), push isn't available yet
+      // Show a prompt to install the app instead
+      if (!isSupp && isIOS() && !isInstalledPWA()) {
+        setNeedsInstall(true);
+        return;
+      }
+
       if (isSupp) {
         const isSub = await isSubscribedToPush();
         setSubscribed(isSub);
@@ -55,14 +68,53 @@ export default function PushNotificationBanner({ userType, userId }: Props) {
     localStorage.setItem(key, 'true');
   };
 
-  // Don't show if not supported, already subscribed, dismissed, or permission denied
-  if (!supported || dismissed || getPushPermission() === 'denied') return null;
+  if (dismissed) return null;
 
-  // On iOS, only show if installed as PWA
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  if (isIOS && !isInstalledPWA()) return null;
+  // iOS Safari — not installed as PWA yet: show "Add to Home Screen" instructions
+  if (needsInstall) {
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <Bell className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-blue-900">
+                Get push notifications
+              </p>
+              <p className="text-xs text-blue-700 mt-1">
+                Install this app to your home screen to receive instant booking alerts:
+              </p>
+              <ol className="text-xs text-blue-700 mt-2 space-y-1.5 list-none pl-0">
+                <li className="flex items-center gap-2">
+                  <span className="bg-blue-200 text-blue-800 font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0 text-[10px]">1</span>
+                  <span>Tap the <Share className="w-3.5 h-3.5 inline -mt-0.5" /> <strong>Share</strong> button in Safari</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="bg-blue-200 text-blue-800 font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0 text-[10px]">2</span>
+                  <span>Scroll down and tap <Plus className="w-3.5 h-3.5 inline -mt-0.5" /> <strong>Add to Home Screen</strong></span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="bg-blue-200 text-blue-800 font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0 text-[10px]">3</span>
+                  <span>Open the app from your home screen & enable notifications</span>
+                </li>
+              </ol>
+            </div>
+          </div>
+          <button onClick={handleDismiss} className="p-1 text-blue-400 hover:text-blue-600 shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-  // If already subscribed, show a subtle toggle
+  // Not supported and not iOS install case — nothing to show
+  if (!supported) return null;
+
+  // Permission was denied — nothing we can do
+  if (getPushPermission() === 'denied') return null;
+
+  // Already subscribed — show a subtle toggle
   if (subscribed) {
     return (
       <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 flex items-center justify-between">
