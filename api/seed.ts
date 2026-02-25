@@ -279,12 +279,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `;
     }
 
-    // Seed supervisor account (Doha) if none exists
-    const supervisorExists = await sql`SELECT COUNT(*) as count FROM admin_users WHERE role = 'supervisor'` as CountRow[];
-    if (parseInt(supervisorExists[0].count) === 0) {
+    // Seed supervisor account (Doha) — create or fix if exists with wrong role
+    const dohaCheck = await sql`SELECT id, role FROM admin_users WHERE LOWER(email) = 'doha@callanannycare.com'` as { id: number; role: string }[];
+    if (dohaCheck.length === 0) {
       await sql`
         INSERT INTO admin_users (name, email, password, role, is_active)
         VALUES ('Doha', 'doha@callanannycare.com', 'doha2024', 'supervisor', true)
+      `;
+    } else if (dohaCheck[0].role !== 'supervisor') {
+      await sql`
+        UPDATE admin_users SET role = 'supervisor', is_active = true, password = 'doha2024', updated_at = NOW()
+        WHERE id = ${dohaCheck[0].id}
       `;
     }
 

@@ -15,6 +15,7 @@ interface AdminLoginBody {
   token?: string;
   resetToken?: string;
   isActive?: boolean;
+  role?: string;
 }
 
 interface AdminIdRow { id: number }
@@ -293,9 +294,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })));
     }
 
-    // PUT: Update admin user (toggle active, update name/email)
+    // PUT: Update admin user (toggle active, update name/email/role)
     if (req.method === 'PUT') {
-      const { adminId, name, email, isActive } = req.body as AdminLoginBody;
+      const { adminId, name, email, isActive, role } = req.body as AdminLoginBody;
 
       if (!adminId) {
         return res.status(400).json({ error: 'Admin ID is required' });
@@ -314,11 +315,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // Validate role if provided
+      const validRoles = ['super_admin', 'admin', 'supervisor'];
+      if (role && !validRoles.includes(role)) {
+        return res.status(400).json({ error: 'Invalid role' });
+      }
+
       const updated = await sql`
         UPDATE admin_users SET
           name = COALESCE(${name || null}, name),
           email = COALESCE(${email || null}, email),
           is_active = COALESCE(${isActive !== undefined ? isActive : null}, is_active),
+          role = COALESCE(${role || null}, role),
           updated_at = NOW()
         WHERE id = ${adminId}
         RETURNING id, name, email, role, is_active, last_login, login_count, created_at
