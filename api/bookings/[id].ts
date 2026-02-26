@@ -65,9 +65,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ─── Payment / Payout ledger actions ────────────────────────────
     if (req.method === 'POST') {
-      const { action, amount, currency, method, received_by, paid_by, note, paymentId, payoutId } = req.body as {
+      const { action, amount, amount_eur, currency, method, received_by, paid_by, note, paymentId, payoutId } = req.body as {
         action: string;
         amount?: number;
+        amount_eur?: number;
         currency?: string;
         method?: string;
         received_by?: string;
@@ -79,9 +80,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (action === 'addPayment') {
         if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+        const cur = currency || 'EUR';
+        // amount_eur: use provided value for DH payments; for EUR payments fall back to amount itself
+        const eurEquiv = amount_eur && amount_eur > 0 ? amount_eur : (cur === 'EUR' ? amount : 0);
         const r = await sql`
-          INSERT INTO booking_payments (booking_id, amount, currency, method, received_by, note)
-          VALUES (${id}, ${amount}, ${currency || 'EUR'}, ${method || 'cash'}, ${received_by || ''}, ${note || ''})
+          INSERT INTO booking_payments (booking_id, amount, amount_eur, currency, method, received_by, note)
+          VALUES (${id}, ${amount}, ${eurEquiv}, ${cur}, ${method || 'cash'}, ${received_by || ''}, ${note || ''})
           RETURNING *
         `;
         return res.status(201).json(r[0]);

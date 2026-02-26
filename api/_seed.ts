@@ -188,6 +188,10 @@ export default async function seedHandler(req: VercelRequest, res: VercelRespons
       )
     `;
     await sql`CREATE INDEX IF NOT EXISTS idx_booking_payments ON booking_payments(booking_id)`;
+    // Ensure amount_eur column exists (EUR equivalent stored for DH payments)
+    await sql`ALTER TABLE booking_payments ADD COLUMN IF NOT EXISTS amount_eur INTEGER DEFAULT 0`;
+    // Backfill: for existing EUR payments, amount_eur = amount
+    await sql`UPDATE booking_payments SET amount_eur = amount WHERE currency = 'EUR' AND amount_eur = 0`;
 
     await sql`
       CREATE TABLE IF NOT EXISTS booking_payouts (

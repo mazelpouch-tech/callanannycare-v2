@@ -303,6 +303,7 @@ export interface BookingPayment {
   id: number;
   bookingId: number;
   amount: number;
+  amountEur: number;   // EUR equivalent (= amount for EUR payments; converted value for DH payments)
   currency: string;
   method: PaymentMethod;
   receivedBy: string;
