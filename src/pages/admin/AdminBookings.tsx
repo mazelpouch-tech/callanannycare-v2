@@ -29,6 +29,8 @@ import {
   Bell,
   RotateCcw,
   History,
+  GitMerge,
+  Users,
 } from "lucide-react";
 import { format, parseISO, formatDistanceToNow, isToday } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -250,6 +252,14 @@ export default function AdminBookings() {
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelLoading, setCancelLoading] = useState(false);
+
+  // ─── Group Selection ──────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<number | string>>(new Set());
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkNannyId, setBulkNannyId] = useState("");
+  const [confirmBulkCancel, setConfirmBulkCancel] = useState(false);
+  // ─────────────────────────────────────────────────────────────
 
   const handleCancelConfirm = async () => {
     if (!cancelTarget) return;
@@ -658,6 +668,96 @@ export default function AdminBookings() {
   };
   // ─────────────────────────────────────────────────────────────
 
+  // ─── Group selection helpers ──────────────────────────────────
+  const selectedBookings = useMemo(
+    () => filteredBookings.filter((b) => selectedIds.has(b.id)),
+    [filteredBookings, selectedIds]
+  );
+
+  const selectedParentName = useMemo(() => {
+    if (selectedBookings.length === 0) return null;
+    const names = [...new Set(selectedBookings.map((b) => b.clientName || ""))].filter(Boolean);
+    return names.length === 1 ? names[0] : null;
+  }, [selectedBookings]);
+
+  // Merge is possible when 2+ bookings share same parent AND same time slot
+  const canMerge = useMemo(() => {
+    if (selectedBookings.length < 2) return false;
+    if (!selectedParentName) return false;
+    const slots = [...new Set(selectedBookings.map((b) => `${b.startTime}__${b.endTime}`))];
+    return slots.length === 1;
+  }, [selectedBookings, selectedParentName]);
+
+  const toggleSelect = (id: number | string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAllByParent = (name: string) => {
+    const ids = filteredBookings.filter((b) => b.clientName === name).map((b) => b.id);
+    setSelectedIds(new Set(ids));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setConfirmBulkCancel(false);
+    setBulkNannyId("");
+  };
+
+  const handleBulkConfirm = async () => {
+    setBulkLoading(true);
+    for (const b of selectedBookings) {
+      if (b.status === "pending") await updateBookingStatus(b.id, "confirmed");
+    }
+    setBulkLoading(false);
+    clearSelection();
+  };
+
+  const handleBulkCancel = async () => {
+    setBulkLoading(true);
+    for (const b of selectedBookings) {
+      if (b.status === "pending" || b.status === "confirmed") {
+        await updateBookingStatus(b.id, "cancelled", { reason: "Bulk cancelled by admin", cancelledBy: "admin" });
+      }
+    }
+    setBulkLoading(false);
+    clearSelection();
+  };
+
+  const handleBulkAssignNanny = async (nannyId: string) => {
+    if (!nannyId) return;
+    setBulkLoading(true);
+    const nanny = nannies.find((n) => n.id === Number(nannyId));
+    for (const b of selectedBookings) {
+      await updateBooking(b.id, { nannyId: Number(nannyId), nannyName: nanny?.name || "" });
+    }
+    setBulkLoading(false);
+    setBulkNannyId("");
+    clearSelection();
+  };
+
+  // Merge: update the earliest booking to span the full date range, soft-delete the rest
+  const handleMerge = async () => {
+    if (!canMerge) return;
+    setBulkLoading(true);
+    const sorted = [...selectedBookings].sort((a, b) => a.date.localeCompare(b.date));
+    const base = sorted[0];
+    const lastDate = sorted[sorted.length - 1].date;
+    const totalPrice = selectedBookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+    await updateBooking(base.id, { endDate: lastDate, totalPrice });
+    for (let i = 1; i < sorted.length; i++) {
+      await deleteBooking(sorted[i].id, adminProfile?.name || "Admin");
+    }
+    setBulkLoading(false);
+    setShowMergeModal(false);
+    clearSelection();
+  };
+  // ─────────────────────────────────────────────────────────────
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -780,6 +880,17 @@ export default function AdminBookings() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
+                    <th className="px-3 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        className="rounded border-border cursor-pointer"
+                        checked={filteredBookings.length > 0 && filteredBookings.every((b) => selectedIds.has(b.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedIds(new Set(filteredBookings.map((b) => b.id)));
+                          else clearSelection();
+                        }}
+                      />
+                    </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Client
                     </th>
@@ -823,7 +934,7 @@ export default function AdminBookings() {
                   ] as const).map((group) => group.items.length > 0 && (
                     <Fragment key={group.label}>
                       <tr>
-                        <td colSpan={10} className="px-4 py-4 bg-primary/5 text-center">
+                        <td colSpan={12} className="px-4 py-4 bg-primary/5 text-center">
                           <div className="flex items-center justify-center gap-4">
                             <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
                             <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
@@ -838,9 +949,28 @@ export default function AdminBookings() {
 
                     return (
                       <Fragment key={booking.id}>
-                        <tr id={`booking-row-${booking.id}`} className="hover:bg-muted/30 transition-colors">
+                        <tr id={`booking-row-${booking.id}`} className={`hover:bg-muted/30 transition-colors ${selectedIds.has(booking.id) ? "bg-primary/5" : ""}`}>
+                          <td className="px-3 py-3.5" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              className="rounded border-border cursor-pointer"
+                              checked={selectedIds.has(booking.id)}
+                              onChange={() => toggleSelect(booking.id)}
+                            />
+                          </td>
                           <td className="px-4 py-3.5 text-sm font-medium text-foreground">
-                            {booking.clientName || "N/A"}
+                            <div className="flex items-center gap-1.5 group/client">
+                              <span>{booking.clientName || "N/A"}</span>
+                              {booking.clientName && (
+                                <button
+                                  onClick={() => selectAllByParent(booking.clientName!)}
+                                  title={`Select all bookings for ${booking.clientName}`}
+                                  className="opacity-0 group-hover/client:opacity-100 transition-opacity p-0.5 rounded text-muted-foreground hover:text-primary hover:bg-primary/10"
+                                >
+                                  <Users className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-3.5 text-sm text-muted-foreground">
                             {booking.clientEmail || "N/A"}
@@ -1045,7 +1175,7 @@ export default function AdminBookings() {
                         {isExpanded && (
                           <tr>
                             <td
-                              colSpan={10}
+                              colSpan={12}
                               className="px-4 py-4 bg-muted/20"
                             >
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -2260,6 +2390,188 @@ export default function AdminBookings() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Floating group-selection toolbar ──────────────────────── */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-card border border-border rounded-2xl px-4 py-2.5 shadow-xl max-w-[96vw] flex-wrap justify-center">
+          {/* Count + parent */}
+          <span className="text-sm font-semibold text-foreground whitespace-nowrap">
+            {selectedIds.size} selected
+            {selectedParentName && (
+              <span className="text-muted-foreground font-normal ml-1">({selectedParentName})</span>
+            )}
+          </span>
+
+          <div className="w-px h-5 bg-border" />
+
+          {/* Select all for same parent */}
+          {selectedParentName && (() => {
+            const allCount = filteredBookings.filter((b) => b.clientName === selectedParentName).length;
+            return allCount > selectedIds.size ? (
+              <button
+                onClick={() => selectAllByParent(selectedParentName)}
+                className="text-xs font-medium text-primary hover:text-primary/80 whitespace-nowrap transition-colors"
+              >
+                Select all {allCount} for {selectedParentName}
+              </button>
+            ) : null;
+          })()}
+
+          {/* Bulk confirm */}
+          {selectedBookings.some((b) => b.status === "pending") && (
+            <button
+              onClick={handleBulkConfirm}
+              disabled={bulkLoading}
+              className="flex items-center gap-1 text-xs font-medium bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600 disabled:opacity-50 transition-colors whitespace-nowrap"
+            >
+              <Check className="w-3.5 h-3.5" />
+              Confirm All
+            </button>
+          )}
+
+          {/* Assign nanny dropdown */}
+          <select
+            value={bulkNannyId}
+            onChange={(e) => handleBulkAssignNanny(e.target.value)}
+            disabled={bulkLoading}
+            className="text-xs border border-border rounded-lg px-2 py-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:opacity-50 cursor-pointer"
+          >
+            <option value="">Assign Nanny…</option>
+            {allActiveNannies.map((n) => (
+              <option key={n.id} value={n.id}>{n.name}</option>
+            ))}
+          </select>
+
+          {/* Merge */}
+          {canMerge && (
+            <button
+              onClick={() => setShowMergeModal(true)}
+              disabled={bulkLoading}
+              className="flex items-center gap-1 text-xs font-medium bg-primary text-white px-3 py-1.5 rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors whitespace-nowrap"
+            >
+              <GitMerge className="w-3.5 h-3.5" />
+              Merge
+            </button>
+          )}
+
+          {/* Bulk cancel */}
+          {selectedBookings.some((b) => b.status === "pending" || b.status === "confirmed") && (
+            confirmBulkCancel ? (
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-destructive font-medium">Cancel all?</span>
+                <button
+                  onClick={handleBulkCancel}
+                  disabled={bulkLoading}
+                  className="text-xs font-medium bg-destructive text-white px-2 py-1 rounded-lg hover:bg-destructive/90 disabled:opacity-50 transition-colors"
+                >
+                  Yes
+                </button>
+                <button
+                  onClick={() => setConfirmBulkCancel(false)}
+                  className="text-xs font-medium bg-muted text-muted-foreground px-2 py-1 rounded-lg hover:bg-muted/80 transition-colors"
+                >
+                  No
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmBulkCancel(true)}
+                className="flex items-center gap-1 text-xs font-medium text-destructive hover:text-destructive/80 transition-colors whitespace-nowrap"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                Cancel All
+              </button>
+            )
+          )}
+
+          <div className="w-px h-5 bg-border" />
+
+          {/* Clear */}
+          <button
+            onClick={clearSelection}
+            className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+            Clear
+          </button>
+        </div>
+      )}
+
+      {/* ─── Merge Modal ────────────────────────────────────────────── */}
+      {showMergeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-2xl border border-border shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-primary/10 rounded-xl">
+                <GitMerge className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="font-serif text-xl font-bold text-foreground">Merge Bookings</h2>
+                <p className="text-sm text-muted-foreground">
+                  Combine {selectedIds.size} bookings into one multi-day booking
+                </p>
+              </div>
+            </div>
+
+            {/* Days preview */}
+            <div className="bg-muted/30 rounded-xl p-4 mb-5 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                Days included
+              </p>
+              {[...selectedBookings]
+                .sort((a, b) => a.date.localeCompare(b.date))
+                .map((b, i) => (
+                  <div key={b.id} className="flex items-center gap-2 text-sm">
+                    <div className="w-5 h-5 rounded-full bg-primary/15 text-primary text-xs flex items-center justify-center font-semibold shrink-0">
+                      {i + 1}
+                    </div>
+                    <Calendar className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span className="font-medium">{formatDate(b.date)}</span>
+                    <span className="text-muted-foreground text-xs">
+                      {b.startTime} – {b.endTime}
+                    </span>
+                    <span className="ml-auto text-muted-foreground text-xs shrink-0">
+                      {b.totalPrice ? `${b.totalPrice}€` : "—"}
+                    </span>
+                  </div>
+                ))}
+              <div className="border-t border-border/60 pt-2 mt-2 flex justify-between text-sm font-semibold">
+                <span>Merged total</span>
+                <span className="text-primary">
+                  {selectedBookings.reduce((s, b) => s + (b.totalPrice || 0), 0)}€
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground mb-5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              The earliest booking will be updated to span all dates. Other bookings will be soft-deleted and can be restored from the Deleted log.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowMergeModal(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMerge}
+                disabled={bulkLoading}
+                className="flex-1 px-4 py-2.5 rounded-xl gradient-warm text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity shadow-warm flex items-center justify-center gap-2"
+              >
+                {bulkLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <GitMerge className="w-4 h-4" />
+                    Merge Bookings
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
