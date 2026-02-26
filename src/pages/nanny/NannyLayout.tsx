@@ -151,8 +151,8 @@ export default function NannyLayout() {
           })}
         </nav>
 
-        {/* Role switcher — only shown for dual-role users (e.g. Doha) */}
-        {isAdmin && (
+        {/* Role switcher — only shown for Doha */}
+        {isAdmin && nannyProfile?.name?.toLowerCase().startsWith('doha') && (
           <div className="px-4 pb-2">
             <button
               onClick={() => { setSidebarOpen(false); navigate(isSupervisor ? "/supervisor" : "/admin"); }}
@@ -253,8 +253,8 @@ export default function NannyLayout() {
                     <span>{t("nanny.layout.myProfile")}</span>
                   </NavLink>
 
-                  {/* Switch role — only for dual-role users */}
-                  {isAdmin && (
+                  {/* Switch role — only for Doha */}
+                  {isAdmin && nannyProfile?.name?.toLowerCase().startsWith('doha') && (
                     <button
                       onClick={() => { setProfileDropdownOpen(false); navigate(isSupervisor ? "/supervisor" : "/admin"); }}
                       className="flex items-center gap-3 px-4 py-2.5 text-sm text-violet-700 hover:bg-violet-50 transition-colors w-full"

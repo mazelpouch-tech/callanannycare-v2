@@ -229,10 +229,15 @@ export default function NannyLogin() {
             </div>
           )}
 
-          <div className="text-center text-sm text-muted-foreground mt-6">
+          <div className="text-center text-sm text-muted-foreground mt-6 space-y-1">
             <p>
               <Link to="/nanny/register" className="text-accent hover:underline font-medium">
                 {t("nanny.login.registerLink")}
+              </Link>
+            </p>
+            <p>
+              <Link to="/admin/login" className="text-primary hover:underline">
+                {t("nanny.login.adminLink")}
               </Link>
             </p>
           </div>
