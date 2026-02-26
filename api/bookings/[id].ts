@@ -53,8 +53,67 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // Include payment/payout ledger when requested
+      if (req.query.include === 'payments') {
+        const payments = await sql`SELECT * FROM booking_payments WHERE booking_id = ${id} ORDER BY created_at ASC`;
+        const payouts  = await sql`SELECT * FROM booking_payouts  WHERE booking_id = ${id} ORDER BY created_at ASC`;
+        return res.status(200).json({ ...result[0], payments, payouts });
+      }
+
       return res.status(200).json(result[0]);
     }
+
+    // ─── Payment / Payout ledger actions ────────────────────────────
+    if (req.method === 'POST') {
+      const { action, amount, currency, method, received_by, paid_by, note, paymentId, payoutId } = req.body as {
+        action: string;
+        amount?: number;
+        currency?: string;
+        method?: string;
+        received_by?: string;
+        paid_by?: string;
+        note?: string;
+        paymentId?: number;
+        payoutId?: number;
+      };
+
+      if (action === 'addPayment') {
+        if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+        const r = await sql`
+          INSERT INTO booking_payments (booking_id, amount, currency, method, received_by, note)
+          VALUES (${id}, ${amount}, ${currency || 'EUR'}, ${method || 'cash'}, ${received_by || ''}, ${note || ''})
+          RETURNING *
+        `;
+        return res.status(201).json(r[0]);
+      }
+
+      if (action === 'deletePayment') {
+        if (!paymentId) return res.status(400).json({ error: 'Missing paymentId' });
+        await sql`DELETE FROM booking_payments WHERE id = ${paymentId} AND booking_id = ${id}`;
+        return res.status(200).json({ success: true });
+      }
+
+      if (action === 'addPayout') {
+        if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+        const bookingRows = await sql`SELECT nanny_id FROM bookings WHERE id = ${id}` as { nanny_id: number | null }[];
+        const nannyId = bookingRows[0]?.nanny_id ?? null;
+        const r = await sql`
+          INSERT INTO booking_payouts (booking_id, nanny_id, amount, currency, method, paid_by, note)
+          VALUES (${id}, ${nannyId}, ${amount}, ${currency || 'DH'}, ${method || 'cash'}, ${paid_by || ''}, ${note || ''})
+          RETURNING *
+        `;
+        return res.status(201).json(r[0]);
+      }
+
+      if (action === 'deletePayout') {
+        if (!payoutId) return res.status(400).json({ error: 'Missing payoutId' });
+        await sql`DELETE FROM booking_payouts WHERE id = ${payoutId} AND booking_id = ${id}`;
+        return res.status(200).json({ success: true });
+      }
+
+      return res.status(400).json({ error: 'Invalid action' });
+    }
+    // ────────────────────────────────────────────────────────────────
     
     if (req.method === 'PUT') {
       const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder, cancellation_reason, cancelled_by } = req.body as UpdateBookingBody;

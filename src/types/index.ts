@@ -297,6 +297,31 @@ export interface PricingPlan {
   highlight: boolean;
 }
 
+export type PaymentMethod = 'cash' | 'bank' | 'card' | 'transfer';
+
+export interface BookingPayment {
+  id: number;
+  bookingId: number;
+  amount: number;
+  currency: string;
+  method: PaymentMethod;
+  receivedBy: string;
+  note: string;
+  createdAt: string;
+}
+
+export interface BookingPayout {
+  id: number;
+  bookingId: number;
+  nannyId: number | null;
+  amount: number;
+  currency: string;
+  method: PaymentMethod;
+  paidBy: string;
+  note: string;
+  createdAt: string;
+}
+
 // ============================================================
 // Input types (for creating/updating — omit server-managed fields)
 // ============================================================

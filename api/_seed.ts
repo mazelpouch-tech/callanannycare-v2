@@ -174,6 +174,37 @@ export default async function seedHandler(req: VercelRequest, res: VercelRespons
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS review_sent_at TIMESTAMPTZ`;
     // ────────────────────────────────────────────────────────────────
 
+    // ─── Payment Reconciliation ──────────────────────────────────────
+    await sql`
+      CREATE TABLE IF NOT EXISTS booking_payments (
+        id SERIAL PRIMARY KEY,
+        booking_id INTEGER REFERENCES bookings(id) ON DELETE CASCADE,
+        amount INTEGER NOT NULL,
+        currency VARCHAR(5) DEFAULT 'EUR',
+        method VARCHAR(20) DEFAULT 'cash',
+        received_by VARCHAR(255) DEFAULT '',
+        note TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_booking_payments ON booking_payments(booking_id)`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS booking_payouts (
+        id SERIAL PRIMARY KEY,
+        booking_id INTEGER REFERENCES bookings(id) ON DELETE CASCADE,
+        nanny_id INTEGER REFERENCES nannies(id) ON DELETE SET NULL,
+        amount INTEGER NOT NULL,
+        currency VARCHAR(5) DEFAULT 'DH',
+        method VARCHAR(20) DEFAULT 'cash',
+        paid_by VARCHAR(255) DEFAULT '',
+        note TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_booking_payouts ON booking_payouts(booking_id)`;
+    // ────────────────────────────────────────────────────────────────
+
     // ─── Push Subscriptions ─────────────────────────────────────────
     await sql`
       CREATE TABLE IF NOT EXISTS push_subscriptions (

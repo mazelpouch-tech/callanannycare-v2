@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import type { BookingStatus } from "@/types";
+import PaymentPanel from "../../components/PaymentPanel";
 
 const statusConfig: Record<BookingStatus, { label: string; className: string }> = {
   pending: { label: "Pending", className: "bg-orange-50 text-orange-700 border border-orange-200" },
@@ -316,6 +317,9 @@ export default function SupervisorBookings() {
                       )}
                     </div>
                   )}
+
+                  {/* Payment Reconciliation */}
+                  <PaymentPanel booking={booking} />
                 </div>
               )}
             </div>
