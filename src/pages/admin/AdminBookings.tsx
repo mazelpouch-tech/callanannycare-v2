@@ -692,16 +692,19 @@ export default function AdminBookings() {
     return names.length === 1 ? names[0] : null;
   }, [selectedBookings]);
 
-  // Merge is possible when 2+ bookings share the same parent
-  const canMerge = useMemo(() => {
-    if (selectedBookings.length < 2) return false;
-    return !!selectedParentName;
-  }, [selectedBookings, selectedParentName]);
+  // Merge is available whenever 2+ bookings are selected
+  const canMerge = selectedBookings.length >= 2;
 
-  // Warn in the merge modal if time slots differ across selected bookings
+  // Warn in the merge modal if time slots differ
   const mergeHasMixedTimes = useMemo(() => {
     const slots = [...new Set(selectedBookings.map((b) => `${b.startTime}__${b.endTime}`))];
     return slots.length > 1;
+  }, [selectedBookings]);
+
+  // Warn if clients differ
+  const mergeHasMixedClients = useMemo(() => {
+    const clients = [...new Set(selectedBookings.map((b) => b.clientName || ""))];
+    return clients.length > 1;
   }, [selectedBookings]);
 
   const toggleSelect = (id: number | string) => {
@@ -2585,9 +2588,14 @@ export default function AdminBookings() {
               </div>
             </div>
 
+            {mergeHasMixedClients && (
+              <p className="text-xs text-amber-700 mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Selected bookings are from different clients. The merged booking will use the client details from the earliest date.
+              </p>
+            )}
             {mergeHasMixedTimes && (
               <p className="text-xs text-amber-700 mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                These bookings have different time slots. The merged booking will use the times from the earliest date.
+                These bookings have different time slots. The merged booking will use the times from the earliest date. Total price reflects all hours.
               </p>
             )}
             <p className="text-xs text-muted-foreground mb-5 bg-muted/40 border border-border rounded-lg px-3 py-2">
