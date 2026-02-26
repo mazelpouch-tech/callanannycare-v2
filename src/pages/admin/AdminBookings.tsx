@@ -692,13 +692,17 @@ export default function AdminBookings() {
     return names.length === 1 ? names[0] : null;
   }, [selectedBookings]);
 
-  // Merge is possible when 2+ bookings share same parent AND same time slot
+  // Merge is possible when 2+ bookings share the same parent
   const canMerge = useMemo(() => {
     if (selectedBookings.length < 2) return false;
-    if (!selectedParentName) return false;
-    const slots = [...new Set(selectedBookings.map((b) => `${b.startTime}__${b.endTime}`))];
-    return slots.length === 1;
+    return !!selectedParentName;
   }, [selectedBookings, selectedParentName]);
+
+  // Warn in the merge modal if time slots differ across selected bookings
+  const mergeHasMixedTimes = useMemo(() => {
+    const slots = [...new Set(selectedBookings.map((b) => `${b.startTime}__${b.endTime}`))];
+    return slots.length > 1;
+  }, [selectedBookings]);
 
   const toggleSelect = (id: number | string) => {
     setSelectedIds((prev) => {
@@ -2581,7 +2585,12 @@ export default function AdminBookings() {
               </div>
             </div>
 
-            <p className="text-xs text-muted-foreground mb-5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            {mergeHasMixedTimes && (
+              <p className="text-xs text-amber-700 mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                These bookings have different time slots. The merged booking will use the times from the earliest date.
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground mb-5 bg-muted/40 border border-border rounded-lg px-3 py-2">
               The earliest booking will be updated to span all dates. Other bookings will be soft-deleted and can be restored from the Deleted log.
             </p>
 
