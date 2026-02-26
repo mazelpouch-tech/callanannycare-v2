@@ -24,6 +24,11 @@ interface UpdateBookingBody {
   send_reminder?: boolean;
   cancellation_reason?: string;
   cancelled_by?: string;
+  collected_by?: string;
+  collected_at?: string | null;
+  collection_note?: string;
+  payment_method?: string;
+  restore?: boolean; // Restore a soft-deleted booking
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -41,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         SELECT b.*, n.name as nanny_name, n.image as nanny_image
         FROM bookings b
         LEFT JOIN nannies n ON b.nanny_id = n.id
-        WHERE b.id = ${id}
+        WHERE b.id = ${id} AND b.deleted_at IS NULL
       ` as DbBookingWithNanny[];
       if (result.length === 0) return res.status(404).json({ error: 'Booking not found' });
 
@@ -116,7 +121,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ────────────────────────────────────────────────────────────────
     
     if (req.method === 'PUT') {
-      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder, cancellation_reason, cancelled_by } = req.body as UpdateBookingBody;
+      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder, cancellation_reason, cancelled_by, collected_by, collected_at, collection_note, payment_method, restore } = req.body as UpdateBookingBody;
+
+      // Restore a soft-deleted booking
+      if (restore) {
+        const restored = await sql`
+          UPDATE bookings SET deleted_at = NULL, deleted_by = '', updated_at = NOW()
+          WHERE id = ${id} RETURNING *
+        ` as DbBookingWithNanny[];
+        if (restored.length === 0) return res.status(404).json({ error: 'Booking not found' });
+        return res.status(200).json(restored[0]);
+      }
 
       // ─── Conflict check when nanny/date/time changes ────────────
       if (nanny_id !== undefined || date || end_date !== undefined || start_time || end_time) {
@@ -174,6 +189,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           cancelled_at = CASE WHEN ${status} = 'cancelled' AND cancelled_at IS NULL THEN NOW() ELSE cancelled_at END,
           cancellation_reason = CASE WHEN ${status} = 'cancelled' THEN COALESCE(${cancellation_reason || ''}, cancellation_reason) ELSE cancellation_reason END,
           cancelled_by = CASE WHEN ${status} = 'cancelled' THEN COALESCE(${cancelled_by || ''}, cancelled_by) ELSE cancelled_by END,
+          collected_by = COALESCE(${collected_by || null}, collected_by),
+          collected_at = COALESCE(${collected_at ? collected_at : null}, collected_at),
+          collection_note = COALESCE(${collection_note || null}, collection_note),
+          payment_method = COALESCE(${payment_method || null}, payment_method),
           updated_at = NOW()
         WHERE id = ${id}
         RETURNING *
@@ -205,6 +224,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
           const { sendPushToUser, sendPushToAllAdmins } = await import('../_pushUtils.js');
 
+          // Fetch nanny name (RETURNING * doesn't include the JOIN)
+          let pushNannyName = '';
+          if (result[0].nanny_id) {
+            try {
+              const nr = await sql`SELECT name FROM nannies WHERE id = ${result[0].nanny_id}` as { name: string }[];
+              pushNannyName = nr[0]?.name || '';
+            } catch { /* ignore */ }
+          }
+
           if (result[0].nanny_id) {
             const pushMessages: Record<string, { title: string; body: string }> = {
               confirmed: { title: 'Booking Confirmed', body: `Booking with ${result[0].client_name} on ${result[0].date} confirmed` },
@@ -221,14 +249,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
           }
 
+          const nannyLabel = pushNannyName ? ` — ${pushNannyName}` : '';
           await sendPushToAllAdmins({
             title: `Booking ${status.charAt(0).toUpperCase() + status.slice(1)}`,
-            body: `Booking #${id} with ${result[0].client_name} is now ${status}`,
+            body: `${result[0].client_name}${nannyLabel} booking is now ${status}`,
             url: `/admin/bookings?booking=${id}`,
             tag: `admin-booking-status-${id}`,
           });
         } catch (pushError: unknown) {
           console.error('Push notification (status) failed:', pushError);
+        }
+      }
+
+      // ─── Collection notification → push to admin when supervisor marks collected ───
+      if (collected_by && collected_at && result[0]) {
+        try {
+          const { sendPushToAllAdmins: pushCollect } = await import('../_pushUtils.js');
+          await pushCollect({
+            title: 'Payment Collected',
+            body: `${collected_by} collected ${result[0].total_price}€ from ${result[0].client_name} (booking #${id})${payment_method ? ` via ${payment_method}` : ''}`,
+            url: '/admin/bookings',
+            tag: `collection-${id}`,
+          });
+        } catch (pushCollectErr: unknown) {
+          console.error('Push notification (collection) failed:', pushCollectErr);
         }
       }
 
@@ -828,7 +872,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'DELETE') {
-      await sql`DELETE FROM bookings WHERE id = ${id}`;
+      const { deleted_by } = (req.body || {}) as { deleted_by?: string };
+      await sql`
+        UPDATE bookings SET deleted_at = NOW(), deleted_by = ${deleted_by || 'Admin'}, updated_at = NOW()
+        WHERE id = ${id}
+      `;
       return res.status(200).json({ success: true });
     }
     

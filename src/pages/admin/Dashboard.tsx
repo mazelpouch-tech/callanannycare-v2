@@ -9,7 +9,7 @@ import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import type { Booking, Nanny, BookingStatus } from "@/types";
-import { calcShiftPayBreakdown, HOURLY_RATE } from "@/utils/shiftHelpers";
+import { calcShiftPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE } from "@/utils/shiftHelpers";
 
 // ─── Chart Data Types ────────────────────────────────────────────
 
@@ -491,7 +491,7 @@ const PLAN_COLORS = {
 
 export default function Dashboard() {
   const { bookings, nannies, stats, adminProfile, updateBookingStatus } = useData();
-  const { toDH } = useExchangeRate();
+  const { toDH, rate } = useExchangeRate();
 
   // ── Compute monthly revenue data (last 7 months) ──
   const monthlyRevenue = useMemo(() => {
@@ -649,6 +649,22 @@ export default function Dashboard() {
   const todaysBookingsCount = todaysBookings.length;
   const avgBookingValue = stats.totalBookings > 0 ? Math.round(stats.totalRevenue / Math.max(bookings.filter((b) => b.status === "confirmed" || b.status === "completed").length, 1)) : 0;
 
+  // Total nanny expense in DH (actual clock data if available, otherwise estimated from booked hours)
+  const totalExpenseDH = useMemo(() => {
+    return bookings
+      .filter((b) => b.status === "confirmed" || b.status === "completed")
+      .reduce((sum, b) => {
+        if (b.clockIn && b.clockOut) {
+          return sum + calcShiftPayBreakdown(b.clockIn, b.clockOut).total;
+        }
+        return sum + estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate).total;
+      }, 0);
+  }, [bookings]);
+
+  // Convert expense DH → EUR, then compute net income
+  const totalExpenseEUR = rate > 0 ? Math.round(totalExpenseDH / rate) : 0;
+  const netIncomeEUR = stats.totalRevenue - totalExpenseEUR;
+
   const formatDate = (dateStr: string) => {
     try { return format(parseISO(dateStr), "MMM dd, yyyy"); } catch { return dateStr || "N/A"; }
   };
@@ -742,219 +758,73 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {/* ── Charts Row 1: Revenue + Bookings ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Revenue Trend - 2/3 width */}
-        <div className="lg:col-span-2 bg-card rounded-xl border border-border shadow-soft p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="font-serif text-base font-semibold text-foreground">Revenue Trend</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Monthly revenue over the last 7 months</p>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs font-medium text-accent bg-accent/10 px-2.5 py-1 rounded-full">
-              <TrendingUp className="w-3.5 h-3.5" />
-              {trends.thisRevenue.toLocaleString()}€ <span className="text-accent/70">({toDH(trends.thisRevenue).toLocaleString()} DH)</span>
-            </div>
-          </div>
-          <AreaChart data={monthlyRevenue} id="revenue" />
-        </div>
 
-        {/* Booking Status - 1/3 width */}
-        <div className="bg-card rounded-xl border border-border shadow-soft p-5">
-          <div className="mb-4">
-            <h3 className="font-serif text-base font-semibold text-foreground">Booking Status</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Distribution overview</p>
-          </div>
-          <DonutChart
-            segments={statusDistribution}
-            centerValue={stats.totalBookings}
-            centerLabel="Total"
-          />
-          <div className="mt-4 space-y-2">
-            {statusDistribution.map((seg) => (
-              <div key={seg.label} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: seg.color }} />
-                  <span className="text-muted-foreground">{seg.label}</span>
+      {/* ── Financial Summary ── */}
+      <div className="bg-card rounded-xl border border-border shadow-soft p-5">
+        <div className="mb-4">
+          <h3 className="font-serif text-base font-semibold text-foreground">Financial Summary</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Revenue, expenses &amp; net income</p>
+        </div>
+        {stats.totalRevenue > 0 || totalExpenseDH > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Revenue */}
+            <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900/30">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
+                  <ArrowUpRight className="w-4 h-4 text-green-700 dark:text-green-400" />
                 </div>
-                <span className="font-semibold text-foreground">{seg.value}</span>
+                <div>
+                  <p className="text-xs font-medium text-green-800 dark:text-green-300">Total Revenue</p>
+                  <p className="text-[10px] text-green-600/70 dark:text-green-500/70">Collected from clients</p>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Charts Row 2: Monthly Bookings + Revenue by Plan + Top Nannies ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Monthly Bookings Bar Chart */}
-        <div className="bg-card rounded-xl border border-border shadow-soft p-5">
-          <div className="mb-4">
-            <h3 className="font-serif text-base font-semibold text-foreground">Monthly Bookings</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Last 6 months</p>
-          </div>
-          <BarChart
-            data={monthlyBookings}
-            height={200}
-            colors={monthlyBookings.map(() => "#cd6845")}
-          />
-        </div>
-
-        {/* Total Revenue */}
-        <div className="bg-card rounded-xl border border-border shadow-soft p-5">
-          <div className="mb-4">
-            <h3 className="font-serif text-base font-semibold text-foreground">Total Revenue</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">All bookings (hourly plan)</p>
-          </div>
-          {stats.totalRevenue > 0 ? (
-            <div className="flex flex-col items-center justify-center py-6">
-              <div className="w-28 h-28 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <DollarSign className="w-10 h-10 text-primary" />
-              </div>
-              <p className="text-3xl font-bold text-foreground">{stats.totalRevenue.toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground mt-1">€</p>
-              <p className="text-xs text-muted-foreground">{toDH(stats.totalRevenue).toLocaleString()} DH</p>
-              <div className="mt-4 flex items-center gap-2 text-xs">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLAN_COLORS.hourly }} />
-                <span className="text-muted-foreground">Hourly Plan</span>
+              <div className="text-right">
+                <p className="text-sm font-bold text-green-800 dark:text-green-300">{stats.totalRevenue.toLocaleString()}€</p>
+                <p className="text-[10px] text-green-600/70 dark:text-green-500/70">{toDH(stats.totalRevenue).toLocaleString()} DH</p>
               </div>
             </div>
-          ) : (
-            <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-              No revenue data yet
+
+            {/* Expense */}
+            <div className="flex items-center justify-between p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
+                  <ArrowDownRight className="w-4 h-4 text-orange-700 dark:text-orange-400" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-orange-800 dark:text-orange-300">Total Expense</p>
+                  <p className="text-[10px] text-orange-600/70 dark:text-orange-500/70">Nanny pay ({HOURLY_RATE} DH/hr)</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-bold text-orange-800 dark:text-orange-300">{totalExpenseEUR.toLocaleString()}€</p>
+                <p className="text-[10px] text-orange-600/70 dark:text-orange-500/70">{totalExpenseDH.toLocaleString()} DH</p>
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* Top Nannies */}
-        <div className="bg-card rounded-xl border border-border shadow-soft p-5">
-          <div className="mb-4">
-            <h3 className="font-serif text-base font-semibold text-foreground flex items-center gap-2">
-              <Star className="w-4 h-4 text-amber-500" />
-              Top Nannies
-            </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">By total revenue earned</p>
-          </div>
-          {topNannies.length > 0 ? (
-            <HorizontalBarChart data={topNannies} />
-          ) : (
-            <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-              No nanny data yet
+            {/* Net Income */}
+            <div className={`flex items-center justify-between p-3 rounded-lg border ${netIncomeEUR >= 0 ? "bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30" : "bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900/30"}`}>
+              <div className="flex items-center gap-2">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center ${netIncomeEUR >= 0 ? "bg-blue-100 dark:bg-blue-900/40" : "bg-red-100 dark:bg-red-900/40"}`}>
+                  <DollarSign className={`w-4 h-4 ${netIncomeEUR >= 0 ? "text-blue-700 dark:text-blue-400" : "text-red-700 dark:text-red-400"}`} />
+                </div>
+                <div>
+                  <p className={`text-xs font-medium ${netIncomeEUR >= 0 ? "text-blue-800 dark:text-blue-300" : "text-red-800 dark:text-red-300"}`}>Net Income</p>
+                  <p className={`text-[10px] ${netIncomeEUR >= 0 ? "text-blue-600/70 dark:text-blue-500/70" : "text-red-600/70 dark:text-red-500/70"}`}>Revenue − Expenses</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className={`text-sm font-bold ${netIncomeEUR >= 0 ? "text-blue-800 dark:text-blue-300" : "text-red-800 dark:text-red-300"}`}>{netIncomeEUR.toLocaleString()}€</p>
+                <p className={`text-[10px] ${netIncomeEUR >= 0 ? "text-blue-600/70 dark:text-blue-500/70" : "text-red-600/70 dark:text-red-500/70"}`}>{(toDH(stats.totalRevenue) - totalExpenseDH).toLocaleString()} DH</p>
+              </div>
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Nanny Hours Report ── */}
-      <NannyHoursReport bookings={bookings} nannies={nannies} />
-
-      {/* ── Invoices Section ── */}
-      <div className="bg-card rounded-xl border border-border shadow-soft">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-serif text-base font-semibold text-foreground flex items-center gap-2">
-            <FileText className="w-4 h-4 text-primary" />
-            Invoices
-          </h2>
-          {allInvoices.length > 0 && (
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span>{allInvoices.length} invoice{allInvoices.length !== 1 ? "s" : ""}</span>
-              <span className="font-semibold text-foreground">{totalInvoiced.toLocaleString()}€</span>
-              <span className="text-muted-foreground/70">({toDH(totalInvoiced).toLocaleString()} DH)</span>
-            </div>
-          )}
-        </div>
-
-        {recentInvoices.length === 0 ? (
-          <div className="px-6 py-10 text-center">
-            <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-muted-foreground font-medium">No invoices yet</p>
-            <p className="text-sm text-muted-foreground/70 mt-1">
-              Invoices are automatically generated and sent to parents when a nanny ends her shift.
-            </p>
           </div>
         ) : (
-          <>
-            {/* Desktop Table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Invoice #</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Billed To</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Caregiver</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hours</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {recentInvoices.map((inv) => (
-                    <tr key={inv.id} className="hover:bg-muted/50 transition-colors">
-                      <td className="px-6 py-4">
-                        <span className="text-sm font-mono font-medium text-primary">#INV-{inv.id}</span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-foreground">{inv.clientName || "N/A"}</p>
-                        <p className="text-xs text-muted-foreground">{inv.clientEmail || ""}</p>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">{inv.nannyName || "Unassigned"}</td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm text-muted-foreground">{formatDate(inv.date)}</p>
-                        <p className="text-xs text-muted-foreground/70">{formatTime(inv.clockIn)} – {formatTime(inv.clockOut)}</p>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">{calcWorkedHours(inv.clockIn, inv.clockOut)}h</td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</div>
-                        <div className="text-[10px] text-muted-foreground">{toDH(inv.totalPrice || 0).toLocaleString()} DH</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                          <CheckCircle className="w-3 h-3" />
-                          Sent
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile Cards */}
-            <div className="md:hidden divide-y divide-border">
-              {recentInvoices.map((inv) => (
-                <div key={inv.id} className="px-5 py-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-mono font-medium text-primary">#INV-{inv.id}</span>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
-                      <CheckCircle className="w-2.5 h-2.5" />
-                      Sent
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">Billed To</p>
-                      <p className="font-medium text-foreground text-sm">{inv.clientName || "N/A"}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</span>
-                      <div className="text-[10px] text-muted-foreground">{toDH(inv.totalPrice || 0).toLocaleString()} DH</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>Caregiver: {inv.nannyName || "Unassigned"}</span>
-                    <span>{formatDate(inv.date)}</span>
-                    <span>{calcWorkedHours(inv.clockIn, inv.clockOut)}h</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="px-6 py-3 border-t border-border text-[10px] text-muted-foreground">
-              Invoices are auto-sent to parents when the nanny ends her shift. Showing last {recentInvoices.length} of {allInvoices.length}.
-            </div>
-          </>
+          <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">
+            No financial data yet
+          </div>
         )}
       </div>
+
 
       {/* ── Recent Bookings Table ── */}
       <div className="bg-card rounded-xl border border-border shadow-soft">
@@ -1095,6 +965,220 @@ export default function Dashboard() {
                   </div>
                 );
               })}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── Nanny Hours Report ── */}
+      <NannyHoursReport bookings={bookings} nannies={nannies} />
+
+      {/* ── Charts Row 1: Revenue + Bookings ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Revenue Trend - 2/3 width */}
+        <div className="lg:col-span-2 bg-card rounded-xl border border-border shadow-soft p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-serif text-base font-semibold text-foreground">Revenue Trend</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Monthly revenue over the last 7 months</p>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs font-medium text-accent bg-accent/10 px-2.5 py-1 rounded-full">
+              <TrendingUp className="w-3.5 h-3.5" />
+              {trends.thisRevenue.toLocaleString()}€ <span className="text-accent/70">({toDH(trends.thisRevenue).toLocaleString()} DH)</span>
+            </div>
+          </div>
+          <AreaChart data={monthlyRevenue} id="revenue" />
+        </div>
+
+        {/* Booking Status - 1/3 width */}
+        <div className="bg-card rounded-xl border border-border shadow-soft p-5">
+          <div className="mb-4">
+            <h3 className="font-serif text-base font-semibold text-foreground">Booking Status</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Distribution overview</p>
+          </div>
+          <DonutChart
+            segments={statusDistribution}
+            centerValue={stats.totalBookings}
+            centerLabel="Total"
+          />
+          <div className="mt-4 space-y-2">
+            {statusDistribution.map((seg) => (
+              <div key={seg.label} className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: seg.color }} />
+                  <span className="text-muted-foreground">{seg.label}</span>
+                </div>
+                <span className="font-semibold text-foreground">{seg.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Charts Row 2: Monthly Bookings + Revenue by Plan + Top Nannies ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Monthly Bookings Bar Chart */}
+        <div className="bg-card rounded-xl border border-border shadow-soft p-5">
+          <div className="mb-4">
+            <h3 className="font-serif text-base font-semibold text-foreground">Monthly Bookings</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Last 6 months</p>
+          </div>
+          <BarChart
+            data={monthlyBookings}
+            height={200}
+            colors={monthlyBookings.map(() => "#cd6845")}
+          />
+        </div>
+
+        {/* Total Revenue */}
+        <div className="bg-card rounded-xl border border-border shadow-soft p-5">
+          <div className="mb-4">
+            <h3 className="font-serif text-base font-semibold text-foreground">Total Revenue</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">All bookings (hourly plan)</p>
+          </div>
+          {stats.totalRevenue > 0 ? (
+            <div className="flex flex-col items-center justify-center py-6">
+              <div className="w-28 h-28 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <DollarSign className="w-10 h-10 text-primary" />
+              </div>
+              <p className="text-3xl font-bold text-foreground">{stats.totalRevenue.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground mt-1">€</p>
+              <p className="text-xs text-muted-foreground">{toDH(stats.totalRevenue).toLocaleString()} DH</p>
+              <div className="mt-4 flex items-center gap-2 text-xs">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PLAN_COLORS.hourly }} />
+                <span className="text-muted-foreground">Hourly Plan</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+              No revenue data yet
+            </div>
+          )}
+        </div>
+
+        {/* Top Nannies */}
+        <div className="bg-card rounded-xl border border-border shadow-soft p-5">
+          <div className="mb-4">
+            <h3 className="font-serif text-base font-semibold text-foreground flex items-center gap-2">
+              <Star className="w-4 h-4 text-amber-500" />
+              Top Nannies
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">By total revenue earned</p>
+          </div>
+          {topNannies.length > 0 ? (
+            <HorizontalBarChart data={topNannies} />
+          ) : (
+            <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+              No nanny data yet
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Invoices Section ── */}
+      <div className="bg-card rounded-xl border border-border shadow-soft">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h2 className="font-serif text-base font-semibold text-foreground flex items-center gap-2">
+            <FileText className="w-4 h-4 text-primary" />
+            Invoices
+          </h2>
+          {allInvoices.length > 0 && (
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span>{allInvoices.length} invoice{allInvoices.length !== 1 ? "s" : ""}</span>
+              <span className="font-semibold text-foreground">{totalInvoiced.toLocaleString()}€</span>
+              <span className="text-muted-foreground/70">({toDH(totalInvoiced).toLocaleString()} DH)</span>
+            </div>
+          )}
+        </div>
+
+        {recentInvoices.length === 0 ? (
+          <div className="px-6 py-10 text-center">
+            <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground font-medium">No invoices yet</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">
+              Invoices are automatically generated and sent to parents when a nanny ends her shift.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Invoice #</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Billed To</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Caregiver</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hours</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {recentInvoices.map((inv) => (
+                    <tr key={inv.id} className="hover:bg-muted/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <span className="text-sm font-mono font-medium text-primary">#INV-{inv.id}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-medium text-foreground">{inv.clientName || "N/A"}</p>
+                        <p className="text-xs text-muted-foreground">{inv.clientEmail || ""}</p>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">{inv.nannyName || "Unassigned"}</td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm text-muted-foreground">{formatDate(inv.date)}</p>
+                        <p className="text-xs text-muted-foreground/70">{formatTime(inv.clockIn)} – {formatTime(inv.clockOut)}</p>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">{calcWorkedHours(inv.clockIn, inv.clockOut)}h</td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</div>
+                        <div className="text-[10px] text-muted-foreground">{toDH(inv.totalPrice || 0).toLocaleString()} DH</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                          <CheckCircle className="w-3 h-3" />
+                          Sent
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden divide-y divide-border">
+              {recentInvoices.map((inv) => (
+                <div key={inv.id} className="px-5 py-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-mono font-medium text-primary">#INV-{inv.id}</span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
+                      <CheckCircle className="w-2.5 h-2.5" />
+                      Sent
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">Billed To</p>
+                      <p className="font-medium text-foreground text-sm">{inv.clientName || "N/A"}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</span>
+                      <div className="text-[10px] text-muted-foreground">{toDH(inv.totalPrice || 0).toLocaleString()} DH</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>Caregiver: {inv.nannyName || "Unassigned"}</span>
+                    <span>{formatDate(inv.date)}</span>
+                    <span>{calcWorkedHours(inv.clockIn, inv.clockOut)}h</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="px-6 py-3 border-t border-border text-[10px] text-muted-foreground">
+              Invoices are auto-sent to parents when the nanny ends her shift. Showing last {recentInvoices.length} of {allInvoices.length}.
             </div>
           </>
         )}

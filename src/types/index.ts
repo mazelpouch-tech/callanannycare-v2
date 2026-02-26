@@ -64,10 +64,16 @@ export interface DbBooking {
   cancelled_at: string | null;
   cancellation_reason: string;
   cancelled_by: string;
+  collected_by: string;
+  collected_at: string | null;
+  collection_note: string;
+  payment_method: string;
   created_by: BookingCreator;
   created_by_name: string;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
+  deleted_by: string;
 }
 
 /** Booking row from a JOIN with nannies (includes nanny_name, nanny_image) */
@@ -154,6 +160,12 @@ export interface Booking {
   cancelledAt: string | null;
   cancellationReason: string;
   cancelledBy: string;
+  collectedBy: string;
+  collectedAt: string | null;
+  collectionNote: string;
+  paymentMethod: string;
+  deletedAt: string | null;
+  deletedBy: string;
 }
 
 export interface Notification {
@@ -337,8 +349,37 @@ export type ApiResult<T = void> =
   | ({ success: true } & T)
   | { success: false; error: string };
 
-export interface NannyLoginResponse { nanny: DbNanny }
-export interface AdminLoginResponse { admin: DbAdminUser; token?: string }
+/** Minimal admin info returned when a nanny has a linked admin account */
+export interface LinkedAdminInfo {
+  id: number;
+  name: string;
+  email: string;
+  role: AdminRole;
+  lastLogin: string | null;
+  loginCount: number;
+}
+
+/** Minimal nanny info returned when an admin has a linked nanny account */
+export interface LinkedNannyInfo {
+  id: number;
+  name: string;
+  email: string | null;
+  image: string;
+  location: string;
+  rating: number;
+  experience: string;
+  bio: string;
+  specialties: string[];
+  languages: string[];
+  rate: number;
+  available: boolean;
+  status: NannyStatus;
+  phone: string;
+  age: string | null;
+}
+
+export interface NannyLoginResponse { nanny: DbNanny; linkedAdmin?: LinkedAdminInfo }
+export interface AdminLoginResponse { admin: DbAdminUser; token?: string; linkedNanny?: LinkedNannyInfo }
 export interface InviteResponse { inviteLink: string; emailSent: boolean; nanny: { id: number; name: string; email: string } }
 export interface ResendInviteResponse { inviteLink: string; emailSent: boolean }
 export interface ProfileUpdateResponse { nanny: DbNanny }
@@ -356,6 +397,7 @@ export interface DataContextValue {
   inviteNanny: (data: { name: string; email: string }) => Promise<ApiResult<InviteResponse>>;
   toggleNannyStatus: (id: number) => Promise<void>;
   resendInvite: (nannyId: number) => Promise<ApiResult<ResendInviteResponse>>;
+  bulkUpdateNannyRate: (newRate: number, opts?: { notifyAdmin?: boolean; updatedByName?: string; updatedByEmail?: string }) => Promise<ApiResult<{ nannyCount: number }>>;
 
   bookings: Booking[];
   fetchBookings: () => Promise<void>;
@@ -364,7 +406,10 @@ export interface DataContextValue {
   updateBookingStatus: (id: number | string, status: BookingStatus, meta?: { reason?: string; cancelledBy?: string }) => Promise<void>;
   clockInBooking: (id: number | string) => Promise<void>;
   clockOutBooking: (id: number | string) => Promise<void>;
-  deleteBooking: (id: number | string) => Promise<void>;
+  deleteBooking: (id: number | string, deletedBy?: string) => Promise<void>;
+  fetchDeletedBookings: () => Promise<Booking[]>;
+  restoreBooking: (id: number | string) => Promise<void>;
+  markAsCollected: (id: number | string, data: { collectedBy: string; paymentMethod: string; collectionNote?: string }) => Promise<void>;
   resendInvoice: (id: number | string) => Promise<void>;
   sendBookingReminder: (id: number | string) => Promise<void>;
 
@@ -388,6 +433,9 @@ export interface DataContextValue {
   loading: boolean;
 
   isNanny: boolean;
+  isImpersonating: boolean;
+  impersonateNanny: (nanny: Nanny) => void;
+  stopImpersonating: () => void;
   nannyProfile: NannyProfile | null;
   nannyBookings: Booking[];
   nannyNotifications: Notification[];

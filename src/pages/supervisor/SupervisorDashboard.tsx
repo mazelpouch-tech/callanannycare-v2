@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
-  CalendarDays, DollarSign, TrendingUp, Users, Clock,
-  ArrowUpRight, ArrowDownRight, CheckCircle, AlertTriangle,
+  CalendarDays, DollarSign, Users, Clock,
+  CheckCircle, AlertTriangle,
 } from "lucide-react";
-import { parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, isToday } from "date-fns";
+import { parseISO, isToday } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 
@@ -12,46 +12,9 @@ export default function SupervisorDashboard() {
   const { bookings, nannies } = useData();
   const { toDH } = useExchangeRate();
 
-  const now = new Date();
-  const thisMonthStart = startOfMonth(now);
-  const thisMonthEnd = endOfMonth(now);
-  const lastMonthStart = startOfMonth(subMonths(now, 1));
-  const lastMonthEnd = endOfMonth(subMonths(now, 1));
-
-  const thisMonthBookings = useMemo(
-    () => bookings.filter((b) => {
-      try {
-        return isWithinInterval(parseISO(b.date), { start: thisMonthStart, end: thisMonthEnd });
-      } catch { return false; }
-    }),
-    [bookings, thisMonthStart, thisMonthEnd]
-  );
-
-  const lastMonthBookings = useMemo(
-    () => bookings.filter((b) => {
-      try {
-        return isWithinInterval(parseISO(b.date), { start: lastMonthStart, end: lastMonthEnd });
-      } catch { return false; }
-    }),
-    [bookings, lastMonthStart, lastMonthEnd]
-  );
-
-  // Revenue calculations
-  const thisMonthRevenue = thisMonthBookings
-    .filter((b) => b.status === "confirmed" || b.status === "completed")
-    .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
-
-  const lastMonthRevenue = lastMonthBookings
-    .filter((b) => b.status === "confirmed" || b.status === "completed")
-    .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
-
-  const revenueChange = lastMonthRevenue > 0
-    ? Math.round(((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
-    : thisMonthRevenue > 0 ? 100 : 0;
-
-  // Money to collect = confirmed bookings (not yet completed)
+  // Money to collect = confirmed bookings not yet collected
   const moneyToCollect = bookings
-    .filter((b) => b.status === "confirmed")
+    .filter((b) => b.status === "confirmed" && !b.collectedAt)
     .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
 
   // Pending bookings
@@ -62,8 +25,23 @@ export default function SupervisorDashboard() {
     try { return isToday(parseISO(b.date)); } catch { return false; }
   });
 
+  // Today's collection progress
+  const todayToCollect = todayBookings
+    .filter((b) => b.status === "confirmed" && !b.collectedAt)
+    .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+
+  const todayCollected = bookings.filter((b) => {
+    try { return b.collectedAt && isToday(parseISO(b.collectedAt)); } catch { return false; }
+  }).reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+
   // Active nannies
   const activeNannies = nannies.filter((n) => n.status === "active" && n.available).length;
+
+  // Overdue collections (booking date has passed, confirmed, not collected)
+  const overdueCollections = bookings.filter((b) => {
+    if (b.status !== "confirmed" || b.collectedAt) return false;
+    try { return parseISO(b.date) < new Date(); } catch { return false; }
+  });
 
   // Upcoming confirmed bookings (next 7 days)
   const upcomingBookings = useMemo(() => {
@@ -87,37 +65,34 @@ export default function SupervisorDashboard() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Supervisor Dashboard</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Overview of bookings, revenue, and collections
+          Overview of bookings and collections
         </p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Revenue */}
+        {/* Today's Collection Progress */}
         <div className="bg-card rounded-2xl border border-border p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
               <DollarSign className="w-5 h-5 text-green-600" />
             </div>
-            {revenueChange !== 0 && (
-              <div className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-                revenueChange > 0 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-              }`}>
-                {revenueChange > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                {Math.abs(revenueChange)}%
-              </div>
-            )}
           </div>
-          <p className="text-2xl font-bold text-foreground">{thisMonthRevenue}€</p>
-          <p className="text-xs text-muted-foreground mt-1">This month revenue</p>
+          <p className="text-2xl font-bold text-foreground">{todayCollected}€ <span className="text-sm font-normal text-muted-foreground">/ {todayToCollect + todayCollected}€</span></p>
+          <p className="text-xs text-muted-foreground mt-1">Today's collections</p>
         </div>
 
         {/* Money to Collect */}
         <div className="bg-card rounded-2xl border border-border p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-amber-600" />
+              <Clock className="w-5 h-5 text-amber-600" />
             </div>
+            {overdueCollections.length > 0 && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
+                {overdueCollections.length} overdue
+              </span>
+            )}
           </div>
           <p className="text-2xl font-bold text-foreground">{moneyToCollect}€</p>
           <p className="text-xs text-muted-foreground mt-1">

@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef } from "react";
-import { Outlet, NavLink, Navigate } from "react-router-dom";
+import { Outlet, NavLink, Navigate, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   CalendarDays,
   DollarSign,
+  Users,
   LogOut,
   Menu,
   X,
   ChevronLeft,
+  ArrowLeftRight,
+  UserCircle,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import type { LucideIcon } from "lucide-react";
@@ -22,11 +25,13 @@ interface SidebarLink {
 const sidebarLinks: SidebarLink[] = [
   { to: "/supervisor", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/supervisor/bookings", label: "Bookings", icon: CalendarDays },
-  { to: "/supervisor/revenue", label: "Revenue & Collections", icon: DollarSign },
+  { to: "/supervisor/assignments", label: "Nanny Schedule", icon: Users },
+  { to: "/supervisor/revenue", label: "Collections", icon: DollarSign },
 ];
 
 export default function SupervisorLayout() {
-  const { isAdmin, isSupervisor, adminProfile, adminLogout, stats } = useData();
+  const { isAdmin, isSupervisor, adminProfile, adminLogout, stats, isNanny, nannyProfile } = useData();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
@@ -113,7 +118,18 @@ export default function SupervisorLayout() {
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="px-3 py-4 border-t border-border">
+        <div className="px-3 py-4 border-t border-border space-y-1">
+          {/* Role switcher — only for dual-role users (e.g. Doha) */}
+          {isNanny && (
+            <button
+              onClick={() => { setSidebarOpen(false); navigate("/nanny"); }}
+              className="flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl text-sm font-medium text-accent bg-accent/10 hover:bg-accent/20 transition-all duration-200"
+            >
+              <ArrowLeftRight className="w-5 h-5 shrink-0" />
+              <span>Switch to Nanny Portal</span>
+              <UserCircle className="w-4 h-4 ml-auto opacity-60" />
+            </button>
+          )}
           <button
             onClick={adminLogout}
             className="flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all duration-200"
@@ -170,6 +186,17 @@ export default function SupervisorLayout() {
                     Supervisor
                   </span>
                 </div>
+
+                {/* Switch to nanny portal — only for dual-role users */}
+                {isNanny && (
+                  <button
+                    onClick={() => { setProfileDropdownOpen(false); navigate("/nanny"); }}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-accent hover:bg-accent/10 transition-colors w-full"
+                  >
+                    <ArrowLeftRight className="w-4 h-4" />
+                    <span>Switch to Nanny Portal</span>
+                  </button>
+                )}
 
                 <div className="border-t border-border my-1" />
 
