@@ -1,6 +1,15 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb } from './_db.js';
-import type { DbNanny } from '@/types';
+import type { DbNanny, DbAdminUser } from '@/types';
+import { sendRateUpdateNotificationEmail } from './_emailTemplates.js';
+
+interface BulkUpdateRateBody {
+  action: 'bulk_update_rate';
+  newRate: number;
+  notifyAdmin?: boolean;
+  updatedByName?: string;
+  updatedByEmail?: string;
+}
 
 interface CreateNannyBody {
   name: string;
@@ -62,6 +71,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(201).json(result[0]);
     }
     
+    if (req.method === 'PUT') {
+      const { action, newRate, notifyAdmin, updatedByName, updatedByEmail } = (req.body || {}) as BulkUpdateRateBody;
+
+      if (action !== 'bulk_update_rate') {
+        return res.status(400).json({ error: 'Unknown action' });
+      }
+
+      const rate = Number(newRate);
+      if (!rate || rate <= 0) {
+        return res.status(400).json({ error: 'A valid positive rate is required' });
+      }
+
+      // Update rate for all non-blocked nannies
+      const updated = await sql`
+        UPDATE nannies
+        SET rate = ${rate}, updated_at = NOW()
+        WHERE status != 'blocked'
+        RETURNING id
+      ` as { id: number }[];
+
+      const nannyCount = updated.length;
+
+      // Notify super admins if requested (supervisor flow)
+      if (notifyAdmin && updatedByName && updatedByEmail) {
+        try {
+          const superAdmins = await sql`
+            SELECT email FROM admin_users WHERE role = 'super_admin' AND is_active = true
+          ` as Pick<DbAdminUser, 'email'>[];
+          const adminEmails = superAdmins.map(a => a.email);
+          if (adminEmails.length > 0) {
+            await sendRateUpdateNotificationEmail({
+              updatedByName,
+              updatedByEmail,
+              newRate: rate,
+              nannyCount,
+              adminEmails,
+            });
+          }
+        } catch (err) {
+          console.error('Failed to send rate notification:', err);
+          // Non-critical — don't fail the request
+        }
+      }
+
+      return res.status(200).json({ success: true, nannyCount });
+    }
+
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';

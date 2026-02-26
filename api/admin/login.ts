@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb } from '../_db.js';
 import crypto from 'crypto';
-import type { DbAdminUser } from '@/types';
+import type { DbAdminUser, DbNanny } from '@/types';
 import { sendAdminInviteEmail } from '../_emailTemplates.js';
 import seedHandler from '../_seed.js';
 
@@ -75,6 +75,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           WHERE id = ${admin.id}
         `;
 
+        // Check for linked nanny account (same email) — enables dual-role access
+        let linkedNanny: object | null = null;
+        try {
+          const nannyResult = await sql`
+            SELECT id, name, email, image, location, rating, experience, bio,
+                   specialties, languages, rate, available, status, phone, age
+            FROM nannies
+            WHERE LOWER(email) = LOWER(${email}) AND status = 'active'
+          ` as DbNanny[];
+          if (nannyResult.length > 0) {
+            const n = nannyResult[0];
+            linkedNanny = {
+              id: n.id,
+              name: n.name,
+              email: n.email,
+              image: n.image,
+              location: n.location,
+              rating: n.rating,
+              experience: n.experience,
+              bio: n.bio,
+              specialties: typeof n.specialties === 'string' ? JSON.parse(n.specialties) : n.specialties || [],
+              languages: typeof n.languages === 'string' ? JSON.parse(n.languages) : n.languages || [],
+              rate: n.rate,
+              available: n.available,
+              status: n.status,
+              phone: n.phone,
+              age: n.age,
+            };
+          }
+        } catch { /* Non-critical — ignore if nannies table lookup fails */ }
+
         return res.status(200).json({
           success: true,
           admin: {
@@ -84,7 +115,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             role: admin.role,
             lastLogin: admin.last_login,
             loginCount: (admin.login_count || 0) + 1
-          }
+          },
+          ...(linkedNanny ? { linkedNanny } : {}),
         });
       }
 

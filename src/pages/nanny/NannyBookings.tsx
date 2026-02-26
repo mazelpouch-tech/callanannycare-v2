@@ -8,7 +8,6 @@ import {
   Clock,
   ClipboardList,
   CheckCircle,
-  XCircle,
   MessageCircle,
   Loader2,
   PlayCircle,
@@ -18,7 +17,6 @@ import {
   Plus,
   X,
   ArrowRightLeft,
-  AlertTriangle,
   Pencil,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
@@ -108,21 +106,31 @@ export default function NannyBookings() {
     const bookingParam = searchParams.get("booking");
     return bookingParam ? Number(bookingParam) : null;
   });
+  // Track the booking ID we need to scroll to (from push notification)
+  const [scrollToBooking, setScrollToBooking] = useState<string | null>(() => searchParams.get("booking"));
   const [actionLoading, setActionLoading] = useState<number | string | null>(null);
 
-  // Auto-scroll to booking from push notification deep link
+  // Extract booking deep-link param and clean up URL on mount
   useEffect(() => {
     const bookingParam = searchParams.get("booking");
     if (bookingParam) {
       setExpandedId(Number(bookingParam));
+      setScrollToBooking(bookingParam);
+      setStatusFilter("all"); // Clear filters so the booking is always visible
       searchParams.delete("booking");
       setSearchParams(searchParams, { replace: true });
-      setTimeout(() => {
-        const el = document.getElementById(`booking-row-${bookingParam}`);
-        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 300);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Scroll to the target booking once it appears in the DOM (retries as bookings load)
+  useEffect(() => {
+    if (!scrollToBooking) return;
+    const el = document.getElementById(`booking-row-${scrollToBooking}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setScrollToBooking(null);
+    }
+  }, [nannyBookings, scrollToBooking]);
 
   const [extendBooking, setExtendBooking] = useState<typeof nannyBookings[0] | null>(null);
   const [forwardBooking, setForwardBooking] = useState<typeof nannyBookings[0] | null>(null);
@@ -157,14 +165,16 @@ export default function NannyBookings() {
     const startLabel = TIME_SLOTS.find(s => s.value === editForm.startTime)?.label || editForm.startTime;
     const endLabel = TIME_SLOTS.find(s => s.value === editForm.endTime)?.label || editForm.endTime;
 
-    // Recalculate price
+    // Recalculate price (handles overnight e.g. 18:00→01:00)
     const [sh, sm] = (editForm.startTime || "0:0").split(":").map(Number);
     const [eh, em] = (editForm.endTime || "0:0").split(":").map(Number);
-    const hours = Math.max(0, (eh + em / 60) - (sh + sm / 60));
+    const startH = sh + sm / 60;
+    const endH = eh + em / 60;
+    const hours = endH > startH ? endH - startH : (24 - startH) + endH;
     const startDate = new Date(editForm.startDate);
     const endDate = editForm.endDate ? new Date(editForm.endDate) : startDate;
     const dayCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1);
-    const isEvening = eh > 19 || (eh === 19 && em > 0) || sh < 7;
+    const isEvening = endH <= startH || sh >= 19 || sh < 7 || eh > 19 || (eh === 19 && em > 0);
     const taxiFee = isEvening ? TAXI_FEE * dayCount : 0;
     const totalPrice = RATE * hours * dayCount + taxiFee;
 
@@ -219,33 +229,6 @@ export default function NannyBookings() {
     setActionLoading(null);
   };
 
-  // Decline Confirmation Modal
-  const [declineTarget, setDeclineTarget] = useState<typeof nannyBookings[0] | null>(null);
-  const [declineReason, setDeclineReason] = useState("");
-  const [declineLoading, setDeclineLoading] = useState(false);
-
-  const handleDecline = (id: number | string) => {
-    const booking = nannyBookings.find((b) => String(b.id) === String(id));
-    if (booking) setDeclineTarget(booking);
-  };
-
-  const handleDeclineConfirm = async () => {
-    if (!declineTarget) return;
-    setDeclineLoading(true);
-    try {
-      await updateBookingStatus(declineTarget.id, "cancelled", {
-        reason: declineReason.trim(),
-        cancelledBy: "nanny",
-      });
-      await fetchNannyBookings();
-    } catch (err) {
-      console.error("Decline failed:", err);
-    }
-    setDeclineLoading(false);
-    setDeclineTarget(null);
-    setDeclineReason("");
-  };
-
   const handleClockIn = async (id: number | string) => {
     setActionLoading(id);
     await clockInBooking(id);
@@ -277,14 +260,16 @@ export default function NannyBookings() {
     if (!formData.clientName || !formData.startDate || !formData.startTime) return;
     setFormLoading(true);
 
-    // Calculate price (hidden from nanny, stored for admin)
+    // Calculate price (hidden from nanny, stored for admin) — handles overnight
     const [sh, sm] = (formData.startTime || "0:0").split(":").map(Number);
     const [eh, em] = (formData.endTime || "0:0").split(":").map(Number);
-    const hours = Math.max(0, (eh + em / 60) - (sh + sm / 60));
+    const startH = sh + sm / 60;
+    const endH = eh + em / 60;
+    const hours = endH > startH ? endH - startH : (24 - startH) + endH;
     const startDate = new Date(formData.startDate);
     const endDate = formData.endDate ? new Date(formData.endDate) : startDate;
     const dayCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1);
-    const isEvening = eh > 19 || (eh === 19 && em > 0) || sh < 7;
+    const isEvening = endH <= startH || sh >= 19 || sh < 7 || eh > 19 || (eh === 19 && em > 0);
     const taxiFee = isEvening ? TAXI_FEE * dayCount : 0;
     const totalPrice = RATE * hours * dayCount + taxiFee;
 
@@ -692,9 +677,8 @@ export default function NannyBookings() {
                         </td>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-1.5">
-                            {/* Accept/Decline for pending */}
+                            {/* Accept for pending */}
                             {booking.status === "pending" && (
-                              <>
                                 <button
                                   onClick={() => handleAccept(booking.id)}
                                   disabled={actionLoading === booking.id}
@@ -707,15 +691,6 @@ export default function NannyBookings() {
                                     <CheckCircle className="w-4 h-4" />
                                   )}
                                 </button>
-                                <button
-                                  onClick={() => handleDecline(booking.id)}
-                                  disabled={actionLoading === booking.id}
-                                  className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                                  title="Decline booking"
-                                >
-                                  <XCircle className="w-4 h-4" />
-                                </button>
-                              </>
                             )}
                             {/* Start Shift for confirmed bookings today, no active shift elsewhere */}
                             {booking.status === "confirmed" && !booking.clockIn && isToday(booking.date) && !activeShift && (
@@ -943,7 +918,6 @@ export default function NannyBookings() {
                   {/* Action buttons for mobile */}
                   <div className="flex flex-wrap gap-2 mt-3">
                     {booking.status === "pending" && (
-                      <>
                         <button
                           onClick={() => handleAccept(booking.id)}
                           disabled={actionLoading === booking.id}
@@ -956,15 +930,6 @@ export default function NannyBookings() {
                           )}
                           {t("nanny.bookings.accept")}
                         </button>
-                        <button
-                          onClick={() => handleDecline(booking.id)}
-                          disabled={actionLoading === booking.id}
-                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50 text-red-700 text-xs font-medium hover:bg-red-100 transition-colors disabled:opacity-50"
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                          {t("nanny.bookings.decline")}
-                        </button>
-                      </>
                     )}
 
                     {/* Start Shift for confirmed bookings today */}
@@ -1285,67 +1250,6 @@ export default function NannyBookings() {
         />
       )}
 
-      {/* Decline Confirmation Modal */}
-      {declineTarget && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setDeclineTarget(null); setDeclineReason(""); }}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{t("nanny.bookings.decline")} Booking</h3>
-                  <p className="text-sm text-gray-500">#{String(declineTarget.id)} — {declineTarget.clientName}</p>
-                </div>
-              </div>
-
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
-                <p className="text-sm text-red-800">
-                  <strong>⚠️ Declining will cancel this booking</strong> and notify the parent via email and WhatsApp.
-                </p>
-              </div>
-
-              <div className="mb-4 text-sm text-gray-600 space-y-1">
-                <p><span className="font-medium">{t("shared.date")}:</span> {declineTarget.date}</p>
-                <p><span className="font-medium">{t("shared.time")}:</span> {declineTarget.startTime} - {declineTarget.endTime}</p>
-                <p><span className="font-medium">{t("shared.hotel")}:</span> {declineTarget.hotel || 'N/A'}</p>
-              </div>
-
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Reason <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
-              <textarea
-                value={declineReason}
-                onChange={(e) => setDeclineReason(e.target.value)}
-                placeholder="e.g. Schedule conflict, personal reasons..."
-                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
-                rows={3}
-              />
-            </div>
-
-            <div className="flex gap-3 p-4 border-t border-gray-100">
-              <button
-                onClick={() => { setDeclineTarget(null); setDeclineReason(""); }}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
-              >
-                {t("shared.cancel")}
-              </button>
-              <button
-                onClick={handleDeclineConfirm}
-                disabled={declineLoading}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {declineLoading ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Declining...</>
-                ) : (
-                  <>Yes, {t("nanny.bookings.decline")}</>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Navigate, Outlet, NavLink } from "react-router-dom";
+import { Navigate, Outlet, NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -11,6 +11,9 @@ import {
   Menu,
   Globe,
   User,
+  ShieldCheck,
+  ArrowLeftRight,
+  Eye,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -26,8 +29,9 @@ const sidebarLinks = [
 ];
 
 export default function NannyLayout() {
-  const { isNanny, nannyProfile, nannyLogout, unreadNotifications, fetchNannyNotifications, unreadChatCount } = useData();
+  const { isNanny, nannyProfile, nannyLogout, unreadNotifications, fetchNannyNotifications, unreadChatCount, isAdmin, isSupervisor, isImpersonating, stopImpersonating } = useData();
   const { t, locale, setLocale } = useLanguage();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
@@ -45,12 +49,12 @@ export default function NannyLayout() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [profileDropdownOpen]);
 
-  // Check if nanny has been blocked since login
+  // Check if nanny has been blocked since login (skip when admin is impersonating)
   useEffect(() => {
-    if (isNanny && nannyProfile?.status === "blocked") {
+    if (isNanny && !isImpersonating && nannyProfile?.status === "blocked") {
       nannyLogout();
     }
-  }, [isNanny, nannyProfile?.status, nannyLogout]);
+  }, [isNanny, isImpersonating, nannyProfile?.status, nannyLogout]);
   useEffect(() => {
     if (!isNanny) return;
     const interval = setInterval(() => {
@@ -147,6 +151,20 @@ export default function NannyLayout() {
           })}
         </nav>
 
+        {/* Role switcher — only shown for dual-role users (e.g. Doha) */}
+        {isAdmin && (
+          <div className="px-4 pb-2">
+            <button
+              onClick={() => { setSidebarOpen(false); navigate(isSupervisor ? "/supervisor" : "/admin"); }}
+              className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-violet-700 bg-violet-50 hover:bg-violet-100 transition-all w-full"
+            >
+              <ArrowLeftRight className="w-4 h-4 shrink-0" />
+              <span>Switch to {isSupervisor ? "Supervisor" : "Admin"}</span>
+              <ShieldCheck className="w-4 h-4 ml-auto opacity-60" />
+            </button>
+          </div>
+        )}
+
         {/* Logout */}
         <div className="p-4 border-t border-border">
           <button
@@ -235,6 +253,17 @@ export default function NannyLayout() {
                     <span>{t("nanny.layout.myProfile")}</span>
                   </NavLink>
 
+                  {/* Switch role — only for dual-role users */}
+                  {isAdmin && (
+                    <button
+                      onClick={() => { setProfileDropdownOpen(false); navigate(isSupervisor ? "/supervisor" : "/admin"); }}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-violet-700 hover:bg-violet-50 transition-colors w-full"
+                    >
+                      <ArrowLeftRight className="w-4 h-4" />
+                      <span>Switch to {isSupervisor ? "Supervisor" : "Admin"}</span>
+                    </button>
+                  )}
+
                   {/* Divider */}
                   <div className="border-t border-border my-1" />
 
@@ -257,7 +286,22 @@ export default function NannyLayout() {
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          {nannyProfile && (
+          {/* Admin impersonation banner */}
+          {isImpersonating && (
+            <div className="mb-4 flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
+              <div className="flex items-center gap-2 text-amber-800 text-sm font-medium">
+                <Eye className="w-4 h-4 shrink-0" />
+                <span>Viewing as <strong>{nannyProfile?.name}</strong> — admin view only</span>
+              </div>
+              <button
+                onClick={() => { stopImpersonating(); navigate(isSupervisor ? "/supervisor" : "/admin"); }}
+                className="text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              >
+                ← Back to Admin
+              </button>
+            </div>
+          )}
+          {nannyProfile && !isImpersonating && (
             <PushNotificationBanner userType="nanny" userId={nannyProfile.id} />
           )}
           <Outlet />

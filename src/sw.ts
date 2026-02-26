@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
-import { NetworkFirst, CacheFirst } from 'workbox-strategies';
+import { CacheFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { clientsClaim } from 'workbox-core';
 
@@ -17,6 +17,17 @@ cleanupOutdatedCaches();
 // Workbox precaching (manifest injected at build time)
 precacheAndRoute(self.__WB_MANIFEST);
 
+// ─── API Bypass (iOS WKWebView fix) ──────────────────────────────
+// On iOS Safari / WKWebView in standalone PWA mode, the SW fetch event
+// fires for ALL requests, even when no Workbox route is registered.
+// We explicitly respondWith(fetch(...)) for every /api/ call to guarantee
+// a direct network request, bypassing any potential Workbox interference.
+self.addEventListener('fetch', (event: FetchEvent) => {
+  if (new URL(event.request.url).pathname.startsWith('/api/')) {
+    event.respondWith(fetch(event.request));
+  }
+});
+
 // ─── SPA Navigation Fallback ─────────────────────────────────────
 // Serve index.html for all navigation requests (SPA routing)
 // This is critical for the PWA to work when opened from home screen
@@ -26,16 +37,7 @@ const navigationRoute = new NavigationRoute(navigationHandler, {
 });
 registerRoute(navigationRoute);
 
-// ─── Runtime Caching (replicating previous generateSW config) ────
-
-// API calls: Network first with 5-minute cache
-registerRoute(
-  ({ url }) => url.pathname.startsWith('/api/'),
-  new NetworkFirst({
-    cacheName: 'api-cache',
-    plugins: [new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 300 })],
-  })
-);
+// ─── Runtime Caching ─────────────────────────────────────────────
 
 // Images: Cache first with 30-day expiry
 registerRoute(
@@ -86,13 +88,17 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Focus existing window if already open
-      for (const client of clientList) {
-        if (client.url === fullUrl && 'focus' in client) {
-          return client.focus();
-        }
+      // Find any open window from our origin (don't require exact URL match)
+      const appClient = clientList.find(
+        (c) => new URL(c.url).origin === self.location.origin
+      );
+
+      if (appClient) {
+        // Navigate the existing window to the booking URL, then focus it
+        return (appClient as WindowClient).navigate(fullUrl).then((c) => c?.focus());
       }
-      // Otherwise open new window
+
+      // No existing window — open a new one
       return self.clients.openWindow(fullUrl);
     })
   );

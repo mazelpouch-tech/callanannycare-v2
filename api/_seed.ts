@@ -150,6 +150,13 @@ export default async function seedHandler(req: VercelRequest, res: VercelRespons
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_by VARCHAR(20) DEFAULT ''`;
     // ────────────────────────────────────────────────────────────────
 
+    // ─── Collection Tracking (Supervisor) ──────────────────────────────
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS collected_by VARCHAR(255) DEFAULT ''`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS collected_at TIMESTAMPTZ`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS collection_note TEXT DEFAULT ''`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50) DEFAULT ''`;
+    // ────────────────────────────────────────────────────────────────
+
     // ─── Created By Tracking ──────────────────────────────────────────
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS created_by VARCHAR(100) DEFAULT ''`;
     // Backfill: set empty created_by to 'Admin' for existing bookings
@@ -173,6 +180,11 @@ export default async function seedHandler(req: VercelRequest, res: VercelRespons
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS review_token VARCHAR(64)`;
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS review_sent_at TIMESTAMPTZ`;
     // ────────────────────────────────────────────────────────────────
+
+    // ─── Deletion Tracking ───────────────────────────────────────
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(255) DEFAULT ''`;
+    // ────────────────────────────────────────────────────────────
 
     // ─── Payment Reconciliation ──────────────────────────────────────
     await sql`

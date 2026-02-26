@@ -97,6 +97,8 @@ export default function ForwardBookingModal({
       setLoading(false);
       if (err && typeof err === 'object' && 'status' in err && (err as { status: number }).status === 409) {
         setConflictError(err instanceof Error ? err.message : 'This nanny has a scheduling conflict at this time.');
+      } else {
+        setConflictError(err instanceof Error ? err.message : 'Failed to forward booking. Please try again.');
       }
     }
   };

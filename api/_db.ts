@@ -16,7 +16,7 @@ export function parseTimeToMinutes(time: string): number | null {
   return parseInt(match[1]) * 60 + parseInt(match[2]);
 }
 
-/** Check if two time ranges overlap: start1 < end2 AND start2 < end1 */
+/** Check if two time ranges overlap, handling overnight shifts (e.g. 20h00-02h00) */
 export function timesOverlap(
   start1: string, end1: string,
   start2: string, end2: string
@@ -26,7 +26,18 @@ export function timesOverlap(
   const s2 = parseTimeToMinutes(start2);
   const e2 = parseTimeToMinutes(end2);
   if (s1 === null || e1 === null || s2 === null || e2 === null) return false;
-  return s1 < e2 && s2 < e1;
+
+  const overnight1 = e1 <= s1;
+  const overnight2 = e2 <= s2;
+
+  if (!overnight1 && !overnight2) {
+    return s1 < e2 && s2 < e1;
+  }
+  if (overnight1 && overnight2) {
+    return true;
+  }
+  // One range crosses midnight: overlap if either segment intersects
+  return s1 < e2 || s2 < e1;
 }
 
 /** Generate all date strings (YYYY-MM-DD) in a range. If endDate is null/same, returns [startDate]. */

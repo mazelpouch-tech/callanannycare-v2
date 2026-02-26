@@ -58,12 +58,15 @@ export function parseTimeToHours(t: string): number | null {
   return null;
 }
 
-/** Calculate booked hours from start/end time strings, with optional day count */
+/** Calculate booked hours from start/end time strings, with optional day count.
+ *  Handles overnight bookings (e.g. 18h00-01h00 = 7 hours). */
 export function calcBookedHours(startTime: string, endTime: string, startDate?: string, endDate?: string | null): number {
   const s = parseTimeToHours(startTime);
   const e = parseTimeToHours(endTime);
-  if (s === null || e === null || e <= s) return 0;
-  const hoursPerDay = e - s;
+  if (s === null || e === null) return 0;
+  // If end <= start, the shift crosses midnight (e.g. 18:00 → 01:00 = 7h)
+  const hoursPerDay = e > s ? e - s : (24 - s) + e;
+  if (hoursPerDay <= 0) return 0;
   let days = 1;
   if (startDate && endDate) {
     const d1 = new Date(startDate).getTime();
@@ -73,9 +76,24 @@ export function calcBookedHours(startTime: string, endTime: string, startDate?: 
   return hoursPerDay * days;
 }
 
-/** Check if a shift overlaps with 7PM-7AM (evening/night window) */
+/** Check if a shift overlaps with 7PM-7AM (evening/night window).
+ *  Overnight shifts (end <= start) always cross midnight, so always evening. */
 function isEveningShift(startHour: number, endHour: number): boolean {
-  return startHour >= 19 || startHour < 7 || endHour > 19 || endHour <= 7;
+  return endHour <= startHour || startHour >= 19 || startHour < 7 || endHour > 19 || endHour <= 7;
+}
+
+/** Check if two time ranges overlap, handling overnight shifts (e.g. 20h00-02h00) */
+export function timesOverlap(start1: string, end1: string, start2: string, end2: string): boolean {
+  const s1 = parseTimeToHours(start1);
+  const e1 = parseTimeToHours(end1);
+  const s2 = parseTimeToHours(start2);
+  const e2 = parseTimeToHours(end2);
+  if (s1 === null || e1 === null || s2 === null || e2 === null) return false;
+  const overnight1 = e1 <= s1;
+  const overnight2 = e2 <= s2;
+  if (!overnight1 && !overnight2) return s1 < e2 && s2 < e1;
+  if (overnight1 && overnight2) return true;
+  return s1 < e2 || s2 < e1;
 }
 
 /** Pay breakdown: base hourly pay + taxi fee */

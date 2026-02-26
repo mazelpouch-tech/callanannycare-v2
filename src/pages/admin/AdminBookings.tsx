@@ -27,6 +27,8 @@ import {
   TimerReset,
   ArrowRightLeft,
   Bell,
+  RotateCcw,
+  History,
 } from "lucide-react";
 import { format, parseISO, formatDistanceToNow, isToday } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -34,7 +36,7 @@ import PhoneInput from "../../components/PhoneInput";
 import ExtendBookingModal from "../../components/ExtendBookingModal";
 import ForwardBookingModal from "../../components/ForwardBookingModal";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
-import { calcBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE, isTomorrow as isTomorrowDate } from "@/utils/shiftHelpers";
+import { calcBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE, isTomorrow as isTomorrowDate, timesOverlap } from "@/utils/shiftHelpers";
 import PaymentPanel from "../../components/PaymentPanel";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 
@@ -104,8 +106,9 @@ const statusConfig: Record<BookingStatus, { label: string; className: string }> 
 
 type UrgencyLevel = "normal" | "warning" | "critical";
 
-function getUrgencyLevel(createdAt: string, status: string): UrgencyLevel {
+function getUrgencyLevel(createdAt: string, status: string, nannyId?: number | null): UrgencyLevel {
   if (status !== "pending") return "normal";
+  if (nannyId) return "normal"; // already assigned to a nanny, no action needed
   const hoursElapsed = (Date.now() - new Date(createdAt).getTime()) / 3600000;
   if (hoursElapsed > 3) return "critical";
   if (hoursElapsed > 1) return "warning";
@@ -113,7 +116,7 @@ function getUrgencyLevel(createdAt: string, status: string): UrgencyLevel {
 }
 
 function UrgencyBadge({ booking }: { booking: Booking }) {
-  const urgency = getUrgencyLevel(booking.createdAt, booking.status);
+  const urgency = getUrgencyLevel(booking.createdAt, booking.status, booking.nannyId);
   if (booking.status !== "pending" || urgency === "normal") {
     const status = statusConfig[booking.status] || statusConfig.pending;
     return (
@@ -148,12 +151,14 @@ function UrgencyBadge({ booking }: { booking: Booking }) {
 const statusFilters = ["all", "pending", "confirmed", "completed", "cancelled"];
 
 export default function AdminBookings() {
-  const { bookings, fetchBookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking, sendBookingReminder, adminProfile } = useData();
+  const { bookings, fetchBookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking, fetchDeletedBookings, restoreBooking, sendBookingReminder, adminProfile } = useData();
   const { toDH } = useExchangeRate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState(() => {
+    // If opening from a notification deep link, clear filters so the booking is visible
+    if (searchParams.get("booking")) return "all";
     const param = searchParams.get("status");
     return param && statusFilters.includes(param) ? param : "all";
   });
@@ -163,23 +168,30 @@ export default function AdminBookings() {
     const bookingParam = searchParams.get("booking");
     return bookingParam ? Number(bookingParam) : null;
   });
+  // Track the booking ID we need to scroll to (from push notification)
+  const [scrollToBooking, setScrollToBooking] = useState<string | null>(() => searchParams.get("booking"));
   const [deleteConfirm, setDeleteConfirm] = useState<number | string | null>(null);
 
-  // Auto-scroll to booking from push notification deep link
+  // Extract booking deep-link param and clean up URL on mount
   useEffect(() => {
     const bookingParam = searchParams.get("booking");
     if (bookingParam) {
       setExpandedRow(Number(bookingParam));
-      // Clean up the URL param
+      setScrollToBooking(bookingParam);
       searchParams.delete("booking");
       setSearchParams(searchParams, { replace: true });
-      // Scroll to the booking row after render
-      setTimeout(() => {
-        const el = document.getElementById(`booking-row-${bookingParam}`);
-        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 300);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Scroll to the target booking once it appears in the DOM (retries as bookings load)
+  useEffect(() => {
+    if (!scrollToBooking) return;
+    const el = document.getElementById(`booking-row-${scrollToBooking}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setScrollToBooking(null);
+    }
+  }, [bookings, scrollToBooking]);
 
   // Reminder cooldown tracking (booking ID → timestamp)
   const [remindedBookings, setRemindedBookings] = useState<Record<string, number>>({});
@@ -315,7 +327,9 @@ export default function AdminBookings() {
     if (!editBookingData.startTime || !editBookingData.endTime) return 0;
     const [sh, sm] = editBookingData.startTime.split(":").map(Number);
     const [eh, em] = editBookingData.endTime.split(":").map(Number);
-    return Math.max(0, (eh + em / 60) - (sh + sm / 60));
+    const startH = sh + sm / 60;
+    const endH = eh + em / 60;
+    return endH > startH ? endH - startH : (24 - startH) + endH;
   }, [editBookingData]);
 
   const editBookingDays = useMemo(() => {
@@ -332,7 +346,8 @@ export default function AdminBookings() {
     // Taxi fee: 10€ per day if shift touches the 7PM–7AM window
     const [sh] = (editBookingData?.startTime || "").split(":").map(Number);
     const [eh, em] = (editBookingData?.endTime || "").split(":").map(Number);
-    const isEvening = (eh > 19 || (eh === 19 && em > 0)) || sh < 7;
+    const isOvernight = (eh + em / 60) <= (sh + 0);
+    const isEvening = isOvernight || sh >= 19 || sh < 7 || eh > 19 || (eh === 19 && em > 0);
     const taxiFee = isEvening ? 10 * editBookingDays : 0;
     return hourlyTotal + taxiFee;
   }, [editSelectedNanny, editBookingHours, editBookingDays, editBookingData]);
@@ -347,7 +362,7 @@ export default function AdminBookings() {
         b.status !== "cancelled" &&
         b.startTime &&
         editBookingData.startTime &&
-        !(b.endTime && editBookingData.endTime && (editBookingData.endTime <= b.startTime || editBookingData.startTime >= b.endTime))
+        timesOverlap(editBookingData.startTime, editBookingData.endTime || "23:59", b.startTime, b.endTime || "23:59")
     );
   }, [editBookingData, bookings]);
 
@@ -397,7 +412,9 @@ export default function AdminBookings() {
     if (!newBooking.startTime || !newBooking.endTime) return 0;
     const [sh, sm] = newBooking.startTime.split(":").map(Number);
     const [eh, em] = newBooking.endTime.split(":").map(Number);
-    return Math.max(0, (eh + em / 60) - (sh + sm / 60));
+    const startH = sh + sm / 60;
+    const endH = eh + em / 60;
+    return endH > startH ? endH - startH : (24 - startH) + endH;
   }, [newBooking.startTime, newBooking.endTime]);
 
   const newBookingDays = useMemo(() => {
@@ -413,7 +430,8 @@ export default function AdminBookings() {
     const hourlyTotal = Math.round(selectedNanny.rate * newBookingHours * newBookingDays);
     const [sh] = (newBooking.startTime || "").split(":").map(Number);
     const [eh, em] = (newBooking.endTime || "").split(":").map(Number);
-    const isEvening = (eh > 19 || (eh === 19 && em > 0)) || sh < 7;
+    const isOvernight = (eh + em / 60) <= (sh + 0);
+    const isEvening = isOvernight || sh >= 19 || sh < 7 || eh > 19 || (eh === 19 && em > 0);
     const taxiFee = isEvening ? 10 * newBookingDays : 0;
     return hourlyTotal + taxiFee;
   }, [selectedNanny, newBookingHours, newBookingDays, newBooking.startTime, newBooking.endTime]);
@@ -487,15 +505,14 @@ export default function AdminBookings() {
 
   // Conflict detection
   const getConflicts = (nannyId: string, date: string, startTime: string, endTime: string) => {
-    if (!nannyId || !date) return [];
+    if (!nannyId || !date || !startTime) return [];
     return bookings.filter(
       (b) =>
         b.nannyId === Number(nannyId) &&
         b.date === date &&
         b.status !== "cancelled" &&
         b.startTime &&
-        startTime &&
-        !(b.endTime && endTime && (endTime <= b.startTime || startTime >= b.endTime))
+        timesOverlap(startTime, endTime || "23:59", b.startTime, b.endTime || "23:59")
     );
   };
 
@@ -605,13 +622,41 @@ export default function AdminBookings() {
   };
 
   const handleDelete = (id: number | string) => {
-    deleteBooking(id);
+    deleteBooking(id, adminProfile?.name || 'Admin');
     setDeleteConfirm(null);
   };
 
   const toggleExpand = (id: number | string) => {
     setExpandedRow(expandedRow === id ? null : id);
   };
+
+  // ─── Deleted bookings audit log ───────────────────────────────
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [deletedBookings, setDeletedBookings] = useState<typeof bookings>([]);
+  const [loadingDeleted, setLoadingDeleted] = useState(false);
+  const [restoring, setRestoring] = useState<number | string | null>(null);
+
+  const openDeletedLog = async () => {
+    setShowDeleted(true);
+    setLoadingDeleted(true);
+    try {
+      const data = await fetchDeletedBookings();
+      setDeletedBookings(data);
+    } finally {
+      setLoadingDeleted(false);
+    }
+  };
+
+  const handleRestore = async (id: number | string) => {
+    setRestoring(id);
+    try {
+      await restoreBooking(id);
+      setDeletedBookings((prev) => prev.filter((b) => b.id !== id));
+    } finally {
+      setRestoring(null);
+    }
+  };
+  // ─────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
@@ -626,6 +671,13 @@ export default function AdminBookings() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={openDeletedLog}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:bg-muted transition-colors"
+          >
+            <History className="w-4 h-4" />
+            <span className="hidden sm:inline">Deleted</span>
+          </button>
           <button
             onClick={exportCSV}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-border text-foreground hover:bg-muted transition-colors"
@@ -2030,11 +2082,19 @@ export default function AdminBookings() {
           nannies={nannies}
           currentNannyId={forwardBooking.nannyId}
           onConfirm={async (newNannyId) => {
-            const newNanny = nannies.find((n) => n.id === newNannyId);
-            await updateBooking(forwardBooking.id, {
-              nannyId: newNannyId,
-              nannyName: newNanny?.name || "",
+            const res = await fetch(`/api/bookings/${forwardBooking.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ nanny_id: newNannyId }),
             });
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}));
+              const err: Error & { status?: number } = new Error(
+                data.error || `Failed to forward booking (${res.status})`
+              );
+              err.status = res.status;
+              throw err;
+            }
             await fetchBookings();
           }}
           onClose={() => setForwardBooking(null)}
@@ -2114,6 +2174,92 @@ export default function AdminBookings() {
                   <>Yes, Cancel It</>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Deleted Bookings Audit Log Modal ─────────────────── */}
+      {showDeleted && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowDeleted(false)}
+        >
+          <div
+            className="bg-white dark:bg-card rounded-2xl shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <div className="flex items-center gap-2">
+                <History className="w-5 h-5 text-muted-foreground" />
+                <h2 className="text-lg font-semibold text-foreground">Deleted Bookings</h2>
+                {!loadingDeleted && (
+                  <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
+                    {deletedBookings.length}
+                  </span>
+                )}
+              </div>
+              <button onClick={() => setShowDeleted(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto flex-1 p-4">
+              {loadingDeleted ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : deletedBookings.length === 0 ? (
+                <p className="text-center text-muted-foreground py-12 text-sm">No deleted bookings found.</p>
+              ) : (
+                <div className="space-y-3">
+                  {deletedBookings.map((b) => (
+                    <div key={b.id} className="bg-muted/40 rounded-xl border border-border p-4 space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-foreground text-sm">
+                            #{b.id} — {b.clientName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {b.date}{b.endDate ? ` → ${b.endDate}` : ""} · {b.startTime}{b.endTime ? ` - ${b.endTime}` : ""}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{b.hotel || "No hotel"} · {b.nannyName || "Unassigned"}</p>
+                        </div>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize shrink-0 ${
+                          b.status === 'completed' ? 'bg-green-100 text-green-700' :
+                          b.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
+                          b.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {b.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-border/50">
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-medium text-red-600">Deleted by {b.deletedBy || 'Unknown'}</span>
+                          {b.deletedAt && (
+                            <span> · {formatDistanceToNow(new Date(b.deletedAt), { addSuffix: true })}</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleRestore(b.id)}
+                          disabled={restoring === b.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors disabled:opacity-50"
+                        >
+                          {restoring === b.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          )}
+                          Restore
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

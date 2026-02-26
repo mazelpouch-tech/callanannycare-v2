@@ -1059,3 +1059,64 @@ export async function sendReviewRequestEmail(data: ReviewRequestEmailData): Prom
     return false;
   }
 }
+
+// ============================================================
+// Rate Update Notification Email (sent to super admins when supervisor changes rates)
+// ============================================================
+
+export interface RateUpdateNotificationData {
+  updatedByName: string;
+  updatedByEmail: string;
+  newRate: number;
+  nannyCount: number;
+  adminEmails: string[];
+}
+
+export async function sendRateUpdateNotificationEmail(data: RateUpdateNotificationData): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log('RESEND_API_KEY not configured. Rate update notification email skipped.');
+    return false;
+  }
+
+  if (data.adminEmails.length === 0) return false;
+
+  const resend = new Resend(apiKey);
+  const fromAddress = process.env.RESEND_FROM_EMAIL || 'Call a Nanny <onboarding@resend.dev>';
+
+  const content = `
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:48px;margin-bottom:8px;">&#128178;</div>
+      <h2 style="margin:0 0 6px;color:#1a1a1a;font-size:22px;font-family:Georgia,'Times New Roman',serif;">Nanny Rate Updated</h2>
+      <p style="margin:0;color:#666;font-size:15px;">A supervisor has changed the hourly rate for all nannies.</p>
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden;margin-bottom:24px;">
+      ${row('Updated By', `${data.updatedByName} (${data.updatedByEmail})`)}
+      ${row('New Hourly Rate', `<strong style="color:#f97316;font-size:16px;">${data.newRate} €/hr</strong>`)}
+      ${row('Nannies Affected', `${data.nannyCount} nannies`)}
+      ${row('Updated At', new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }))}
+    </table>
+
+    <div style="margin:24px 0;padding:16px 20px;background-color:#fff7ed;border-radius:12px;border-left:4px solid #f97316;">
+      <p style="margin:0;color:#92400e;font-size:14px;line-height:1.5;">
+        This is an automated notification. If this change was not expected, please review it in the admin dashboard and contact your team.
+      </p>
+    </div>
+
+    <p style="margin:0;color:#999;font-size:13px;text-align:center;">Call a Nanny &mdash; <a href="mailto:info@callanannycare.com" style="color:#f97316;">info@callanannycare.com</a></p>
+  `;
+
+  try {
+    await resend.emails.send({
+      from: fromAddress,
+      to: data.adminEmails,
+      subject: `[Action] Nanny rates updated to ${data.newRate} €/hr by ${data.updatedByName}`,
+      html: emailWrapper(content),
+    });
+    return true;
+  } catch (err) {
+    console.error('Failed to send rate update notification email:', err);
+    return false;
+  }
+}

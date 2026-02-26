@@ -26,6 +26,7 @@ import type {
   DbChatChannel,
   NannyLoginResponse,
   AdminLoginResponse,
+  LinkedNannyInfo,
   InviteResponse,
   ResendInviteResponse,
   ApiResult,
@@ -41,6 +42,7 @@ const STORAGE_KEYS = {
   admin: "callanannycare_admin",
   nanny: "callanannycare_nanny",
   nannyProfile: "callanannycare_nanny_profile",
+  impersonating: "callanannycare_impersonating",
 };
 
 function loadFromStorage<T>(key: string, fallback: T): T {
@@ -112,6 +114,9 @@ export function DataProvider({ children }: DataProviderProps) {
   const [nannyProfile, setNannyProfile] = useState<NannyProfile | null>(() =>
     loadFromStorage(STORAGE_KEYS.nannyProfile, null)
   );
+  const [isImpersonating, setIsImpersonating] = useState<boolean>(() =>
+    loadFromStorage(STORAGE_KEYS.impersonating, false)
+  );
   const [nannyBookings, setNannyBookings] = useState<Booking[]>([]);
   const [nannyNotifications, setNannyNotifications] = useState<Notification[]>([]);
   const [nannyStats, setNannyStats] = useState<NannyStats | null>(null);
@@ -120,62 +125,77 @@ export function DataProvider({ children }: DataProviderProps) {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadData() {
-      try {
-        const [apiNannies, apiBookings] = await Promise.all([
-          apiFetch<DbNanny[]>("/nannies"),
-          apiFetch<DbBookingWithNanny[]>("/bookings"),
-        ]);
+    async function loadData(isRetry = false) {
+      // Use allSettled so a single failing endpoint doesn't wipe out all data
+      const [nanniesResult, bookingsResult] = await Promise.allSettled([
+        apiFetch<DbNanny[]>("/nannies"),
+        apiFetch<DbBookingWithNanny[]>("/bookings"),
+      ]);
 
-        if (!cancelled) {
-          // Normalize nanny data from DB (JSONB fields come as objects already)
-          const normalizedNannies: Nanny[] = apiNannies.map((n) => ({
-            ...n,
-            status: n.status || "active",
-            specialties: typeof n.specialties === "string" ? JSON.parse(n.specialties) : n.specialties || [],
-            languages: typeof n.languages === "string" ? JSON.parse(n.languages) : n.languages || [],
-          }));
-          setNannies(normalizedNannies);
-          saveToStorage(STORAGE_KEYS.nannies, normalizedNannies);
+      if (cancelled) return;
 
-          // Normalize bookings - map DB column names to frontend camelCase
-          const normalizedBookings: Booking[] = apiBookings.map((b) => ({
-            id: b.id,
-            nannyId: b.nanny_id,
-            nannyName: b.nanny_name || b.client_name,
-            nannyImage: b.nanny_image || "",
-            clientName: b.client_name,
-            clientEmail: b.client_email,
-            clientPhone: b.client_phone,
-            hotel: b.hotel,
-            date: b.date,
-            endDate: b.end_date ?? null,
-            startTime: b.start_time,
-            endTime: b.end_time,
-            plan: b.plan,
-            childrenCount: b.children_count,
-            childrenAges: b.children_ages,
-            notes: b.notes,
-            totalPrice: b.total_price,
-            status: b.status,
-            createdBy: b.created_by || 'parent',
-            createdByName: b.created_by_name || '',
-            createdAt: b.created_at,
-            clockIn: b.clock_in,
-            clockOut: b.clock_out,
-            cancelledAt: b.cancelled_at ?? null,
-            cancellationReason: b.cancellation_reason || '',
-            cancelledBy: b.cancelled_by || '',
-            createdBy: b.created_by || '',
-          }));
-          setBookings(normalizedBookings);
-          saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
-        }
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        console.warn("API unavailable, using localStorage cache:", message);
-        // Keep localStorage data as fallback
-      } finally {
+      let anySuccess = false;
+
+      if (nanniesResult.status === 'fulfilled') {
+        anySuccess = true;
+        const normalizedNannies: Nanny[] = nanniesResult.value.map((n) => ({
+          ...n,
+          status: n.status || "active",
+          specialties: typeof n.specialties === "string" ? JSON.parse(n.specialties) : n.specialties || [],
+          languages: typeof n.languages === "string" ? JSON.parse(n.languages) : n.languages || [],
+        }));
+        setNannies(normalizedNannies);
+        saveToStorage(STORAGE_KEYS.nannies, normalizedNannies);
+      } else {
+        console.warn("Nannies fetch failed:", nanniesResult.reason);
+      }
+
+      if (bookingsResult.status === 'fulfilled') {
+        anySuccess = true;
+        const normalizedBookings: Booking[] = bookingsResult.value.map((b) => ({
+          id: b.id,
+          nannyId: b.nanny_id,
+          nannyName: b.nanny_name || b.client_name,
+          nannyImage: b.nanny_image || "",
+          clientName: b.client_name,
+          clientEmail: b.client_email,
+          clientPhone: b.client_phone,
+          hotel: b.hotel,
+          date: b.date,
+          endDate: b.end_date ?? null,
+          startTime: b.start_time,
+          endTime: b.end_time,
+          plan: b.plan,
+          childrenCount: b.children_count,
+          childrenAges: b.children_ages,
+          notes: b.notes,
+          totalPrice: b.total_price,
+          status: b.status,
+          createdBy: b.created_by || 'parent',
+          createdByName: b.created_by_name || '',
+          createdAt: b.created_at,
+          clockIn: b.clock_in,
+          clockOut: b.clock_out,
+          cancelledAt: b.cancelled_at ?? null,
+          cancellationReason: b.cancellation_reason || '',
+          cancelledBy: b.cancelled_by || '',
+          collectedBy: b.collected_by || '',
+          collectedAt: b.collected_at ?? null,
+          collectionNote: b.collection_note || '',
+          paymentMethod: b.payment_method || '',
+          deletedAt: b.deleted_at ?? null,
+          deletedBy: b.deleted_by || '',
+        }));
+        setBookings(normalizedBookings);
+        saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
+      } else {
+        console.warn("Bookings fetch failed:", bookingsResult.reason);
+      }
+
+      if (!anySuccess && !isRetry) {
+        // Both failed — retry once after 3s (handles iOS PWA cold-start SW activation delay)
+        setTimeout(() => { if (!cancelled) loadData(true); }, 3000);
+      } else {
         if (!cancelled) setLoading(false);
       }
     }
@@ -308,7 +328,13 @@ export function DataProvider({ children }: DataProviderProps) {
         cancelledAt: b.cancelled_at ?? null,
         cancellationReason: b.cancellation_reason || '',
         cancelledBy: b.cancelled_by || '',
+        collectedBy: b.collected_by || '',
+        collectedAt: b.collected_at ?? null,
+        collectionNote: b.collection_note || '',
+        paymentMethod: b.payment_method || '',
         createdBy: b.created_by || '',
+        deletedAt: b.deleted_at ?? null,
+        deletedBy: b.deleted_by || '',
       }));
       setBookings(normalizedBookings);
       saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -316,6 +342,18 @@ export function DataProvider({ children }: DataProviderProps) {
       console.warn("Failed to refresh bookings");
     }
   }, []);
+
+  // Refetch data when the PWA is foregrounded (tab/app becomes visible again).
+  // Placed here — AFTER fetchBookings declaration — to avoid Temporal Dead Zone crash.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchBookings().catch(() => { /* best effort */ });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [fetchBookings]);
 
   const addBooking = useCallback(
     async (booking: Partial<Booking>, meta?: { locale?: string }): Promise<Booking> => {
@@ -374,7 +412,13 @@ export function DataProvider({ children }: DataProviderProps) {
           cancelledAt: created.cancelled_at ?? null,
           cancellationReason: created.cancellation_reason || '',
           cancelledBy: created.cancelled_by || '',
+          collectedBy: created.collected_by || '',
+          collectedAt: created.collected_at ?? null,
+          collectionNote: created.collection_note || '',
+          paymentMethod: created.payment_method || '',
           createdBy: created.created_by || '',
+          deletedAt: created.deleted_at ?? null,
+          deletedBy: created.deleted_by || '',
         };
         setBookings((prev) => {
           const updated = [...prev, normalized];
@@ -521,14 +565,100 @@ export function DataProvider({ children }: DataProviderProps) {
     setNannyBookings((prev) => prev.map((b) => b.id === id ? { ...b, clockOut: clockTime, status: "completed" as BookingStatus } : b));
   }, []);
 
-  const deleteBooking = useCallback(async (id: number | string): Promise<void> => {
+  const deleteBooking = useCallback(async (id: number | string, deletedBy?: string): Promise<void> => {
     try {
-      await apiFetch(`/bookings/${id}`, { method: "DELETE" });
+      await apiFetch(`/bookings/${id}`, {
+        method: "DELETE",
+        body: JSON.stringify({ deleted_by: deletedBy || 'Admin' }),
+      });
     } catch {
       console.warn("API delete failed, deleting locally");
     }
     setBookings((prev) => {
       const updated = prev.filter((b) => b.id !== id);
+      saveToStorage(STORAGE_KEYS.bookings, updated);
+      return updated;
+    });
+  }, []);
+
+  const fetchDeletedBookings = useCallback(async (): Promise<Booking[]> => {
+    try {
+      const data = await apiFetch<DbBookingWithNanny[]>('/bookings?deleted=true');
+      return data.map((b) => ({
+        id: b.id,
+        nannyId: b.nanny_id,
+        nannyName: b.nanny_name || '',
+        nannyImage: b.nanny_image || '',
+        clientName: b.client_name,
+        clientEmail: b.client_email,
+        clientPhone: b.client_phone || '',
+        hotel: b.hotel || '',
+        date: b.date,
+        endDate: b.end_date ?? null,
+        startTime: b.start_time,
+        endTime: b.end_time,
+        plan: b.plan,
+        childrenCount: b.children_count,
+        childrenAges: b.children_ages,
+        notes: b.notes,
+        totalPrice: b.total_price,
+        status: b.status,
+        createdBy: b.created_by || 'parent',
+        createdByName: b.created_by_name || '',
+        createdAt: b.created_at,
+        clockIn: b.clock_in ?? null,
+        clockOut: b.clock_out ?? null,
+        cancelledAt: b.cancelled_at ?? null,
+        cancellationReason: b.cancellation_reason || '',
+        cancelledBy: b.cancelled_by || '',
+        collectedBy: b.collected_by || '',
+        collectedAt: b.collected_at ?? null,
+        collectionNote: b.collection_note || '',
+        paymentMethod: b.payment_method || '',
+        deletedAt: b.deleted_at ?? null,
+        deletedBy: b.deleted_by || '',
+      }));
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const restoreBooking = useCallback(async (id: number | string): Promise<void> => {
+    await apiFetch(`/bookings/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ restore: true }),
+    });
+    await fetchBookings();
+  }, [fetchBookings]);
+
+  const markAsCollected = useCallback(async (
+    id: number | string,
+    data: { collectedBy: string; paymentMethod: string; collectionNote?: string }
+  ): Promise<void> => {
+    const collectedAt = new Date().toISOString();
+    try {
+      await apiFetch(`/bookings/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          collected_by: data.collectedBy,
+          collected_at: collectedAt,
+          collection_note: data.collectionNote || '',
+          payment_method: data.paymentMethod,
+        }),
+      });
+    } catch {
+      console.warn("API mark-collected failed, updating locally");
+    }
+    setBookings((prev) => {
+      const updated = prev.map((b) =>
+        b.id === id ? {
+          ...b,
+          collectedBy: data.collectedBy,
+          collectedAt: collectedAt,
+          collectionNote: data.collectionNote || '',
+          paymentMethod: data.paymentMethod,
+        } : b
+      );
       saveToStorage(STORAGE_KEYS.bookings, updated);
       return updated;
     });
@@ -580,6 +710,21 @@ export function DataProvider({ children }: DataProviderProps) {
         setNannyProfile(profile);
         saveToStorage(STORAGE_KEYS.nannyProfile, profile);
 
+        // If this nanny also has a linked admin/supervisor account, activate it too
+        if (result.linkedAdmin) {
+          const la = result.linkedAdmin;
+          const adminProf: AdminProfile = {
+            id: la.id,
+            name: la.name,
+            email: la.email,
+            role: la.role,
+            lastLogin: la.lastLogin,
+            loginCount: la.loginCount,
+          };
+          setIsAdmin(true);
+          setAdminProfile(adminProf);
+        }
+
         // Auto-resubscribe push if permission was previously granted
         try {
           const { isPushSupported, isSubscribedToPush, subscribeToPush } = await import('../utils/pushNotifications');
@@ -605,7 +750,48 @@ export function DataProvider({ children }: DataProviderProps) {
     setNannyBookings([]);
     setNannyNotifications([]);
     setNannyStats(null);
+    setIsImpersonating(false);
     localStorage.removeItem(STORAGE_KEYS.nannyProfile);
+    localStorage.removeItem(STORAGE_KEYS.impersonating);
+  }, []);
+
+  /** Admin impersonates a nanny — no credentials needed. */
+  const impersonateNanny = useCallback((nanny: Nanny) => {
+    const profile: NannyProfile = {
+      id: nanny.id,
+      name: nanny.name,
+      email: nanny.email || '',
+      image: nanny.image || '',
+      location: nanny.location || '',
+      rating: nanny.rating ?? 5,
+      experience: nanny.experience || '',
+      status: nanny.status,
+      bio: nanny.bio || '',
+      specialties: Array.isArray(nanny.specialties) ? nanny.specialties : [],
+      languages: Array.isArray(nanny.languages) ? nanny.languages : [],
+      rate: nanny.rate ?? 0,
+      available: nanny.available,
+      phone: nanny.phone || '',
+    };
+    setNannyProfile(profile);
+    setIsNanny(true);
+    setIsImpersonating(true);
+    saveToStorage(STORAGE_KEYS.nannyProfile, profile);
+    saveToStorage(STORAGE_KEYS.nanny, true);
+    saveToStorage(STORAGE_KEYS.impersonating, true);
+  }, []);
+
+  /** Stop impersonating — return to admin-only state. */
+  const stopImpersonating = useCallback(() => {
+    setIsNanny(false);
+    setNannyProfile(null);
+    setNannyBookings([]);
+    setNannyNotifications([]);
+    setNannyStats(null);
+    setIsImpersonating(false);
+    localStorage.removeItem(STORAGE_KEYS.nannyProfile);
+    localStorage.removeItem(STORAGE_KEYS.impersonating);
+    saveToStorage(STORAGE_KEYS.nanny, false);
   }, []);
 
   const normalizeBooking = useCallback((b: DbBookingWithNanny): Booking => ({
@@ -635,7 +821,13 @@ export function DataProvider({ children }: DataProviderProps) {
     cancelledAt: b.cancelled_at ?? null,
     cancellationReason: b.cancellation_reason || '',
     cancelledBy: b.cancelled_by || '',
+    collectedBy: b.collected_by || '',
+    collectedAt: b.collected_at ?? null,
+    collectionNote: b.collection_note || '',
+    paymentMethod: b.payment_method || '',
     createdBy: b.created_by || '',
+    deletedAt: b.deleted_at ?? null,
+    deletedBy: b.deleted_by || '',
   }), []);
 
   const fetchNannyBookings = useCallback(async () => {
@@ -809,6 +1001,37 @@ export function DataProvider({ children }: DataProviderProps) {
     }
   }, []);
 
+  const bulkUpdateNannyRate = useCallback(async (
+    newRate: number,
+    opts?: { notifyAdmin?: boolean; updatedByName?: string; updatedByEmail?: string }
+  ): Promise<ApiResult<{ nannyCount: number }>> => {
+    try {
+      const result = await apiFetch<{ success: boolean; nannyCount?: number; error?: string }>("/nannies", {
+        method: "PUT",
+        body: JSON.stringify({
+          action: "bulk_update_rate",
+          newRate,
+          notifyAdmin: opts?.notifyAdmin ?? false,
+          updatedByName: opts?.updatedByName,
+          updatedByEmail: opts?.updatedByEmail,
+        }),
+      });
+      if (!result.success) {
+        return { success: false, error: result.error || "Failed to update rates" };
+      }
+      // Update local state
+      setNannies((prev) => {
+        const updated = prev.map((n) => n.status !== "blocked" ? { ...n, rate: newRate } : n);
+        saveToStorage(STORAGE_KEYS.nannies, updated);
+        return updated;
+      });
+      return { success: true, nannyCount: result.nannyCount ?? 0 };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return { success: false, error: message };
+    }
+  }, []);
+
   // --- Admin Auth & User Management ---
 
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(() =>
@@ -844,6 +1067,35 @@ export function DataProvider({ children }: DataProviderProps) {
         setIsAdmin(true);
         setAdminProfile(profile);
 
+        // Re-fetch all data after login — handles iOS PWA cold-start where the
+        // initial fetch (on app open) may have failed before the SW settled
+        fetchBookings().catch(() => { /* best effort */ });
+
+        // If this admin also has a linked nanny account, activate it too
+        if (result.linkedNanny) {
+          const ln = result.linkedNanny as LinkedNannyInfo;
+          const nannyProf: NannyProfile = {
+            id: ln.id,
+            name: ln.name,
+            email: ln.email ?? '',
+            image: ln.image,
+            location: ln.location,
+            rating: ln.rating,
+            experience: ln.experience,
+            status: ln.status,
+            bio: ln.bio,
+            specialties: ln.specialties,
+            languages: ln.languages,
+            rate: ln.rate,
+            available: ln.available,
+            phone: ln.phone,
+            age: ln.age ?? null,
+          };
+          setIsNanny(true);
+          setNannyProfile(nannyProf);
+          saveToStorage(STORAGE_KEYS.nannyProfile, nannyProf);
+        }
+
         // Auto-resubscribe push if permission was previously granted
         try {
           const { isPushSupported, isSubscribedToPush, subscribeToPush } = await import('../utils/pushNotifications');
@@ -860,7 +1112,7 @@ export function DataProvider({ children }: DataProviderProps) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       return { success: false as const, error: message || "Invalid email or password" };
     }
-  }, []);
+  }, [fetchBookings]);
 
   const adminLogout = useCallback(() => {
     setIsAdmin(false);
@@ -1133,6 +1385,7 @@ export function DataProvider({ children }: DataProviderProps) {
       inviteNanny,
       toggleNannyStatus,
       resendInvite,
+      bulkUpdateNannyRate,
       bookings,
       fetchBookings,
       addBooking,
@@ -1141,6 +1394,9 @@ export function DataProvider({ children }: DataProviderProps) {
       clockInBooking,
       clockOutBooking,
       deleteBooking,
+      fetchDeletedBookings,
+      restoreBooking,
+      markAsCollected,
       resendInvoice,
       sendBookingReminder,
       stats,
@@ -1161,6 +1417,9 @@ export function DataProvider({ children }: DataProviderProps) {
       loading,
       // Nanny portal
       isNanny,
+      isImpersonating,
+      impersonateNanny,
+      stopImpersonating,
       nannyProfile,
       nannyBookings,
       nannyNotifications,
@@ -1185,12 +1444,12 @@ export function DataProvider({ children }: DataProviderProps) {
       setActiveChannel,
     }),
     [
-      nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability, inviteNanny, toggleNannyStatus, resendInvite,
-      bookings, fetchBookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking, resendInvoice, sendBookingReminder,
+      nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability, inviteNanny, toggleNannyStatus, resendInvite, bulkUpdateNannyRate,
+      bookings, fetchBookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking, fetchDeletedBookings, restoreBooking, resendInvoice, sendBookingReminder,
       stats, isAdmin, adminProfile, adminUsers, adminLogin, adminLogout,
       fetchAdminUsers, addAdminUser, updateAdminUser, deleteAdminUser,
       changeAdminPassword, forgotAdminPassword, resetAdminPassword, registerAdmin, loading,
-      isNanny, nannyProfile, nannyBookings, nannyNotifications, nannyStats,
+      isNanny, isImpersonating, impersonateNanny, stopImpersonating, nannyProfile, nannyBookings, nannyNotifications, nannyStats,
       unreadNotifications, nannyLogin, nannyLogout, fetchNannyBookings,
       fetchNannyStats, fetchNannyNotifications, markNotificationsRead, updateNannyProfile,
       chatChannels, chatMessages, activeChannel, unreadChatCount,

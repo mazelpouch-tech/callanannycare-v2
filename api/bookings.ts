@@ -38,6 +38,7 @@ interface ExistingBookingRow {
   start_time: string;
   end_time: string;
   client_name: string;
+  hotel: string;
 }
 
 interface BlockedNannyRow { nanny_id: number }
@@ -51,6 +52,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
+    // Ensure migration columns exist (no-op once columns are present)
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(255) DEFAULT ''`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reminder_sent BOOLEAN DEFAULT false`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS locale VARCHAR(10) DEFAULT 'en'`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancellation_reason TEXT DEFAULT ''`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_by VARCHAR(20) DEFAULT ''`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS collected_by VARCHAR(255) DEFAULT ''`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS collected_at TIMESTAMPTZ`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS collection_note TEXT DEFAULT ''`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50) DEFAULT ''`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS price_migrated_to_eur BOOLEAN DEFAULT true`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS review_token VARCHAR(64)`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS review_sent_at TIMESTAMPTZ`;
+
     if (req.method === 'GET') {
       // ─── Cron: Send automated reminders for tomorrow's bookings ──
       if (req.query.cron === 'send-reminders') {
@@ -165,10 +182,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       // ────────────────────────────────────────────────────────────
 
+      // ?deleted=true → return soft-deleted bookings for audit view
+      if (req.query.deleted === 'true') {
+        const deleted = await sql`
+          SELECT b.*, n.name as nanny_name, n.image as nanny_image
+          FROM bookings b
+          LEFT JOIN nannies n ON b.nanny_id = n.id
+          WHERE b.deleted_at IS NOT NULL
+          ORDER BY b.deleted_at DESC
+        ` as DbBookingWithNanny[];
+        return res.status(200).json(deleted);
+      }
+
       const bookings = await sql`
         SELECT b.*, n.name as nanny_name, n.image as nanny_image
         FROM bookings b
         LEFT JOIN nannies n ON b.nanny_id = n.id
+        WHERE b.deleted_at IS NULL
         ORDER BY b.created_at DESC
       ` as DbBookingWithNanny[];
       return res.status(200).json(bookings);
@@ -202,13 +232,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ` as BlockedNannyRow[];
         const blockedIds = new Set(blockedRows.map(b => b.nanny_id));
 
-        // Check existing bookings for overlap
+        // Check existing bookings for overlap + same-hotel priority
         const existing = await sql`
-          SELECT id, nanny_id, date, start_time, end_time, client_name FROM bookings
+          SELECT id, nanny_id, date, start_time, end_time, client_name, hotel FROM bookings
           WHERE status != 'cancelled' AND date = ANY(${bookingDates})
         ` as ExistingBookingRow[];
 
-        let assigned = false;
+        // Build list of conflict-free candidates
+        const eligibleCandidates: { id: number; sameHotel: boolean }[] = [];
         for (const candidate of available) {
           if (blockedIds.has(candidate.id)) continue;
           const hasConflict = existing.some(
@@ -216,14 +247,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               timesOverlap(start_time, effectiveEndTime, eb.start_time, eb.end_time || '23h59')
           );
           if (!hasConflict) {
-            nanny_id = candidate.id;
-            assigned = true;
-            break;
+            // Check if this nanny already has a same-day booking at the same hotel
+            const sameHotel = !!(hotel && existing.some(
+              eb => eb.nanny_id === candidate.id &&
+                eb.hotel && eb.hotel.toLowerCase().trim() === hotel.toLowerCase().trim()
+            ));
+            eligibleCandidates.push({ id: candidate.id, sameHotel });
           }
         }
-        if (!assigned) {
+
+        if (eligibleCandidates.length === 0) {
           return res.status(400).json({ error: 'No nannies are currently available for this time slot. Please try a different time.' });
         }
+
+        // Prefer nanny already at the same hotel (saves transportation)
+        const sameHotelMatch = eligibleCandidates.find(c => c.sameHotel);
+        nanny_id = sameHotelMatch ? sameHotelMatch.id : eligibleCandidates[0].id;
       } else {
         // Manual assign: check for conflicts with the chosen nanny
         const conflicts = await sql`
@@ -289,7 +328,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Send push notifications (best-effort, non-blocking)
       try {
         const { sendPushToUser, sendPushToAllAdmins } = await import('./_pushUtils.js');
+        let pushNannyName = '';
         if (nanny_id) {
+          try {
+            const nr = await sql`SELECT name FROM nannies WHERE id = ${nanny_id}` as { name: string }[];
+            pushNannyName = nr[0]?.name || '';
+          } catch { /* ignore */ }
           await sendPushToUser('nanny', nanny_id, {
             title: 'New Booking Request',
             body: `New booking from ${client_name} on ${date}`,
@@ -299,7 +343,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         await sendPushToAllAdmins({
           title: 'New Booking',
-          body: `${client_name} booked for ${date}`,
+          body: pushNannyName ? `${client_name} booked for ${date} — ${pushNannyName}` : `${client_name} booked for ${date}`,
           url: `/admin/bookings?booking=${result[0].id}`,
           tag: `admin-booking-new-${result[0].id}`,
         });

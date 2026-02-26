@@ -10,6 +10,7 @@ import RebookBooking from './pages/RebookBooking'
 import BookingStatus from './pages/BookingStatus'
 import ReviewNannyPublic from './pages/ReviewNannyPublic'
 import PrivacyPolicy from './pages/PrivacyPolicy'
+import PartnerDemo from './pages/PartnerDemo'
 import NotFound from './pages/NotFound'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminLayout from './pages/admin/AdminLayout'
@@ -26,6 +27,7 @@ import SupervisorLayout from './pages/supervisor/SupervisorLayout'
 import SupervisorDashboard from './pages/supervisor/SupervisorDashboard'
 import SupervisorBookings from './pages/supervisor/SupervisorBookings'
 import SupervisorRevenue from './pages/supervisor/SupervisorRevenue'
+import SupervisorAssignments from './pages/supervisor/SupervisorAssignments'
 import NannyLogin from './pages/nanny/NannyLogin'
 import NannyRegister from './pages/nanny/NannyRegister'
 import NannyLayout from './pages/nanny/NannyLayout'
@@ -47,6 +49,9 @@ export default function App() {
         <Route path="/book" element={<Book />} />
         <Route path="*" element={<NotFound />} />
       </Route>
+
+      {/* Partner demo page */}
+      <Route path="/partner" element={<PartnerDemo />} />
 
       {/* Public standalone pages (no navbar/footer) */}
       <Route path="/parent-form" element={<ParentForm />} />
@@ -74,6 +79,7 @@ export default function App() {
       <Route path="/supervisor" element={<SupervisorLayout />}>
         <Route index element={<SupervisorDashboard />} />
         <Route path="bookings" element={<SupervisorBookings />} />
+        <Route path="assignments" element={<SupervisorAssignments />} />
         <Route path="revenue" element={<SupervisorRevenue />} />
       </Route>
 
