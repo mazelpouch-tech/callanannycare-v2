@@ -29,8 +29,9 @@ import {
   Bell,
   RotateCcw,
   History,
-  GitMerge,
+  Layers,
   Users,
+  Ungroup,
 } from "lucide-react";
 import { format, parseISO, formatDistanceToNow, isToday } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -255,10 +256,12 @@ export default function AdminBookings() {
 
   // ─── Group Selection ──────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<number | string>>(new Set());
-  const [showMergeModal, setShowMergeModal] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkNannyId, setBulkNannyId] = useState("");
   const [confirmBulkCancel, setConfirmBulkCancel] = useState(false);
+  // bookingGroups: label → Set of booking IDs (visual grouping only, no DB changes)
+  const [bookingGroups, setBookingGroups] = useState<Map<string, Set<number | string>>>(new Map());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   // ─────────────────────────────────────────────────────────────
 
   const handleCancelConfirm = async () => {
@@ -680,20 +683,16 @@ export default function AdminBookings() {
     return names.length === 1 ? names[0] : null;
   }, [selectedBookings]);
 
-  // Merge is available whenever 2+ bookings are selected
-  const canMerge = selectedBookings.length >= 2;
+  const canGroup = selectedBookings.length >= 2;
 
-  // Warn in the merge modal if time slots differ
-  const mergeHasMixedTimes = useMemo(() => {
-    const slots = [...new Set(selectedBookings.map((b) => `${b.startTime}__${b.endTime}`))];
-    return slots.length > 1;
-  }, [selectedBookings]);
-
-  // Warn if clients differ
-  const mergeHasMixedClients = useMemo(() => {
-    const clients = [...new Set(selectedBookings.map((b) => b.clientName || ""))];
-    return clients.length > 1;
-  }, [selectedBookings]);
+  // bookingId → group key
+  const bookingGroupMap = useMemo(() => {
+    const map = new Map<number | string, string>();
+    for (const [key, ids] of bookingGroups) {
+      for (const id of ids) map.set(id, key);
+    }
+    return map;
+  }, [bookingGroups]);
 
   const toggleSelect = (id: number | string) => {
     setSelectedIds((prev) => {
@@ -713,6 +712,62 @@ export default function AdminBookings() {
     setSelectedIds(new Set());
     setConfirmBulkCancel(false);
     setBulkNannyId("");
+  };
+
+  // Group = purely visual, no DB changes
+  const handleGroup = () => {
+    if (!canGroup) return;
+    const key = selectedParentName || `Group ${bookingGroups.size + 1}`;
+    setBookingGroups((prev) => new Map([...prev, [key, new Set(selectedIds)]]));
+    setExpandedGroups((prev) => new Set([...prev, key]));
+    clearSelection();
+  };
+
+  const handleUngroup = (key: string) => {
+    setBookingGroups((prev) => {
+      const next = new Map(prev);
+      next.delete(key);
+      return next;
+    });
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  };
+
+  const toggleGroupExpand = (key: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  // Build render items for a table section, inserting group headers before grouped bookings
+  const buildRenderItems = (items: Booking[]) => {
+    type RenderItem =
+      | { type: "booking"; booking: Booking; grouped: boolean }
+      | { type: "group-header"; key: string; bookings: Booking[] };
+    const result: RenderItem[] = [];
+    const seenGroups = new Set<string>();
+    for (const booking of items) {
+      const gKey = bookingGroupMap.get(booking.id);
+      if (gKey) {
+        if (!seenGroups.has(gKey)) {
+          seenGroups.add(gKey);
+          const groupBookings = items.filter((b) => bookingGroupMap.get(b.id) === gKey);
+          result.push({ type: "group-header", key: gKey, bookings: groupBookings });
+        }
+        if (expandedGroups.has(gKey)) {
+          result.push({ type: "booking", booking, grouped: true });
+        }
+      } else {
+        result.push({ type: "booking", booking, grouped: false });
+      }
+    }
+    return result;
   };
 
   const handleBulkConfirm = async () => {
@@ -744,23 +799,6 @@ export default function AdminBookings() {
     }
     setBulkLoading(false);
     setBulkNannyId("");
-    clearSelection();
-  };
-
-  // Merge: update the earliest booking to span the full date range, soft-delete the rest
-  const handleMerge = async () => {
-    if (!canMerge) return;
-    setBulkLoading(true);
-    const sorted = [...selectedBookings].sort((a, b) => a.date.localeCompare(b.date));
-    const base = sorted[0];
-    const lastDate = sorted[sorted.length - 1].date;
-    const totalPrice = selectedBookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
-    await updateBooking(base.id, { endDate: lastDate, totalPrice });
-    for (let i = 1; i < sorted.length; i++) {
-      await deleteBooking(sorted[i].id, adminProfile?.name || "Admin");
-    }
-    setBulkLoading(false);
-    setShowMergeModal(false);
     clearSelection();
   };
   // ─────────────────────────────────────────────────────────────
@@ -951,12 +989,64 @@ export default function AdminBookings() {
                           </div>
                         </td>
                       </tr>
-                      {group.items.map((booking) => {
+                      {buildRenderItems(group.items).map((item) => {
+                    if (item.type === "group-header") {
+                      const { key: gKey, bookings: gBookings } = item;
+                      const isExpanded = expandedGroups.has(gKey);
+                      const sortedDates = [...gBookings].sort((a, b) => a.date.localeCompare(b.date));
+                      const nannyNames = [...new Set(gBookings.map((b) => b.nannyName).filter(Boolean))];
+                      return (
+                        <tr key={`group-header-${gKey}`} className="bg-primary/5 border-y border-primary/20">
+                          <td className="px-3 py-3">
+                            <button
+                              onClick={() => toggleGroupExpand(gKey)}
+                              className="p-1 rounded hover:bg-primary/10 text-primary transition-colors"
+                            >
+                              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            </button>
+                          </td>
+                          <td colSpan={10} className="px-3 py-3">
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <div className="flex items-center gap-2">
+                                <Layers className="w-4 h-4 text-primary shrink-0" />
+                                <span className="font-semibold text-sm text-foreground">{gKey}</span>
+                                <span className="px-2 py-0.5 rounded-full bg-primary/15 text-primary text-xs font-bold">
+                                  {gBookings.length} bookings
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {sortedDates.map((b) => (
+                                  <span key={b.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-background border border-border text-xs text-foreground">
+                                    <Calendar className="w-3 h-3 text-muted-foreground" />
+                                    {formatDate(b.date)}
+                                    <span className="text-muted-foreground">{b.startTime}–{b.endTime}</span>
+                                  </span>
+                                ))}
+                              </div>
+                              {nannyNames.length > 0 && (
+                                <span className="text-xs text-muted-foreground">{nannyNames.join(", ")}</span>
+                              )}
+                              <button
+                                onClick={() => handleUngroup(gKey)}
+                                title="Ungroup"
+                                className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
+                              >
+                                <Ungroup className="w-3.5 h-3.5" />
+                                Ungroup
+                              </button>
+                            </div>
+                          </td>
+                          <td />
+                        </tr>
+                      );
+                    }
+
+                    const { booking, grouped } = item;
                     const isExpanded = expandedRow === booking.id;
 
                     return (
                       <Fragment key={booking.id}>
-                        <tr id={`booking-row-${booking.id}`} className={`hover:bg-muted/30 transition-colors ${selectedIds.has(booking.id) ? "bg-primary/5" : ""}`}>
+                        <tr id={`booking-row-${booking.id}`} className={`hover:bg-muted/30 transition-colors ${grouped ? "bg-muted/20" : ""} ${selectedIds.has(booking.id) ? "bg-primary/5" : ""}`}>
                           <td className="px-3 py-3.5" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="checkbox"
@@ -2453,15 +2543,15 @@ export default function AdminBookings() {
             ))}
           </select>
 
-          {/* Merge */}
-          {canMerge && (
+          {/* Group */}
+          {canGroup && (
             <button
-              onClick={() => setShowMergeModal(true)}
+              onClick={handleGroup}
               disabled={bulkLoading}
               className="flex items-center gap-1 text-xs font-medium bg-primary text-white px-3 py-1.5 rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors whitespace-nowrap"
             >
-              <GitMerge className="w-3.5 h-3.5" />
-              Merge
+              <Layers className="w-3.5 h-3.5" />
+              Group
             </button>
           )}
 
@@ -2508,91 +2598,6 @@ export default function AdminBookings() {
         </div>
       )}
 
-      {/* ─── Merge Modal ────────────────────────────────────────────── */}
-      {showMergeModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-2xl border border-border shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-primary/10 rounded-xl">
-                <GitMerge className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <h2 className="font-serif text-xl font-bold text-foreground">Merge Bookings</h2>
-                <p className="text-sm text-muted-foreground">
-                  Combine {selectedIds.size} bookings into one multi-day booking
-                </p>
-              </div>
-            </div>
-
-            {/* Days preview */}
-            <div className="bg-muted/30 rounded-xl p-4 mb-5 space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                Days included
-              </p>
-              {[...selectedBookings]
-                .sort((a, b) => a.date.localeCompare(b.date))
-                .map((b, i) => (
-                  <div key={b.id} className="flex items-center gap-2 text-sm">
-                    <div className="w-5 h-5 rounded-full bg-primary/15 text-primary text-xs flex items-center justify-center font-semibold shrink-0">
-                      {i + 1}
-                    </div>
-                    <Calendar className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    <span className="font-medium">{formatDate(b.date)}</span>
-                    <span className="text-muted-foreground text-xs">
-                      {b.startTime} – {b.endTime}
-                    </span>
-                    <span className="ml-auto text-muted-foreground text-xs shrink-0">
-                      {b.totalPrice ? `${b.totalPrice}€` : "—"}
-                    </span>
-                  </div>
-                ))}
-              <div className="border-t border-border/60 pt-2 mt-2 flex justify-between text-sm font-semibold">
-                <span>Merged total</span>
-                <span className="text-primary">
-                  {selectedBookings.reduce((s, b) => s + (b.totalPrice || 0), 0)}€
-                </span>
-              </div>
-            </div>
-
-            {mergeHasMixedClients && (
-              <p className="text-xs text-amber-700 mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                Selected bookings are from different clients. The merged booking will use the client details from the earliest date.
-              </p>
-            )}
-            {mergeHasMixedTimes && (
-              <p className="text-xs text-amber-700 mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                These bookings have different time slots. The merged booking will use the times from the earliest date. Total price reflects all hours.
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground mb-5 bg-muted/40 border border-border rounded-lg px-3 py-2">
-              The earliest booking will be updated to span all dates. Other bookings will be soft-deleted and can be restored from the Deleted log.
-            </p>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowMergeModal(false)}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleMerge}
-                disabled={bulkLoading}
-                className="flex-1 px-4 py-2.5 rounded-xl gradient-warm text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity shadow-warm flex items-center justify-center gap-2"
-              >
-                {bulkLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <GitMerge className="w-4 h-4" />
-                    Merge Bookings
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
