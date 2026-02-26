@@ -32,9 +32,11 @@ import type {
   ApiResult,
 } from "../types";
 
+import { NATIVE_API_BASE } from '../utils/native';
+
 const DataContext = createContext<DataContextValue | null>(null);
 
-const API_BASE = "/api";
+const API_BASE = `${NATIVE_API_BASE}/api`;
 
 const STORAGE_KEYS = {
   nannies: "callanannycare_nannies",

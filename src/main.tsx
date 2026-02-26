@@ -5,7 +5,12 @@ import App from './App'
 import { DataProvider } from './context/DataContext'
 import { LanguageProvider } from './context/LanguageContext'
 import ErrorBoundary from './components/ErrorBoundary'
+import { initStatusBar, initPushListeners } from './utils/native'
 import './index.css'
+
+// Initialize native features (no-ops on web)
+initStatusBar();
+initPushListeners();
 
 try {
   ReactDOM.createRoot(document.getElementById('root')!).render(

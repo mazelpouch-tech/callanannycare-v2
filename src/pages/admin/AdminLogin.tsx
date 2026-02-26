@@ -1,7 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigate, useSearchParams, Link } from "react-router-dom";
-import { Lock, Mail, LogIn, AlertCircle, CheckCircle, ArrowLeft, Key, Loader2, UserPlus, Eye, EyeOff } from "lucide-react";
+import { Lock, Mail, LogIn, AlertCircle, CheckCircle, ArrowLeft, Key, Loader2, UserPlus, Eye, EyeOff, Fingerprint } from "lucide-react";
 import { useData } from "../../context/DataContext";
+import {
+  isBiometricAvailable,
+  isBiometricEnabled,
+  getBiometricCredentials,
+  saveBiometricCredentials,
+  hapticSuccess,
+  hapticError,
+  hapticLight,
+  isNative,
+} from "../../utils/native";
 
 export default function AdminLogin() {
   const { isAdmin, isSupervisor, adminLogin, forgotAdminPassword, resetAdminPassword, registerAdmin } = useData();
@@ -33,6 +43,20 @@ export default function AdminLogin() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Biometric state
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+  const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
+
+  useEffect(() => {
+    if (!isNative()) return;
+    isBiometricAvailable().then((available) => {
+      setBiometricAvailable(available);
+      if (available) setBiometricEnabled(isBiometricEnabled("admin"));
+    });
+  }, []);
+
   if (isAdmin) {
     // Redirect supervisors to their own portal
     if (isSupervisor) {
@@ -46,10 +70,42 @@ export default function AdminLogin() {
     setError("");
     setLoading(true);
     const result = await adminLogin(email, password);
-    if (!result.success) {
+    if (result.success) {
+      await hapticSuccess();
+      if (biometricAvailable && !biometricEnabled) {
+        setShowBiometricPrompt(true);
+      }
+    } else {
+      await hapticError();
       setError(result.error || "Invalid credentials. Please try again.");
     }
     setLoading(false);
+  };
+
+  const handleBiometricLogin = async () => {
+    setBiometricLoading(true);
+    setError("");
+    await hapticLight();
+    const creds = await getBiometricCredentials("admin");
+    if (!creds) {
+      setBiometricLoading(false);
+      setError("Face ID cancelled or unavailable.");
+      return;
+    }
+    const result = await adminLogin(creds.username, creds.password);
+    if (result.success) {
+      await hapticSuccess();
+    } else {
+      await hapticError();
+      setError(result.error || "Biometric login failed. Please sign in manually.");
+    }
+    setBiometricLoading(false);
+  };
+
+  const handleEnableBiometric = async () => {
+    await saveBiometricCredentials("admin", email, password);
+    setBiometricEnabled(true);
+    setShowBiometricPrompt(false);
   };
 
   const handleForgotPassword = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -492,6 +548,25 @@ export default function AdminLogin() {
             </div>
           )}
 
+          {/* Face ID quick-login (shown when biometric is set up) */}
+          {biometricAvailable && biometricEnabled && (
+            <button
+              type="button"
+              onClick={handleBiometricLogin}
+              disabled={biometricLoading}
+              className="w-full mb-5 flex items-center justify-center gap-2 py-3 rounded-xl bg-primary/10 border border-primary/20 text-primary font-semibold hover:bg-primary/20 transition-colors disabled:opacity-60"
+            >
+              {biometricLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  <Fingerprint className="w-5 h-5" />
+                  Sign in with Face ID
+                </>
+              )}
+            </button>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1.5">
@@ -561,6 +636,33 @@ export default function AdminLogin() {
               )}
             </button>
           </form>
+
+          {/* Face ID enable prompt (after successful login) */}
+          {showBiometricPrompt && biometricAvailable && (
+            <div className="mt-5 p-4 rounded-xl bg-primary/5 border border-primary/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Fingerprint className="w-5 h-5 text-primary" />
+                <span className="font-semibold text-sm text-foreground">Enable Face ID?</span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Sign in faster next time using Face ID.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleEnableBiometric}
+                  className="flex-1 py-2 text-sm font-semibold gradient-warm text-white rounded-lg hover:opacity-90 transition"
+                >
+                  Enable
+                </button>
+                <button
+                  onClick={() => setShowBiometricPrompt(false)}
+                  className="flex-1 py-2 text-sm font-medium text-muted-foreground bg-muted rounded-lg hover:bg-muted/80 transition"
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="text-center text-sm text-muted-foreground mt-6">
             <p>

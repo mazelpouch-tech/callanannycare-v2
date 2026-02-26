@@ -12,7 +12,14 @@
     "typecheck:api": "tsc --noEmit -p tsconfig.api.json"
   },
   "dependencies": {
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/haptics": "^6.0.3",
+    "@capacitor/ios": "^6.2.1",
+    "@capacitor/preferences": "^6.0.4",
+    "@capacitor/push-notifications": "^6.0.5",
+    "@capacitor/status-bar": "^6.0.3",
     "@neondatabase/serverless": "^1.0.2",
+    "capacitor-native-biometric": "^4.2.2",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.575.0",
     "qrcode.react": "^4.2.0",
@@ -23,6 +30,7 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@capacitor/cli": "^6.2.1",
     "@eslint/js": "^9.39.1",
     "@tailwindcss/vite": "^4.2.0",
     "@types/react": "^19.2.7",

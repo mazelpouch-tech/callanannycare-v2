@@ -1,9 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
-import { Mail, Key, ArrowRight, Loader2, Globe } from "lucide-react";
+import { Mail, Key, ArrowRight, Loader2, Globe, Fingerprint } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { Link } from "react-router-dom";
+import {
+  isBiometricAvailable,
+  isBiometricEnabled,
+  getBiometricCredentials,
+  saveBiometricCredentials,
+  hapticSuccess,
+  hapticError,
+  hapticLight,
+  isNative,
+} from "../../utils/native";
 
 export default function NannyLogin() {
   const { isNanny, nannyLogin } = useData();
@@ -12,6 +22,20 @@ export default function NannyLogin() {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+  const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
+
+  useEffect(() => {
+    if (!isNative()) return;
+    isBiometricAvailable().then((available) => {
+      setBiometricAvailable(available);
+      if (available) {
+        setBiometricEnabled(isBiometricEnabled("nanny"));
+      }
+    });
+  }, []);
 
   if (isNanny) return <Navigate to="/nanny" replace />;
 
@@ -20,10 +44,43 @@ export default function NannyLogin() {
     setError("");
     setLoading(true);
     const result = await nannyLogin(email, pin);
-    if (!result.success) {
+    if (result.success) {
+      await hapticSuccess();
+      // After successful login, offer to enable Face ID
+      if (biometricAvailable && !biometricEnabled) {
+        setShowBiometricPrompt(true);
+      }
+    } else {
+      await hapticError();
       setError(result.error);
     }
     setLoading(false);
+  };
+
+  const handleBiometricLogin = async () => {
+    setBiometricLoading(true);
+    setError("");
+    await hapticLight();
+    const creds = await getBiometricCredentials("nanny");
+    if (!creds) {
+      setBiometricLoading(false);
+      setError("Face ID cancelled or unavailable.");
+      return;
+    }
+    const result = await nannyLogin(creds.username, creds.password);
+    if (result.success) {
+      await hapticSuccess();
+    } else {
+      await hapticError();
+      setError(result.error || "Biometric login failed. Please sign in manually.");
+    }
+    setBiometricLoading(false);
+  };
+
+  const handleEnableBiometric = async () => {
+    await saveBiometricCredentials("nanny", email, pin);
+    setBiometricEnabled(true);
+    setShowBiometricPrompt(false);
   };
 
   return (
@@ -70,6 +127,25 @@ export default function NannyLogin() {
               </span>
               <span>{error}</span>
             </div>
+          )}
+
+          {/* Face ID quick-login button (shown when biometric is set up) */}
+          {biometricAvailable && biometricEnabled && (
+            <button
+              type="button"
+              onClick={handleBiometricLogin}
+              disabled={biometricLoading}
+              className="w-full mb-5 flex items-center justify-center gap-2 py-3 rounded-xl bg-primary/10 border border-primary/20 text-primary font-semibold hover:bg-primary/20 transition-colors disabled:opacity-60"
+            >
+              {biometricLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  <Fingerprint className="w-5 h-5" />
+                  Sign in with Face ID
+                </>
+              )}
+            </button>
           )}
 
           {/* Form */}
@@ -125,6 +201,33 @@ export default function NannyLogin() {
               )}
             </button>
           </form>
+
+          {/* Face ID enable prompt (appears after first successful login) */}
+          {showBiometricPrompt && biometricAvailable && (
+            <div className="mt-5 p-4 rounded-xl bg-primary/5 border border-primary/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Fingerprint className="w-5 h-5 text-primary" />
+                <span className="font-semibold text-sm text-foreground">Enable Face ID?</span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Sign in faster next time using Face ID.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleEnableBiometric}
+                  className="flex-1 py-2 text-sm font-semibold gradient-warm text-white rounded-lg hover:opacity-90 transition"
+                >
+                  Enable
+                </button>
+                <button
+                  onClick={() => setShowBiometricPrompt(false)}
+                  className="flex-1 py-2 text-sm font-medium text-muted-foreground bg-muted rounded-lg hover:bg-muted/80 transition"
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="text-center text-sm text-muted-foreground mt-6 space-y-1">
             <p>

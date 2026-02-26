@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.PROD ? '' : '';
+import { NATIVE_API_BASE } from './native';
+const API_BASE = NATIVE_API_BASE;
 
 /** Check if push notifications are supported in this browser/PWA context. */
 export function isPushSupported(): boolean {
