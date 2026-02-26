@@ -29,9 +29,6 @@ import {
   Bell,
   RotateCcw,
   History,
-  Layers,
-  Users,
-  Ungroup,
 } from "lucide-react";
 import { format, parseISO, formatDistanceToNow, isToday } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -253,16 +250,6 @@ export default function AdminBookings() {
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelLoading, setCancelLoading] = useState(false);
-
-  // ─── Group Selection ──────────────────────────────────────────
-  const [selectedIds, setSelectedIds] = useState<Set<number | string>>(new Set());
-  const [bulkLoading, setBulkLoading] = useState(false);
-  const [bulkNannyId, setBulkNannyId] = useState("");
-  const [confirmBulkCancel, setConfirmBulkCancel] = useState(false);
-  // bookingGroups: label → Set of booking IDs (visual grouping only, no DB changes)
-  const [bookingGroups, setBookingGroups] = useState<Map<string, Set<number | string>>>(new Map());
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  // ─────────────────────────────────────────────────────────────
 
   const handleCancelConfirm = async () => {
     if (!cancelTarget) return;
@@ -683,138 +670,6 @@ export default function AdminBookings() {
   };
   // ─────────────────────────────────────────────────────────────
 
-  // ─── Group selection helpers ──────────────────────────────────
-  const selectedBookings = useMemo(
-    () => filteredBookings.filter((b) => selectedIds.has(b.id)),
-    [filteredBookings, selectedIds]
-  );
-
-  const selectedParentName = useMemo(() => {
-    if (selectedBookings.length === 0) return null;
-    const names = [...new Set(selectedBookings.map((b) => b.clientName || ""))].filter(Boolean);
-    return names.length === 1 ? names[0] : null;
-  }, [selectedBookings]);
-
-  const canGroup = selectedBookings.length >= 2;
-
-  // bookingId → group key
-  const bookingGroupMap = useMemo(() => {
-    const map = new Map<number | string, string>();
-    for (const [key, ids] of bookingGroups) {
-      for (const id of ids) map.set(id, key);
-    }
-    return map;
-  }, [bookingGroups]);
-
-  const toggleSelect = (id: number | string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const selectAllByParent = (name: string) => {
-    const ids = filteredBookings.filter((b) => b.clientName === name).map((b) => b.id);
-    setSelectedIds(new Set(ids));
-  };
-
-  const clearSelection = () => {
-    setSelectedIds(new Set());
-    setConfirmBulkCancel(false);
-    setBulkNannyId("");
-  };
-
-  // Group = purely visual, no DB changes
-  const handleGroup = () => {
-    if (!canGroup) return;
-    const key = selectedParentName || `Group ${bookingGroups.size + 1}`;
-    setBookingGroups((prev) => new Map([...prev, [key, new Set(selectedIds)]]));
-    setExpandedGroups((prev) => new Set([...prev, key]));
-    clearSelection();
-  };
-
-  const handleUngroup = (key: string) => {
-    setBookingGroups((prev) => {
-      const next = new Map(prev);
-      next.delete(key);
-      return next;
-    });
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      next.delete(key);
-      return next;
-    });
-  };
-
-  const toggleGroupExpand = (key: string) => {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  // Build render items for a table section, inserting group headers before grouped bookings
-  const buildRenderItems = (items: Booking[]) => {
-    type RenderItem =
-      | { type: "booking"; booking: Booking; grouped: boolean }
-      | { type: "group-header"; key: string; bookings: Booking[] };
-    const result: RenderItem[] = [];
-    const seenGroups = new Set<string>();
-    for (const booking of items) {
-      const gKey = bookingGroupMap.get(booking.id);
-      if (gKey) {
-        if (!seenGroups.has(gKey)) {
-          seenGroups.add(gKey);
-          const groupBookings = items.filter((b) => bookingGroupMap.get(b.id) === gKey);
-          result.push({ type: "group-header", key: gKey, bookings: groupBookings });
-        }
-        if (expandedGroups.has(gKey)) {
-          result.push({ type: "booking", booking, grouped: true });
-        }
-      } else {
-        result.push({ type: "booking", booking, grouped: false });
-      }
-    }
-    return result;
-  };
-
-  const handleBulkConfirm = async () => {
-    setBulkLoading(true);
-    for (const b of selectedBookings) {
-      if (b.status === "pending") await updateBookingStatus(b.id, "confirmed");
-    }
-    setBulkLoading(false);
-    clearSelection();
-  };
-
-  const handleBulkCancel = async () => {
-    setBulkLoading(true);
-    for (const b of selectedBookings) {
-      if (b.status === "pending" || b.status === "confirmed") {
-        await updateBookingStatus(b.id, "cancelled", { reason: "Bulk cancelled by admin", cancelledBy: "admin" });
-      }
-    }
-    setBulkLoading(false);
-    clearSelection();
-  };
-
-  const handleBulkAssignNanny = async (nannyId: string) => {
-    if (!nannyId) return;
-    setBulkLoading(true);
-    const nanny = nannies.find((n) => n.id === Number(nannyId));
-    for (const b of selectedBookings) {
-      await updateBooking(b.id, { nannyId: Number(nannyId), nannyName: nanny?.name || "" });
-    }
-    setBulkLoading(false);
-    setBulkNannyId("");
-    clearSelection();
-  };
-  // ─────────────────────────────────────────────────────────────
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -937,17 +792,6 @@ export default function AdminBookings() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
-                    <th className="px-3 py-3 w-10">
-                      <input
-                        type="checkbox"
-                        className="rounded border-border cursor-pointer"
-                        checked={filteredBookings.length > 0 && filteredBookings.every((b) => selectedIds.has(b.id))}
-                        onChange={(e) => {
-                          if (e.target.checked) setSelectedIds(new Set(filteredBookings.map((b) => b.id)));
-                          else clearSelection();
-                        }}
-                      />
-                    </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Client
                     </th>
@@ -991,7 +835,7 @@ export default function AdminBookings() {
                   ] as const).map((group) => group.items.length > 0 && (
                     <Fragment key={group.label}>
                       <tr>
-                        <td colSpan={12} className="px-4 py-4 bg-primary/5 text-center">
+                        <td colSpan={10} className="px-4 py-4 bg-primary/5 text-center">
                           <div className="flex items-center justify-center gap-4">
                             <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
                             <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
@@ -1001,85 +845,14 @@ export default function AdminBookings() {
                           </div>
                         </td>
                       </tr>
-                      {buildRenderItems(group.items).map((item) => {
-                    if (item.type === "group-header") {
-                      const { key: gKey, bookings: gBookings } = item;
-                      const isExpanded = expandedGroups.has(gKey);
-                      const sortedDates = [...gBookings].sort((a, b) => a.date.localeCompare(b.date));
-                      const nannyNames = [...new Set(gBookings.map((b) => b.nannyName).filter(Boolean))];
-                      return (
-                        <tr key={`group-header-${gKey}`} className="bg-primary/5 border-y border-primary/20">
-                          <td className="px-3 py-3">
-                            <button
-                              onClick={() => toggleGroupExpand(gKey)}
-                              className="p-1 rounded hover:bg-primary/10 text-primary transition-colors"
-                            >
-                              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                            </button>
-                          </td>
-                          <td colSpan={10} className="px-3 py-3">
-                            <div className="flex items-center gap-3 flex-wrap">
-                              <div className="flex items-center gap-2">
-                                <Layers className="w-4 h-4 text-primary shrink-0" />
-                                <span className="font-semibold text-sm text-foreground">{gKey}</span>
-                                <span className="px-2 py-0.5 rounded-full bg-primary/15 text-primary text-xs font-bold">
-                                  {gBookings.length} bookings
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                {sortedDates.map((b) => (
-                                  <span key={b.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-background border border-border text-xs text-foreground">
-                                    <Calendar className="w-3 h-3 text-muted-foreground" />
-                                    {formatDate(b.date)}
-                                    <span className="text-muted-foreground">{b.startTime}–{b.endTime}</span>
-                                  </span>
-                                ))}
-                              </div>
-                              {nannyNames.length > 0 && (
-                                <span className="text-xs text-muted-foreground">{nannyNames.join(", ")}</span>
-                              )}
-                              <button
-                                onClick={() => handleUngroup(gKey)}
-                                title="Ungroup"
-                                className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
-                              >
-                                <Ungroup className="w-3.5 h-3.5" />
-                                Ungroup
-                              </button>
-                            </div>
-                          </td>
-                          <td />
-                        </tr>
-                      );
-                    }
-
-                    const { booking, grouped } = item;
+                      {group.items.map((booking) => {
                     const isExpanded = expandedRow === booking.id;
 
                     return (
                       <Fragment key={booking.id}>
-                        <tr id={`booking-row-${booking.id}`} className={`hover:bg-muted/30 transition-colors ${grouped ? "bg-muted/20" : ""} ${selectedIds.has(booking.id) ? "bg-primary/5" : ""}`}>
-                          <td className="px-3 py-3.5" onClick={(e) => e.stopPropagation()}>
-                            <input
-                              type="checkbox"
-                              className="rounded border-border cursor-pointer"
-                              checked={selectedIds.has(booking.id)}
-                              onChange={() => toggleSelect(booking.id)}
-                            />
-                          </td>
+                        <tr id={`booking-row-${booking.id}`} className="hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-3.5 text-sm font-medium text-foreground">
-                            <div className="flex items-center gap-1.5 group/client">
-                              <span>{booking.clientName || "N/A"}</span>
-                              {booking.clientName && (
-                                <button
-                                  onClick={() => selectAllByParent(booking.clientName!)}
-                                  title={`Select all bookings for ${booking.clientName}`}
-                                  className="opacity-0 group-hover/client:opacity-100 transition-opacity p-0.5 rounded text-muted-foreground hover:text-primary hover:bg-primary/10"
-                                >
-                                  <Users className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
+                            {booking.clientName || "N/A"}
                           </td>
                           <td className="px-4 py-3.5 text-sm text-muted-foreground">
                             {booking.clientEmail || "N/A"}
@@ -1284,7 +1057,7 @@ export default function AdminBookings() {
                         {isExpanded && (
                           <tr>
                             <td
-                              colSpan={12}
+                              colSpan={10}
                               className="px-4 py-4 bg-muted/20"
                             >
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -2525,113 +2298,6 @@ export default function AdminBookings() {
           </div>
         </div>
       )}
-
-      {/* ─── Floating group-selection toolbar ──────────────────────── */}
-      {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-card border border-border rounded-2xl px-4 py-2.5 shadow-xl max-w-[96vw] flex-wrap justify-center">
-          {/* Count + parent */}
-          <span className="text-sm font-semibold text-foreground whitespace-nowrap">
-            {selectedIds.size} selected
-            {selectedParentName && (
-              <span className="text-muted-foreground font-normal ml-1">({selectedParentName})</span>
-            )}
-          </span>
-
-          <div className="w-px h-5 bg-border" />
-
-          {/* Select all for same parent */}
-          {selectedParentName && (() => {
-            const allCount = filteredBookings.filter((b) => b.clientName === selectedParentName).length;
-            return allCount > selectedIds.size ? (
-              <button
-                onClick={() => selectAllByParent(selectedParentName)}
-                className="text-xs font-medium text-primary hover:text-primary/80 whitespace-nowrap transition-colors"
-              >
-                Select all {allCount} for {selectedParentName}
-              </button>
-            ) : null;
-          })()}
-
-          {/* Bulk confirm */}
-          {selectedBookings.some((b) => b.status === "pending") && (
-            <button
-              onClick={handleBulkConfirm}
-              disabled={bulkLoading}
-              className="flex items-center gap-1 text-xs font-medium bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600 disabled:opacity-50 transition-colors whitespace-nowrap"
-            >
-              <Check className="w-3.5 h-3.5" />
-              Confirm All
-            </button>
-          )}
-
-          {/* Assign nanny dropdown */}
-          <select
-            value={bulkNannyId}
-            onChange={(e) => handleBulkAssignNanny(e.target.value)}
-            disabled={bulkLoading}
-            className="text-xs border border-border rounded-lg px-2 py-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 disabled:opacity-50 cursor-pointer"
-          >
-            <option value="">Assign Nanny…</option>
-            {allActiveNannies.map((n) => (
-              <option key={n.id} value={n.id}>{n.name}</option>
-            ))}
-          </select>
-
-          {/* Group */}
-          {canGroup && (
-            <button
-              onClick={handleGroup}
-              disabled={bulkLoading}
-              className="flex items-center gap-1 text-xs font-medium bg-primary text-white px-3 py-1.5 rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors whitespace-nowrap"
-            >
-              <Layers className="w-3.5 h-3.5" />
-              Group
-            </button>
-          )}
-
-          {/* Bulk cancel */}
-          {selectedBookings.some((b) => b.status === "pending" || b.status === "confirmed") && (
-            confirmBulkCancel ? (
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-destructive font-medium">Cancel all?</span>
-                <button
-                  onClick={handleBulkCancel}
-                  disabled={bulkLoading}
-                  className="text-xs font-medium bg-destructive text-white px-2 py-1 rounded-lg hover:bg-destructive/90 disabled:opacity-50 transition-colors"
-                >
-                  Yes
-                </button>
-                <button
-                  onClick={() => setConfirmBulkCancel(false)}
-                  className="text-xs font-medium bg-muted text-muted-foreground px-2 py-1 rounded-lg hover:bg-muted/80 transition-colors"
-                >
-                  No
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setConfirmBulkCancel(true)}
-                className="flex items-center gap-1 text-xs font-medium text-destructive hover:text-destructive/80 transition-colors whitespace-nowrap"
-              >
-                <XCircle className="w-3.5 h-3.5" />
-                Cancel All
-              </button>
-            )
-          )}
-
-          <div className="w-px h-5 bg-border" />
-
-          {/* Clear */}
-          <button
-            onClick={clearSelection}
-            className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="w-3.5 h-3.5" />
-            Clear
-          </button>
-        </div>
-      )}
-
     </div>
   );
 }
