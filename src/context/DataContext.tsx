@@ -426,24 +426,8 @@ export function DataProvider({ children }: DataProviderProps) {
           return updated;
         });
         return normalized;
-      } catch {
-        // Fallback to local
-        const newBooking: Booking = {
-          ...booking,
-          id: crypto.randomUUID(),
-          nannyName: nanny ? nanny.name : booking.nannyName || "Unknown",
-          status: booking.status || "pending",
-          createdBy: booking.createdBy || "parent",
-          createdByName: booking.createdByName || "",
-          createdAt: new Date().toISOString(),
-          createdBy: booking.createdBy || (adminProfile ? `Admin (${adminProfile.name})` : nannyProfile ? `Nanny (${nannyProfile.name})` : "Parent"),
-        } as Booking;
-        setBookings((prev) => {
-          const updated = [...prev, newBooking];
-          saveToStorage(STORAGE_KEYS.bookings, updated);
-          return updated;
-        });
-        return newBooking;
+      } catch (error) {
+        throw error;
       }
     },
     [nannies]

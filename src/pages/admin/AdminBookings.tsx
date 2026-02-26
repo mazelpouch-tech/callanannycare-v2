@@ -444,45 +444,49 @@ export default function AdminBookings() {
     const startLabel = TIME_SLOTS.find((s) => s.value === newBooking.startTime)?.label || newBooking.startTime;
     const endLabel = TIME_SLOTS.find((s) => s.value === newBooking.endTime)?.label || newBooking.endTime;
 
-    await addBooking({
-      nannyId: selectedNanny.id,
-      nannyName: selectedNanny.name,
-      date: newBooking.date,
-      endDate: newBooking.endDate || null,
-      startTime: startLabel,
-      endTime: endLabel,
-      plan: newBooking.plan as BookingPlan,
-      totalPrice: newBookingPrice,
-      clientName: newBooking.clientName,
-      clientEmail: newBooking.clientEmail,
-      clientPhone: newBooking.clientPhone,
-      hotel: newBooking.hotel,
-      childrenCount: Number(newBooking.numChildren),
-      childrenAges: newBooking.childrenAges,
-      notes: newBooking.notes,
-      status: newBooking.status as BookingStatus,
-      createdBy: 'admin',
-      createdByName: adminProfile?.name || 'Admin',
-    });
-
-    setNewBookingLoading(false);
-    setShowNewBooking(false);
-    setNewBooking({
-      nannyId: "",
-      clientName: "",
-      clientEmail: "",
-      clientPhone: "",
-      date: "",
-      endDate: "",
-      startTime: "",
-      endTime: "",
-      plan: "hourly",
-      hotel: "",
-      numChildren: "1",
-      childrenAges: "",
-      notes: "",
-      status: "confirmed",
-    });
+    try {
+      await addBooking({
+        nannyId: selectedNanny.id,
+        nannyName: selectedNanny.name,
+        date: newBooking.date,
+        endDate: newBooking.endDate || null,
+        startTime: startLabel,
+        endTime: endLabel,
+        plan: newBooking.plan as BookingPlan,
+        totalPrice: newBookingPrice,
+        clientName: newBooking.clientName,
+        clientEmail: newBooking.clientEmail,
+        clientPhone: newBooking.clientPhone,
+        hotel: newBooking.hotel,
+        childrenCount: Number(newBooking.numChildren),
+        childrenAges: newBooking.childrenAges,
+        notes: newBooking.notes,
+        status: newBooking.status as BookingStatus,
+        createdBy: 'admin',
+        createdByName: adminProfile?.name || 'Admin',
+      });
+      setShowNewBooking(false);
+      setNewBooking({
+        nannyId: "",
+        clientName: "",
+        clientEmail: "",
+        clientPhone: "",
+        date: "",
+        endDate: "",
+        startTime: "",
+        endTime: "",
+        plan: "hourly",
+        hotel: "",
+        numChildren: "1",
+        childrenAges: "",
+        notes: "",
+        status: "confirmed",
+      });
+    } catch (err) {
+      console.error('Booking creation failed:', err);
+    } finally {
+      setNewBookingLoading(false);
+    }
   };
 
   // WhatsApp helpers
@@ -520,6 +524,14 @@ export default function AdminBookings() {
     if (!newBooking.nannyId || !newBooking.date) return [];
     return getConflicts(newBooking.nannyId, newBooking.date, newBooking.startTime, newBooking.endTime);
   }, [newBooking.nannyId, newBooking.date, newBooking.startTime, newBooking.endTime, bookings]);
+
+  const suggestedNannies = useMemo(() => {
+    if (!newBooking.date || !newBooking.startTime || conflicts.length === 0) return [];
+    return allActiveNannies.filter((n) => {
+      if (n.id === Number(newBooking.nannyId)) return false;
+      return getConflicts(String(n.id), newBooking.date, newBooking.startTime, newBooking.endTime).length === 0;
+    });
+  }, [allActiveNannies, newBooking.nannyId, newBooking.date, newBooking.startTime, newBooking.endTime, conflicts.length, bookings]);
 
   // Unique nanny names for filter dropdown
   const uniqueNannyNames = useMemo(() => {
@@ -1708,14 +1720,36 @@ export default function AdminBookings() {
 
               {/* Conflict Warning */}
               {conflicts.length > 0 && (
-                <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm text-orange-700">
-                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="font-semibold">Scheduling conflict!</p>
-                    <p className="text-xs mt-0.5">
-                      {selectedNanny?.name || "This nanny"} already has {conflicts.length} booking{conflicts.length > 1 ? "s" : ""} on this date.
-                    </p>
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm text-orange-700 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-semibold">Scheduling conflict — booking blocked</p>
+                      <p className="text-xs mt-0.5">
+                        {selectedNanny?.name || "This nanny"} already has {conflicts.length} booking{conflicts.length > 1 ? "s" : ""} at this time.
+                      </p>
+                    </div>
                   </div>
+                  {suggestedNannies.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium mb-1.5">Switch to an available nanny:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {suggestedNannies.map((n) => (
+                          <button
+                            key={n.id}
+                            type="button"
+                            onClick={() => setNewBooking((prev) => ({ ...prev, nannyId: String(n.id) }))}
+                            className="px-2.5 py-1 bg-white border border-orange-300 rounded-lg text-xs font-medium text-orange-800 hover:bg-orange-100 transition-colors"
+                          >
+                            {n.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {suggestedNannies.length === 0 && (
+                    <p className="text-xs">No other nannies are available at this time.</p>
+                  )}
                 </div>
               )}
 
@@ -1745,7 +1779,7 @@ export default function AdminBookings() {
                 </button>
                 <button
                   type="submit"
-                  disabled={newBookingLoading || !newBooking.nannyId || !newBooking.date || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime}
+                  disabled={newBookingLoading || !newBooking.nannyId || !newBooking.date || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime || conflicts.length > 0}
                   className="flex-1 gradient-warm text-white rounded-xl px-4 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {newBookingLoading ? (
