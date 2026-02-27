@@ -110,7 +110,7 @@ export function calcShiftPay(clockIn: string, clockOut: string): number {
 export function calcShiftPayBreakdown(clockIn: string, clockOut: string): PayBreakdown {
   const ms = new Date(clockOut).getTime() - new Date(clockIn).getTime();
   const hours = ms / 3600000;
-  const basePay = Math.round(hours * HOURLY_RATE);
+  const basePay = Math.ceil(hours * HOURLY_RATE);
   const inHour = new Date(clockIn).getHours();
   const outHour = new Date(clockOut).getHours();
   const taxiFee = isEveningShift(inHour, outHour) ? 100 : 0;
@@ -145,7 +145,7 @@ export function estimateNannyPayBreakdown(
 ): PayBreakdown {
   const hours = calcBookedHours(startTime, endTime, startDate, endDate);
   if (hours <= 0) return { basePay: 0, taxiFee: 0, total: 0 };
-  const basePay = Math.round(hours * HOURLY_RATE);
+  const basePay = Math.ceil(hours * HOURLY_RATE);
   const startH = parseTimeToHours(startTime);
   const endH = parseTimeToHours(endTime);
   const taxiFee = startH !== null && endH !== null && isEveningShift(startH, endH) ? 100 : 0;
