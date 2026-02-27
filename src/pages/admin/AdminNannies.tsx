@@ -20,11 +20,13 @@ import {
   UserPlus,
   DollarSign,
   Eye,
+  Download,
 } from "lucide-react";
 import ImageUpload from "../../components/ImageUpload";
 import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
 import type { Nanny, NannyStatus } from "@/types";
+import { exportPayrollExcel } from "@/utils/exportPayroll";
 
 const emptyForm = {
   name: "",
@@ -49,7 +51,7 @@ const STATUS_BADGES: Record<NannyStatus, { label: string; bg: string; text: stri
 
 export default function AdminNannies() {
   const {
-    nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability,
+    nannies, bookings, addNanny, updateNanny, deleteNanny, toggleNannyAvailability,
     inviteNanny, toggleNannyStatus, resendInvite, bulkUpdateNannyRate,
     impersonateNanny,
   } = useData();
@@ -270,6 +272,14 @@ export default function AdminNannies() {
           </p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <button
+            onClick={() => exportPayrollExcel(nannies, bookings)}
+            className="bg-blue-600 text-white font-semibold px-5 py-2.5 rounded-xl hover:opacity-90 transition-all flex items-center gap-2"
+            title="Download Excel payroll report: hours worked & pay owed per nanny"
+          >
+            <Download className="w-4 h-4" />
+            Download Payroll
+          </button>
           <button
             onClick={() => { setBulkRateValue(""); setBulkRateError(""); setBulkRateSuccess(""); setBulkRateModalOpen(true); }}
             className="bg-emerald-600 text-white font-semibold px-5 py-2.5 rounded-xl hover:opacity-90 transition-all flex items-center gap-2"
