@@ -157,7 +157,7 @@ export function DataProvider({ children }: DataProviderProps) {
         const normalizedBookings: Booking[] = bookingsResult.value.map((b) => ({
           id: b.id,
           nannyId: b.nanny_id,
-          nannyName: b.nanny_name || b.client_name,
+          nannyName: b.nanny_name || '',
           nannyImage: b.nanny_image || "",
           clientName: b.client_name,
           clientEmail: b.client_email,
@@ -308,7 +308,7 @@ export function DataProvider({ children }: DataProviderProps) {
       const normalizedBookings: Booking[] = apiBookings.map((b) => ({
         id: b.id,
         nannyId: b.nanny_id,
-        nannyName: b.nanny_name || b.client_name,
+        nannyName: b.nanny_name || '',
         nannyImage: b.nanny_image || "",
         clientName: b.client_name,
         clientEmail: b.client_email,
