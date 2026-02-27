@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -21,12 +21,17 @@ import {
   DollarSign,
   Eye,
   Download,
+  FileText,
 } from "lucide-react";
 import ImageUpload from "../../components/ImageUpload";
 import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
 import type { Nanny, NannyStatus } from "@/types";
 import { exportPayrollExcel } from "@/utils/exportPayroll";
+import {
+  startOfWeek, endOfWeek, startOfMonth, endOfMonth,
+  subMonths, format as fmtDate,
+} from "date-fns";
 
 const emptyForm = {
   name: "",
@@ -249,6 +254,61 @@ export default function AdminNannies() {
     setResendLoading(null);
   };
 
+  // --- Payroll Export Modal ---
+  const [payrollModalOpen, setPayrollModalOpen] = useState(false);
+  const today = new Date();
+  const todayStr = fmtDate(today, 'yyyy-MM-dd');
+  const [payrollFrom, setPayrollFrom] = useState('');
+  const [payrollTo, setPayrollTo] = useState(todayStr);
+
+  const PRESETS = useMemo(() => [
+    {
+      label: 'This Week',
+      from: fmtDate(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
+      to: todayStr,
+    },
+    {
+      label: 'This Month',
+      from: fmtDate(startOfMonth(today), 'yyyy-MM-dd'),
+      to: todayStr,
+    },
+    {
+      label: 'Last Month',
+      from: fmtDate(startOfMonth(subMonths(today, 1)), 'yyyy-MM-dd'),
+      to: fmtDate(endOfMonth(subMonths(today, 1)), 'yyyy-MM-dd'),
+    },
+    { label: 'All Time', from: '', to: todayStr },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], []);
+
+  const applyPreset = useCallback((from: string, to: string) => {
+    setPayrollFrom(from);
+    setPayrollTo(to);
+  }, []);
+
+  const payrollBookingCount = useMemo(() => {
+    return bookings.filter(
+      (b) =>
+        b.status !== 'cancelled' &&
+        !b.deletedAt &&
+        b.date <= (payrollTo || todayStr) &&
+        (!payrollFrom || b.date >= payrollFrom),
+    ).length;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings, payrollFrom, payrollTo]);
+
+  const handlePayrollDownload = useCallback(() => {
+    exportPayrollExcel(
+      nannies,
+      bookings,
+      payrollFrom || payrollTo !== todayStr
+        ? { fromDate: payrollFrom || '', toDate: payrollTo || todayStr }
+        : undefined,
+    );
+    setPayrollModalOpen(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nannies, bookings, payrollFrom, payrollTo]);
+
   // Status badge helper
   const renderStatusBadge = (status: NannyStatus) => {
     const badge = STATUS_BADGES[status] || STATUS_BADGES.active;
@@ -273,7 +333,7 @@ export default function AdminNannies() {
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
           <button
-            onClick={() => exportPayrollExcel(nannies, bookings)}
+            onClick={() => setPayrollModalOpen(true)}
             className="bg-blue-600 text-white font-semibold px-5 py-2.5 rounded-xl hover:opacity-90 transition-all flex items-center gap-2"
             title="Download Excel payroll report: hours worked & pay owed per nanny"
           >
@@ -1029,6 +1089,121 @@ export default function AdminNannies() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Payroll Download Modal */}
+      {payrollModalOpen && (
+        <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-md p-6 space-y-5">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
+                  <Download className="w-5 h-5 text-blue-600" />
+                </div>
+                <h2 className="font-serif text-lg font-bold text-foreground">Download Payroll</h2>
+              </div>
+              <button
+                onClick={() => setPayrollModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              Choose a date range to include in the Excel report. The file will show hours worked and pay owed per nanny.
+            </p>
+
+            {/* Quick Presets */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Quick Select</p>
+              <div className="grid grid-cols-2 gap-2">
+                {PRESETS.map((p) => (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => applyPreset(p.from, p.to)}
+                    className={`px-3 py-2 rounded-xl text-sm font-medium border transition-all text-left ${
+                      payrollFrom === p.from && payrollTo === p.to
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-background border-border text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {p.label}
+                    {p.label === 'All Time' && (
+                      <span className="block text-[10px] opacity-70">from first booking</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Date Range */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Custom Range</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">From</label>
+                  <input
+                    type="date"
+                    value={payrollFrom}
+                    max={payrollTo || todayStr}
+                    onChange={(e) => setPayrollFrom(e.target.value)}
+                    className="w-full px-3 py-2 bg-background border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Leave empty = all time</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">To</label>
+                  <input
+                    type="date"
+                    value={payrollTo}
+                    min={payrollFrom || undefined}
+                    max={todayStr}
+                    onChange={(e) => setPayrollTo(e.target.value)}
+                    className="w-full px-3 py-2 bg-background border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Booking count preview */}
+            <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                <FileText className="w-4 h-4 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-blue-900">
+                  {payrollBookingCount} booking{payrollBookingCount !== 1 ? 's' : ''} in this range
+                </p>
+                <p className="text-xs text-blue-600">
+                  {payrollFrom ? payrollFrom : 'All time'} → {payrollTo || todayStr}
+                </p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                onClick={handlePayrollDownload}
+                disabled={payrollBookingCount === 0}
+                className="flex-1 bg-blue-600 text-white font-semibold py-2.5 rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Download Excel
+              </button>
+              <button
+                type="button"
+                onClick={() => setPayrollModalOpen(false)}
+                className="flex-1 bg-muted text-muted-foreground font-semibold py-2.5 rounded-xl hover:bg-muted/80 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

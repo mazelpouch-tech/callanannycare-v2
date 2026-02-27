@@ -22,13 +22,28 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export function exportPayrollExcel(nannies: Nanny[], bookings: Booking[]): void {
+export interface PayrollDateRange {
+  fromDate: string; // YYYY-MM-DD, inclusive
+  toDate: string;   // YYYY-MM-DD, inclusive
+}
+
+export function exportPayrollExcel(
+  nannies: Nanny[],
+  bookings: Booking[],
+  range?: PayrollDateRange,
+): void {
   const today = new Date();
   const todayStr = format(today, 'yyyy-MM-dd');
+  const from = range?.fromDate ?? '';
+  const to = range?.toDate ?? todayStr;
 
-  // All bookings up to tonight, excluding cancelled and deleted
+  // Filter by date range + exclude cancelled/deleted
   const relevant = bookings.filter(
-    (b) => b.status !== 'cancelled' && !b.deletedAt && b.date <= todayStr
+    (b) =>
+      b.status !== 'cancelled' &&
+      !b.deletedAt &&
+      b.date <= to &&
+      (!from || b.date >= from),
   );
 
   // Nanny lookup by id
@@ -47,7 +62,6 @@ export function exportPayrollExcel(nannies: Nanny[], bookings: Booking[]): void 
         b.clockIn && b.clockOut ? calcActualHoursWorked(b.clockIn, b.clockOut) : 0;
       const estimatedHours = calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
 
-      // Use actual pay if clocked; estimate otherwise
       const actualPay = calcNannyPayBreakdown(b);
       const estimatedPay = estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate);
       const pay = actualPay.total > 0 ? actualPay : estimatedPay;
@@ -156,9 +170,8 @@ export function exportPayrollExcel(nannies: Nanny[], bookings: Booking[]): void 
       'Last Booking': s.lastBooking,
     }));
 
-  // Totals row
   if (summaryRows.length > 0) {
-    const totals = {
+    summaryRows.push({
       'Nanny Name': '── TOTAL ──',
       'Rate (DH/hr)': null as unknown as number,
       'Total Bookings': summaryRows.reduce((n, r) => n + r['Total Bookings'], 0),
@@ -171,8 +184,7 @@ export function exportPayrollExcel(nannies: Nanny[], bookings: Booking[]): void 
       'Client Revenue (€)': fmt2(summaryRows.reduce((n, r) => n + r['Client Revenue (€)'], 0)),
       'First Booking': '',
       'Last Booking': '',
-    };
-    summaryRows.push(totals);
+    });
   }
 
   // ── BUILD WORKBOOK ─────────────────────────────────────────────────
@@ -195,6 +207,6 @@ export function exportPayrollExcel(nannies: Nanny[], bookings: Booking[]): void 
   ];
   XLSX.utils.book_append_sheet(wb, wsDetail, 'Booking Details');
 
-  const filename = `nanny-payroll-${format(today, 'yyyy-MM-dd')}.xlsx`;
-  XLSX.writeFile(wb, filename);
+  const rangeLabel = from ? `${from}-to-${to}` : `all-until-${to}`;
+  XLSX.writeFile(wb, `nanny-payroll-${rangeLabel}.xlsx`);
 }
