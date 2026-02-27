@@ -29,9 +29,15 @@ import PhoneInput from "../../components/PhoneInput";
 import type { Nanny, NannyStatus } from "@/types";
 import { exportPayrollExcel } from "@/utils/exportPayroll";
 import {
-  startOfWeek, endOfWeek, startOfMonth, endOfMonth,
+  startOfWeek, startOfMonth, endOfMonth,
   subMonths, format as fmtDate,
 } from "date-fns";
+import {
+  calcNannyPayBreakdown,
+  estimateNannyPayBreakdown,
+  calcActualHoursWorked,
+  calcBookedHours,
+} from "@/utils/shiftHelpers";
 
 const emptyForm = {
   name: "",
@@ -260,6 +266,8 @@ export default function AdminNannies() {
   const todayStr = fmtDate(today, 'yyyy-MM-dd');
   const [payrollFrom, setPayrollFrom] = useState('');
   const [payrollTo, setPayrollTo] = useState(todayStr);
+  const [payrollStatusFilter, setPayrollStatusFilter] = useState<'all' | 'completed' | 'confirmed'>('all');
+  const [selectedNannyIds, setSelectedNannyIds] = useState<number[]>([]); // empty = all
 
   const PRESETS = useMemo(() => [
     {
@@ -286,28 +294,62 @@ export default function AdminNannies() {
     setPayrollTo(to);
   }, []);
 
-  const payrollBookingCount = useMemo(() => {
-    return bookings.filter(
-      (b) =>
-        b.status !== 'cancelled' &&
-        !b.deletedAt &&
-        b.date <= (payrollTo || todayStr) &&
-        (!payrollFrom || b.date >= payrollFrom),
-    ).length;
+  const toggleNannySelection = useCallback((id: number) => {
+    setSelectedNannyIds((prev) =>
+      prev.includes(id) ? prev.filter((n) => n !== id) : [...prev, id],
+    );
+  }, []);
+
+  // Live preview: per-nanny summary matching all current filters
+  const payrollPreview = useMemo(() => {
+    const to = payrollTo || todayStr;
+    const filtered = bookings.filter((b) => {
+      if (b.status === 'cancelled' || b.deletedAt) return false;
+      if (b.date > to) return false;
+      if (payrollFrom && b.date < payrollFrom) return false;
+      if (payrollStatusFilter !== 'all' && b.status !== payrollStatusFilter) return false;
+      if (selectedNannyIds.length > 0 && (!b.nannyId || !selectedNannyIds.includes(b.nannyId))) return false;
+      return true;
+    });
+
+    const byNanny = new Map<string, { bookings: number; hours: number; pay: number }>();
+    for (const b of filtered) {
+      const key = b.nannyName || 'Unassigned';
+      if (!byNanny.has(key)) byNanny.set(key, { bookings: 0, hours: 0, pay: 0 });
+      const s = byNanny.get(key)!;
+      s.bookings++;
+      const aP = calcNannyPayBreakdown(b);
+      const eP = estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate);
+      const pay = aP.total > 0 ? aP : eP;
+      s.pay += pay.total;
+      s.hours += b.clockIn && b.clockOut
+        ? calcActualHoursWorked(b.clockIn, b.clockOut)
+        : calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
+    }
+
+    const rows = Array.from(byNanny.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([name, s]) => ({ name, ...s }));
+
+    return {
+      rows,
+      totalBookings: filtered.length,
+      totalHours: rows.reduce((s, r) => s + r.hours, 0),
+      totalPay: rows.reduce((s, r) => s + r.pay, 0),
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookings, payrollFrom, payrollTo]);
+  }, [bookings, payrollFrom, payrollTo, payrollStatusFilter, selectedNannyIds]);
 
   const handlePayrollDownload = useCallback(() => {
-    exportPayrollExcel(
-      nannies,
-      bookings,
-      payrollFrom || payrollTo !== todayStr
-        ? { fromDate: payrollFrom || '', toDate: payrollTo || todayStr }
-        : undefined,
-    );
+    exportPayrollExcel(nannies, bookings, {
+      fromDate: payrollFrom || '',
+      toDate: payrollTo || todayStr,
+      nannyIds: selectedNannyIds,
+      statusFilter: payrollStatusFilter,
+    });
     setPayrollModalOpen(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nannies, bookings, payrollFrom, payrollTo]);
+  }, [nannies, bookings, payrollFrom, payrollTo, selectedNannyIds, payrollStatusFilter]);
 
   // Status badge helper
   const renderStatusBadge = (status: NannyStatus) => {
@@ -1096,14 +1138,18 @@ export default function AdminNannies() {
       {/* Payroll Download Modal */}
       {payrollModalOpen && (
         <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-md p-6 space-y-5">
-            {/* Header */}
-            <div className="flex items-center justify-between">
+          <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-xl flex flex-col max-h-[90vh]">
+
+            {/* ── Sticky Header ── */}
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
                   <Download className="w-5 h-5 text-blue-600" />
                 </div>
-                <h2 className="font-serif text-lg font-bold text-foreground">Download Payroll</h2>
+                <div>
+                  <h2 className="font-serif text-lg font-bold text-foreground leading-tight">Download Payroll</h2>
+                  <p className="text-xs text-muted-foreground">Filter, preview, then download</p>
+                </div>
               </div>
               <button
                 onClick={() => setPayrollModalOpen(false)}
@@ -1113,88 +1159,194 @@ export default function AdminNannies() {
               </button>
             </div>
 
-            <p className="text-sm text-muted-foreground">
-              Choose a date range to include in the Excel report. The file will show hours worked and pay owed per nanny.
-            </p>
+            {/* ── Scrollable Content ── */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
-            {/* Quick Presets */}
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Quick Select</p>
-              <div className="grid grid-cols-2 gap-2">
-                {PRESETS.map((p) => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    onClick={() => applyPreset(p.from, p.to)}
-                    className={`px-3 py-2 rounded-xl text-sm font-medium border transition-all text-left ${
-                      payrollFrom === p.from && payrollTo === p.to
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-background border-border text-foreground hover:bg-muted'
-                    }`}
-                  >
-                    {p.label}
-                    {p.label === 'All Time' && (
-                      <span className="block text-[10px] opacity-70">from first booking</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Custom Date Range */}
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Custom Range</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">From</label>
-                  <input
-                    type="date"
-                    value={payrollFrom}
-                    max={payrollTo || todayStr}
-                    onChange={(e) => setPayrollFrom(e.target.value)}
-                    className="w-full px-3 py-2 bg-background border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
-                  />
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Leave empty = all time</p>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-foreground mb-1">To</label>
-                  <input
-                    type="date"
-                    value={payrollTo}
-                    min={payrollFrom || undefined}
-                    max={todayStr}
-                    onChange={(e) => setPayrollTo(e.target.value)}
-                    className="w-full px-3 py-2 bg-background border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Booking count preview */}
-            <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                <FileText className="w-4 h-4 text-blue-600" />
-              </div>
+              {/* Date Range */}
               <div>
-                <p className="text-sm font-semibold text-blue-900">
-                  {payrollBookingCount} booking{payrollBookingCount !== 1 ? 's' : ''} in this range
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Date Range</p>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {PRESETS.map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => applyPreset(p.from, p.to)}
+                      className={`px-3 py-2 rounded-xl text-sm font-medium border transition-all text-left ${
+                        payrollFrom === p.from && payrollTo === p.to
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-background border-border text-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {p.label}
+                      {p.label === 'All Time' && (
+                        <span className="block text-[10px] opacity-70">from first booking</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">From</label>
+                    <input
+                      type="date"
+                      value={payrollFrom}
+                      max={payrollTo || todayStr}
+                      onChange={(e) => setPayrollFrom(e.target.value)}
+                      className="w-full px-3 py-2 bg-background border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Leave empty = all time</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">To</label>
+                    <input
+                      type="date"
+                      value={payrollTo}
+                      min={payrollFrom || undefined}
+                      max={todayStr}
+                      onChange={(e) => setPayrollTo(e.target.value)}
+                      className="w-full px-3 py-2 bg-background border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Booking Status</p>
+                <div className="flex gap-2">
+                  {(['all', 'completed', 'confirmed'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setPayrollStatusFilter(s)}
+                      className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-all ${
+                        payrollStatusFilter === s
+                          ? s === 'completed'
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : s === 'confirmed'
+                              ? 'bg-green-600 text-white border-green-600'
+                              : 'bg-foreground text-background border-foreground'
+                          : 'bg-background border-border text-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Nanny Filter */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nannies</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedNannyIds([])}
+                      className={`text-xs font-medium px-2 py-0.5 rounded-lg transition-colors ${
+                        selectedNannyIds.length === 0
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      All
+                    </button>
+                    {selectedNannyIds.length > 0 && (
+                      <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg">
+                        {selectedNannyIds.length} selected
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                  {nannies.filter((n) => n.status !== 'invited').map((n) => {
+                    const checked = selectedNannyIds.length === 0 || selectedNannyIds.includes(n.id);
+                    const explicit = selectedNannyIds.includes(n.id);
+                    return (
+                      <label
+                        key={n.id}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-all text-sm ${
+                          selectedNannyIds.length === 0
+                            ? 'border-border bg-background text-foreground opacity-70'
+                            : explicit
+                              ? 'border-blue-400 bg-blue-50 text-blue-800 font-medium'
+                              : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedNannyIds.length === 0 ? true : explicit}
+                          onChange={() => {
+                            if (selectedNannyIds.length === 0) {
+                              // Switch from "all" mode: select only this one's inverse
+                              setSelectedNannyIds(nannies.filter((x) => x.id !== n.id).map((x) => x.id));
+                            } else {
+                              toggleNannySelection(n.id);
+                            }
+                          }}
+                          className="accent-blue-600 w-3.5 h-3.5 shrink-0"
+                        />
+                        <span className="truncate">{n.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Live Preview Table */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  Preview — {payrollPreview.totalBookings} booking{payrollPreview.totalBookings !== 1 ? 's' : ''}
                 </p>
-                <p className="text-xs text-blue-600">
-                  {payrollFrom ? payrollFrom : 'All time'} → {payrollTo || todayStr}
-                </p>
+                {payrollPreview.rows.length === 0 ? (
+                  <div className="bg-muted/40 rounded-xl py-6 text-center text-sm text-muted-foreground border border-border">
+                    No bookings match the selected filters
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-border overflow-hidden text-sm">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-muted/50">
+                          <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Nanny</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Jobs</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Hours</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Pay (DH)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {payrollPreview.rows.map((row) => (
+                          <tr key={row.name} className="hover:bg-muted/20 transition-colors">
+                            <td className="px-3 py-2 font-medium text-foreground truncate max-w-[140px]">{row.name}</td>
+                            <td className="px-3 py-2 text-right text-muted-foreground">{row.bookings}</td>
+                            <td className="px-3 py-2 text-right text-muted-foreground">{row.hours.toFixed(1)}h</td>
+                            <td className="px-3 py-2 text-right font-semibold text-foreground">{row.pay.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-blue-50 border-t-2 border-blue-200">
+                          <td className="px-3 py-2 font-bold text-blue-900 text-xs uppercase tracking-wide">Total</td>
+                          <td className="px-3 py-2 text-right font-bold text-blue-900">{payrollPreview.totalBookings}</td>
+                          <td className="px-3 py-2 text-right font-bold text-blue-900">{payrollPreview.totalHours.toFixed(1)}h</td>
+                          <td className="px-3 py-2 text-right font-bold text-blue-900">{payrollPreview.totalPay.toLocaleString()} DH</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex gap-3 pt-1">
+            {/* ── Sticky Footer ── */}
+            <div className="flex gap-3 px-6 py-4 border-t border-border shrink-0">
               <button
                 type="button"
                 onClick={handlePayrollDownload}
-                disabled={payrollBookingCount === 0}
+                disabled={payrollPreview.totalBookings === 0}
                 className="flex-1 bg-blue-600 text-white font-semibold py-2.5 rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <Download className="w-4 h-4" />
-                Download Excel
+                Download Excel ({payrollPreview.totalBookings})
               </button>
               <button
                 type="button"

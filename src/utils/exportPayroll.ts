@@ -22,34 +22,37 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export interface PayrollDateRange {
-  fromDate: string; // YYYY-MM-DD, inclusive
-  toDate: string;   // YYYY-MM-DD, inclusive
+export interface PayrollOptions {
+  fromDate?: string;          // YYYY-MM-DD inclusive; empty = all time
+  toDate?: string;            // YYYY-MM-DD inclusive; empty = today
+  nannyIds?: number[];        // empty / undefined = all nannies
+  statusFilter?: 'all' | 'completed' | 'confirmed'; // default 'all'
 }
 
 export function exportPayrollExcel(
   nannies: Nanny[],
   bookings: Booking[],
-  range?: PayrollDateRange,
+  options?: PayrollOptions,
 ): void {
   const today = new Date();
   const todayStr = format(today, 'yyyy-MM-dd');
-  const from = range?.fromDate ?? '';
-  const to = range?.toDate ?? todayStr;
+  const from = options?.fromDate ?? '';
+  const to = options?.toDate ?? todayStr;
+  const statusFilter = options?.statusFilter ?? 'all';
+  const nannyIds = options?.nannyIds ?? [];
 
-  // Filter by date range + exclude cancelled/deleted
-  const relevant = bookings.filter(
-    (b) =>
-      b.status !== 'cancelled' &&
-      !b.deletedAt &&
-      b.date <= to &&
-      (!from || b.date >= from),
-  );
+  const relevant = bookings.filter((b) => {
+    if (b.status === 'cancelled' || b.deletedAt) return false;
+    if (b.date > to) return false;
+    if (from && b.date < from) return false;
+    if (statusFilter !== 'all' && b.status !== statusFilter) return false;
+    if (nannyIds.length > 0 && (!b.nannyId || !nannyIds.includes(b.nannyId))) return false;
+    return true;
+  });
 
-  // Nanny lookup by id
   const nannyMap = new Map<number, Nanny>(nannies.map((n) => [n.id, n]));
 
-  // ── DETAIL ROWS ────────────────────────────────────────────────────
+  // ── DETAIL ROWS ─────────────────────────────────────────────────────
   const detailRows = [...relevant]
     .sort((a, b) => {
       const na = (a.nannyName || 'Unassigned').toLowerCase();
@@ -61,7 +64,6 @@ export function exportPayrollExcel(
       const actualHours =
         b.clockIn && b.clockOut ? calcActualHoursWorked(b.clockIn, b.clockOut) : 0;
       const estimatedHours = calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
-
       const actualPay = calcNannyPayBreakdown(b);
       const estimatedPay = estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate);
       const pay = actualPay.total > 0 ? actualPay : estimatedPay;
@@ -92,7 +94,7 @@ export function exportPayrollExcel(
       };
     });
 
-  // ── SUMMARY ROWS (per nanny) ────────────────────────────────────────
+  // ── SUMMARY ROWS (per nanny) ─────────────────────────────────────────
   type NannyStat = {
     name: string;
     rate: number;
@@ -187,7 +189,7 @@ export function exportPayrollExcel(
     });
   }
 
-  // ── BUILD WORKBOOK ─────────────────────────────────────────────────
+  // ── BUILD WORKBOOK ──────────────────────────────────────────────────
   const wb = XLSX.utils.book_new();
 
   const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
