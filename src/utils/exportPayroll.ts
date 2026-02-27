@@ -13,6 +13,10 @@ function fmt2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+function fmtHours(n: number): number | string {
+  return n > 0 ? fmt2(n) : '—';
+}
+
 function fmtClock(ts: string | null | undefined): string {
   if (!ts) return '—';
   return format(new Date(ts), 'dd/MM/yyyy HH:mm');
@@ -20,6 +24,13 @@ function fmtClock(ts: string | null | undefined): string {
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Best-available hours for a single booking.
+ *  Uses actual clock hours when clocked in/out, otherwise uses scheduled shift hours. */
+function bestHours(b: Booking): number {
+  if (b.clockIn && b.clockOut) return calcActualHoursWorked(b.clockIn, b.clockOut);
+  return calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
 }
 
 export interface PayrollOptions {
@@ -61,13 +72,14 @@ export function exportPayrollExcel(
       return a.date.localeCompare(b.date);
     })
     .map((b) => {
-      const actualHours =
-        b.clockIn && b.clockOut ? calcActualHoursWorked(b.clockIn, b.clockOut) : 0;
-      const estimatedHours = calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
+      const clocked = !!(b.clockIn && b.clockOut);
+      const clockHours = clocked ? calcActualHoursWorked(b.clockIn!, b.clockOut!) : 0;
+      const scheduledHours = calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
+      const hoursWorked = clocked ? clockHours : scheduledHours;
+
       const actualPay = calcNannyPayBreakdown(b);
       const estimatedPay = estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate);
       const pay = actualPay.total > 0 ? actualPay : estimatedPay;
-      const hoursUsed = actualPay.total > 0 ? fmt2(actualHours) : fmt2(estimatedHours);
 
       return {
         'Booking #': b.id,
@@ -76,13 +88,13 @@ export function exportPayrollExcel(
         'Parent Name': b.clientName,
         Hotel: b.hotel || '—',
         Children: b.childrenCount || 1,
-        'Start Time': b.startTime,
-        'End Time': b.endTime,
+        'Start Time': b.startTime || '—',
+        'End Time': b.endTime || '—',
+        'Scheduled Hours': fmtHours(scheduledHours),
         'Clock In': fmtClock(b.clockIn),
         'Clock Out': fmtClock(b.clockOut),
-        'Hours Worked': hoursUsed,
-        'Actual Hours': b.clockIn && b.clockOut ? fmt2(actualHours) : '—',
-        'Estimated Hours': fmt2(estimatedHours),
+        'Clock Hours': clocked ? fmt2(clockHours) : '—',
+        'Hours Worked': fmtHours(hoursWorked),
         Status: capitalize(b.status),
         'Client Price (€)': b.totalPrice || 0,
         'Base Pay (DH)': pay.basePay,
@@ -100,8 +112,9 @@ export function exportPayrollExcel(
     rate: number;
     totalBookings: number;
     completedBookings: number;
-    actualHours: number;
-    estimatedHours: number;
+    clockHours: number;       // sum of actual clock-in/out hours
+    scheduledHours: number;   // sum of booked shift hours (start→end time)
+    totalHours: number;       // best-available: clock if available, else scheduled
     basePay: number;
     taxiFees: number;
     totalPay: number;
@@ -122,8 +135,9 @@ export function exportPayrollExcel(
         rate: nanny?.rate ?? HOURLY_RATE,
         totalBookings: 0,
         completedBookings: 0,
-        actualHours: 0,
-        estimatedHours: 0,
+        clockHours: 0,
+        scheduledHours: 0,
+        totalHours: 0,
         basePay: 0,
         taxiFees: 0,
         totalPay: 0,
@@ -137,10 +151,10 @@ export function exportPayrollExcel(
     s.totalBookings++;
     if (b.status === 'completed') s.completedBookings++;
 
-    if (b.clockIn && b.clockOut) {
-      s.actualHours += calcActualHoursWorked(b.clockIn, b.clockOut);
-    }
-    s.estimatedHours += calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
+    const clocked = !!(b.clockIn && b.clockOut);
+    if (clocked) s.clockHours += calcActualHoursWorked(b.clockIn!, b.clockOut!);
+    s.scheduledHours += calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
+    s.totalHours += bestHours(b);
 
     const actualPay = calcNannyPayBreakdown(b);
     const estimatedPay = estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate);
@@ -162,8 +176,9 @@ export function exportPayrollExcel(
       'Rate (DH/hr)': HOURLY_RATE,
       'Total Bookings': s.totalBookings,
       'Completed Bookings': s.completedBookings,
-      'Actual Hours Worked': fmt2(s.actualHours),
-      'Estimated Total Hours': fmt2(s.estimatedHours),
+      'Total Hours': fmt2(s.totalHours),
+      'Clock Hours': fmt2(s.clockHours),
+      'Scheduled Hours': fmt2(s.scheduledHours),
       'Base Pay (DH)': s.basePay,
       'Taxi Fees (DH)': s.taxiFees,
       'TOTAL OWED (DH)': s.totalPay,
@@ -178,8 +193,9 @@ export function exportPayrollExcel(
       'Rate (DH/hr)': null as unknown as number,
       'Total Bookings': summaryRows.reduce((n, r) => n + r['Total Bookings'], 0),
       'Completed Bookings': summaryRows.reduce((n, r) => n + r['Completed Bookings'], 0),
-      'Actual Hours Worked': fmt2(summaryRows.reduce((n, r) => n + r['Actual Hours Worked'], 0)),
-      'Estimated Total Hours': fmt2(summaryRows.reduce((n, r) => n + r['Estimated Total Hours'], 0)),
+      'Total Hours': fmt2(summaryRows.reduce((n, r) => n + r['Total Hours'], 0)),
+      'Clock Hours': fmt2(summaryRows.reduce((n, r) => n + r['Clock Hours'], 0)),
+      'Scheduled Hours': fmt2(summaryRows.reduce((n, r) => n + r['Scheduled Hours'], 0)),
       'Base Pay (DH)': summaryRows.reduce((n, r) => n + r['Base Pay (DH)'], 0),
       'Taxi Fees (DH)': summaryRows.reduce((n, r) => n + r['Taxi Fees (DH)'], 0),
       'TOTAL OWED (DH)': summaryRows.reduce((n, r) => n + r['TOTAL OWED (DH)'], 0),
@@ -194,17 +210,17 @@ export function exportPayrollExcel(
 
   const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
   wsSummary['!cols'] = [
-    { wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 20 }, { wch: 22 },
-    { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 20 },
-    { wch: 14 }, { wch: 14 },
+    { wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 20 }, { wch: 14 },
+    { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 18 },
+    { wch: 20 }, { wch: 14 }, { wch: 14 },
   ];
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Payroll Summary');
 
   const wsDetail = XLSX.utils.json_to_sheet(detailRows);
   wsDetail['!cols'] = [
     { wch: 10 }, { wch: 12 }, { wch: 22 }, { wch: 22 }, { wch: 22 },
-    { wch: 10 }, { wch: 11 }, { wch: 11 }, { wch: 20 }, { wch: 20 },
-    { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 16 },
+    { wch: 10 }, { wch: 11 }, { wch: 11 }, { wch: 16 }, { wch: 20 },
+    { wch: 20 }, { wch: 13 }, { wch: 14 }, { wch: 12 }, { wch: 16 },
     { wch: 14 }, { wch: 14 }, { wch: 20 }, { wch: 18 }, { wch: 16 }, { wch: 20 },
   ];
   XLSX.utils.book_append_sheet(wb, wsDetail, 'Booking Details');
