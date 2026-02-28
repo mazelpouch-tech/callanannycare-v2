@@ -207,6 +207,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'POST') {
       const { nanny_id: provided_nanny_id, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, locale, status: reqStatus, clock_in, clock_out, created_by, created_by_name } = req.body as CreateBookingBody;
 
+      // ─── Minimum 3-hour duration check ──────────────────────────
+      if (start_time && end_time && !clock_in) {
+        const parseT = (t: string) => {
+          const [h, m] = t.replace('h', ':').split(':').map(Number);
+          return h + (m || 0) / 60;
+        };
+        const s = parseT(start_time);
+        const e = parseT(end_time);
+        const dur = e <= s ? (24 - s) + e : e - s;
+        if (dur < 3) {
+          return res.status(400).json({ error: 'Minimum booking duration is 3 hours.' });
+        }
+      }
+
       // ─── Conflict-aware nanny assignment ────────────────────────
       const bookingDates = getDateRange(date, end_date || null);
       const effectiveEndTime = end_time || '23h59';

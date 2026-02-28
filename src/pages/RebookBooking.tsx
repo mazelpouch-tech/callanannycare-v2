@@ -258,7 +258,7 @@ export default function RebookBooking() {
     selectedDates.length > 0 &&
     startTime &&
     endTime &&
-    hours > 0;
+    hours >= 3;
 
   const handleVerify = () => {
     if (!booking) return;
@@ -659,8 +659,15 @@ export default function RebookBooking() {
               </div>
             </div>
 
+            {/* Minimum duration warning */}
+            {startTime && endTime && hours > 0 && hours < 3 && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">
+                Minimum booking duration is <strong>3 hours</strong>. Please adjust your end time.
+              </p>
+            )}
+
             {/* Price Summary */}
-            {hours > 0 && selectedDates.length > 0 && (
+            {hours >= 3 && selectedDates.length > 0 && (
               <div className="bg-orange-50 border border-orange-200/60 rounded-2xl px-5 py-4 space-y-2">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{s.priceSummary}</p>
                 <div className="flex items-center justify-between text-sm">

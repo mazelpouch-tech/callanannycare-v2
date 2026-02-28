@@ -244,7 +244,9 @@ function StepDateTime({
 
   const todayDate = startOfDay(new Date());
 
-  const isValid = selectedDates.length > 0 && startTime && endTime;
+  const hours = startTime && endTime ? calculateHours(startTime, endTime) : 0;
+  const isTooShort = startTime && endTime && hours < 3;
+  const isValid = selectedDates.length > 0 && startTime && endTime && hours >= 3;
 
   const dayHeaders = locale === "fr"
     ? ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"]
@@ -437,6 +439,13 @@ function StepDateTime({
           </select>
         </div>
       </div>
+
+      {/* Minimum duration warning */}
+      {isTooShort && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 mb-4">
+          Minimum booking duration is <strong>3 hours</strong>. Please adjust your end time.
+        </p>
+      )}
 
       {/* Navigation */}
       <div className={`flex ${onBack ? "justify-between" : "justify-end"}`}>
