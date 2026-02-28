@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import {
   format, parseISO, formatDistanceToNow, isToday,
-  startOfWeek, addDays, addWeeks, subWeeks, isSameDay,
+  startOfWeek, addDays, subDays, addWeeks, subWeeks, isSameDay,
 } from "date-fns";
 import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
@@ -770,9 +770,21 @@ export default function AdminBookings() {
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
 
+  // Responsive: 3-day view on mobile, 7-day on desktop
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 640
+  );
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", onResize, { passive: true });
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const calDayCount = isMobile ? 3 : 7;
+
   const calDays = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDays(calWeekStart, i)),
-    [calWeekStart]
+    () => Array.from({ length: calDayCount }, (_, i) => addDays(calWeekStart, i)),
+    [calWeekStart, calDayCount]
   );
 
   const calByDate = useMemo(() => {
@@ -931,44 +943,59 @@ export default function AdminBookings() {
       {/* ── Calendar View ── */}
       {viewMode === "calendar" && (
         <div className="space-y-4">
-          {/* Week navigation */}
+          {/* Week / period navigation */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setCalWeekStart((d) => subWeeks(d, 1))}
+                onClick={() =>
+                  setCalWeekStart((d) =>
+                    isMobile ? subDays(d, 3) : subWeeks(d, 1)
+                  )
+                }
                 className="p-2 rounded-xl border border-border hover:bg-muted transition-colors"
-                title="Previous week"
+                title={isMobile ? "Previous 3 days" : "Previous week"}
               >
                 <ChevronLeft className="w-4 h-4 text-muted-foreground" />
               </button>
               <button
-                onClick={() => setCalWeekStart((d) => addWeeks(d, 1))}
+                onClick={() =>
+                  setCalWeekStart((d) =>
+                    isMobile ? addDays(d, 3) : addWeeks(d, 1)
+                  )
+                }
                 className="p-2 rounded-xl border border-border hover:bg-muted transition-colors"
-                title="Next week"
+                title={isMobile ? "Next 3 days" : "Next week"}
               >
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </button>
               <span className="text-sm font-semibold text-foreground">
-                {format(calWeekStart, "d MMM")} — {format(addDays(calWeekStart, 6), "d MMM yyyy")}
+                {format(calWeekStart, "d MMM")} —{" "}
+                {format(addDays(calWeekStart, calDayCount - 1), "d MMM yyyy")}
               </span>
             </div>
             <button
-              onClick={() => setCalWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
+              onClick={() =>
+                setCalWeekStart(
+                  isMobile
+                    ? new Date()
+                    : startOfWeek(new Date(), { weekStartsOn: 1 })
+                )
+              }
               className="px-3 py-1.5 rounded-xl border border-border text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
             >
               Today
             </button>
           </div>
 
-          {/* 7-day grid */}
-          <div className="grid grid-cols-7 gap-2 overflow-x-auto min-w-0">
+          {/* Day grid: 3 cols on mobile, 7 on desktop */}
+          <div className={`grid gap-2 min-w-0 ${isMobile ? "grid-cols-3" : "grid-cols-7"}`}>
             {calDays.map((day) => {
               const key = format(day, "yyyy-MM-dd");
               const dayBookings = calByDate.get(key) || [];
               const todayDay = isToday(day);
 
               return (
-                <div key={key} className={`flex flex-col gap-1.5 min-w-[120px] rounded-xl border p-2 ${todayDay ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
+                <div key={key} className={`flex flex-col gap-1.5 min-w-0 rounded-xl border p-2 ${todayDay ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
                   {/* Day header */}
                   <div className={`flex flex-col items-center py-1 rounded-lg ${todayDay ? "bg-primary text-white" : ""}`}>
                     <span className={`text-[10px] font-semibold uppercase tracking-wide ${todayDay ? "text-white/80" : "text-muted-foreground"}`}>
