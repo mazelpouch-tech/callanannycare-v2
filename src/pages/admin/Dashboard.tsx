@@ -676,8 +676,8 @@ export default function Dashboard() {
     let start: Date;
     let end: Date;
     if (financialPeriod === "week") {
-      start = startOfWeek(now, { weekStartsOn: 1 });
-      end = endOfWeek(now, { weekStartsOn: 1 });
+      start = startOfWeek(now, { weekStartsOn: 6 }); // Saturday midnight
+      end = endOfWeek(now, { weekStartsOn: 6 });     // Friday 23:59
     } else if (financialPeriod === "month") {
       start = startOfMonth(now);
       end = endOfMonth(now);
