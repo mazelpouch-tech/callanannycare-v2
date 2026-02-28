@@ -3,14 +3,15 @@ import { Link } from "react-router-dom";
 import {
   CalendarDays, Clock, DollarSign,
   ArrowUpRight, ArrowDownRight, Timer,
+  Activity, ArrowRight, Eye, AlertTriangle,
 } from "lucide-react";
 import {
   format, parseISO, subMonths, startOfMonth, endOfMonth,
-  isWithinInterval, subDays, isAfter, isToday,
+  isWithinInterval, subDays, isAfter, isToday, formatDistanceToNow,
 } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
-import type { Booking, Nanny } from "@/types";
+import type { Booking, Nanny, BookingStatus } from "@/types";
 import { calcShiftPayBreakdown, HOURLY_RATE } from "@/utils/shiftHelpers";
 
 // ─── Mini Sparkline ──────────────────────────────────────────────
@@ -30,6 +31,43 @@ function MiniSparkline({ data, width = 80, height = 28, color = "#cd6845" }: { d
       <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
+}
+
+// ─── Urgency Badge ───────────────────────────────────────────────
+
+const statusConfig: Record<BookingStatus, { label: string; className: string }> = {
+  pending: { label: "Pending", className: "bg-orange-50 text-orange-700 border border-orange-200" },
+  confirmed: { label: "Confirmed", className: "bg-green-50 text-green-700 border border-green-200" },
+  completed: { label: "Completed", className: "bg-blue-50 text-blue-700 border border-blue-200" },
+  cancelled: { label: "Cancelled", className: "bg-red-50 text-red-700 border border-red-200" },
+};
+
+function DashboardUrgencyBadge({ booking }: { booking: Booking }) {
+  const status = statusConfig[booking.status] || statusConfig.pending;
+  if (booking.status !== "pending") {
+    return <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}>{status.label}</span>;
+  }
+  const hoursElapsed = (Date.now() - new Date(booking.createdAt).getTime()) / 3600000;
+  const elapsed = formatDistanceToNow(new Date(booking.createdAt), { addSuffix: true });
+  if (hoursElapsed > 3) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-300 animate-pulse">
+        <AlertTriangle className="w-3 h-3" />
+        Needs Attention
+        <span className="text-[10px] font-normal opacity-70">({elapsed})</span>
+      </span>
+    );
+  }
+  if (hoursElapsed > 1) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-300">
+        <Clock className="w-3 h-3" />
+        Awaiting
+        <span className="text-[10px] font-normal opacity-70">({elapsed})</span>
+      </span>
+    );
+  }
+  return <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${status.className}`}>{status.label}</span>;
 }
 
 // ─── Nanny Hours Report ─────────────────────────────────────────
@@ -192,7 +230,7 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
 // ─── Main Dashboard ──────────────────────────────────────────────
 
 export default function Dashboard() {
-  const { bookings, nannies, stats, adminProfile } = useData();
+  const { bookings, nannies, stats, adminProfile, updateBookingStatus } = useData();
   const { toDH } = useExchangeRate();
 
   // ── Weekly sparkline (last 8 weeks) ──
@@ -252,6 +290,15 @@ export default function Dashboard() {
 
   const todaysBookings = bookings.filter((b) => { try { return isToday(parseISO(b.date)); } catch { return false; } });
   const todaysBookingsCount = todaysBookings.length;
+
+  // Bookings created today (for the table)
+  const recentBookings = [...bookings]
+    .filter((b) => { try { return isToday(new Date(b.createdAt)); } catch { return false; } })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const formatDate = (dateStr: string) => {
+    try { return format(parseISO(dateStr), "MMM dd, yyyy"); } catch { return dateStr || "N/A"; }
+  };
   const avgBookingValue = stats.totalBookings > 0
     ? Math.round(stats.totalRevenue / Math.max(bookings.filter((b) => b.status === "confirmed" || b.status === "completed").length, 1))
     : 0;
@@ -343,6 +390,147 @@ export default function Dashboard() {
           <p className="text-2xl font-bold text-foreground">{todaysBookingsCount}</p>
           <p className="text-xs text-muted-foreground mt-1">Today&apos;s Bookings</p>
         </Link>
+      </div>
+
+      {/* ── Today's Bookings ── */}
+      <div className="bg-card rounded-xl border border-border shadow-soft">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h2 className="font-serif text-base font-semibold text-foreground flex items-center gap-2">
+            <Activity className="w-4 h-4 text-primary" />
+            Today's Bookings
+            {recentBookings.length > 0 && (
+              <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary">{recentBookings.length}</span>
+            )}
+          </h2>
+          <Link
+            to="/admin/bookings"
+            className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+          >
+            View All
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {recentBookings.length === 0 ? (
+          <div className="px-6 py-12 text-center">
+            <CalendarDays className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+            <p className="text-muted-foreground font-medium">No bookings today</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">Bookings made today will appear here.</p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Client</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nanny</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                    <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {recentBookings.map((booking) => (
+                    <tr key={booking.id} className="hover:bg-muted/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-medium text-foreground">{booking.clientName || "N/A"}</p>
+                        <p className="text-xs text-muted-foreground">{booking.clientEmail || ""}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        {booking.nannyName ? (
+                          <div className="flex items-center gap-2">
+                            {booking.nannyImage ? (
+                              <img src={booking.nannyImage} alt={booking.nannyName} className="w-7 h-7 rounded-full object-cover border border-border" />
+                            ) : (
+                              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                                {booking.nannyName.charAt(0)}
+                              </div>
+                            )}
+                            <span className="text-sm font-medium text-foreground">{booking.nannyName}</span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground italic">Unassigned</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(booking.date)}</td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()}€</div>
+                        <div className="text-[10px] text-muted-foreground">{toDH(booking.totalPrice || 0).toLocaleString()} DH</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <DashboardUrgencyBadge booking={booking} />
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {booking.status === "pending" && (
+                            <button onClick={() => updateBookingStatus(booking.id, "confirmed")} className="text-xs font-medium text-accent hover:text-accent/80 bg-accent/10 px-3 py-1.5 rounded-lg transition-colors">
+                              Confirm
+                            </button>
+                          )}
+                          {booking.status === "confirmed" && (
+                            <button onClick={() => updateBookingStatus(booking.id, "completed")} className="text-xs font-medium text-blue-700 hover:text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
+                              Complete
+                            </button>
+                          )}
+                          <Link to="/admin/bookings" className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                            <Eye className="w-4 h-4" />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden divide-y divide-border">
+              {recentBookings.map((booking) => (
+                <div key={booking.id} className="px-5 py-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-foreground text-sm">{booking.clientName || "N/A"}</p>
+                    <DashboardUrgencyBadge booking={booking} />
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {booking.nannyName ? (
+                      <div className="flex items-center gap-1.5">
+                        {booking.nannyImage ? (
+                          <img src={booking.nannyImage} alt={booking.nannyName} className="w-5 h-5 rounded-full object-cover border border-border" />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                            {booking.nannyName.charAt(0)}
+                          </div>
+                        )}
+                        <span className="font-medium text-foreground">{booking.nannyName}</span>
+                      </div>
+                    ) : (
+                      <span className="italic">Unassigned</span>
+                    )}
+                    <span>·</span>
+                    <span>{formatDate(booking.date)}</span>
+                    <span>·</span>
+                    <span className="font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()}€</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {booking.status === "pending" && (
+                      <button onClick={() => updateBookingStatus(booking.id, "confirmed")} className="text-xs font-medium text-accent bg-accent/10 px-3 py-1.5 rounded-lg">
+                        Confirm
+                      </button>
+                    )}
+                    {booking.status === "confirmed" && (
+                      <button onClick={() => updateBookingStatus(booking.id, "completed")} className="text-xs font-medium text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg">
+                        Complete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── Nanny Hours Report ── */}
