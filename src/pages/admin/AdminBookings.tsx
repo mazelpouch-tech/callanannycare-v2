@@ -37,7 +37,6 @@ import ExtendBookingModal from "../../components/ExtendBookingModal";
 import ForwardBookingModal from "../../components/ForwardBookingModal";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
 import { calcBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE, isTomorrow as isTomorrowDate, timesOverlap } from "@/utils/shiftHelpers";
-import PaymentPanel from "../../components/PaymentPanel";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 
 interface EditBookingForm {
@@ -1226,9 +1225,6 @@ export default function AdminBookings() {
                                   </div>
                                 </div>
                               </div>
-                              {/* Payment Reconciliation */}
-                              <PaymentPanel booking={booking} />
-
                               {/* Status actions */}
                               <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border">
                                 {booking.status === "pending" && (
@@ -1584,12 +1580,6 @@ export default function AdminBookings() {
                             </button>
                           )}
                         </div>
-                      </div>
-                    )}
-                    {/* Payment Reconciliation (mobile) */}
-                    {isExpanded && (
-                      <div className="px-4 pb-4">
-                        <PaymentPanel booking={booking} />
                       </div>
                     )}
                   </div>
