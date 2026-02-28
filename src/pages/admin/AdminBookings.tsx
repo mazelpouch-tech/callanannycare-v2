@@ -642,6 +642,16 @@ export default function AdminBookings() {
     setExpandedRow(expandedRow === id ? null : id);
   };
 
+  const rowBorderColor = (status: string) => {
+    switch (status) {
+      case "pending":   return "border-l-orange-400";
+      case "confirmed": return "border-l-green-500";
+      case "completed": return "border-l-blue-400";
+      case "cancelled": return "border-l-gray-300";
+      default:          return "border-l-transparent";
+    }
+  };
+
   // ─── Deleted bookings audit log ───────────────────────────────
   const [showDeleted, setShowDeleted] = useState(false);
   const [deletedBookings, setDeletedBookings] = useState<typeof bookings>([]);
@@ -796,10 +806,7 @@ export default function AdminBookings() {
                       Client
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Phone
+                      Contact
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Nanny
@@ -835,11 +842,14 @@ export default function AdminBookings() {
                   ] as const).map((group) => group.items.length > 0 && (
                     <Fragment key={group.label}>
                       <tr>
-                        <td colSpan={10} className="px-4 py-4 bg-primary/5 text-center">
+                        <td colSpan={9} className="px-4 py-4 bg-primary/5 text-center">
                           <div className="flex items-center justify-center gap-4">
                             <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
                             <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
                               {group.label}
+                            </span>
+                            <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                              {group.items.length}
                             </span>
                             <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
                           </div>
@@ -850,18 +860,30 @@ export default function AdminBookings() {
 
                     return (
                       <Fragment key={booking.id}>
-                        <tr id={`booking-row-${booking.id}`} className="hover:bg-muted/30 transition-colors">
+                        <tr
+                          id={`booking-row-${booking.id}`}
+                          className={`hover:bg-muted/30 transition-colors cursor-pointer border-l-4 ${rowBorderColor(booking.status)}`}
+                          onClick={() => toggleExpand(booking.id)}
+                        >
                           <td className="px-4 py-3.5 text-sm font-medium text-foreground">
                             {booking.clientName || "N/A"}
                           </td>
-                          <td className="px-4 py-3.5 text-sm text-muted-foreground">
-                            {booking.clientEmail || "N/A"}
+                          <td className="px-4 py-3.5">
+                            <div className="text-sm text-foreground">{booking.clientEmail || "—"}</div>
+                            {booking.clientPhone && (
+                              <div className="text-xs text-muted-foreground mt-0.5">{booking.clientPhone}</div>
+                            )}
                           </td>
                           <td className="px-4 py-3.5 text-sm text-muted-foreground">
-                            {booking.clientPhone || "N/A"}
-                          </td>
-                          <td className="px-4 py-3.5 text-sm text-muted-foreground">
-                            {booking.nannyName || "N/A"}
+                            <div className="flex items-center gap-1.5">
+                              {booking.clockIn && !booking.clockOut && (
+                                <span className="relative flex h-2 w-2 shrink-0">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                                </span>
+                              )}
+                              {booking.nannyName || "N/A"}
+                            </div>
                           </td>
                           <td className="px-4 py-3.5 text-sm text-muted-foreground">
                             {formatDate(booking.date)}{booking.endDate ? ` → ${formatDate(booking.endDate)}` : ""}
@@ -923,20 +945,16 @@ export default function AdminBookings() {
                           <td className="px-4 py-3.5">
                             <UrgencyBadge booking={booking} />
                           </td>
-                          <td className="px-4 py-3.5">
+                          <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1.5">
-                              {/* Expand / View */}
-                              <button
-                                onClick={() => toggleExpand(booking.id)}
-                                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                                title="View details"
-                              >
+                              {/* Expand indicator (visual only) */}
+                              <span className="p-1.5 text-muted-foreground">
                                 {isExpanded ? (
                                   <ChevronUp className="w-4 h-4" />
                                 ) : (
                                   <Eye className="w-4 h-4" />
                                 )}
-                              </button>
+                              </span>
 
                               {/* Edit */}
                               <button
@@ -954,7 +972,7 @@ export default function AdminBookings() {
                         {isExpanded && (
                           <tr>
                             <td
-                              colSpan={10}
+                              colSpan={9}
                               className="px-4 py-4 bg-muted/20"
                             >
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -1209,6 +1227,9 @@ export default function AdminBookings() {
                   <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
                     {group.label}
                   </span>
+                  <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    {group.items.length}
+                  </span>
                   <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
                 </div>
                 {group.items.map((booking) => {
@@ -1218,7 +1239,7 @@ export default function AdminBookings() {
                 <Fragment key={`mobile-${booking.id}`}>
                 <div
                   id={`booking-row-${booking.id}`}
-                  className="bg-card rounded-xl border border-border shadow-soft overflow-hidden"
+                  className={`bg-card rounded-xl border border-border shadow-soft overflow-hidden border-l-4 ${rowBorderColor(booking.status)}`}
                 >
                   {/* Card Header */}
                   <div className="p-4 space-y-3">
@@ -1227,9 +1248,17 @@ export default function AdminBookings() {
                         <p className="font-medium text-foreground text-sm">
                           {booking.clientName || "N/A"}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {booking.nannyName || "Unassigned"}
-                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {booking.clockIn && !booking.clockOut && (
+                            <span className="relative flex h-2 w-2 shrink-0">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                            </span>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            {booking.nannyName || "Unassigned"}
+                          </p>
+                        </div>
                       </div>
                       <UrgencyBadge booking={booking} />
                     </div>
