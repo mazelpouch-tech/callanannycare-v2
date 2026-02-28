@@ -3,7 +3,7 @@ import {
   DollarSign, CheckCircle, Clock, TrendingUp,
   Phone, User, Calendar, ChevronDown, ChevronUp,
   Hotel, Search, X, AlertTriangle, MessageCircle,
-  ArrowUpRight, ArrowDownRight,
+  ArrowUpRight, ArrowDownRight, Banknote, CreditCard, Wallet,
 } from "lucide-react";
 import {
   format, parseISO, isWithinInterval,
@@ -20,7 +20,7 @@ type ViewTab = "to-collect" | "collected" | "by-nanny";
 type FinancialPeriod = "week" | "month" | "year" | "custom";
 
 export default function AdminRevenue() {
-  const { bookings, nannies } = useData();
+  const { bookings, nannies, markAsCollected, adminProfile } = useData();
   const { toDH, rate } = useExchangeRate();
 
   // ── Tabs & filters ──
@@ -28,6 +28,12 @@ export default function AdminRevenue() {
   const [expandedId, setExpandedId] = useState<number | string | null>(null);
   const [search, setSearch] = useState("");
   const [nannyFilter, setNannyFilter] = useState("all");
+
+  // ── Collection modal ──
+  const [collectingBooking, setCollectingBooking] = useState<Booking | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [collectionNote, setCollectionNote] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ── Financial period filter ──
   const [financialPeriod, setFinancialPeriod] = useState<FinancialPeriod>("month");
@@ -136,32 +142,53 @@ export default function AdminRevenue() {
     { key: "by-nanny",   label: "By Nanny",   count: byNanny.length },
   ];
 
+  const handleCollect = async () => {
+    if (!collectingBooking) return;
+    setIsSubmitting(true);
+    try {
+      await markAsCollected(collectingBooking.id, {
+        collectedBy: adminProfile?.name || "Admin",
+        paymentMethod,
+        collectionNote: collectionNote.trim() || undefined,
+      });
+      setCollectingBooking(null);
+      setPaymentMethod("cash");
+      setCollectionNote("");
+    } catch (err) {
+      console.error("Collection failed:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const openWhatsApp = (phone: string) => {
     window.open(`https://wa.me/${phone.replace(/\s+/g, "")}`, "_blank");
   };
 
-  // ── Booking card shared components ──
-  const BookingCard = ({ b, accent }: { b: Booking; accent: "amber" | "green" }) => {
-    const overdue = accent === "amber" && isOverdue(b);
+  // ── Booking row card ──
+  const BookingCard = ({ b, variant }: { b: Booking; variant: "pending" | "collected" }) => {
+    const overdue = variant === "pending" && isOverdue(b);
     const isOpen  = expandedId === b.id;
 
-    const borderCls  = overdue ? "border-red-300" : accent === "amber" ? "border-amber-200" : "border-green-200";
-    const amountCls  = overdue ? "text-red-700"   : accent === "amber" ? "text-amber-700"  : "text-green-700";
-
     return (
-      <div className={`bg-card rounded-2xl border overflow-hidden transition-shadow ${borderCls} ${isOpen ? "shadow-md" : ""}`}>
-        {/* Summary row — always visible */}
+      <div className={`bg-card rounded-2xl border overflow-hidden transition-shadow ${
+        overdue       ? "border-red-300"   :
+        variant === "pending" ? "border-amber-200" :
+        "border-green-200"
+      } ${isOpen ? "shadow-md" : ""}`}>
+
+        {/* ── Summary row — always visible ── */}
         <button
           className="w-full px-4 py-4 flex items-center gap-3 hover:bg-muted/20 transition-colors text-left"
           onClick={() => setExpandedId(isOpen ? null : b.id)}
         >
-          {/* Status icon */}
-          <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
-            overdue ? "bg-red-50" : accent === "amber" ? "bg-amber-50" : "bg-green-50"
+          {/* Icon */}
+          <div className={`w-9 h-9 rounded-full shrink-0 flex items-center justify-center ${
+            overdue ? "bg-red-50" : variant === "pending" ? "bg-amber-50" : "bg-green-50"
           }`}>
             {overdue
-              ? <AlertTriangle className="w-4.5 h-4.5 text-red-600" />
-              : accent === "amber"
+              ? <AlertTriangle className="w-4 h-4 text-red-600" />
+              : variant === "pending"
               ? <DollarSign className="w-4 h-4 text-amber-600" />
               : <CheckCircle className="w-4 h-4 text-green-600" />
             }
@@ -174,7 +201,7 @@ export default function AdminRevenue() {
               {overdue && (
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 shrink-0">Overdue</span>
               )}
-              {accent === "green" && b.paymentMethod && (
+              {variant === "collected" && b.paymentMethod && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 capitalize">{b.paymentMethod}</span>
               )}
             </div>
@@ -183,28 +210,31 @@ export default function AdminRevenue() {
             </p>
           </div>
 
-          {/* Price */}
+          {/* Amount in EUR + DH */}
           <div className="text-right shrink-0">
-            <p className={`text-base font-bold ${amountCls}`}>{b.totalPrice}€</p>
+            <p className={`text-base font-bold ${
+              overdue ? "text-red-700" : variant === "pending" ? "text-amber-700" : "text-green-700"
+            }`}>{b.totalPrice}€</p>
             <p className="text-[10px] text-muted-foreground">{toDH(b.totalPrice)} DH</p>
           </div>
 
-          {/* Expand chevron */}
+          {/* Chevron */}
           <div className="shrink-0 text-muted-foreground ml-1">
             {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </div>
         </button>
 
-        {/* Expanded content */}
+        {/* ── Expanded panel ── */}
         {isOpen && (
           <div className={`border-t px-4 pb-5 pt-4 space-y-4 ${
-            overdue ? "border-red-200 bg-red-50/20" : accent === "amber" ? "border-amber-100 bg-amber-50/10" : "border-green-200 bg-green-50/10"
+            overdue ? "border-red-200 bg-red-50/20" : variant === "pending" ? "border-amber-100 bg-amber-50/10" : "border-green-200 bg-green-50/10"
           }`}>
-            {/* Contact + booking info row */}
+
+            {/* Contact + booking details */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               {/* Contact */}
-              <div className="space-y-2">
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Contact</p>
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Parent Contact</p>
                 <div className="flex items-center gap-2">
                   <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                   <span className="font-medium text-foreground">{b.clientName}</span>
@@ -231,26 +261,26 @@ export default function AdminRevenue() {
               </div>
 
               {/* Booking details */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Booking</p>
-                <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
                   <Calendar className="w-3.5 h-3.5 shrink-0" />
                   <span>{b.date}{b.endDate && b.endDate !== b.date ? ` → ${b.endDate}` : ""}</span>
                 </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
                   <Clock className="w-3.5 h-3.5 shrink-0" />
                   <span>{b.startTime} – {b.endTime}</span>
                 </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <User className="w-3.5 h-3.5 shrink-0" />
-                  <span>Nanny: <span className="font-medium text-foreground">{b.nannyName}</span></span>
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Nanny:</span>
+                  <span className="font-medium text-foreground">{b.nannyName}</span>
                 </div>
-                {accent === "green" && b.collectedAt && (
-                  <div className="text-xs text-green-700 bg-green-100 rounded-lg px-2 py-1 mt-1">
+                {variant === "collected" && b.collectedAt && (
+                  <div className="text-xs text-green-700 bg-green-100 rounded-lg px-2 py-1">
                     Collected {(() => {
                       try {
-                        const d = parseISO(b.collectedAt);
-                        return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                        return parseISO(b.collectedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
                       } catch { return b.collectedAt; }
                     })()}
                     {b.collectedBy ? ` by ${b.collectedBy}` : ""}
@@ -259,11 +289,31 @@ export default function AdminRevenue() {
               </div>
             </div>
 
-            {/* Payment Panel */}
+            {/* Payment Tracking (PaymentPanel) */}
             <div>
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Payment Tracking</p>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Payment Records</p>
               <PaymentPanel booking={b} />
             </div>
+
+            {/* Mark as Collected button — only on pending */}
+            {variant === "pending" && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCollectingBooking(b);
+                  setPaymentMethod("cash");
+                  setCollectionNote("");
+                }}
+                className={`w-full py-3 font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 ${
+                  overdue
+                    ? "bg-red-600 hover:bg-red-700 text-white"
+                    : "bg-green-600 hover:bg-green-700 text-white"
+                }`}
+              >
+                <CheckCircle className="w-4 h-4" />
+                Mark as Collected — {b.totalPrice}€ ({toDH(b.totalPrice)} DH)
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -405,12 +455,12 @@ export default function AdminRevenue() {
             {t.label}
             {t.count > 0 && (
               <span className={`text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full ${
-                t.key === "to-collect" && t.overdue ? "bg-red-500 text-white" :
+                t.key === "to-collect" && (t.overdue ?? 0) > 0 ? "bg-red-500 text-white" :
                 t.key === "to-collect" ? "bg-amber-400 text-white" :
                 t.key === "collected" ? "bg-green-500 text-white" :
                 "bg-primary/20 text-primary"
               }`}>
-                {t.key === "to-collect" && t.overdue ? t.overdue : t.count > 9 ? "9+" : t.count}
+                {t.key === "to-collect" && (t.overdue ?? 0) > 0 ? t.overdue : t.count > 9 ? "9+" : t.count}
               </span>
             )}
           </button>
@@ -454,16 +504,14 @@ export default function AdminRevenue() {
             </div>
           ) : (
             <>
-              {toCollect.map((b) => (
-                <BookingCard key={b.id} b={b} accent="amber" />
-              ))}
+              {toCollect.map((b) => <BookingCard key={b.id} b={b} variant="pending" />)}
               <div className={`rounded-2xl border p-4 flex items-center justify-between ${overdueCount > 0 ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}>
                 <p className={`text-sm font-medium ${overdueCount > 0 ? "text-red-800" : "text-amber-800"}`}>
                   {toCollect.length} booking{toCollect.length !== 1 ? "s" : ""}
                   {overdueCount > 0 && ` · ${overdueCount} overdue`}
                 </p>
                 <p className={`text-lg font-bold ${overdueCount > 0 ? "text-red-800" : "text-amber-800"}`}>
-                  {totalToCollect}€ <span className="text-xs font-normal">({toDH(totalToCollect)} DH)</span>
+                  {totalToCollect}€ <span className="text-xs font-normal opacity-70">({toDH(totalToCollect)} DH)</span>
                 </p>
               </div>
             </>
@@ -481,12 +529,10 @@ export default function AdminRevenue() {
             </div>
           ) : (
             <>
-              {collected.map((b) => (
-                <BookingCard key={b.id} b={b} accent="green" />
-              ))}
+              {collected.map((b) => <BookingCard key={b.id} b={b} variant="collected" />)}
               <div className="bg-green-50 rounded-2xl border border-green-200 p-4 flex items-center justify-between">
                 <p className="text-sm font-medium text-green-800">{collected.length} booking{collected.length !== 1 ? "s" : ""} collected</p>
-                <p className="text-lg font-bold text-green-800">{totalCollected}€ <span className="text-xs font-normal">({toDH(totalCollected)} DH)</span></p>
+                <p className="text-lg font-bold text-green-800">{totalCollected}€ <span className="text-xs font-normal opacity-70">({toDH(totalCollected)} DH)</span></p>
               </div>
             </>
           )}
@@ -525,6 +571,108 @@ export default function AdminRevenue() {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* ── Mark as Collected Modal ── */}
+      {collectingBooking && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm" onClick={() => !isSubmitting && setCollectingBooking(null)} />
+          <div className="relative bg-card rounded-t-3xl sm:rounded-2xl border border-border w-full sm:max-w-md mx-auto shadow-xl z-10 max-h-[90vh] overflow-y-auto">
+
+            {/* Modal header */}
+            <div className="px-6 pt-6 pb-4 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-foreground">Confirm Collection</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">{collectingBooking.clientName} · {collectingBooking.date}</p>
+              </div>
+              <button
+                onClick={() => !isSubmitting && setCollectingBooking(null)}
+                className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-5">
+              {/* Amount highlight */}
+              <div className="bg-green-50 rounded-xl p-4 text-center border border-green-100">
+                <p className="text-3xl font-bold text-green-700">{collectingBooking.totalPrice}€</p>
+                <p className="text-sm text-green-600 mt-1">{toDH(collectingBooking.totalPrice)} DH</p>
+              </div>
+
+              {/* Booking summary */}
+              <div className="space-y-1 text-sm bg-muted/30 rounded-xl px-4 py-3">
+                <div><span className="text-muted-foreground">Nanny: </span><span className="font-medium">{collectingBooking.nannyName}</span></div>
+                <div><span className="text-muted-foreground">Date: </span><span>{collectingBooking.date} · {collectingBooking.startTime}–{collectingBooking.endTime}</span></div>
+                {collectingBooking.hotel && (
+                  <div><span className="text-muted-foreground">Hotel: </span><span>{collectingBooking.hotel}</span></div>
+                )}
+              </div>
+
+              {/* Payment method */}
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">Payment Method</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: "cash",  label: "Cash",     Icon: Banknote  },
+                    { value: "bank",  label: "Transfer", Icon: CreditCard },
+                    { value: "card",  label: "Card / Tap", Icon: Wallet  },
+                  ].map(({ value, label, Icon }) => (
+                    <button
+                      key={value}
+                      onClick={() => setPaymentMethod(value)}
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-sm font-medium transition-all ${
+                        paymentMethod === value
+                          ? "border-green-500 bg-green-50 text-green-700"
+                          : "border-border bg-card text-muted-foreground hover:border-green-300"
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span className="text-xs">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Note */}
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">Note <span className="text-muted-foreground font-normal">(optional)</span></label>
+                <textarea
+                  value={collectionNote}
+                  onChange={(e) => setCollectionNote(e.target.value)}
+                  placeholder="Any additional notes..."
+                  rows={2}
+                  className="w-full px-4 py-2.5 bg-card border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Modal actions */}
+            <div className="px-6 pb-6 pt-2 flex gap-3">
+              <button
+                onClick={() => !isSubmitting && setCollectingBooking(null)}
+                disabled={isSubmitting}
+                className="flex-1 py-3 border border-border rounded-xl text-sm font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCollect}
+                disabled={isSubmitting}
+                className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <span className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    Confirm Collection
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
