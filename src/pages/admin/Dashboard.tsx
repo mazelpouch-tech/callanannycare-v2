@@ -666,8 +666,10 @@ export default function Dashboard() {
   const netIncomeEUR = stats.totalRevenue - totalExpenseEUR;
 
   // ── Financial period filter ──
-  type FinancialPeriod = "week" | "month" | "year";
+  type FinancialPeriod = "week" | "month" | "year" | "custom";
   const [financialPeriod, setFinancialPeriod] = useState<FinancialPeriod>("month");
+  const [customStart, setCustomStart] = useState<string>(() => format(startOfMonth(new Date()), "yyyy-MM-dd"));
+  const [customEnd, setCustomEnd] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
 
   const filteredFinancialBookings = useMemo(() => {
     const now = new Date();
@@ -679,9 +681,16 @@ export default function Dashboard() {
     } else if (financialPeriod === "month") {
       start = startOfMonth(now);
       end = endOfMonth(now);
-    } else {
+    } else if (financialPeriod === "year") {
       start = startOfYear(now);
       end = endOfYear(now);
+    } else {
+      try {
+        start = parseISO(customStart);
+        end = parseISO(customEnd);
+        // swap if end is before start
+        if (end < start) [start, end] = [end, start];
+      } catch { return []; }
     }
     return bookings
       .filter((b) => b.status === "confirmed" || b.status === "completed")
@@ -690,7 +699,7 @@ export default function Dashboard() {
           return isWithinInterval(parseISO(b.date), { start, end });
         } catch { return false; }
       });
-  }, [bookings, financialPeriod]);
+  }, [bookings, financialPeriod, customStart, customEnd]);
 
   const filteredRevenue = useMemo(
     () => filteredFinancialBookings.reduce((s, b) => s + (b.totalPrice || 0), 0),
@@ -811,20 +820,39 @@ export default function Dashboard() {
             <p className="text-xs text-muted-foreground mt-0.5">Revenue, expenses &amp; net income</p>
           </div>
           {/* Period filter */}
-          <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/60 border border-border self-start sm:self-auto">
-            {(["week", "month", "year"] as const).map((p) => (
-              <button
-                key={p}
-                onClick={() => setFinancialPeriod(p)}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                  financialPeriod === p
-                    ? "bg-background text-foreground shadow-sm border border-border"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {p === "week" ? "Weekly" : p === "month" ? "Monthly" : "Annually"}
-              </button>
-            ))}
+          <div className="flex flex-col gap-2 self-start sm:self-auto">
+            <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/60 border border-border">
+              {(["week", "month", "year", "custom"] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setFinancialPeriod(p)}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                    financialPeriod === p
+                      ? "bg-background text-foreground shadow-sm border border-border"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {p === "week" ? "Weekly" : p === "month" ? "Monthly" : p === "year" ? "Annually" : "Custom"}
+                </button>
+              ))}
+            </div>
+            {financialPeriod === "custom" && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  className="text-xs px-2 py-1 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <span className="text-xs text-muted-foreground">→</span>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  className="text-xs px-2 py-1 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+            )}
           </div>
         </div>
         {filteredRevenue > 0 || filteredExpenseDH > 0 ? (
