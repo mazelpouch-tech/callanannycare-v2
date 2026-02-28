@@ -1,11 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   CalendarDays, Clock, DollarSign, ArrowRight,
   Eye, TrendingUp, Users, Activity, Star,
   ArrowUpRight, ArrowDownRight, Timer, FileText, CheckCircle, AlertTriangle,
 } from "lucide-react";
-import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, subDays, isAfter, formatDistanceToNow, isToday } from "date-fns";
+import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, subDays, isAfter, formatDistanceToNow, isToday, startOfWeek, endOfWeek, startOfYear, endOfYear } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import type { Booking, Nanny, BookingStatus } from "@/types";
@@ -665,6 +665,50 @@ export default function Dashboard() {
   const totalExpenseEUR = rate > 0 ? Math.round(totalExpenseDH / rate) : 0;
   const netIncomeEUR = stats.totalRevenue - totalExpenseEUR;
 
+  // ── Financial period filter ──
+  type FinancialPeriod = "week" | "month" | "year";
+  const [financialPeriod, setFinancialPeriod] = useState<FinancialPeriod>("month");
+
+  const filteredFinancialBookings = useMemo(() => {
+    const now = new Date();
+    let start: Date;
+    let end: Date;
+    if (financialPeriod === "week") {
+      start = startOfWeek(now, { weekStartsOn: 1 });
+      end = endOfWeek(now, { weekStartsOn: 1 });
+    } else if (financialPeriod === "month") {
+      start = startOfMonth(now);
+      end = endOfMonth(now);
+    } else {
+      start = startOfYear(now);
+      end = endOfYear(now);
+    }
+    return bookings
+      .filter((b) => b.status === "confirmed" || b.status === "completed")
+      .filter((b) => {
+        try {
+          return isWithinInterval(parseISO(b.date), { start, end });
+        } catch { return false; }
+      });
+  }, [bookings, financialPeriod]);
+
+  const filteredRevenue = useMemo(
+    () => filteredFinancialBookings.reduce((s, b) => s + (b.totalPrice || 0), 0),
+    [filteredFinancialBookings]
+  );
+
+  const filteredExpenseDH = useMemo(() => {
+    return filteredFinancialBookings.reduce((sum, b) => {
+      if (b.clockIn && b.clockOut) {
+        return sum + calcShiftPayBreakdown(b.clockIn, b.clockOut).total;
+      }
+      return sum + estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate).total;
+    }, 0);
+  }, [filteredFinancialBookings]);
+
+  const filteredExpenseEUR = rate > 0 ? Math.round(filteredExpenseDH / rate) : 0;
+  const filteredNetIncomeEUR = filteredRevenue - filteredExpenseEUR;
+
   const formatDate = (dateStr: string) => {
     try { return format(parseISO(dateStr), "MMM dd, yyyy"); } catch { return dateStr || "N/A"; }
   };
@@ -761,11 +805,29 @@ export default function Dashboard() {
 
       {/* ── Financial Summary ── */}
       <div className="bg-card rounded-xl border border-border shadow-soft p-5">
-        <div className="mb-4">
-          <h3 className="font-serif text-base font-semibold text-foreground">Financial Summary</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Revenue, expenses &amp; net income</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div>
+            <h3 className="font-serif text-base font-semibold text-foreground">Financial Summary</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Revenue, expenses &amp; net income</p>
+          </div>
+          {/* Period filter */}
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/60 border border-border self-start sm:self-auto">
+            {(["week", "month", "year"] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setFinancialPeriod(p)}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                  financialPeriod === p
+                    ? "bg-background text-foreground shadow-sm border border-border"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {p === "week" ? "Weekly" : p === "month" ? "Monthly" : "Annually"}
+              </button>
+            ))}
+          </div>
         </div>
-        {stats.totalRevenue > 0 || totalExpenseDH > 0 ? (
+        {filteredRevenue > 0 || filteredExpenseDH > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Revenue */}
             <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900/30">
@@ -774,13 +836,13 @@ export default function Dashboard() {
                   <ArrowUpRight className="w-4 h-4 text-green-700 dark:text-green-400" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-green-800 dark:text-green-300">Total Revenue</p>
+                  <p className="text-xs font-medium text-green-800 dark:text-green-300">Revenue</p>
                   <p className="text-[10px] text-green-600/70 dark:text-green-500/70">Collected from clients</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-bold text-green-800 dark:text-green-300">{stats.totalRevenue.toLocaleString()}€</p>
-                <p className="text-[10px] text-green-600/70 dark:text-green-500/70">{toDH(stats.totalRevenue).toLocaleString()} DH</p>
+                <p className="text-sm font-bold text-green-800 dark:text-green-300">{filteredRevenue.toLocaleString()}€</p>
+                <p className="text-[10px] text-green-600/70 dark:text-green-500/70">{toDH(filteredRevenue).toLocaleString()} DH</p>
               </div>
             </div>
 
@@ -791,36 +853,36 @@ export default function Dashboard() {
                   <ArrowDownRight className="w-4 h-4 text-orange-700 dark:text-orange-400" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-orange-800 dark:text-orange-300">Total Expense</p>
+                  <p className="text-xs font-medium text-orange-800 dark:text-orange-300">Expense</p>
                   <p className="text-[10px] text-orange-600/70 dark:text-orange-500/70">Nanny pay ({HOURLY_RATE} DH/hr)</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-bold text-orange-800 dark:text-orange-300">{totalExpenseEUR.toLocaleString()}€</p>
-                <p className="text-[10px] text-orange-600/70 dark:text-orange-500/70">{totalExpenseDH.toLocaleString()} DH</p>
+                <p className="text-sm font-bold text-orange-800 dark:text-orange-300">{filteredExpenseEUR.toLocaleString()}€</p>
+                <p className="text-[10px] text-orange-600/70 dark:text-orange-500/70">{filteredExpenseDH.toLocaleString()} DH</p>
               </div>
             </div>
 
             {/* Net Income */}
-            <div className={`flex items-center justify-between p-3 rounded-lg border ${netIncomeEUR >= 0 ? "bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30" : "bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900/30"}`}>
+            <div className={`flex items-center justify-between p-3 rounded-lg border ${filteredNetIncomeEUR >= 0 ? "bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30" : "bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900/30"}`}>
               <div className="flex items-center gap-2">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center ${netIncomeEUR >= 0 ? "bg-blue-100 dark:bg-blue-900/40" : "bg-red-100 dark:bg-red-900/40"}`}>
-                  <DollarSign className={`w-4 h-4 ${netIncomeEUR >= 0 ? "text-blue-700 dark:text-blue-400" : "text-red-700 dark:text-red-400"}`} />
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center ${filteredNetIncomeEUR >= 0 ? "bg-blue-100 dark:bg-blue-900/40" : "bg-red-100 dark:bg-red-900/40"}`}>
+                  <DollarSign className={`w-4 h-4 ${filteredNetIncomeEUR >= 0 ? "text-blue-700 dark:text-blue-400" : "text-red-700 dark:text-red-400"}`} />
                 </div>
                 <div>
-                  <p className={`text-xs font-medium ${netIncomeEUR >= 0 ? "text-blue-800 dark:text-blue-300" : "text-red-800 dark:text-red-300"}`}>Net Income</p>
-                  <p className={`text-[10px] ${netIncomeEUR >= 0 ? "text-blue-600/70 dark:text-blue-500/70" : "text-red-600/70 dark:text-red-500/70"}`}>Revenue − Expenses</p>
+                  <p className={`text-xs font-medium ${filteredNetIncomeEUR >= 0 ? "text-blue-800 dark:text-blue-300" : "text-red-800 dark:text-red-300"}`}>Net Income</p>
+                  <p className={`text-[10px] ${filteredNetIncomeEUR >= 0 ? "text-blue-600/70 dark:text-blue-500/70" : "text-red-600/70 dark:text-red-500/70"}`}>Revenue − Expenses</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className={`text-sm font-bold ${netIncomeEUR >= 0 ? "text-blue-800 dark:text-blue-300" : "text-red-800 dark:text-red-300"}`}>{netIncomeEUR.toLocaleString()}€</p>
-                <p className={`text-[10px] ${netIncomeEUR >= 0 ? "text-blue-600/70 dark:text-blue-500/70" : "text-red-600/70 dark:text-red-500/70"}`}>{(toDH(stats.totalRevenue) - totalExpenseDH).toLocaleString()} DH</p>
+                <p className={`text-sm font-bold ${filteredNetIncomeEUR >= 0 ? "text-blue-800 dark:text-blue-300" : "text-red-800 dark:text-red-300"}`}>{filteredNetIncomeEUR.toLocaleString()}€</p>
+                <p className={`text-[10px] ${filteredNetIncomeEUR >= 0 ? "text-blue-600/70 dark:text-blue-500/70" : "text-red-600/70 dark:text-red-500/70"}`}>{(toDH(filteredRevenue) - filteredExpenseDH).toLocaleString()} DH</p>
               </div>
             </div>
           </div>
         ) : (
           <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">
-            No financial data yet
+            No financial data for this period
           </div>
         )}
       </div>
