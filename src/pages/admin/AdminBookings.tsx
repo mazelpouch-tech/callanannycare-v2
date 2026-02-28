@@ -652,6 +652,9 @@ export default function AdminBookings() {
     }
   };
 
+  // Previous bookings collapsed by default
+  const [previousExpanded, setPreviousExpanded] = useState(false);
+
   // ─── Deleted bookings audit log ───────────────────────────────
   const [showDeleted, setShowDeleted] = useState(false);
   const [deletedBookings, setDeletedBookings] = useState<typeof bookings>([]);
@@ -841,7 +844,10 @@ export default function AdminBookings() {
                     { label: "Previous Bookings", items: groupedBookings.previous },
                   ] as const).map((group) => group.items.length > 0 && (
                     <Fragment key={group.label}>
-                      <tr>
+                      <tr
+                        className={group.label === "Previous Bookings" ? "cursor-pointer hover:bg-primary/10 transition-colors" : ""}
+                        onClick={group.label === "Previous Bookings" ? () => setPreviousExpanded((p) => !p) : undefined}
+                      >
                         <td colSpan={9} className="px-4 py-4 bg-primary/5 text-center">
                           <div className="flex items-center justify-center gap-4">
                             <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
@@ -851,11 +857,16 @@ export default function AdminBookings() {
                             <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                               {group.items.length}
                             </span>
+                            {group.label === "Previous Bookings" && (
+                              previousExpanded
+                                ? <ChevronUp className="w-4 h-4 text-primary" />
+                                : <ChevronDown className="w-4 h-4 text-primary" />
+                            )}
                             <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
                           </div>
                         </td>
                       </tr>
-                      {group.items.map((booking) => {
+                      {(group.label !== "Previous Bookings" || previousExpanded) && group.items.map((booking) => {
                     const isExpanded = expandedRow === booking.id;
 
                     return (
@@ -1222,7 +1233,10 @@ export default function AdminBookings() {
               { label: "Previous Bookings", items: groupedBookings.previous },
             ] as const).map((group) => group.items.length > 0 && (
               <Fragment key={`m-${group.label}`}>
-                <div className="flex items-center gap-4 py-3 px-2 my-1 bg-primary/5 rounded-xl">
+                <div
+                  className={`flex items-center gap-4 py-3 px-2 my-1 bg-primary/5 rounded-xl ${group.label === "Previous Bookings" ? "cursor-pointer hover:bg-primary/10 transition-colors" : ""}`}
+                  onClick={group.label === "Previous Bookings" ? () => setPreviousExpanded((p) => !p) : undefined}
+                >
                   <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
                   <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
                     {group.label}
@@ -1230,9 +1244,14 @@ export default function AdminBookings() {
                   <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                     {group.items.length}
                   </span>
+                  {group.label === "Previous Bookings" && (
+                    previousExpanded
+                      ? <ChevronUp className="w-4 h-4 text-primary" />
+                      : <ChevronDown className="w-4 h-4 text-primary" />
+                  )}
                   <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
                 </div>
-                {group.items.map((booking) => {
+                {(group.label !== "Previous Bookings" || previousExpanded) && group.items.map((booking) => {
               const isExpanded = expandedRow === booking.id;
 
               return (
