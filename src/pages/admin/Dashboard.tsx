@@ -614,10 +614,10 @@ export default function Dashboard() {
     });
   }, [bookings]);
 
-  // ── Recent bookings ──
+  // ── Today's bookings (created today) ──
   const recentBookings = [...bookings]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5);
+    .filter((b) => { try { return isToday(new Date(b.createdAt)); } catch { return false; } })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // ── Invoices (completed bookings with clock data) ──
   const allInvoices = useMemo(() => {
@@ -916,12 +916,15 @@ export default function Dashboard() {
       </div>
 
 
-      {/* ── Recent Bookings Table ── */}
+      {/* ── Today's Bookings Table ── */}
       <div className="bg-card rounded-xl border border-border shadow-soft">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h2 className="font-serif text-base font-semibold text-foreground flex items-center gap-2">
             <Activity className="w-4 h-4 text-primary" />
-            Recent Bookings
+            Today's Bookings
+            {recentBookings.length > 0 && (
+              <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary">{recentBookings.length}</span>
+            )}
           </h2>
           <Link
             to="/admin/bookings"
@@ -935,9 +938,9 @@ export default function Dashboard() {
         {recentBookings.length === 0 ? (
           <div className="px-6 py-12 text-center">
             <CalendarDays className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-muted-foreground font-medium">No bookings yet</p>
+            <p className="text-muted-foreground font-medium">No bookings today</p>
             <p className="text-sm text-muted-foreground/70 mt-1">
-              Bookings will appear here once clients start booking.
+              Bookings made today will appear here.
             </p>
           </div>
         ) : (
