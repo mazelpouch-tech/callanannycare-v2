@@ -1058,9 +1058,53 @@ export default function AdminBookings() {
                         {isExpanded && (
                           <tr>
                             <td
-                              colSpan={9}
+                              colSpan={10}
                               className="px-4 py-4 bg-muted/20"
                             >
+                              {/* Quick actions — at top for easy access */}
+                              <div className="flex flex-wrap gap-2 mb-3 pb-3 border-b border-border">
+                                <button
+                                  onClick={() => handleRebook(booking)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 text-xs font-medium hover:bg-purple-100 transition-colors"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" />
+                                  Rebook
+                                </button>
+                                {booking.clientPhone && (
+                                  <button
+                                    onClick={() => whatsAppParent(booking.clientPhone, booking.clientName, booking.date)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
+                                  >
+                                    <MessageCircle className="w-3.5 h-3.5" />
+                                    WhatsApp Parent
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => whatsAppNanny(booking)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                  WhatsApp Nanny
+                                </button>
+                                {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
+                                  <button
+                                    onClick={() => setExtendBooking(booking)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
+                                  >
+                                    <TimerReset className="w-3.5 h-3.5" />
+                                    Extend
+                                  </button>
+                                )}
+                                {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
+                                  <button
+                                    onClick={() => setForwardBooking(booking)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 text-xs font-medium hover:bg-orange-100 transition-colors"
+                                  >
+                                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                                    Forward
+                                  </button>
+                                )}
+                              </div>
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                 <div className="flex items-center gap-2">
                                   <Hotel className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -1185,49 +1229,8 @@ export default function AdminBookings() {
                               {/* Payment Reconciliation */}
                               <PaymentPanel booking={booking} />
 
-                              {/* Quick actions */}
+                              {/* Status actions */}
                               <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border">
-                                <button
-                                  onClick={() => handleRebook(booking)}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 text-xs font-medium hover:bg-purple-100 transition-colors"
-                                >
-                                  <RotateCcw className="w-3.5 h-3.5" />
-                                  Rebook
-                                </button>
-                                {booking.clientPhone && (
-                                  <button
-                                    onClick={() => whatsAppParent(booking.clientPhone, booking.clientName, booking.date)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
-                                  >
-                                    <MessageCircle className="w-3.5 h-3.5" />
-                                    WhatsApp Parent
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => whatsAppNanny(booking)}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
-                                >
-                                  <MessageCircle className="w-3.5 h-3.5" />
-                                  WhatsApp Nanny
-                                </button>
-                                {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
-                                  <button
-                                    onClick={() => setExtendBooking(booking)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
-                                  >
-                                    <TimerReset className="w-3.5 h-3.5" />
-                                    Extend
-                                  </button>
-                                )}
-                                {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
-                                  <button
-                                    onClick={() => setForwardBooking(booking)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 text-xs font-medium hover:bg-orange-100 transition-colors"
-                                  >
-                                    <ArrowRightLeft className="w-3.5 h-3.5" />
-                                    Forward
-                                  </button>
-                                )}
                                 {booking.status === "pending" && (
                                   <button
                                     onClick={() => updateBookingStatus(booking.id, "confirmed")}
@@ -1428,46 +1431,9 @@ export default function AdminBookings() {
 
                     {/* Expanded Details */}
                     {isExpanded && (
-                      <div className="pt-3 border-t border-border grid grid-cols-2 gap-3 text-xs">
-                        <div className="flex items-center gap-1.5">
-                          <Hotel className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                          <div>
-                            <p className="text-muted-foreground">Hotel</p>
-                            <p className="font-medium text-foreground">
-                              {booking.hotel || "N/A"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Baby className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                          <div>
-                            <p className="text-muted-foreground">Children</p>
-                            <p className="font-medium text-foreground">
-                              {booking.childrenCount || "N/A"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="col-span-2">
-                          <p className="text-muted-foreground">Notes</p>
-                          <p className="font-medium text-foreground mt-0.5">
-                            {booking.notes || "None"}
-                          </p>
-                        </div>
-                        <div className="col-span-2 flex items-center gap-1.5">
-                          <p className="text-muted-foreground">Created by</p>
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                            booking.createdBy === 'admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                            booking.createdBy === 'nanny' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                            'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          }`}>
-                            {booking.createdBy === 'admin' ? 'Admin' : booking.createdBy === 'nanny' ? 'Nanny' : 'Parent'}
-                          </span>
-                          {booking.createdByName && (
-                            <span className="text-muted-foreground text-[10px]">{booking.createdByName}</span>
-                          )}
-                        </div>
-                        {/* Actions */}
-                        <div className="col-span-2 flex flex-wrap gap-2 pt-2 border-t border-border">
+                      <div className="pt-3 border-t border-border space-y-3 text-xs">
+                        {/* Quick actions — top */}
+                        <div className="flex flex-wrap gap-2 pb-3 border-b border-border">
                           <button
                             onClick={() => handleRebook(booking)}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 text-xs font-medium hover:bg-purple-100 transition-colors"
@@ -1509,6 +1475,49 @@ export default function AdminBookings() {
                               Forward
                             </button>
                           )}
+                        </div>
+                        {/* Detail fields */}
+                        <div className="grid grid-cols-2 gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <Hotel className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <div>
+                            <p className="text-muted-foreground">Hotel</p>
+                            <p className="font-medium text-foreground">
+                              {booking.hotel || "N/A"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Baby className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <div>
+                            <p className="text-muted-foreground">Children</p>
+                            <p className="font-medium text-foreground">
+                              {booking.childrenCount || "N/A"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-muted-foreground">Notes</p>
+                          <p className="font-medium text-foreground mt-0.5">
+                            {booking.notes || "None"}
+                          </p>
+                        </div>
+                        <div className="col-span-2 flex items-center gap-1.5">
+                          <p className="text-muted-foreground">Created by</p>
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                            booking.createdBy === 'admin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                            booking.createdBy === 'nanny' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                            'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          }`}>
+                            {booking.createdBy === 'admin' ? 'Admin' : booking.createdBy === 'nanny' ? 'Nanny' : 'Parent'}
+                          </span>
+                          {booking.createdByName && (
+                            <span className="text-muted-foreground text-[10px]">{booking.createdByName}</span>
+                          )}
+                        </div>
+                        </div>
+                        {/* Status actions */}
+                        <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
                           {booking.status === "pending" && (
                             <button
                               onClick={() => updateBookingStatus(booking.id, "confirmed")}
