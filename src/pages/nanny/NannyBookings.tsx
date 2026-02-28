@@ -213,6 +213,7 @@ export default function NannyBookings() {
   const [formData, setFormData] = useState<BookingFormData>(emptyForm);
   const [formLoading, setFormLoading] = useState(false);
   const [rebookClientName, setRebookClientName] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const handleRebook = (booking: (typeof nannyBookings)[0]) => {
     setFormData({
@@ -278,6 +279,7 @@ export default function NannyBookings() {
   const handleNewBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.clientName || !formData.startDate || !formData.startTime) return;
+    setFormError(null);
     setFormLoading(true);
 
     // Calculate price (hidden from nanny, stored for admin) — handles overnight
@@ -322,8 +324,8 @@ export default function NannyBookings() {
       setFormData(emptyForm);
       setRebookClientName(null);
       await fetchNannyBookings();
-    } catch {
-      // error handled by context
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to create booking. Please try again.');
     } finally {
       setFormLoading(false);
     }
@@ -350,6 +352,15 @@ export default function NannyBookings() {
     );
     return result;
   }, [nannyBookings, search, statusFilter, sortOrder]);
+
+  const formHours = useMemo(() => {
+    if (!formData.startTime || !formData.endTime) return 0;
+    const [sh, sm] = formData.startTime.split(":").map(Number);
+    const [eh, em] = formData.endTime.split(":").map(Number);
+    const s = sh + sm / 60;
+    const e = eh + em / 60;
+    return e > s ? e - s : (24 - s) + e;
+  }, [formData.startTime, formData.endTime]);
 
   const pendingCount = nannyBookings.filter((b) => b.status === "pending").length;
 
@@ -388,11 +399,28 @@ export default function NannyBookings() {
                   </span>
                 ) : t("nanny.bookings.newBooking")}
               </h2>
-              <button onClick={() => { setShowForm(false); setFormData(emptyForm); setRebookClientName(null); }} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+              <button onClick={() => { setShowForm(false); setFormData(emptyForm); setRebookClientName(null); setFormError(null); }} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleNewBooking} className="p-5 space-y-4">
+              {/* Rebook pre-fill notice */}
+              {rebookClientName && (
+                <div className="flex items-start gap-2.5 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 text-sm text-purple-700">
+                  <RotateCcw className="w-4 h-4 mt-0.5 shrink-0 text-purple-500" />
+                  <span>
+                    <span className="font-semibold">Client details pre-filled</span> — enter a date &amp; start time to continue.
+                  </span>
+                </div>
+              )}
+
+              {/* Error */}
+              {formError && (
+                <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+                  <span className="font-medium">{formError}</span>
+                </div>
+              )}
+
               {/* Client Name */}
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.clientName")} *</label>
@@ -537,18 +565,25 @@ export default function NannyBookings() {
                 />
               </div>
 
+              {/* 3-hour minimum warning */}
+              {formHours > 0 && formHours < 3 && (
+                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700">
+                  <span className="font-medium">⚠ Minimum booking is 3 hours (current: {formHours}h)</span>
+                </div>
+              )}
+
               {/* Submit */}
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => { setShowForm(false); setFormData(emptyForm); setRebookClientName(null); }}
+                  onClick={() => { setShowForm(false); setFormData(emptyForm); setRebookClientName(null); setFormError(null); }}
                   className="flex-1 px-4 py-2.5 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors"
                 >
                   {t("shared.cancel")}
                 </button>
                 <button
                   type="submit"
-                  disabled={formLoading || !formData.clientName || !formData.startDate || !formData.startTime}
+                  disabled={formLoading || !formData.clientName || !formData.startDate || !formData.startTime || (formHours > 0 && formHours < 3)}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 gradient-warm text-white text-sm font-medium rounded-lg shadow-warm hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
                   {formLoading && <Loader2 className="w-4 h-4 animate-spin" />}

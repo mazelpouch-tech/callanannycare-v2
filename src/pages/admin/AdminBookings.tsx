@@ -219,6 +219,7 @@ export default function AdminBookings() {
   const [showNewBooking, setShowNewBooking] = useState(false);
   const [newBookingLoading, setNewBookingLoading] = useState(false);
   const [rebookClientName, setRebookClientName] = useState<string | null>(null);
+  const [newBookingError, setNewBookingError] = useState<string | null>(null);
 
   const handleRebook = (booking: Booking) => {
     setNewBooking({
@@ -461,6 +462,7 @@ export default function AdminBookings() {
   const handleNewBookingSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedNanny || !newBooking.date || !newBooking.clientName) return;
+    setNewBookingError(null);
     setNewBookingLoading(true);
 
     const startLabel = TIME_SLOTS.find((s) => s.value === newBooking.startTime)?.label || newBooking.startTime;
@@ -507,6 +509,7 @@ export default function AdminBookings() {
       });
     } catch (err) {
       console.error('Booking creation failed:', err);
+      setNewBookingError(err instanceof Error ? err.message : 'Failed to create booking. Please try again.');
     } finally {
       setNewBookingLoading(false);
     }
@@ -1626,7 +1629,7 @@ export default function AdminBookings() {
                 ) : "New Booking"}
               </h2>
               <button
-                onClick={() => { setShowNewBooking(false); setRebookClientName(null); }}
+                onClick={() => { setShowNewBooking(false); setRebookClientName(null); setNewBookingError(null); }}
                 className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"
               >
                 <X className="w-5 h-5" />
@@ -1634,6 +1637,25 @@ export default function AdminBookings() {
             </div>
 
             <form onSubmit={handleNewBookingSubmit} className="space-y-5">
+              {/* Rebook pre-fill notice */}
+              {rebookClientName && (
+                <div className="flex items-start gap-2.5 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 text-sm text-purple-700">
+                  <RotateCcw className="w-4 h-4 mt-0.5 shrink-0 text-purple-500" />
+                  <span>
+                    <span className="font-semibold">Client details pre-filled</span> from previous booking —{" "}
+                    <span className="font-medium">select a date &amp; time</span> to create the new booking.
+                  </span>
+                </div>
+              )}
+
+              {/* API / validation error */}
+              {newBookingError && (
+                <div className="flex items-start gap-2.5 bg-destructive/10 border border-destructive/30 rounded-xl px-4 py-3 text-sm text-destructive">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>{newBookingError}</span>
+                </div>
+              )}
+
               {/* Nanny Selection */}
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
@@ -1878,8 +1900,16 @@ export default function AdminBookings() {
                 </div>
               )}
 
+              {/* 3-hour minimum warning */}
+              {newBookingHours > 0 && newBookingHours < 3 && (
+                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  Minimum booking duration is 3 hours (current: {newBookingHours}h)
+                </div>
+              )}
+
               {/* Price Summary */}
-              {selectedNanny && newBookingHours > 0 && (
+              {selectedNanny && newBookingHours >= 3 && (
                 <div className="bg-muted/50 rounded-xl p-4 flex items-center justify-between">
                   <div className="text-sm text-muted-foreground">
                     <span className="font-medium text-foreground">{selectedNanny.name}</span>
@@ -1897,14 +1927,14 @@ export default function AdminBookings() {
               <div className="flex items-center gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowNewBooking(false)}
+                  onClick={() => { setShowNewBooking(false); setRebookClientName(null); setNewBookingError(null); }}
                   className="flex-1 px-4 py-3 border border-border rounded-xl text-sm font-medium text-foreground hover:bg-muted transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={newBookingLoading || !newBooking.nannyId || !newBooking.date || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime || conflicts.length > 0}
+                  disabled={newBookingLoading || !newBooking.nannyId || !newBooking.date || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime || conflicts.length > 0 || (newBookingHours > 0 && newBookingHours < 3)}
                   className="flex-1 gradient-warm text-white rounded-xl px-4 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {newBookingLoading ? (
