@@ -521,22 +521,77 @@ export default function AdminBookings() {
     }
   };
 
-  // WhatsApp helpers
-  const whatsAppParent = (phone: string, clientName: string, date: string) => {
-    const text = encodeURIComponent(
-      `Hi ${clientName}, this is call a nanny. Regarding your booking on ${date} — `
-    );
-    window.open(`https://wa.me/${phone?.replace(/\D/g, "")}?text=${text}`, "_blank");
+  // ── WhatsApp template modal ────────────────────────────────────
+  const [waModal, setWaModal] = useState<{ booking: Booking; target: "parent" | "nanny" } | null>(null);
+
+  const openWAModal = (booking: Booking, target: "parent" | "nanny") => {
+    setWaModal({ booking, target });
   };
 
-  const whatsAppNanny = (booking: Booking) => {
-    const nanny = nannies.find((n) => n.id === booking.nannyId);
-    if (!nanny?.email) return;
-    // We don't have nanny phone, so use the booking info
-    const text = encodeURIComponent(
-      `Hi ${nanny.name}, you have a booking with ${booking.clientName} on ${booking.date} at ${booking.hotel || "TBD"}. `
-    );
-    window.open(`https://wa.me/?text=${text}`, "_blank");
+  const sendWA = (phone: string | undefined, message: string) => {
+    const clean = phone?.replace(/\D/g, "") || "";
+    const url = clean
+      ? `https://wa.me/${clean}?text=${encodeURIComponent(message)}`
+      : `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank");
+    setWaModal(null);
+  };
+
+  const buildParentTemplates = (b: Booking) => {
+    const time = b.startTime && b.endTime ? `${b.startTime}–${b.endTime}` : b.startTime || "";
+    const loc = b.hotel || "your location";
+    const price = b.totalPrice ? `${b.totalPrice}€` : "";
+    return [
+      {
+        emoji: "✅", label: "Confirmation",
+        message: `Hi ${b.clientName}! Your booking with Call a Nanny is confirmed ✅\n📅 Date: ${b.date}\n🕐 Time: ${time}\n📍 ${loc}\n👶 Nanny: ${b.nannyName || "TBA"}\nSee you soon! 🤗`,
+      },
+      {
+        emoji: "🔔", label: "Reminder",
+        message: `Hi ${b.clientName}! Just a reminder that your nanny booking is tomorrow 🗓️\n📅 ${b.date} · ${time}\n👶 ${b.nannyName || "your nanny"} will be at ${loc}\nSee you then!`,
+      },
+      {
+        emoji: "💰", label: "Payment Due",
+        message: `Hi ${b.clientName}! Your session on ${b.date} (${time}) is now complete 🎉\n💶 Amount due: ${price}\nPlease arrange payment at your earliest convenience. Thank you! 🙏`,
+      },
+      {
+        emoji: "🕐", label: "Running Late",
+        message: `Hi ${b.clientName}! We wanted to let you know that ${b.nannyName || "your nanny"} is running a few minutes late today. She will arrive shortly — sorry for the wait! 🙏`,
+      },
+      {
+        emoji: "❌", label: "Cancellation",
+        message: `Hi ${b.clientName}, unfortunately your booking on ${b.date} (${time}) has been cancelled. We're sorry for the inconvenience — please contact us to reschedule. 🙏`,
+      },
+    ];
+  };
+
+  const buildNannyTemplates = (b: Booking) => {
+    const time = b.startTime && b.endTime ? `${b.startTime}–${b.endTime}` : b.startTime || "";
+    const loc = b.hotel || "client location";
+    const nanny = nannies.find((n) => n.id === b.nannyId);
+    const nannyName = nanny?.name || b.nannyName || "there";
+    const nannyPhone = nanny?.phone || "";
+    return {
+      phone: nannyPhone,
+      templates: [
+        {
+          emoji: "📋", label: "New Assignment",
+          message: `Hi ${nannyName}! You have a new booking 🎉\n📅 Date: ${b.date}\n🕐 Time: ${time}\n📍 ${loc}\n👤 Client: ${b.clientName}\n👶 Children: ${b.numChildren || 1}\nPlease confirm your availability ✅`,
+        },
+        {
+          emoji: "🔔", label: "Tomorrow Reminder",
+          message: `Hi ${nannyName}! Just a reminder — you have a booking tomorrow 📅\n📅 ${b.date} · ${time}\n📍 ${loc}\n👤 ${b.clientName}\nDon't forget! See you there 💪`,
+        },
+        {
+          emoji: "✅", label: "Booking Confirmed",
+          message: `Hi ${nannyName}! Your booking for ${b.date} (${time}) with ${b.clientName} at ${loc} is officially confirmed ✅. Thank you!`,
+        },
+        {
+          emoji: "💰", label: "Payout Ready",
+          message: `Hi ${nannyName}! Your payout for the session on ${b.date} (${time}) has been processed. Please check your payment details. Thank you! 🙏`,
+        },
+      ],
+    };
   };
 
   // Conflict detection
@@ -760,6 +815,43 @@ export default function AdminBookings() {
       setDeletedBookings((prev) => prev.filter((b) => b.id !== id));
     } finally {
       setRestoring(null);
+    }
+  };
+  // ─────────────────────────────────────────────────────────────
+
+  // ── Bulk selection ───────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredBookings.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredBookings.map((b) => b.id)));
+    }
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const [bulkLoading, setBulkLoading] = useState<string | null>(null);
+
+  const handleBulkAction = async (action: "confirmed" | "completed" | "cancelled") => {
+    if (selectedIds.size === 0) return;
+    setBulkLoading(action);
+    try {
+      await Promise.all(
+        [...selectedIds].map((id) => updateBookingStatus(id, action))
+      );
+      clearSelection();
+    } finally {
+      setBulkLoading(null);
     }
   };
   // ─────────────────────────────────────────────────────────────
@@ -1082,6 +1174,16 @@ export default function AdminBookings() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
+                    {/* Select-all checkbox */}
+                    <th className="pl-4 pr-2 py-3 w-8">
+                      <input
+                        type="checkbox"
+                        className="rounded border-border accent-primary cursor-pointer"
+                        checked={filteredBookings.length > 0 && selectedIds.size === filteredBookings.length}
+                        onChange={toggleSelectAll}
+                        title="Select all"
+                      />
+                    </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Client
                     </th>
@@ -1121,7 +1223,7 @@ export default function AdminBookings() {
                         className={group.collapsible ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}
                         onClick={group.collapsible ? () => togglePrevSection(group.key) : undefined}
                       >
-                        <td colSpan={9} className={`px-4 py-4 ${group.bgColor} text-center`}>
+                        <td colSpan={11} className={`px-4 py-4 ${group.bgColor} text-center`}>
                           <div className="flex items-center justify-center gap-4">
                             <div className={`flex-1 h-0.5 ${group.lineColor} rounded-full`} />
                             <span className={`text-sm font-bold ${group.textColor} whitespace-nowrap uppercase tracking-wide`}>
@@ -1146,9 +1248,18 @@ export default function AdminBookings() {
                       <Fragment key={booking.id}>
                         <tr
                           id={`booking-row-${booking.id}`}
-                          className={`hover:bg-muted/30 transition-colors cursor-pointer border-l-4 ${rowBorderColor(booking.status)}`}
+                          className={`hover:bg-muted/30 transition-colors cursor-pointer border-l-4 ${rowBorderColor(booking.status)} ${selectedIds.has(booking.id) ? "bg-primary/5" : ""}`}
                           onClick={() => toggleExpand(booking.id)}
                         >
+                          {/* Row checkbox */}
+                          <td className="pl-4 pr-2 py-3.5" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              className="rounded border-border accent-primary cursor-pointer"
+                              checked={selectedIds.has(booking.id)}
+                              onChange={() => toggleSelect(booking.id)}
+                            />
+                          </td>
                           <td className="px-4 py-3.5 text-sm font-medium text-foreground">
                             {booking.clientName || "N/A"}
                           </td>
@@ -1260,7 +1371,7 @@ export default function AdminBookings() {
                         {isExpanded && (
                           <tr>
                             <td
-                              colSpan={10}
+                              colSpan={11}
                               className="px-4 py-4 bg-muted/20"
                             >
                               {/* Quick actions — at top for easy access */}
@@ -1274,7 +1385,7 @@ export default function AdminBookings() {
                                 </button>
                                 {booking.clientPhone && (
                                   <button
-                                    onClick={() => whatsAppParent(booking.clientPhone, booking.clientName, booking.date)}
+                                    onClick={() => openWAModal(booking, "parent")}
                                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
                                   >
                                     <MessageCircle className="w-3.5 h-3.5" />
@@ -1282,7 +1393,7 @@ export default function AdminBookings() {
                                   </button>
                                 )}
                                 <button
-                                  onClick={() => whatsAppNanny(booking)}
+                                  onClick={() => openWAModal(booking, "nanny")}
                                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
                                 >
                                   <MessageCircle className="w-3.5 h-3.5" />
@@ -1642,7 +1753,7 @@ export default function AdminBookings() {
                           </button>
                           {booking.clientPhone && (
                             <button
-                              onClick={() => whatsAppParent(booking.clientPhone, booking.clientName, booking.date)}
+                              onClick={() => openWAModal(booking, "parent")}
                               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
                             >
                               <MessageCircle className="w-3.5 h-3.5" />
@@ -1650,7 +1761,7 @@ export default function AdminBookings() {
                             </button>
                           )}
                           <button
-                            onClick={() => whatsAppNanny(booking)}
+                            onClick={() => openWAModal(booking, "nanny")}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
                           >
                             <MessageCircle className="w-3.5 h-3.5" />
@@ -2659,6 +2770,127 @@ export default function AdminBookings() {
           </div>
         </div>
       )}
+
+      {/* ── Bulk Action Floating Bar ── */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 bg-card border border-border rounded-2xl shadow-xl backdrop-blur-sm animate-in slide-in-from-bottom-4 duration-200">
+          <span className="text-sm font-semibold text-foreground pr-2 border-r border-border">
+            {selectedIds.size} selected
+          </span>
+          <button
+            onClick={() => handleBulkAction("confirmed")}
+            disabled={!!bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-green-500 text-white hover:bg-green-600 transition-colors disabled:opacity-50"
+          >
+            {bulkLoading === "confirmed" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+            Confirm All
+          </button>
+          <button
+            onClick={() => handleBulkAction("completed")}
+            disabled={!!bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-500 text-white hover:bg-blue-600 transition-colors disabled:opacity-50"
+          >
+            {bulkLoading === "completed" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+            Complete All
+          </button>
+          <button
+            onClick={() => handleBulkAction("cancelled")}
+            disabled={!!bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50"
+          >
+            {bulkLoading === "cancelled" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+            Cancel All
+          </button>
+          <button
+            onClick={clearSelection}
+            className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Clear selection"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* ── WhatsApp Template Picker ── */}
+      {waModal && (() => {
+        const { booking: b, target } = waModal;
+        const isParent = target === "parent";
+        const parentTemplates = buildParentTemplates(b);
+        const nannyData = buildNannyTemplates(b);
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setWaModal(null)}>
+            <div className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-green-500 flex items-center justify-center">
+                    <MessageCircle className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm text-foreground">
+                      WhatsApp {isParent ? "Parent" : "Nanny"}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate max-w-[180px]">
+                      {isParent ? (b.clientName || "Client") : (b.nannyName || "Nanny")}
+                      {" · "}{b.date}
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setWaModal(null)} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+                  <X className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </div>
+
+              {/* Templates */}
+              <div className="p-4 space-y-2">
+                <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide mb-3">
+                  Choose a message template
+                </p>
+                {isParent
+                  ? parentTemplates.map((t) => (
+                      <button
+                        key={t.label}
+                        onClick={() => sendWA(b.clientPhone, t.message)}
+                        className="w-full text-left px-4 py-3 rounded-xl border border-border hover:border-green-300 hover:bg-green-50 transition-all group"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-lg">{t.emoji}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-foreground group-hover:text-green-700">{t.label}</p>
+                            <p className="text-[11px] text-muted-foreground truncate">{t.message.split("\n")[0]}</p>
+                          </div>
+                          <MessageCircle className="w-3.5 h-3.5 text-green-500 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </button>
+                    ))
+                  : nannyData.templates.map((t) => (
+                      <button
+                        key={t.label}
+                        onClick={() => sendWA(nannyData.phone, t.message)}
+                        className="w-full text-left px-4 py-3 rounded-xl border border-border hover:border-blue-300 hover:bg-blue-50 transition-all group"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-lg">{t.emoji}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-foreground group-hover:text-blue-700">{t.label}</p>
+                            <p className="text-[11px] text-muted-foreground truncate">{t.message.split("\n")[0]}</p>
+                          </div>
+                          <MessageCircle className="w-3.5 h-3.5 text-blue-500 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </button>
+                    ))
+                }
+                {!isParent && !nannyData.phone && (
+                  <p className="text-[11px] text-amber-600 bg-amber-50 px-3 py-2 rounded-lg mt-1">
+                    ⚠️ No phone saved for this nanny — opens WhatsApp share
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   CalendarDays, Clock, DollarSign,
   ArrowUpRight, ArrowDownRight, Timer,
   Activity, ArrowRight, Eye, AlertTriangle,
+  Banknote, CheckCircle2,
 } from "lucide-react";
 import {
   format, parseISO, subMonths, startOfMonth, endOfMonth,
@@ -291,10 +292,17 @@ export default function Dashboard() {
   const todaysBookings = bookings.filter((b) => { try { return isToday(parseISO(b.date)); } catch { return false; } });
   const todaysBookingsCount = todaysBookings.length;
 
-  // Bookings created today (for the table)
-  const recentBookings = [...bookings]
-    .filter((b) => { try { return isToday(new Date(b.createdAt)); } catch { return false; } })
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  // Bookings SCHEDULED for today, sorted by start time
+  const recentBookings = [...todaysBookings]
+    .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
+
+  // Amount to collect today = confirmed/completed bookings today not yet collected
+  const toCollectToday = todaysBookings
+    .filter((b) => (b.status === "confirmed" || b.status === "completed") && !b.collectedAt)
+    .reduce((s, b) => s + (b.totalPrice || 0), 0);
+  const toCollectTodayCount = todaysBookings.filter(
+    (b) => (b.status === "confirmed" || b.status === "completed") && !b.collectedAt
+  ).length;
 
   const formatDate = (dateStr: string) => {
     try { return format(parseISO(dateStr), "MMM dd, yyyy"); } catch { return dateStr || "N/A"; }
@@ -392,30 +400,43 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {/* ── Today's Bookings ── */}
-      <div className="bg-card rounded-xl border border-border shadow-soft">
+      {/* ── Today's Schedule ── */}
+      <div className="bg-card rounded-xl border border-border shadow-soft overflow-hidden">
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h2 className="font-serif text-base font-semibold text-foreground flex items-center gap-2">
             <Activity className="w-4 h-4 text-primary" />
-            Today's Bookings
+            Today's Schedule
             {recentBookings.length > 0 && (
               <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary">{recentBookings.length}</span>
             )}
           </h2>
-          <Link
-            to="/admin/bookings"
-            className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
-          >
-            View All
-            <ArrowRight className="w-3.5 h-3.5" />
+          <Link to="/admin/bookings" className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors">
+            View All <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
+
+        {/* To Collect Today banner */}
+        {toCollectTodayCount > 0 && (
+          <div className="flex items-center justify-between gap-4 px-6 py-3 bg-green-50 border-b border-green-100">
+            <div className="flex items-center gap-2.5">
+              <Banknote className="w-4 h-4 text-green-700 shrink-0" />
+              <span className="text-sm font-semibold text-green-800">
+                To collect today: {toCollectToday.toLocaleString()}€
+                <span className="ml-1 text-xs font-normal text-green-600">({toDH(toCollectToday).toLocaleString()} DH)</span>
+              </span>
+            </div>
+            <span className="text-xs text-green-700 bg-green-100 px-2.5 py-1 rounded-full font-medium">
+              {toCollectTodayCount} booking{toCollectTodayCount !== 1 ? "s" : ""}
+            </span>
+          </div>
+        )}
 
         {recentBookings.length === 0 ? (
           <div className="px-6 py-12 text-center">
             <CalendarDays className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-muted-foreground font-medium">No bookings today</p>
-            <p className="text-sm text-muted-foreground/70 mt-1">Bookings made today will appear here.</p>
+            <p className="text-muted-foreground font-medium">No bookings scheduled today</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">Today's appointments will appear here sorted by start time.</p>
           </div>
         ) : (
           <>
@@ -426,108 +447,125 @@ export default function Dashboard() {
                   <tr className="border-b border-border">
                     <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Client</th>
                     <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nanny</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Time</th>
                     <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</th>
                     <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
                     <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {recentBookings.map((booking) => (
-                    <tr key={booking.id} className="hover:bg-muted/50 transition-colors">
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-foreground">{booking.clientName || "N/A"}</p>
-                        <p className="text-xs text-muted-foreground">{booking.clientEmail || ""}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        {booking.nannyName ? (
-                          <div className="flex items-center gap-2">
-                            {booking.nannyImage ? (
-                              <img src={booking.nannyImage} alt={booking.nannyName} className="w-7 h-7 rounded-full object-cover border border-border" />
-                            ) : (
-                              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                                {booking.nannyName.charAt(0)}
-                              </div>
-                            )}
-                            <span className="text-sm font-medium text-foreground">{booking.nannyName}</span>
+                  {recentBookings.map((booking) => {
+                    const collected = !!booking.collectedAt;
+                    return (
+                      <tr key={booking.id} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <p className="text-sm font-medium text-foreground">{booking.clientName || "N/A"}</p>
+                          <p className="text-xs text-muted-foreground">{booking.clientEmail || ""}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          {booking.nannyName ? (
+                            <div className="flex items-center gap-2">
+                              {booking.nannyImage ? (
+                                <img src={booking.nannyImage} alt={booking.nannyName} className="w-7 h-7 rounded-full object-cover border border-border" />
+                              ) : (
+                                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                                  {booking.nannyName.charAt(0)}
+                                </div>
+                              )}
+                              <span className="text-sm font-medium text-foreground">{booking.nannyName}</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground italic">Unassigned</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                            <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                            {booking.startTime || "—"}{booking.endTime ? `–${booking.endTime}` : ""}
                           </div>
-                        ) : (
-                          <span className="text-sm text-muted-foreground italic">Unassigned</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(booking.date)}</td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()}€</div>
-                        <div className="text-[10px] text-muted-foreground">{toDH(booking.totalPrice || 0).toLocaleString()} DH</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <DashboardUrgencyBadge booking={booking} />
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {booking.status === "pending" && (
-                            <button onClick={() => updateBookingStatus(booking.id, "confirmed")} className="text-xs font-medium text-accent hover:text-accent/80 bg-accent/10 px-3 py-1.5 rounded-lg transition-colors">
-                              Confirm
-                            </button>
-                          )}
-                          {booking.status === "confirmed" && (
-                            <button onClick={() => updateBookingStatus(booking.id, "completed")} className="text-xs font-medium text-blue-700 hover:text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
-                              Complete
-                            </button>
-                          )}
-                          <Link to="/admin/bookings" className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-                            <Eye className="w-4 h-4" />
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                          {booking.hotel && <div className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[140px]">📍 {booking.hotel}</div>}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()}€</div>
+                          <div className="text-[10px] text-muted-foreground">{toDH(booking.totalPrice || 0).toLocaleString()} DH</div>
+                          {collected && <div className="flex items-center gap-1 text-[10px] text-green-600 mt-0.5"><CheckCircle2 className="w-3 h-3" /> Collected</div>}
+                        </td>
+                        <td className="px-6 py-4">
+                          <DashboardUrgencyBadge booking={booking} />
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {booking.status === "pending" && (
+                              <button onClick={() => updateBookingStatus(booking.id, "confirmed")} className="text-xs font-medium text-accent hover:text-accent/80 bg-accent/10 px-3 py-1.5 rounded-lg transition-colors">
+                                Confirm
+                              </button>
+                            )}
+                            {booking.status === "confirmed" && (
+                              <button onClick={() => updateBookingStatus(booking.id, "completed")} className="text-xs font-medium text-blue-700 hover:text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
+                                Complete
+                              </button>
+                            )}
+                            <Link to="/admin/bookings" className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                              <Eye className="w-4 h-4" />
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
             {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-border">
-              {recentBookings.map((booking) => (
-                <div key={booking.id} className="px-5 py-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium text-foreground text-sm">{booking.clientName || "N/A"}</p>
-                    <DashboardUrgencyBadge booking={booking} />
+              {recentBookings.map((booking) => {
+                const collected = !!booking.collectedAt;
+                return (
+                  <div key={booking.id} className="px-5 py-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium text-foreground text-sm truncate">{booking.clientName || "N/A"}</p>
+                      <DashboardUrgencyBadge booking={booking} />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      {booking.nannyName ? (
+                        <div className="flex items-center gap-1">
+                          {booking.nannyImage ? (
+                            <img src={booking.nannyImage} alt={booking.nannyName} className="w-4 h-4 rounded-full object-cover border border-border" />
+                          ) : (
+                            <div className="w-4 h-4 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-bold text-primary">
+                              {booking.nannyName.charAt(0)}
+                            </div>
+                          )}
+                          <span className="font-medium text-foreground">{booking.nannyName}</span>
+                        </div>
+                      ) : (
+                        <span className="italic">Unassigned</span>
+                      )}
+                      <span>·</span>
+                      <span className="flex items-center gap-0.5">
+                        <Clock className="w-3 h-3" />
+                        {booking.startTime || "—"}{booking.endTime ? `–${booking.endTime}` : ""}
+                      </span>
+                      <span>·</span>
+                      <span className="font-semibold text-foreground">{(booking.totalPrice || 0).toLocaleString()}€</span>
+                      {collected && <span className="text-green-600 flex items-center gap-0.5"><CheckCircle2 className="w-3 h-3" />Collected</span>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {booking.status === "pending" && (
+                        <button onClick={() => updateBookingStatus(booking.id, "confirmed")} className="text-xs font-medium text-accent bg-accent/10 px-3 py-1.5 rounded-lg">
+                          Confirm
+                        </button>
+                      )}
+                      {booking.status === "confirmed" && (
+                        <button onClick={() => updateBookingStatus(booking.id, "completed")} className="text-xs font-medium text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg">
+                          Complete
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    {booking.nannyName ? (
-                      <div className="flex items-center gap-1.5">
-                        {booking.nannyImage ? (
-                          <img src={booking.nannyImage} alt={booking.nannyName} className="w-5 h-5 rounded-full object-cover border border-border" />
-                        ) : (
-                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
-                            {booking.nannyName.charAt(0)}
-                          </div>
-                        )}
-                        <span className="font-medium text-foreground">{booking.nannyName}</span>
-                      </div>
-                    ) : (
-                      <span className="italic">Unassigned</span>
-                    )}
-                    <span>·</span>
-                    <span>{formatDate(booking.date)}</span>
-                    <span>·</span>
-                    <span className="font-medium text-foreground">{(booking.totalPrice || 0).toLocaleString()}€</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {booking.status === "pending" && (
-                      <button onClick={() => updateBookingStatus(booking.id, "confirmed")} className="text-xs font-medium text-accent bg-accent/10 px-3 py-1.5 rounded-lg">
-                        Confirm
-                      </button>
-                    )}
-                    {booking.status === "confirmed" && (
-                      <button onClick={() => updateBookingStatus(booking.id, "completed")} className="text-xs font-medium text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg">
-                        Complete
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
