@@ -170,6 +170,8 @@ export default function AdminBookings() {
   });
   const [nannyFilter, setNannyFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [expandedRow, setExpandedRow] = useState<number | string | null>(() => {
     const bookingParam = searchParams.get("booking");
     return bookingParam ? Number(bookingParam) : null;
@@ -620,6 +622,15 @@ export default function AdminBookings() {
     });
   }, [allActiveNannies, newBooking.nannyId, newBooking.date, newBooking.startTime, newBooking.endTime, conflicts.length, bookings]);
 
+  // Availability map: per nanny, whether they're free for the selected slot
+  const nannyAvailabilityMap = useMemo(() => {
+    if (!newBooking.date || !newBooking.startTime) return null;
+    return allActiveNannies.map((n) => ({
+      nanny: n,
+      busy: getConflicts(String(n.id), newBooking.date, newBooking.startTime, newBooking.endTime).length > 0,
+    }));
+  }, [allActiveNannies, newBooking.date, newBooking.startTime, newBooking.endTime, bookings]);
+
   // Unique nanny names for filter dropdown
   const uniqueNannyNames = useMemo(() => {
     const names = new Set<string>();
@@ -683,6 +694,10 @@ export default function AdminBookings() {
       result = result.filter((b) => b.nannyName === nannyFilter);
     }
 
+    // Date range filter
+    if (dateFrom) result = result.filter((b) => b.date >= dateFrom);
+    if (dateTo)   result = result.filter((b) => b.date <= dateTo);
+
     // Sort
     result.sort((a, b) => {
       const dateA = new Date(a.createdAt || a.date);
@@ -691,7 +706,7 @@ export default function AdminBookings() {
     });
 
     return result;
-  }, [bookings, search, statusFilter, nannyFilter, sortOrder]);
+  }, [bookings, search, statusFilter, nannyFilter, sortOrder, dateFrom, dateTo]);
 
   // Split bookings into grouped sections: today / tomorrow / prev by status
   const groupedBookings = useMemo(() => {
@@ -817,6 +832,24 @@ export default function AdminBookings() {
       setRestoring(null);
     }
   };
+  // ─────────────────────────────────────────────────────────────
+
+  // ── Client History Panel ─────────────────────────────────────
+  const [clientHistory, setClientHistory] = useState<string | null>(null);
+
+  const clientHistoryBookings = useMemo(() => {
+    if (!clientHistory) return [];
+    return [...bookings]
+      .filter((b) => (b.clientName || "").toLowerCase() === clientHistory.toLowerCase())
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [bookings, clientHistory]);
+
+  const clientHistoryStats = useMemo(() => {
+    const total = clientHistoryBookings.reduce((s, b) => s + (b.totalPrice || 0), 0);
+    const confirmed = clientHistoryBookings.filter((b) => b.status === "confirmed" || b.status === "completed").length;
+    const lastBooking = clientHistoryBookings[0];
+    return { total, confirmed, count: clientHistoryBookings.length, lastBooking };
+  }, [clientHistoryBookings]);
   // ─────────────────────────────────────────────────────────────
 
   // ── Bulk selection ───────────────────────────────────────────
@@ -968,7 +1001,7 @@ export default function AdminBookings() {
 
       {/* Filter Bar */}
       <div className="bg-card rounded-xl border border-border p-4 shadow-soft">
-        <div className="flex flex-col md:flex-row gap-3">
+        <div className="flex flex-col md:flex-row gap-3 flex-wrap">
           {/* Search */}
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -1029,6 +1062,37 @@ export default function AdminBookings() {
             </select>
             <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           </div>
+        </div>
+
+        {/* Date range row */}
+        <div className="flex flex-col sm:flex-row gap-3 mt-3 pt-3 border-t border-border/60">
+          <div className="flex items-center gap-2 flex-1">
+            <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">From</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="flex-1 px-3 py-2 bg-background border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+            />
+          </div>
+          <div className="flex items-center gap-2 flex-1">
+            <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">To</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              min={dateFrom || undefined}
+              className="flex-1 px-3 py-2 bg-background border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+            />
+          </div>
+          {(dateFrom || dateTo) && (
+            <button
+              onClick={() => { setDateFrom(""); setDateTo(""); }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <X className="w-3.5 h-3.5" /> Clear dates
+            </button>
+          )}
         </div>
       </div>
 
@@ -1260,8 +1324,14 @@ export default function AdminBookings() {
                               onChange={() => toggleSelect(booking.id)}
                             />
                           </td>
-                          <td className="px-4 py-3.5 text-sm font-medium text-foreground">
-                            {booking.clientName || "N/A"}
+                          <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => setClientHistory(booking.clientName)}
+                              className="text-sm font-medium text-foreground hover:text-primary hover:underline text-left transition-colors"
+                              title="View client history"
+                            >
+                              {booking.clientName || "N/A"}
+                            </button>
                           </td>
                           <td className="px-4 py-3.5">
                             <div className="text-sm text-foreground">{booking.clientEmail || "—"}</div>
@@ -1979,19 +2049,54 @@ export default function AdminBookings() {
                   <User className="w-3.5 h-3.5 text-muted-foreground" />
                   Select Nanny <span className="text-destructive">*</span>
                 </label>
-                <select
-                  value={newBooking.nannyId}
-                  onChange={(e) => setNewBooking({ ...newBooking, nannyId: e.target.value })}
-                  required
-                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
-                >
-                  <option value="">Choose a nanny...</option>
-                  {availableNannies.map((n) => (
-                    <option key={n.id} value={n.id}>
-                      {n.name} — {n.rate}€/hr ({n.location})
-                    </option>
-                  ))}
-                </select>
+                {/* Visual availability grid when date + time are set */}
+                {nannyAvailabilityMap ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {nannyAvailabilityMap.map(({ nanny: n, busy }) => {
+                      const selected = String(n.id) === newBooking.nannyId;
+                      return (
+                        <button
+                          key={n.id}
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setNewBooking({ ...newBooking, nannyId: String(n.id) })}
+                          className={`flex flex-col items-start p-3 rounded-xl border-2 text-left transition-all ${
+                            selected
+                              ? "border-primary bg-primary/10 shadow-sm"
+                              : busy
+                              ? "border-border bg-muted/40 opacity-50 cursor-not-allowed"
+                              : "border-border bg-background hover:border-green-400 hover:bg-green-50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 w-full mb-1">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${selected ? "bg-primary" : busy ? "bg-red-400" : "bg-green-400"}`} />
+                            <span className="text-xs font-semibold text-foreground truncate flex-1">{n.name}</span>
+                          </div>
+                          <span className="text-[11px] text-muted-foreground">{n.rate}€/hr</span>
+                          <span className="text-[10px] text-muted-foreground truncate w-full">{n.location}</span>
+                          <span className={`text-[10px] font-medium mt-1 ${selected ? "text-primary" : busy ? "text-red-500" : "text-green-600"}`}>
+                            {selected ? "Selected" : busy ? "Busy" : "Free"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* Fallback dropdown when no date/time selected yet */
+                  <select
+                    value={newBooking.nannyId}
+                    onChange={(e) => setNewBooking({ ...newBooking, nannyId: e.target.value })}
+                    required
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  >
+                    <option value="">Select date & time first to see availability...</option>
+                    {availableNannies.map((n) => (
+                      <option key={n.id} value={n.id}>
+                        {n.name} — {n.rate}€/hr ({n.location})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Client Info Row */}
@@ -2769,6 +2874,103 @@ export default function AdminBookings() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Client History Panel ── */}
+      {clientHistory && (
+        <>
+          {/* Backdrop */}
+          <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" onClick={() => setClientHistory(null)} />
+          {/* Slide-in panel */}
+          <div className="fixed right-0 top-0 h-full z-50 w-full max-w-md bg-card border-l border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-border">
+              <div>
+                <h2 className="font-serif text-lg font-bold text-foreground">{clientHistory}</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Client history</p>
+              </div>
+              <button onClick={() => setClientHistory(null)} className="p-2 rounded-xl hover:bg-muted transition-colors">
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+
+            {/* Stats bar */}
+            <div className="grid grid-cols-3 divide-x divide-border border-b border-border">
+              {[
+                { label: "Total bookings", value: clientHistoryStats.count },
+                { label: "Completed", value: clientHistoryStats.confirmed },
+                { label: "Total spent", value: `${clientHistoryStats.total}€` },
+              ].map((s) => (
+                <div key={s.label} className="px-4 py-3 text-center">
+                  <p className="text-lg font-bold text-foreground">{s.value}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Contact info from last booking */}
+            {clientHistoryStats.lastBooking && (
+              <div className="flex items-center gap-4 px-6 py-3 bg-muted/40 border-b border-border text-xs text-muted-foreground">
+                {clientHistoryStats.lastBooking.clientEmail && (
+                  <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5" />{clientHistoryStats.lastBooking.clientEmail}</span>
+                )}
+                {clientHistoryStats.lastBooking.clientPhone && (
+                  <span className="flex items-center gap-1"><Phone className="w-3.5 h-3.5" />{clientHistoryStats.lastBooking.clientPhone}</span>
+                )}
+              </div>
+            )}
+
+            {/* Booking list */}
+            <div className="flex-1 overflow-y-auto divide-y divide-border">
+              {clientHistoryBookings.length === 0 ? (
+                <div className="px-6 py-12 text-center text-muted-foreground text-sm">No bookings found</div>
+              ) : (
+                clientHistoryBookings.map((b) => {
+                  const statusColors: Record<string, string> = {
+                    pending: "bg-orange-100 text-orange-700",
+                    confirmed: "bg-green-100 text-green-700",
+                    completed: "bg-blue-100 text-blue-700",
+                    cancelled: "bg-gray-100 text-gray-500",
+                  };
+                  return (
+                    <div key={b.id} className="px-6 py-4 hover:bg-muted/30 transition-colors">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-semibold text-foreground">{b.date}</span>
+                            {b.startTime && (
+                              <span className="text-xs text-muted-foreground">{b.startTime}{b.endTime ? `–${b.endTime}` : ""}</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            👶 {b.nannyName || "Unassigned"} · {b.hotel || "No location"}
+                          </p>
+                          {b.numChildren && (
+                            <p className="text-xs text-muted-foreground">{b.numChildren} child{b.numChildren !== 1 ? "ren" : ""}</p>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize ${statusColors[b.status] || statusColors.pending}`}>
+                            {b.status}
+                          </span>
+                          {b.totalPrice && (
+                            <span className="text-sm font-bold text-foreground">{b.totalPrice}€</span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => { setClientHistory(null); openEditModal(b); }}
+                        className="mt-2 text-[11px] text-primary hover:text-primary/80 font-medium transition-colors"
+                      >
+                        View details →
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </>
       )}
 
       {/* ── Bulk Action Floating Bar ── */}

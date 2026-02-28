@@ -24,6 +24,7 @@ import AdminInvoices from './pages/admin/AdminInvoices'
 import AdminLoginLogs from './pages/admin/AdminLoginLogs'
 import AdminMessages from './pages/admin/AdminMessages'
 import AdminRevenue from './pages/admin/AdminRevenue'
+import AdminAnalytics from './pages/admin/AdminAnalytics'
 import SupervisorLayout from './pages/supervisor/SupervisorLayout'
 import SupervisorDashboard from './pages/supervisor/SupervisorDashboard'
 import SupervisorBookings from './pages/supervisor/SupervisorBookings'
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="qr-codes" element={<AdminQRCode />} />
         <Route path="login-logs" element={<AdminLoginLogs />} />
         <Route path="messages" element={<AdminMessages />} />
+        <Route path="analytics" element={<AdminAnalytics />} />
       </Route>
 
       {/* Supervisor routes */}

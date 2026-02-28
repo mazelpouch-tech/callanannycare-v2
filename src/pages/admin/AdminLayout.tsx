@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   User,
   TrendingUp,
+  BarChart2,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import AdminToast, { type AdminToastItem } from "../../components/AdminToast";
@@ -34,6 +35,7 @@ const sidebarLinks: SidebarLink[] = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/admin/bookings", label: "Bookings", icon: CalendarDays },
   { to: "/admin/revenue", label: "Revenue", icon: TrendingUp },
+  { to: "/admin/analytics", label: "Analytics", icon: BarChart2 },
   { to: "/admin/invoices", label: "Invoices", icon: FileText },
   { to: "/admin/calendar", label: "Calendar", icon: CalendarRange },
   { to: "/admin/nannies", label: "Nannies", icon: Users },

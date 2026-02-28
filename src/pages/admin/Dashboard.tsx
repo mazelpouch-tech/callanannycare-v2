@@ -304,6 +304,17 @@ export default function Dashboard() {
     (b) => (b.status === "confirmed" || b.status === "completed") && !b.collectedAt
   ).length;
 
+  // Overdue uncollected payments — confirmed/completed, past date, not collected
+  const overduePayments = useMemo(() => {
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    return bookings.filter((b) => {
+      if (!(!b.collectedAt && (b.status === "confirmed" || b.status === "completed"))) return false;
+      try { return parseISO(b.date) < threeDaysAgo; } catch { return false; }
+    });
+  }, [bookings]);
+  const overdueTotal = overduePayments.reduce((s, b) => s + (b.totalPrice || 0), 0);
+
   const formatDate = (dateStr: string) => {
     try { return format(parseISO(dateStr), "MMM dd, yyyy"); } catch { return dateStr || "N/A"; }
   };
@@ -399,6 +410,29 @@ export default function Dashboard() {
           <p className="text-xs text-muted-foreground mt-1">Today&apos;s Bookings</p>
         </Link>
       </div>
+
+      {/* ── Overdue Payment Alert ── */}
+      {overduePayments.length > 0 && (
+        <Link
+          to="/admin/revenue"
+          className="flex items-center justify-between gap-4 bg-red-50 border border-red-200 rounded-xl px-5 py-4 hover:bg-red-100 transition-colors group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-red-100 rounded-xl flex items-center justify-center group-hover:bg-red-200 transition-colors shrink-0">
+              <AlertTriangle className="w-4 h-4 text-red-600" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-red-800">
+                {overduePayments.length} overdue payment{overduePayments.length !== 1 ? "s" : ""} — {overdueTotal.toLocaleString()}€ uncollected
+              </p>
+              <p className="text-xs text-red-600 mt-0.5">
+                Bookings completed more than 3 days ago without payment collection. Tap to review.
+              </p>
+            </div>
+          </div>
+          <ArrowRight className="w-4 h-4 text-red-500 shrink-0 group-hover:translate-x-0.5 transition-transform" />
+        </Link>
+      )}
 
       {/* ── Today's Schedule ── */}
       <div className="bg-card rounded-xl border border-border shadow-soft overflow-hidden">
