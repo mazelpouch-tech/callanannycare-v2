@@ -606,19 +606,25 @@ export default function AdminBookings() {
     return result;
   }, [bookings, search, statusFilter, nannyFilter, sortOrder]);
 
-  // Split bookings into grouped sections: today / tomorrow / previous
+  // Split bookings into grouped sections: today / tomorrow / prev by status
   const groupedBookings = useMemo(() => {
     const today: typeof filteredBookings = [];
     const tomorrow: typeof filteredBookings = [];
-    const previous: typeof filteredBookings = [];
+    const prevPending: typeof filteredBookings = [];
+    const prevConfirmed: typeof filteredBookings = [];
+    const prevCompleted: typeof filteredBookings = [];
+    const prevCancelled: typeof filteredBookings = [];
     for (const b of filteredBookings) {
       try {
         if (isToday(parseISO(b.date))) { today.push(b); continue; }
         if (isTomorrowDate(b.date)) { tomorrow.push(b); continue; }
       } catch { /* ignore */ }
-      previous.push(b);
+      if (b.status === "pending")        prevPending.push(b);
+      else if (b.status === "confirmed") prevConfirmed.push(b);
+      else if (b.status === "completed") prevCompleted.push(b);
+      else                               prevCancelled.push(b);
     }
-    return { today, tomorrow, previous };
+    return { today, tomorrow, prevPending, prevConfirmed, prevCompleted, prevCancelled };
   }, [filteredBookings]);
 
   const formatDate = (dateStr: string) => {
@@ -652,8 +658,51 @@ export default function AdminBookings() {
     }
   };
 
-  // Previous bookings collapsed by default
-  const [previousExpanded, setPreviousExpanded] = useState(false);
+  // Previous sub-sections — each collapsed by default
+  const [prevExpanded, setPrevExpanded] = useState<Record<string, boolean>>({
+    pending: false, confirmed: false, completed: false, cancelled: false,
+  });
+  const togglePrevSection = (key: string) =>
+    setPrevExpanded((p) => ({ ...p, [key]: !p[key] }));
+
+  const allGroups = [
+    {
+      key: "today", label: "Today\u2019s Bookings", items: groupedBookings.today,
+      collapsible: false, isExpanded: true,
+      bgColor: "bg-primary/5", textColor: "text-primary",
+      lineColor: "bg-primary/50", badgeColor: "bg-primary", chevronColor: "text-primary",
+    },
+    {
+      key: "tomorrow", label: "Tomorrow\u2019s Bookings", items: groupedBookings.tomorrow,
+      collapsible: false, isExpanded: true,
+      bgColor: "bg-primary/5", textColor: "text-primary",
+      lineColor: "bg-primary/50", badgeColor: "bg-primary", chevronColor: "text-primary",
+    },
+    {
+      key: "pending", label: "Previous \u00b7 Pending", items: groupedBookings.prevPending,
+      collapsible: true, isExpanded: prevExpanded.pending,
+      bgColor: "bg-orange-50/70", textColor: "text-orange-700",
+      lineColor: "bg-orange-300", badgeColor: "bg-orange-500", chevronColor: "text-orange-500",
+    },
+    {
+      key: "confirmed", label: "Previous \u00b7 Confirmed", items: groupedBookings.prevConfirmed,
+      collapsible: true, isExpanded: prevExpanded.confirmed,
+      bgColor: "bg-green-50/70", textColor: "text-green-700",
+      lineColor: "bg-green-400", badgeColor: "bg-green-600", chevronColor: "text-green-600",
+    },
+    {
+      key: "completed", label: "Previous \u00b7 Completed", items: groupedBookings.prevCompleted,
+      collapsible: true, isExpanded: prevExpanded.completed,
+      bgColor: "bg-blue-50/70", textColor: "text-blue-700",
+      lineColor: "bg-blue-400", badgeColor: "bg-blue-600", chevronColor: "text-blue-500",
+    },
+    {
+      key: "cancelled", label: "Previous \u00b7 Cancelled", items: groupedBookings.prevCancelled,
+      collapsible: true, isExpanded: prevExpanded.cancelled,
+      bgColor: "bg-gray-50/60", textColor: "text-gray-500",
+      lineColor: "bg-gray-300", badgeColor: "bg-gray-400", chevronColor: "text-gray-400",
+    },
+  ];
 
   // ─── Deleted bookings audit log ───────────────────────────────
   const [showDeleted, setShowDeleted] = useState(false);
@@ -838,35 +887,31 @@ export default function AdminBookings() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {([
-                    { label: "Today\u2019s Bookings", items: groupedBookings.today },
-                    { label: "Tomorrow\u2019s Bookings", items: groupedBookings.tomorrow },
-                    { label: "Previous Bookings", items: groupedBookings.previous },
-                  ] as const).map((group) => group.items.length > 0 && (
-                    <Fragment key={group.label}>
+                  {allGroups.map((group) => group.items.length > 0 && (
+                    <Fragment key={group.key}>
                       <tr
-                        className={group.label === "Previous Bookings" ? "cursor-pointer hover:bg-primary/10 transition-colors" : ""}
-                        onClick={group.label === "Previous Bookings" ? () => setPreviousExpanded((p) => !p) : undefined}
+                        className={group.collapsible ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}
+                        onClick={group.collapsible ? () => togglePrevSection(group.key) : undefined}
                       >
-                        <td colSpan={9} className="px-4 py-4 bg-primary/5 text-center">
+                        <td colSpan={9} className={`px-4 py-4 ${group.bgColor} text-center`}>
                           <div className="flex items-center justify-center gap-4">
-                            <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
-                            <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
+                            <div className={`flex-1 h-0.5 ${group.lineColor} rounded-full`} />
+                            <span className={`text-sm font-bold ${group.textColor} whitespace-nowrap uppercase tracking-wide`}>
                               {group.label}
                             </span>
-                            <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            <span className={`${group.badgeColor} text-white text-[10px] font-bold px-2 py-0.5 rounded-full`}>
                               {group.items.length}
                             </span>
-                            {group.label === "Previous Bookings" && (
-                              previousExpanded
-                                ? <ChevronUp className="w-4 h-4 text-primary" />
-                                : <ChevronDown className="w-4 h-4 text-primary" />
+                            {group.collapsible && (
+                              group.isExpanded
+                                ? <ChevronUp className={`w-4 h-4 ${group.chevronColor}`} />
+                                : <ChevronDown className={`w-4 h-4 ${group.chevronColor}`} />
                             )}
-                            <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
+                            <div className={`flex-1 h-0.5 ${group.lineColor} rounded-full`} />
                           </div>
                         </td>
                       </tr>
-                      {(group.label !== "Previous Bookings" || previousExpanded) && group.items.map((booking) => {
+                      {(!group.collapsible || group.isExpanded) && group.items.map((booking) => {
                     const isExpanded = expandedRow === booking.id;
 
                     return (
@@ -1227,31 +1272,27 @@ export default function AdminBookings() {
 
           {/* Mobile Cards */}
           <div className="lg:hidden space-y-3">
-            {([
-              { label: "Today\u2019s Bookings", items: groupedBookings.today },
-              { label: "Tomorrow\u2019s Bookings", items: groupedBookings.tomorrow },
-              { label: "Previous Bookings", items: groupedBookings.previous },
-            ] as const).map((group) => group.items.length > 0 && (
-              <Fragment key={`m-${group.label}`}>
+            {allGroups.map((group) => group.items.length > 0 && (
+              <Fragment key={`m-${group.key}`}>
                 <div
-                  className={`flex items-center gap-4 py-3 px-2 my-1 bg-primary/5 rounded-xl ${group.label === "Previous Bookings" ? "cursor-pointer hover:bg-primary/10 transition-colors" : ""}`}
-                  onClick={group.label === "Previous Bookings" ? () => setPreviousExpanded((p) => !p) : undefined}
+                  className={`flex items-center gap-4 py-3 px-2 my-1 ${group.bgColor} rounded-xl ${group.collapsible ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}`}
+                  onClick={group.collapsible ? () => togglePrevSection(group.key) : undefined}
                 >
-                  <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
-                  <span className="text-sm font-bold text-primary whitespace-nowrap uppercase tracking-wide">
+                  <div className={`flex-1 h-0.5 ${group.lineColor} rounded-full`} />
+                  <span className={`text-sm font-bold ${group.textColor} whitespace-nowrap uppercase tracking-wide`}>
                     {group.label}
                   </span>
-                  <span className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  <span className={`${group.badgeColor} text-white text-[10px] font-bold px-2 py-0.5 rounded-full`}>
                     {group.items.length}
                   </span>
-                  {group.label === "Previous Bookings" && (
-                    previousExpanded
-                      ? <ChevronUp className="w-4 h-4 text-primary" />
-                      : <ChevronDown className="w-4 h-4 text-primary" />
+                  {group.collapsible && (
+                    group.isExpanded
+                      ? <ChevronUp className={`w-4 h-4 ${group.chevronColor}`} />
+                      : <ChevronDown className={`w-4 h-4 ${group.chevronColor}`} />
                   )}
-                  <div className="flex-1 h-0.5 bg-primary/50 rounded-full" />
+                  <div className={`flex-1 h-0.5 ${group.lineColor} rounded-full`} />
                 </div>
-                {(group.label !== "Previous Bookings" || previousExpanded) && group.items.map((booking) => {
+                {(!group.collapsible || group.isExpanded) && group.items.map((booking) => {
               const isExpanded = expandedRow === booking.id;
 
               return (
