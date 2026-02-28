@@ -218,6 +218,28 @@ export default function AdminBookings() {
   // New Booking Modal
   const [showNewBooking, setShowNewBooking] = useState(false);
   const [newBookingLoading, setNewBookingLoading] = useState(false);
+  const [rebookClientName, setRebookClientName] = useState<string | null>(null);
+
+  const handleRebook = (booking: Booking) => {
+    setNewBooking({
+      nannyId: String(booking.nannyId || ""),
+      clientName: booking.clientName || "",
+      clientEmail: booking.clientEmail || "",
+      clientPhone: booking.clientPhone || "",
+      date: "",
+      endDate: "",
+      startTime: "",
+      endTime: "",
+      plan: booking.plan || "hourly",
+      hotel: booking.hotel || "",
+      numChildren: String(booking.childrenCount || 1),
+      childrenAges: booking.childrenAges || "",
+      notes: booking.notes || "",
+      status: "confirmed",
+    });
+    setRebookClientName(booking.clientName || null);
+    setShowNewBooking(true);
+  };
   const [newBooking, setNewBooking] = useState<NewBookingForm>({
     nannyId: "",
     clientName: "",
@@ -466,6 +488,7 @@ export default function AdminBookings() {
         createdByName: adminProfile?.name || 'Admin',
       });
       setShowNewBooking(false);
+      setRebookClientName(null);
       setNewBooking({
         nannyId: "",
         clientName: "",
@@ -1157,6 +1180,13 @@ export default function AdminBookings() {
 
                               {/* Quick actions */}
                               <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border">
+                                <button
+                                  onClick={() => handleRebook(booking)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 text-xs font-medium hover:bg-purple-100 transition-colors"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" />
+                                  Rebook
+                                </button>
                                 {booking.clientPhone && (
                                   <button
                                     onClick={() => whatsAppParent(booking.clientPhone, booking.clientName, booking.date)}
@@ -1431,6 +1461,13 @@ export default function AdminBookings() {
                         </div>
                         {/* Actions */}
                         <div className="col-span-2 flex flex-wrap gap-2 pt-2 border-t border-border">
+                          <button
+                            onClick={() => handleRebook(booking)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 text-xs font-medium hover:bg-purple-100 transition-colors"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            Rebook
+                          </button>
                           {booking.clientPhone && (
                             <button
                               onClick={() => whatsAppParent(booking.clientPhone, booking.clientName, booking.date)}
@@ -1580,9 +1617,16 @@ export default function AdminBookings() {
         <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
           <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-2xl p-6 my-8">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="font-serif text-lg font-bold text-foreground">New Booking</h2>
+              <h2 className="font-serif text-lg font-bold text-foreground">
+                {rebookClientName ? (
+                  <span className="flex items-center gap-2">
+                    <RotateCcw className="w-4 h-4 text-purple-500" />
+                    Rebook — {rebookClientName}
+                  </span>
+                ) : "New Booking"}
+              </h2>
               <button
-                onClick={() => setShowNewBooking(false)}
+                onClick={() => { setShowNewBooking(false); setRebookClientName(null); }}
                 className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"
               >
                 <X className="w-5 h-5" />

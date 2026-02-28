@@ -18,6 +18,7 @@ import {
   X,
   ArrowRightLeft,
   Pencil,
+  RotateCcw,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -211,6 +212,25 @@ export default function NannyBookings() {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<BookingFormData>(emptyForm);
   const [formLoading, setFormLoading] = useState(false);
+  const [rebookClientName, setRebookClientName] = useState<string | null>(null);
+
+  const handleRebook = (booking: (typeof nannyBookings)[0]) => {
+    setFormData({
+      clientName: booking.clientName || "",
+      clientEmail: booking.clientEmail || "",
+      clientPhone: booking.clientPhone || "",
+      hotel: booking.hotel || "",
+      startDate: "",
+      endDate: "",
+      startTime: "",
+      endTime: "",
+      numChildren: String(booking.childrenCount || 1),
+      childrenAges: booking.childrenAges || "",
+      notes: booking.notes || "",
+    });
+    setRebookClientName(booking.clientName || null);
+    setShowForm(true);
+  };
 
   useEffect(() => {
     fetchNannyBookings();
@@ -300,6 +320,7 @@ export default function NannyBookings() {
       });
       setShowForm(false);
       setFormData(emptyForm);
+      setRebookClientName(null);
       await fetchNannyBookings();
     } catch {
       // error handled by context
@@ -359,8 +380,15 @@ export default function NannyBookings() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-border">
-              <h2 className="font-serif text-xl font-bold text-foreground">{t("nanny.bookings.newBooking")}</h2>
-              <button onClick={() => { setShowForm(false); setFormData(emptyForm); }} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+              <h2 className="font-serif text-xl font-bold text-foreground">
+                {rebookClientName ? (
+                  <span className="flex items-center gap-2">
+                    <RotateCcw className="w-4 h-4 text-purple-500" />
+                    Rebook — {rebookClientName}
+                  </span>
+                ) : t("nanny.bookings.newBooking")}
+              </h2>
+              <button onClick={() => { setShowForm(false); setFormData(emptyForm); setRebookClientName(null); }} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -513,7 +541,7 @@ export default function NannyBookings() {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => { setShowForm(false); setFormData(emptyForm); }}
+                  onClick={() => { setShowForm(false); setFormData(emptyForm); setRebookClientName(null); }}
                   className="flex-1 px-4 py-2.5 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors"
                 >
                   {t("shared.cancel")}
@@ -850,6 +878,15 @@ export default function NannyBookings() {
                                 </div>
                               )}
                             </div>
+                            <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border">
+                              <button
+                                onClick={() => handleRebook(booking)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 text-xs font-medium hover:bg-purple-100 transition-colors"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                Rebook
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       )}
@@ -1068,6 +1105,15 @@ export default function NannyBookings() {
                           {booking.notes}
                         </p>
                       )}
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                        <button
+                          onClick={() => handleRebook(booking)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 text-xs font-medium hover:bg-purple-100 transition-colors"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          Rebook
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
