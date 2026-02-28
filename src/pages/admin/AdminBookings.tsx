@@ -946,109 +946,6 @@ export default function AdminBookings() {
                               >
                                 <Pencil className="w-4 h-4" />
                               </button>
-
-                              {/* Extend */}
-                              {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
-                                <button
-                                  onClick={() => setExtendBooking(booking)}
-                                  className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
-                                  title="Extend booking"
-                                >
-                                  <TimerReset className="w-4 h-4" />
-                                </button>
-                              )}
-
-                              {/* Forward */}
-                              {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
-                                <button
-                                  onClick={() => setForwardBooking(booking)}
-                                  className="p-1.5 rounded-lg text-orange-600 hover:bg-orange-50 transition-colors"
-                                  title="Forward to another nanny"
-                                >
-                                  <ArrowRightLeft className="w-4 h-4" />
-                                </button>
-                              )}
-
-                              {/* Confirm */}
-                              {booking.status === "pending" && (
-                                <button
-                                  onClick={() =>
-                                    updateBookingStatus(booking.id, "confirmed")
-                                  }
-                                  className="p-1.5 rounded-lg text-accent hover:bg-accent/10 transition-colors"
-                                  title="Confirm booking"
-                                >
-                                  <Check className="w-4 h-4" />
-                                </button>
-                              )}
-
-                              {/* Send Reminder */}
-                              {booking.status === "pending" && (
-                                <button
-                                  onClick={() => handleSendReminder(booking.id)}
-                                  disabled={isReminderCooling(booking.id) || reminderLoading === booking.id}
-                                  className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
-                                  title={isReminderCooling(booking.id) ? "Reminder sent" : "Send reminder to nanny"}
-                                >
-                                  {reminderLoading === booking.id ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <Bell className="w-4 h-4" />
-                                  )}
-                                </button>
-                              )}
-
-                              {/* Complete */}
-                              {booking.status === "confirmed" && (
-                                <button
-                                  onClick={() =>
-                                    updateBookingStatus(booking.id, "completed")
-                                  }
-                                  className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
-                                  title="Mark as completed"
-                                >
-                                  <Check className="w-4 h-4" />
-                                </button>
-                              )}
-
-                              {/* Cancel */}
-                              {(booking.status === "pending" ||
-                                booking.status === "confirmed") && (
-                                <button
-                                  onClick={() => setCancelTarget(booking)}
-                                  className="p-1.5 rounded-lg text-orange-600 hover:bg-orange-50 transition-colors"
-                                  title="Cancel booking"
-                                >
-                                  <XCircle className="w-4 h-4" />
-                                </button>
-                              )}
-
-
-                              {/* Delete */}
-                              {deleteConfirm === booking.id ? (
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => handleDelete(booking.id)}
-                                    className="text-xs font-medium text-white bg-destructive px-2 py-1 rounded-lg hover:bg-destructive/90 transition-colors"
-                                  >
-                                    Yes
-                                  </button>
-                                  <button
-                                    onClick={() => setDeleteConfirm(null)}
-                                    className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded-lg hover:bg-muted/80 transition-colors"
-                                  >
-                                    No
-                                  </button>
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() => setDeleteConfirm(booking.id)}
-                                  className="p-1.5 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
-                                  title="Delete booking"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
                             </div>
                           </td>
                         </tr>
@@ -1185,7 +1082,7 @@ export default function AdminBookings() {
                               <PaymentPanel booking={booking} />
 
                               {/* Quick actions */}
-                              <div className="flex gap-2 mt-3 pt-3 border-t border-border">
+                              <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border">
                                 {booking.clientPhone && (
                                   <button
                                     onClick={() => whatsAppParent(booking.clientPhone, booking.clientName, booking.date)}
@@ -1202,6 +1099,89 @@ export default function AdminBookings() {
                                   <MessageCircle className="w-3.5 h-3.5" />
                                   WhatsApp Nanny
                                 </button>
+                                {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
+                                  <button
+                                    onClick={() => setExtendBooking(booking)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
+                                  >
+                                    <TimerReset className="w-3.5 h-3.5" />
+                                    Extend
+                                  </button>
+                                )}
+                                {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
+                                  <button
+                                    onClick={() => setForwardBooking(booking)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 text-xs font-medium hover:bg-orange-100 transition-colors"
+                                  >
+                                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                                    Forward
+                                  </button>
+                                )}
+                                {booking.status === "pending" && (
+                                  <button
+                                    onClick={() => updateBookingStatus(booking.id, "confirmed")}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/10 text-accent text-xs font-medium hover:bg-accent/20 transition-colors"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    Confirm
+                                  </button>
+                                )}
+                                {booking.status === "pending" && (
+                                  <button
+                                    onClick={() => handleSendReminder(booking.id)}
+                                    disabled={isReminderCooling(booking.id) || reminderLoading === booking.id}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-medium hover:bg-amber-100 transition-colors disabled:opacity-40"
+                                  >
+                                    {reminderLoading === booking.id ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <Bell className="w-3.5 h-3.5" />
+                                    )}
+                                    {isReminderCooling(booking.id) ? "Reminded" : "Remind"}
+                                  </button>
+                                )}
+                                {booking.status === "confirmed" && (
+                                  <button
+                                    onClick={() => updateBookingStatus(booking.id, "completed")}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    Complete
+                                  </button>
+                                )}
+                                {(booking.status === "pending" || booking.status === "confirmed") && (
+                                  <button
+                                    onClick={() => setCancelTarget(booking)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 text-xs font-medium hover:bg-orange-100 transition-colors"
+                                  >
+                                    <XCircle className="w-3.5 h-3.5" />
+                                    Cancel
+                                  </button>
+                                )}
+                                {deleteConfirm === booking.id ? (
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => handleDelete(booking.id)}
+                                      className="text-xs font-medium text-white bg-destructive px-2 py-1 rounded-lg hover:bg-destructive/90 transition-colors"
+                                    >
+                                      Yes, delete
+                                    </button>
+                                    <button
+                                      onClick={() => setDeleteConfirm(null)}
+                                      className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded-lg hover:bg-muted/80 transition-colors"
+                                    >
+                                      No
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => setDeleteConfirm(booking.id)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive text-xs font-medium hover:bg-destructive/20 transition-colors"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    Delete
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1360,6 +1340,108 @@ export default function AdminBookings() {
                             <span className="text-muted-foreground text-[10px]">{booking.createdByName}</span>
                           )}
                         </div>
+                        {/* Actions */}
+                        <div className="col-span-2 flex flex-wrap gap-2 pt-2 border-t border-border">
+                          {booking.clientPhone && (
+                            <button
+                              onClick={() => whatsAppParent(booking.clientPhone, booking.clientName, booking.date)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                              WhatsApp Parent
+                            </button>
+                          )}
+                          <button
+                            onClick={() => whatsAppNanny(booking)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            WhatsApp Nanny
+                          </button>
+                          {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
+                            <button
+                              onClick={() => setExtendBooking(booking)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
+                            >
+                              <TimerReset className="w-3.5 h-3.5" />
+                              Extend
+                            </button>
+                          )}
+                          {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
+                            <button
+                              onClick={() => setForwardBooking(booking)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 text-xs font-medium hover:bg-orange-100 transition-colors"
+                            >
+                              <ArrowRightLeft className="w-3.5 h-3.5" />
+                              Forward
+                            </button>
+                          )}
+                          {booking.status === "pending" && (
+                            <button
+                              onClick={() => updateBookingStatus(booking.id, "confirmed")}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/10 text-accent text-xs font-medium hover:bg-accent/20 transition-colors"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              Confirm
+                            </button>
+                          )}
+                          {booking.status === "pending" && (
+                            <button
+                              onClick={() => handleSendReminder(booking.id)}
+                              disabled={isReminderCooling(booking.id) || reminderLoading === booking.id}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-medium hover:bg-amber-100 transition-colors disabled:opacity-40"
+                            >
+                              {reminderLoading === booking.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Bell className="w-3.5 h-3.5" />
+                              )}
+                              {isReminderCooling(booking.id) ? "Reminded" : "Remind"}
+                            </button>
+                          )}
+                          {booking.status === "confirmed" && (
+                            <button
+                              onClick={() => updateBookingStatus(booking.id, "completed")}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              Complete
+                            </button>
+                          )}
+                          {(booking.status === "pending" || booking.status === "confirmed") && (
+                            <button
+                              onClick={() => setCancelTarget(booking)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 text-xs font-medium hover:bg-orange-100 transition-colors"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              Cancel
+                            </button>
+                          )}
+                          {deleteConfirm === booking.id ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleDelete(booking.id)}
+                                className="text-xs font-medium text-white bg-destructive px-2 py-1 rounded-lg hover:bg-destructive/90 transition-colors"
+                              >
+                                Yes, delete
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirm(null)}
+                                className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded-lg hover:bg-muted/80 transition-colors"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setDeleteConfirm(booking.id)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive text-xs font-medium hover:bg-destructive/20 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                     {/* Payment Reconciliation (mobile) */}
@@ -1393,96 +1475,6 @@ export default function AdminBookings() {
                     >
                       <Pencil className="w-3.5 h-3.5" /> Edit
                     </button>
-
-                    {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
-                      <button
-                        onClick={() => setExtendBooking(booking)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors"
-                      >
-                        <TimerReset className="w-3.5 h-3.5" /> Extend
-                      </button>
-                    )}
-
-                    {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
-                      <button
-                        onClick={() => setForwardBooking(booking)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-orange-600 hover:bg-orange-50 transition-colors"
-                      >
-                        <ArrowRightLeft className="w-3.5 h-3.5" /> Forward
-                      </button>
-                    )}
-
-                    {booking.status === "pending" && (
-                      <button
-                        onClick={() =>
-                          updateBookingStatus(booking.id, "confirmed")
-                        }
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-accent hover:bg-accent/10 transition-colors"
-                      >
-                        <Check className="w-3.5 h-3.5" /> Confirm
-                      </button>
-                    )}
-
-                    {booking.status === "pending" && (
-                      <button
-                        onClick={() => handleSendReminder(booking.id)}
-                        disabled={isReminderCooling(booking.id) || reminderLoading === booking.id}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
-                      >
-                        {reminderLoading === booking.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Bell className="w-3.5 h-3.5" />
-                        )}
-                        {isReminderCooling(booking.id) ? "Reminded" : "Remind"}
-                      </button>
-                    )}
-
-                    {booking.status === "confirmed" && (
-                      <button
-                        onClick={() =>
-                          updateBookingStatus(booking.id, "completed")
-                        }
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors"
-                      >
-                        <Check className="w-3.5 h-3.5" /> Complete
-                      </button>
-                    )}
-
-                    {(booking.status === "pending" ||
-                      booking.status === "confirmed") && (
-                      <button
-                        onClick={() => setCancelTarget(booking)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-orange-600 hover:bg-orange-50 transition-colors"
-                      >
-                        <XCircle className="w-3.5 h-3.5" /> Cancel
-                      </button>
-                    )}
-
-
-                    {deleteConfirm === booking.id ? (
-                      <div className="flex-1 flex items-center justify-center gap-1.5 py-2.5">
-                        <button
-                          onClick={() => handleDelete(booking.id)}
-                          className="text-xs font-medium text-white bg-destructive px-2 py-1 rounded"
-                        >
-                          Yes
-                        </button>
-                        <button
-                          onClick={() => setDeleteConfirm(null)}
-                          className="text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded"
-                        >
-                          No
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setDeleteConfirm(booking.id)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Delete
-                      </button>
-                    )}
                   </div>
                 </div>
                 </Fragment>
