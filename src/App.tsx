@@ -23,6 +23,7 @@ import AdminQRCode from './pages/admin/AdminQRCode'
 import AdminInvoices from './pages/admin/AdminInvoices'
 import AdminLoginLogs from './pages/admin/AdminLoginLogs'
 import AdminMessages from './pages/admin/AdminMessages'
+import AdminRevenue from './pages/admin/AdminRevenue'
 import SupervisorLayout from './pages/supervisor/SupervisorLayout'
 import SupervisorDashboard from './pages/supervisor/SupervisorDashboard'
 import SupervisorBookings from './pages/supervisor/SupervisorBookings'
@@ -66,6 +67,7 @@ export default function App() {
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="bookings" element={<AdminBookings />} />
+        <Route path="revenue" element={<AdminRevenue />} />
         <Route path="invoices" element={<AdminInvoices />} />
         <Route path="calendar" element={<AdminCalendar />} />
         <Route path="nannies" element={<AdminNannies />} />
