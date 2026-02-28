@@ -1027,20 +1027,24 @@ export default function AdminBookings() {
                           <td className="px-4 py-3.5">
                             <UrgencyBadge booking={booking} />
                           </td>
-                          <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
+                          <td className="px-4 py-3.5">
                             <div className="flex items-center justify-end gap-1.5">
-                              {/* Expand indicator (visual only) */}
-                              <span className="p-1.5 text-muted-foreground">
+                              {/* Expand toggle button */}
+                              <button
+                                onClick={() => toggleExpand(booking.id)}
+                                className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted/50 transition-colors"
+                                title={isExpanded ? "Collapse" : "View details"}
+                              >
                                 {isExpanded ? (
                                   <ChevronUp className="w-4 h-4" />
                                 ) : (
                                   <Eye className="w-4 h-4" />
                                 )}
-                              </span>
+                              </button>
 
                               {/* Edit */}
                               <button
-                                onClick={() => openEditModal(booking)}
+                                onClick={(e) => { e.stopPropagation(); openEditModal(booking); }}
                                 className="p-1.5 rounded-lg text-primary hover:bg-primary/10 transition-colors"
                                 title="Edit booking"
                               >
