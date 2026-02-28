@@ -9,6 +9,8 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Calendar,
   Clock,
   User,
@@ -29,8 +31,13 @@ import {
   Bell,
   RotateCcw,
   History,
+  LayoutGrid,
+  List,
 } from "lucide-react";
-import { format, parseISO, formatDistanceToNow, isToday } from "date-fns";
+import {
+  format, parseISO, formatDistanceToNow, isToday,
+  startOfWeek, addDays, addWeeks, subWeeks, isSameDay,
+} from "date-fns";
 import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
 import ExtendBookingModal from "../../components/ExtendBookingModal";
@@ -757,6 +764,49 @@ export default function AdminBookings() {
   };
   // ─────────────────────────────────────────────────────────────
 
+  // ── Calendar view state ──────────────────────────────────────
+  const [viewMode, setViewMode] = useState<"table" | "calendar">("table");
+  const [calWeekStart, setCalWeekStart] = useState<Date>(() =>
+    startOfWeek(new Date(), { weekStartsOn: 1 })
+  );
+
+  const calDays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addDays(calWeekStart, i)),
+    [calWeekStart]
+  );
+
+  const calByDate = useMemo(() => {
+    const map = new Map<string, Booking[]>();
+    filteredBookings.forEach((b) => {
+      const key = b.date;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(b);
+    });
+    map.forEach((arr) =>
+      arr.sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""))
+    );
+    return map;
+  }, [filteredBookings]);
+
+  const calStatusChip = (status: string) => {
+    switch (status) {
+      case "pending":   return "border-l-2 border-orange-400 bg-orange-50 text-orange-800";
+      case "confirmed": return "border-l-2 border-green-400 bg-green-50 text-green-800";
+      case "completed": return "border-l-2 border-blue-400 bg-blue-50 text-blue-800";
+      default:          return "border-l-2 border-gray-300 bg-gray-50 text-gray-500 opacity-60";
+    }
+  };
+
+  const calStatusDot = (status: string) => {
+    switch (status) {
+      case "pending":   return "bg-orange-400";
+      case "confirmed": return "bg-green-500";
+      case "completed": return "bg-blue-500";
+      default:          return "bg-gray-400";
+    }
+  };
+  // ─────────────────────────────────────────────────────────────
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -770,6 +820,24 @@ export default function AdminBookings() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex items-center p-1 rounded-xl bg-muted/60 border border-border">
+            <button
+              onClick={() => setViewMode("table")}
+              className={`p-1.5 rounded-lg transition-all ${viewMode === "table" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              title="Table view"
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode("calendar")}
+              className={`p-1.5 rounded-lg transition-all ${viewMode === "calendar" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              title="Calendar view"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
+
           <button
             onClick={openDeletedLog}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-border text-muted-foreground hover:bg-muted transition-colors"
@@ -860,8 +928,116 @@ export default function AdminBookings() {
         </div>
       </div>
 
+      {/* ── Calendar View ── */}
+      {viewMode === "calendar" && (
+        <div className="space-y-4">
+          {/* Week navigation */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCalWeekStart((d) => subWeeks(d, 1))}
+                className="p-2 rounded-xl border border-border hover:bg-muted transition-colors"
+                title="Previous week"
+              >
+                <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+              </button>
+              <button
+                onClick={() => setCalWeekStart((d) => addWeeks(d, 1))}
+                className="p-2 rounded-xl border border-border hover:bg-muted transition-colors"
+                title="Next week"
+              >
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </button>
+              <span className="text-sm font-semibold text-foreground">
+                {format(calWeekStart, "d MMM")} — {format(addDays(calWeekStart, 6), "d MMM yyyy")}
+              </span>
+            </div>
+            <button
+              onClick={() => setCalWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
+              className="px-3 py-1.5 rounded-xl border border-border text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+            >
+              Today
+            </button>
+          </div>
+
+          {/* 7-day grid */}
+          <div className="grid grid-cols-7 gap-2 overflow-x-auto min-w-0">
+            {calDays.map((day) => {
+              const key = format(day, "yyyy-MM-dd");
+              const dayBookings = calByDate.get(key) || [];
+              const todayDay = isToday(day);
+
+              return (
+                <div key={key} className={`flex flex-col gap-1.5 min-w-[120px] rounded-xl border p-2 ${todayDay ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
+                  {/* Day header */}
+                  <div className={`flex flex-col items-center py-1 rounded-lg ${todayDay ? "bg-primary text-white" : ""}`}>
+                    <span className={`text-[10px] font-semibold uppercase tracking-wide ${todayDay ? "text-white/80" : "text-muted-foreground"}`}>
+                      {format(day, "EEE")}
+                    </span>
+                    <span className={`text-base font-bold leading-tight ${todayDay ? "text-white" : "text-foreground"}`}>
+                      {format(day, "d")}
+                    </span>
+                  </div>
+
+                  {/* Bookings for this day */}
+                  {dayBookings.length === 0 ? (
+                    <div className="flex items-center justify-center h-8 text-[10px] text-muted-foreground/40">—</div>
+                  ) : (
+                    dayBookings.map((b) => (
+                      <button
+                        key={b.id}
+                        onClick={() => { openEditModal(b); }}
+                        className={`w-full text-left px-2 py-1.5 rounded-lg text-[10px] leading-tight transition-all hover:brightness-95 active:scale-95 ${calStatusChip(b.status)}`}
+                        title={`${b.clientName} · ${b.startTime}–${b.endTime} · ${b.nannyName}`}
+                      >
+                        <div className="flex items-center gap-1 mb-0.5">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${calStatusDot(b.status)}`} />
+                          <span className="font-semibold truncate">{b.startTime}–{b.endTime}</span>
+                        </div>
+                        <div className="truncate font-medium">{b.clientName}</div>
+                        <div className="truncate text-[9px] opacity-70">{b.nannyName}</div>
+                        {b.totalPrice && (
+                          <div className="font-semibold mt-0.5">{b.totalPrice}€</div>
+                        )}
+                      </button>
+                    ))
+                  )}
+
+                  {/* Day total */}
+                  {dayBookings.length > 0 && (
+                    <div className="mt-auto pt-1 border-t border-border/50 text-[9px] text-muted-foreground text-center">
+                      {dayBookings.length} booking{dayBookings.length !== 1 ? "s" : ""}
+                      {dayBookings.reduce((s, b) => s + (b.totalPrice || 0), 0) > 0 && (
+                        <span className="ml-1 font-semibold text-foreground">
+                          · {dayBookings.reduce((s, b) => s + (b.totalPrice || 0), 0)}€
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Legend */}
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            {[
+              { label: "Pending",   dot: "bg-orange-400" },
+              { label: "Confirmed", dot: "bg-green-500" },
+              { label: "Completed", dot: "bg-blue-500" },
+              { label: "Cancelled", dot: "bg-gray-400" },
+            ].map(({ label, dot }) => (
+              <div key={label} className="flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${dot}`} />
+                {label}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Bookings Table / Cards */}
-      {filteredBookings.length === 0 ? (
+      {viewMode === "table" && filteredBookings.length === 0 ? (
         <div className="bg-card rounded-xl border border-border p-12 text-center shadow-soft">
           <Calendar className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <p className="font-medium text-foreground text-lg">No bookings found</p>
