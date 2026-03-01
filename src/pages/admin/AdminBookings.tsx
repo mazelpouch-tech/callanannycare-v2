@@ -1023,6 +1023,18 @@ export default function AdminBookings() {
       setBulkLoading(null);
     }
   };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.size} booking${selectedIds.size !== 1 ? "s" : ""}? This cannot be undone.`)) return;
+    setBulkLoading("delete");
+    try {
+      await Promise.all([...selectedIds].map((id) => deleteBooking(id, adminProfile?.name || "Admin")));
+      clearSelection();
+    } finally {
+      setBulkLoading(null);
+    }
+  };
   // ─────────────────────────────────────────────────────────────
 
   // ── Admin notes (internal per-booking notes) ─────────────────
@@ -3374,6 +3386,14 @@ export default function AdminBookings() {
           >
             {bulkLoading === "cancelled" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
             Cancel All
+          </button>
+          <button
+            onClick={handleBulkDelete}
+            disabled={!!bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-700 text-white hover:bg-red-800 transition-colors disabled:opacity-50"
+          >
+            {bulkLoading === "delete" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            Delete
           </button>
           <button
             onClick={clearSelection}
