@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, Fragment } from "react";
+import { useState, useMemo, useEffect, useRef, Fragment } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Search,
@@ -33,6 +33,9 @@ import {
   History,
   LayoutGrid,
   List,
+  Repeat2,
+  StickyNote,
+  Activity,
 } from "lucide-react";
 import {
   format, parseISO, formatDistanceToNow, isToday,
@@ -78,6 +81,9 @@ interface NewBookingForm {
   numChildren: string;
   childrenAges: string;
   notes: string;
+  recurring: boolean;
+  recurringType: 'weekly' | 'biweekly' | 'monthly';
+  recurringCount: string;
   status: string;
 }
 
@@ -245,6 +251,9 @@ export default function AdminBookings() {
       childrenAges: booking.childrenAges || "",
       notes: booking.notes || "",
       status: "confirmed",
+      recurring: false,
+      recurringType: "weekly",
+      recurringCount: "4",
     });
     setRebookClientName(booking.clientName || null);
     setShowNewBooking(true);
@@ -264,6 +273,9 @@ export default function AdminBookings() {
     childrenAges: "",
     notes: "",
     status: "confirmed",
+    recurring: false,
+    recurringType: "weekly",
+    recurringCount: "4",
   });
 
   // Edit Booking Modal
@@ -476,27 +488,44 @@ export default function AdminBookings() {
     const startLabel = TIME_SLOTS.find((s) => s.value === newBooking.startTime)?.label || newBooking.startTime;
     const endLabel = TIME_SLOTS.find((s) => s.value === newBooking.endTime)?.label || newBooking.endTime;
 
+    // Compute dates for recurring bookings
+    const baseBookingData = {
+      nannyId: selectedNanny.id,
+      nannyName: selectedNanny.name,
+      endDate: newBooking.endDate || null,
+      startTime: startLabel,
+      endTime: endLabel,
+      plan: newBooking.plan as BookingPlan,
+      totalPrice: newBookingPrice,
+      clientName: newBooking.clientName,
+      clientEmail: newBooking.clientEmail,
+      clientPhone: newBooking.clientPhone,
+      hotel: newBooking.hotel,
+      childrenCount: Number(newBooking.numChildren),
+      childrenAges: newBooking.childrenAges,
+      notes: newBooking.notes,
+      status: newBooking.status as BookingStatus,
+      createdBy: 'admin' as const,
+      createdByName: adminProfile?.name || 'Admin',
+    };
+
     try {
-      await addBooking({
-        nannyId: selectedNanny.id,
-        nannyName: selectedNanny.name,
-        date: newBooking.date,
-        endDate: newBooking.endDate || null,
-        startTime: startLabel,
-        endTime: endLabel,
-        plan: newBooking.plan as BookingPlan,
-        totalPrice: newBookingPrice,
-        clientName: newBooking.clientName,
-        clientEmail: newBooking.clientEmail,
-        clientPhone: newBooking.clientPhone,
-        hotel: newBooking.hotel,
-        childrenCount: Number(newBooking.numChildren),
-        childrenAges: newBooking.childrenAges,
-        notes: newBooking.notes,
-        status: newBooking.status as BookingStatus,
-        createdBy: 'admin',
-        createdByName: adminProfile?.name || 'Admin',
-      });
+      if (newBooking.recurring) {
+        const count = Math.max(1, Math.min(12, parseInt(newBooking.recurringCount) || 4));
+        const dates: string[] = [newBooking.date];
+        const offsetDays = newBooking.recurringType === 'weekly' ? 7 : newBooking.recurringType === 'biweekly' ? 14 : 30;
+        for (let i = 1; i < count; i++) {
+          const d = new Date(dates[dates.length - 1]);
+          d.setDate(d.getDate() + offsetDays);
+          dates.push(d.toISOString().slice(0, 10));
+        }
+        // Create bookings sequentially to avoid overloading the API
+        for (const date of dates) {
+          await addBooking({ ...baseBookingData, date });
+        }
+      } else {
+        await addBooking({ ...baseBookingData, date: newBooking.date });
+      }
       setShowNewBooking(false);
       setRebookClientName(null);
       setNewBooking({
@@ -514,6 +543,9 @@ export default function AdminBookings() {
         childrenAges: "",
         notes: "",
         status: "confirmed",
+        recurring: false,
+        recurringType: "weekly",
+        recurringCount: "4",
       });
     } catch (err) {
       console.error('Booking creation failed:', err);
@@ -887,6 +919,24 @@ export default function AdminBookings() {
       setBulkLoading(null);
     }
   };
+  // ─────────────────────────────────────────────────────────────
+
+  // ── Admin notes (internal per-booking notes) ─────────────────
+  const [adminNoteDrafts, setAdminNoteDrafts] = useState<Record<string | number, string>>({});
+  const getAdminNoteDraft = (b: Booking) =>
+    adminNoteDrafts[b.id] !== undefined ? adminNoteDrafts[b.id] : (b.adminNotes || "");
+  const saveAdminNote = async (bookingId: string | number, value: string) => {
+    const booking = bookings.find((b) => b.id === bookingId);
+    if (!booking || value === (booking.adminNotes || "")) return;
+    try {
+      await updateBooking(bookingId, { adminNotes: value });
+    } catch { /* silent */ }
+  };
+  // ─────────────────────────────────────────────────────────────
+
+  // ── Swipe actions on mobile cards ────────────────────────────
+  const [swipedBookingId, setSwipedBookingId] = useState<string | number | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
   // ─────────────────────────────────────────────────────────────
 
   // ── Calendar view state ──────────────────────────────────────
@@ -1537,6 +1587,21 @@ export default function AdminBookings() {
                                     </p>
                                   </div>
                                 </div>
+                                {/* Admin Notes */}
+                                <div className="flex items-start gap-2 col-span-1 sm:col-span-2">
+                                  <StickyNote className="w-4 h-4 text-amber-500 shrink-0 mt-1" />
+                                  <div className="flex-1">
+                                    <p className="text-xs text-muted-foreground mb-1">Admin Notes (internal)</p>
+                                    <textarea
+                                      rows={2}
+                                      placeholder="Add internal notes..."
+                                      className="w-full px-2.5 py-1.5 text-xs border border-amber-200 bg-amber-50/50 rounded-lg text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400 transition resize-none"
+                                      value={getAdminNoteDraft(booking)}
+                                      onChange={(e) => setAdminNoteDrafts((prev) => ({ ...prev, [booking.id]: e.target.value }))}
+                                      onBlur={(e) => saveAdminNote(booking.id, e.target.value)}
+                                    />
+                                  </div>
+                                </div>
                                 {(() => {
                                   const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
                                   const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 150;
@@ -1609,6 +1674,40 @@ export default function AdminBookings() {
                                   </div>
                                 </div>
                               </div>
+                              {/* Activity Feed */}
+                              {(() => {
+                                const events: { time: string; label: string; detail?: string; color: string }[] = [];
+                                if (booking.createdAt) events.push({ time: booking.createdAt, label: "Booking created", detail: booking.createdByName || booking.createdBy, color: "bg-primary/20 text-primary" });
+                                if (booking.clockIn) events.push({ time: booking.clockIn, label: "Nanny clocked in", color: "bg-green-100 text-green-700" });
+                                if (booking.clockOut) events.push({ time: booking.clockOut, label: "Completed", detail: "Clocked out", color: "bg-blue-100 text-blue-700" });
+                                if (booking.collectedAt) events.push({ time: booking.collectedAt, label: "Payment collected", detail: `${booking.collectedBy || ""}${booking.paymentMethod ? " · " + booking.paymentMethod : ""}`, color: "bg-emerald-100 text-emerald-700" });
+                                if (booking.cancelledAt) events.push({ time: booking.cancelledAt, label: "Cancelled", detail: `${booking.cancelledBy || ""}${booking.cancellationReason ? ": " + booking.cancellationReason : ""}`, color: "bg-red-100 text-red-700" });
+                                if (booking.deletedAt) events.push({ time: booking.deletedAt, label: "Deleted", detail: booking.deletedBy || "", color: "bg-gray-100 text-gray-600" });
+                                events.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+                                if (events.length <= 1) return null;
+                                return (
+                                  <div className="mt-3 pt-3 border-t border-border">
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5"><Activity className="w-3 h-3" />Activity</p>
+                                    <div className="relative pl-4">
+                                      <div className="absolute left-1.5 top-0 bottom-0 w-0.5 bg-border" />
+                                      {events.map((ev, i) => (
+                                        <div key={i} className="relative mb-2 last:mb-0">
+                                          <div className="absolute -left-[9px] top-1 w-2 h-2 rounded-full bg-border border-2 border-background" />
+                                          <div className="flex items-start gap-2">
+                                            <div className="flex-1 min-w-0">
+                                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${ev.color}`}>{ev.label}</span>
+                                              {ev.detail && <span className="text-[10px] text-muted-foreground ml-1.5">{ev.detail}</span>}
+                                            </div>
+                                            <span className="text-[10px] text-muted-foreground/60 shrink-0 whitespace-nowrap">
+                                              {(() => { try { return format(new Date(ev.time), "dd MMM, HH:mm"); } catch { return ""; } })()}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                               {/* Status actions */}
                               <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border">
                                 {booking.status === "pending" && (
@@ -1717,9 +1816,53 @@ export default function AdminBookings() {
 
               return (
                 <Fragment key={`mobile-${booking.id}`}>
+                {/* Swipe wrapper */}
+                <div className="relative overflow-hidden rounded-xl">
+                  {/* Action buttons revealed on swipe left */}
+                  {swipedBookingId === booking.id && (
+                    <div className="absolute right-0 top-0 bottom-0 w-40 flex items-center justify-end gap-1.5 pr-3 bg-card border border-border border-l-0 rounded-r-xl shadow-md z-10">
+                      {booking.status === "pending" && (
+                        <button
+                          onClick={() => { updateBookingStatus(booking.id, "confirmed"); setSwipedBookingId(null); }}
+                          className="flex flex-col items-center gap-0.5 px-2.5 py-2 rounded-lg bg-green-100 text-green-700 text-[10px] font-semibold hover:bg-green-200 transition-colors"
+                        >
+                          <Check className="w-4 h-4" />
+                          Confirm
+                        </button>
+                      )}
+                      {booking.clientPhone && (
+                        <button
+                          onClick={() => { openWAModal(booking, "parent"); setSwipedBookingId(null); }}
+                          className="flex flex-col items-center gap-0.5 px-2.5 py-2 rounded-lg bg-emerald-100 text-emerald-700 text-[10px] font-semibold hover:bg-emerald-200 transition-colors"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          WA
+                        </button>
+                      )}
+                      {(booking.status === "pending" || booking.status === "confirmed") && (
+                        <button
+                          onClick={() => { setCancelTarget(booking); setSwipedBookingId(null); }}
+                          className="flex flex-col items-center gap-0.5 px-2.5 py-2 rounded-lg bg-red-100 text-red-700 text-[10px] font-semibold hover:bg-red-200 transition-colors"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  )}
                 <div
                   id={`booking-row-${booking.id}`}
-                  className={`bg-card rounded-xl border border-border shadow-soft overflow-hidden border-l-4 ${rowBorderColor(booking.status)}`}
+                  className={`bg-card rounded-xl border border-border shadow-soft overflow-hidden border-l-4 ${rowBorderColor(booking.status)} transition-transform duration-200`}
+                  style={{ transform: swipedBookingId === booking.id ? 'translateX(-160px)' : 'translateX(0)' }}
+                  onTouchStart={(e) => { touchStartXRef.current = e.touches[0].clientX; }}
+                  onTouchEnd={(e) => {
+                    if (touchStartXRef.current === null) return;
+                    const diff = touchStartXRef.current - e.changedTouches[0].clientX;
+                    if (diff > 60) setSwipedBookingId(booking.id);
+                    else if (diff < -30) setSwipedBookingId(null);
+                    touchStartXRef.current = null;
+                  }}
+                  onClick={() => { if (swipedBookingId === booking.id) { setSwipedBookingId(null); return; } }}
                 >
                   {/* Card Header */}
                   <div className="p-4 space-y-3">
@@ -1882,6 +2025,41 @@ export default function AdminBookings() {
                             {booking.notes || "None"}
                           </p>
                         </div>
+                        {/* Admin Notes (mobile) */}
+                        <div className="col-span-2">
+                          <p className="text-muted-foreground flex items-center gap-1"><StickyNote className="w-3 h-3 text-amber-500" />Admin Notes</p>
+                          <textarea
+                            rows={2}
+                            placeholder="Add internal notes..."
+                            className="w-full mt-1 px-2.5 py-1.5 text-xs border border-amber-200 bg-amber-50/50 rounded-lg text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-amber-400 resize-none"
+                            value={getAdminNoteDraft(booking)}
+                            onChange={(e) => setAdminNoteDrafts((prev) => ({ ...prev, [booking.id]: e.target.value }))}
+                            onBlur={(e) => saveAdminNote(booking.id, e.target.value)}
+                          />
+                        </div>
+                        {/* Activity feed (mobile) */}
+                        {(() => {
+                          const events: { time: string; label: string; detail?: string }[] = [];
+                          if (booking.createdAt) events.push({ time: booking.createdAt, label: "Created", detail: booking.createdByName || undefined });
+                          if (booking.clockIn) events.push({ time: booking.clockIn, label: "Clocked in" });
+                          if (booking.clockOut) events.push({ time: booking.clockOut, label: "Completed" });
+                          if (booking.collectedAt) events.push({ time: booking.collectedAt, label: "Collected", detail: booking.collectedBy || undefined });
+                          if (booking.cancelledAt) events.push({ time: booking.cancelledAt, label: "Cancelled", detail: booking.cancelledBy || undefined });
+                          events.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+                          if (events.length <= 1) return null;
+                          return (
+                            <div className="col-span-2 space-y-1">
+                              <p className="text-muted-foreground flex items-center gap-1"><Activity className="w-3 h-3" />Activity</p>
+                              <div className="flex flex-wrap gap-1">
+                                {events.map((ev, i) => (
+                                  <span key={i} className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
+                                    {ev.label}{ev.detail ? ` · ${ev.detail}` : ""} <span className="opacity-50">{(() => { try { return format(new Date(ev.time), "dd/MM HH:mm"); } catch { return ""; } })()}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
                         <div className="col-span-2 flex items-center gap-1.5">
                           <p className="text-muted-foreground">Created by</p>
                           <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${
@@ -1993,6 +2171,7 @@ export default function AdminBookings() {
                     </button>
                   </div>
                 </div>
+                </div>{/* end swipe wrapper */}
                 </Fragment>
               );
             })}
@@ -2287,6 +2466,50 @@ export default function AdminBookings() {
                 />
               </div>
 
+              {/* Recurring Booking */}
+              <div className="rounded-xl border border-border p-3.5 bg-muted/20">
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newBooking.recurring}
+                    onChange={(e) => setNewBooking({ ...newBooking, recurring: e.target.checked })}
+                    className="w-4 h-4 rounded accent-primary"
+                  />
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                    <Repeat2 className="w-3.5 h-3.5 text-primary" />
+                    Recurring booking
+                  </span>
+                </label>
+                {newBooking.recurring && (
+                  <div className="mt-3 flex items-center gap-3 flex-wrap">
+                    <select
+                      value={newBooking.recurringType}
+                      onChange={(e) => setNewBooking({ ...newBooking, recurringType: e.target.value as 'weekly' | 'biweekly' | 'monthly' })}
+                      className="px-3 py-1.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    >
+                      <option value="weekly">Weekly (every 7 days)</option>
+                      <option value="biweekly">Biweekly (every 14 days)</option>
+                      <option value="monthly">Monthly (every 30 days)</option>
+                    </select>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-muted-foreground">Repeat</label>
+                      <input
+                        type="number"
+                        min="2"
+                        max="12"
+                        value={newBooking.recurringCount}
+                        onChange={(e) => setNewBooking({ ...newBooking, recurringCount: e.target.value })}
+                        className="w-16 px-2 py-1.5 bg-background border border-border rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      />
+                      <label className="text-sm text-muted-foreground">times</label>
+                    </div>
+                    <p className="w-full text-[11px] text-primary/70">
+                      Will create {newBooking.recurringCount || 4} bookings starting from {newBooking.date || "selected date"}
+                    </p>
+                  </div>
+                )}
+              </div>
+
               {/* Conflict Warning */}
               {conflicts.length > 0 && (
                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm text-orange-700 space-y-2">
@@ -2360,11 +2583,11 @@ export default function AdminBookings() {
                   className="flex-1 gradient-warm text-white rounded-xl px-4 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {newBookingLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <><Loader2 className="w-5 h-5 animate-spin" />{newBooking.recurring ? `Creating ${newBooking.recurringCount || 4} bookings…` : "Creating…"}</>
                   ) : (
                     <>
-                      <Plus className="w-4 h-4" />
-                      Create Booking
+                      {newBooking.recurring ? <Repeat2 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                      {newBooking.recurring ? `Create ${newBooking.recurringCount || 4} Bookings` : "Create Booking"}
                     </>
                   )}
                 </button>

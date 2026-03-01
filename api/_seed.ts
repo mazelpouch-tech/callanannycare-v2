@@ -221,6 +221,10 @@ export default async function seedHandler(req: VercelRequest, res: VercelRespons
     await sql`CREATE INDEX IF NOT EXISTS idx_booking_payouts ON booking_payouts(booking_id)`;
     // ────────────────────────────────────────────────────────────────
 
+    // ─── Admin Notes (internal notes per booking) ────────────────────
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS admin_notes TEXT DEFAULT ''`;
+    // ────────────────────────────────────────────────────────────────
+
     // ─── Push Subscriptions ─────────────────────────────────────────
     await sql`
       CREATE TABLE IF NOT EXISTS push_subscriptions (

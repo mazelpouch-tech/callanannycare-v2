@@ -74,6 +74,7 @@ export interface DbBooking {
   updated_at: string;
   deleted_at: string | null;
   deleted_by: string;
+  admin_notes: string;
 }
 
 /** Booking row from a JOIN with nannies (includes nanny_name, nanny_image) */
@@ -166,6 +167,7 @@ export interface Booking {
   paymentMethod: string;
   deletedAt: string | null;
   deletedBy: string;
+  adminNotes: string;
 }
 
 export interface Notification {

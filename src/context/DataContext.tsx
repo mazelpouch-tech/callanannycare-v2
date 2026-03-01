@@ -187,6 +187,7 @@ export function DataProvider({ children }: DataProviderProps) {
           paymentMethod: b.payment_method || '',
           deletedAt: b.deleted_at ?? null,
           deletedBy: b.deleted_by || '',
+          adminNotes: b.admin_notes || '',
         }));
         setBookings(normalizedBookings);
         saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -337,6 +338,7 @@ export function DataProvider({ children }: DataProviderProps) {
         createdBy: b.created_by || '',
         deletedAt: b.deleted_at ?? null,
         deletedBy: b.deleted_by || '',
+        adminNotes: b.admin_notes || '',
       }));
       setBookings(normalizedBookings);
       saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -421,6 +423,7 @@ export function DataProvider({ children }: DataProviderProps) {
           createdBy: created.created_by || '',
           deletedAt: created.deleted_at ?? null,
           deletedBy: created.deleted_by || '',
+          adminNotes: created.admin_notes || '',
         };
         setBookings((prev) => {
           const updated = [...prev, normalized];
@@ -492,6 +495,7 @@ export function DataProvider({ children }: DataProviderProps) {
     if (updates.childrenCount !== undefined) apiBody.children_count = updates.childrenCount;
     if (updates.childrenAges !== undefined) apiBody.children_ages = updates.childrenAges;
     if (updates.notes !== undefined) apiBody.notes = updates.notes;
+    if (updates.adminNotes !== undefined) apiBody.admin_notes = updates.adminNotes;
     if (updates.totalPrice !== undefined) apiBody.total_price = updates.totalPrice;
     if (updates.status !== undefined) apiBody.status = updates.status;
     if (updates.clockIn !== undefined) apiBody.clock_in = updates.clockIn;
@@ -603,6 +607,7 @@ export function DataProvider({ children }: DataProviderProps) {
         paymentMethod: b.payment_method || '',
         deletedAt: b.deleted_at ?? null,
         deletedBy: b.deleted_by || '',
+        adminNotes: b.admin_notes || '',
       }));
     } catch {
       return [];
@@ -814,6 +819,7 @@ export function DataProvider({ children }: DataProviderProps) {
     createdBy: b.created_by || '',
     deletedAt: b.deleted_at ?? null,
     deletedBy: b.deleted_by || '',
+    adminNotes: b.admin_notes || '',
   }), []);
 
   const fetchNannyBookings = useCallback(async () => {

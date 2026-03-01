@@ -29,6 +29,7 @@ interface UpdateBookingBody {
   collection_note?: string;
   payment_method?: string;
   restore?: boolean; // Restore a soft-deleted booking
+  admin_notes?: string;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -125,7 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ────────────────────────────────────────────────────────────────
     
     if (req.method === 'PUT') {
-      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder, cancellation_reason, cancelled_by, collected_by, collected_at, collection_note, payment_method, restore } = req.body as UpdateBookingBody;
+      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder, cancellation_reason, cancelled_by, collected_by, collected_at, collection_note, payment_method, restore, admin_notes } = req.body as UpdateBookingBody;
 
       // Restore a soft-deleted booking
       if (restore) {
@@ -197,6 +198,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           collected_at = COALESCE(${collected_at ? collected_at : null}, collected_at),
           collection_note = COALESCE(${collection_note || null}, collection_note),
           payment_method = COALESCE(${payment_method || null}, payment_method),
+          admin_notes = COALESCE(${admin_notes !== undefined ? admin_notes : null}, admin_notes),
           updated_at = NOW()
         WHERE id = ${id}
         RETURNING *

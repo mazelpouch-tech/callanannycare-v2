@@ -118,17 +118,29 @@ export default function AdminRevenue() {
   }, [bookings, nannyFilter, search]);
 
   const byNanny = useMemo(() => {
-    const map = new Map<number, { nanny: string; toCollect: number; collected: number; toCollectCount: number; collectedCount: number }>();
+    const map = new Map<number, {
+      nanny: string;
+      toCollect: number; collected: number;
+      toCollectCount: number; collectedCount: number;
+      estPayDH: number; completedCount: number;
+    }>();
     bookings.forEach((b) => {
       if (b.status === "cancelled" || b.status === "pending") return;
       const id = b.nannyId || 0;
-      if (!map.has(id)) map.set(id, { nanny: b.nannyName, toCollect: 0, collected: 0, toCollectCount: 0, collectedCount: 0 });
+      if (!map.has(id)) map.set(id, { nanny: b.nannyName, toCollect: 0, collected: 0, toCollectCount: 0, collectedCount: 0, estPayDH: 0, completedCount: 0 });
       const entry = map.get(id)!;
       if (b.collectedAt) { entry.collected += b.totalPrice || 0; entry.collectedCount++; }
       else if (b.status === "confirmed") { entry.toCollect += b.totalPrice || 0; entry.toCollectCount++; }
+      if (b.status === "completed" || b.status === "confirmed") {
+        const pay = b.clockIn && b.clockOut
+          ? calcShiftPayBreakdown(b.clockIn, b.clockOut).total
+          : estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate).total;
+        entry.estPayDH += pay;
+        entry.completedCount++;
+      }
     });
     return Array.from(map.values())
-      .filter((e) => e.toCollect > 0 || e.collected > 0)
+      .filter((e) => e.toCollect > 0 || e.collected > 0 || e.completedCount > 0)
       .sort((a, b) => b.toCollect - a.toCollect);
   }, [bookings]);
 
@@ -547,29 +559,54 @@ export default function AdminRevenue() {
               <p className="text-muted-foreground">No collection data yet</p>
             </div>
           ) : (
-            byNanny.map((entry, idx) => (
-              <div key={idx} className="bg-card rounded-2xl border border-border p-5">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-primary font-bold text-sm">{entry.nanny.charAt(0).toUpperCase()}</span>
+            byNanny.map((entry, idx) => {
+              const estPayEUR = rate > 0 ? Math.round(entry.estPayDH / rate) : 0;
+              const totalRevenue = entry.toCollect + entry.collected;
+              const netEUR = totalRevenue - estPayEUR;
+              return (
+                <div key={idx} className="bg-card rounded-2xl border border-border p-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-primary font-bold text-sm">{entry.nanny.charAt(0).toUpperCase()}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-foreground">{entry.nanny || "Unassigned"}</p>
+                      <p className="text-xs text-muted-foreground">{entry.completedCount} booking{entry.completedCount !== 1 ? "s" : ""}</p>
+                    </div>
+                    {/* Net income badge */}
+                    {netEUR !== 0 && (
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${netEUR >= 0 ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-red-50 text-red-700 border-red-200"}`}>
+                        Net {netEUR >= 0 ? "+" : ""}{netEUR}€
+                      </span>
+                    )}
                   </div>
-                  <div>
-                    <p className="font-semibold text-foreground">{entry.nanny}</p>
-                    <p className="text-xs text-muted-foreground">{entry.toCollectCount + entry.collectedCount} bookings</p>
+                  {/* Revenue row */}
+                  <div className="flex gap-2 mb-2">
+                    <div className="flex-1 bg-amber-50 rounded-xl p-2.5 text-center border border-amber-100">
+                      <p className="text-base font-bold text-amber-700">{entry.toCollect}€</p>
+                      <p className="text-[10px] text-amber-600">{entry.toCollectCount} to collect</p>
+                    </div>
+                    <div className="flex-1 bg-green-50 rounded-xl p-2.5 text-center border border-green-100">
+                      <p className="text-base font-bold text-green-700">{entry.collected}€</p>
+                      <p className="text-[10px] text-green-600">{entry.collectedCount} collected</p>
+                    </div>
                   </div>
+                  {/* Payout estimate row */}
+                  {entry.estPayDH > 0 && (
+                    <div className="bg-orange-50 rounded-xl p-2.5 border border-orange-100 flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-semibold text-orange-700 uppercase tracking-wide">Est. Nanny Pay</p>
+                        <p className="text-[10px] text-orange-500">{HOURLY_RATE} DH/hr · {entry.completedCount} bookings</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-orange-700">{entry.estPayDH.toLocaleString()} DH</p>
+                        <p className="text-[10px] text-orange-500">≈ {estPayEUR}€</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex gap-3">
-                  <div className="flex-1 bg-amber-50 rounded-xl p-3 text-center border border-amber-100">
-                    <p className="text-lg font-bold text-amber-700">{entry.toCollect}€</p>
-                    <p className="text-[10px] text-amber-600">{entry.toCollectCount} to collect</p>
-                  </div>
-                  <div className="flex-1 bg-green-50 rounded-xl p-3 text-center border border-green-100">
-                    <p className="text-lg font-bold text-green-700">{entry.collected}€</p>
-                    <p className="text-[10px] text-green-600">{entry.collectedCount} collected</p>
-                  </div>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
