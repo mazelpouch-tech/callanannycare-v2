@@ -2667,7 +2667,7 @@ export default function AdminBookings() {
                 </button>
                 <button
                   type="submit"
-                  disabled={newBookingLoading || !newBooking.nannyId || !newBooking.date || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime || conflicts.length > 0 || (newBookingHours > 0 && newBookingHours < 3)}
+                  disabled={newBookingLoading || !newBooking.nannyId || (multiDateMode ? multiDates.length === 0 : !newBooking.date) || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime || conflicts.length > 0 || (newBookingHours > 0 && newBookingHours < 3)}
                   className="flex-1 gradient-warm text-white rounded-xl px-4 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {newBookingLoading ? (
