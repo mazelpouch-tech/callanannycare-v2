@@ -215,16 +215,8 @@ export default function NannyBookings() {
   const [rebookClientName, setRebookClientName] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Multi-date mode for new booking
-  const [multiDateMode, setMultiDateMode] = useState(false);
-  const [multiDates, setMultiDates] = useState<string[]>([]);
-  const [multiDateInput, setMultiDateInput] = useState("");
-  const addMultiDate = (d: string) => {
-    if (!d || multiDates.includes(d)) return;
-    setMultiDates((prev) => [...prev, d].sort());
-  };
-  const removeMultiDate = (d: string) => setMultiDates((prev) => prev.filter((x) => x !== d));
-  const resetMultiDate = () => { setMultiDateMode(false); setMultiDates([]); setMultiDateInput(""); };
+  // Number of days for new booking
+  const [newBookingNumDays, setNewBookingNumDays] = useState(1);
 
   const handleRebook = (booking: (typeof nannyBookings)[0]) => {
     setFormData({
@@ -241,7 +233,7 @@ export default function NannyBookings() {
       notes: booking.notes || "",
     });
     setRebookClientName(booking.clientName || null);
-    resetMultiDate();
+    setNewBookingNumDays(1);
     setShowForm(true);
   };
 
@@ -290,12 +282,11 @@ export default function NannyBookings() {
 
   const handleNewBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    const hasDate = multiDateMode ? multiDates.length > 0 : !!formData.startDate;
-    if (!formData.clientName || !hasDate || !formData.startTime) return;
+    if (!formData.clientName || !formData.startDate || !formData.startTime) return;
     setFormError(null);
     setFormLoading(true);
 
-    // Calculate daily price
+    // Calculate daily price (per-day, not multiplied by numDays)
     const [sh, sm] = (formData.startTime || "0:0").split(":").map(Number);
     const [eh, em] = (formData.endTime || "0:0").split(":").map(Number);
     const startH = sh + sm / 60;
@@ -327,28 +318,17 @@ export default function NannyBookings() {
     };
 
     try {
-      if (multiDateMode) {
-        for (const d of multiDates) {
-          await addBooking({ ...baseBooking, date: d, endDate: null, totalPrice: dailyPrice });
-        }
-      } else {
-        // Date range: expand into per-day bookings (one booking per day)
-        const startD = new Date(formData.startDate);
-        const endD = formData.endDate ? new Date(formData.endDate) : startD;
-        const rangeDates: string[] = [];
-        const cur = new Date(startD);
-        while (cur <= endD) {
-          rangeDates.push(cur.toISOString().slice(0, 10));
-          cur.setDate(cur.getDate() + 1);
-        }
-        for (const d of rangeDates) {
-          await addBooking({ ...baseBooking, date: d, endDate: null, totalPrice: dailyPrice });
-        }
+      // Create one booking per consecutive day
+      const startD = new Date(formData.startDate);
+      for (let i = 0; i < newBookingNumDays; i++) {
+        const d = new Date(startD);
+        d.setDate(d.getDate() + i);
+        await addBooking({ ...baseBooking, date: d.toISOString().slice(0, 10), endDate: null, totalPrice: dailyPrice });
       }
       setShowForm(false);
       setFormData(emptyForm);
       setRebookClientName(null);
-      resetMultiDate();
+      setNewBookingNumDays(1);
       await fetchNannyBookings();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to create booking. Please try again.');
@@ -493,82 +473,43 @@ export default function NannyBookings() {
                 />
               </div>
 
-              {/* Date mode toggle */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <button type="button"
-                  onClick={() => { setMultiDateMode(false); resetMultiDate(); }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${!multiDateMode ? "bg-accent text-accent-foreground border-accent" : "border-border text-muted-foreground hover:text-foreground"}`}
-                >
-                  {t("nanny.bookings.endDate") ? "Date range" : "Date range"}
-                </button>
-                <button type="button"
-                  onClick={() => { setMultiDateMode(true); setMultiDates([]); setMultiDateInput(""); handleFormChange("endDate", ""); }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${multiDateMode ? "bg-accent text-accent-foreground border-accent" : "border-border text-muted-foreground hover:text-foreground"}`}
-                >
-                  Multiple dates
-                </button>
+              {/* Start Date + Days Counter */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">{t("shared.date")} *</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.startDate}
+                    onChange={(e) => handleFormChange("startDate", e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border bg-muted/20">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Number of days</p>
+                    {formData.startDate && newBookingNumDays > 1 && (() => {
+                      const end = new Date(formData.startDate);
+                      end.setDate(end.getDate() + newBookingNumDays - 1);
+                      return (
+                        <p className="text-xs text-accent mt-0.5">
+                          {formData.startDate} → {end.toISOString().slice(0, 10)} · {newBookingNumDays} separate bookings
+                        </p>
+                      );
+                    })()}
+                    {newBookingNumDays === 1 && (
+                      <p className="text-xs text-muted-foreground mt-0.5">Single day booking</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button type="button" onClick={() => setNewBookingNumDays(Math.max(1, newBookingNumDays - 1))} disabled={newBookingNumDays <= 1}
+                      className="w-8 h-8 rounded-full border border-border bg-background flex items-center justify-center text-lg font-bold hover:bg-muted transition-colors disabled:opacity-30">−</button>
+                    <span className="w-7 text-center font-bold text-foreground">{newBookingNumDays}</span>
+                    <button type="button" onClick={() => setNewBookingNumDays(Math.min(14, newBookingNumDays + 1))} disabled={newBookingNumDays >= 14}
+                      className="w-8 h-8 rounded-full border border-border bg-background flex items-center justify-center text-lg font-bold hover:bg-muted transition-colors disabled:opacity-30">+</button>
+                  </div>
+                </div>
               </div>
-
-              {!multiDateMode ? (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">{t("shared.date")} *</label>
-                    <input
-                      type="date"
-                      required={!multiDateMode}
-                      value={formData.startDate}
-                      onChange={(e) => handleFormChange("startDate", e.target.value)}
-                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.endDate")}</label>
-                    <input
-                      type="date"
-                      value={formData.endDate}
-                      min={formData.startDate}
-                      onChange={(e) => handleFormChange("endDate", e.target.value)}
-                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-foreground">Selected Dates *</label>
-                  {multiDates.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {multiDates.map((d) => (
-                        <span key={d} className="inline-flex items-center gap-1 px-2.5 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full border border-accent/20">
-                          {d}
-                          <button type="button" onClick={() => removeMultiDate(d)} className="ml-0.5 hover:text-red-500 transition-colors">×</button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="date"
-                      value={multiDateInput}
-                      onChange={(e) => setMultiDateInput(e.target.value)}
-                      className="flex-1 px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => { if (multiDateInput) { addMultiDate(multiDateInput); setMultiDateInput(""); } }}
-                      disabled={!multiDateInput || multiDates.includes(multiDateInput)}
-                      className="px-3 py-2.5 bg-accent text-accent-foreground rounded-lg text-sm font-medium disabled:opacity-40 transition hover:opacity-90 shrink-0"
-                    >
-                      + Add
-                    </button>
-                  </div>
-                  {multiDates.length === 0 && (
-                    <p className="text-xs text-amber-600">Pick a date and click + Add</p>
-                  )}
-                  {multiDates.length > 0 && (
-                    <p className="text-xs text-muted-foreground">{multiDates.length} date{multiDates.length !== 1 ? "s" : ""} selected</p>
-                  )}
-                </div>
-              )}
 
               {/* Start / End Time */}
               <div className="grid grid-cols-2 gap-4">
@@ -662,7 +603,7 @@ export default function NannyBookings() {
                 </button>
                 <button
                   type="submit"
-                  disabled={formLoading || !formData.clientName || (multiDateMode ? multiDates.length === 0 : !formData.startDate) || !formData.startTime || (formHours > 0 && formHours < 3)}
+                  disabled={formLoading || !formData.clientName || !formData.startDate || !formData.startTime || (formHours > 0 && formHours < 3)}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 gradient-warm text-white text-sm font-medium rounded-lg shadow-warm hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
                   {formLoading && <Loader2 className="w-4 h-4 animate-spin" />}

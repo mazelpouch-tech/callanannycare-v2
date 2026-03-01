@@ -277,15 +277,8 @@ export default function AdminBookings() {
     recurringType: "weekly",
     recurringCount: "4",
   });
-  // ── Multi-date mode (non-contiguous date selection) ─────────
-  const [multiDateMode, setMultiDateMode] = useState(false);
-  const [multiDates, setMultiDates] = useState<string[]>([]);
-  const [multiDateInput, setMultiDateInput] = useState("");
-  const addMultiDate = (d: string) => {
-    if (!d || multiDates.includes(d)) return;
-    setMultiDates((prev) => [...prev, d].sort());
-  };
-  const removeMultiDate = (d: string) => setMultiDates((prev) => prev.filter((x) => x !== d));
+  // ── Number of days for new booking ──────────────────────────
+  const [newBookingNumDays, setNewBookingNumDays] = useState(1);
 
   // Edit Booking Modal
   const [showEditBooking, setShowEditBooking] = useState(false);
@@ -469,14 +462,7 @@ export default function AdminBookings() {
     return endH > startH ? endH - startH : (24 - startH) + endH;
   }, [newBooking.startTime, newBooking.endTime]);
 
-  const newBookingDays = useMemo(() => {
-    if (multiDateMode) return Math.max(1, multiDates.length);
-    if (!newBooking.date) return 1;
-    if (!newBooking.endDate || newBooking.endDate === newBooking.date) return 1;
-    const d1 = new Date(newBooking.date).getTime();
-    const d2 = new Date(newBooking.endDate).getTime();
-    return isNaN(d1) || isNaN(d2) ? 1 : Math.max(1, Math.round((d2 - d1) / 86400000) + 1);
-  }, [newBooking.date, newBooking.endDate, multiDateMode, multiDates]);
+  const newBookingDays = newBookingNumDays;
 
   const newBookingPrice = useMemo(() => {
     if (!selectedNanny) return 0;
@@ -491,22 +477,15 @@ export default function AdminBookings() {
 
   const handleNewBookingSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (multiDateMode) {
-      if (!selectedNanny || multiDates.length === 0 || !newBooking.clientName) return;
-    } else {
-      if (!selectedNanny || !newBooking.date || !newBooking.clientName) return;
-    }
+    if (!selectedNanny || !newBooking.date || !newBooking.clientName) return;
     setNewBookingError(null);
     setNewBookingLoading(true);
 
     const startLabel = TIME_SLOTS.find((s) => s.value === newBooking.startTime)?.label || newBooking.startTime;
     const endLabel = TIME_SLOTS.find((s) => s.value === newBooking.endTime)?.label || newBooking.endTime;
 
-    // Always create one booking per day (multi-date, date-range, or single)
-    const effectiveDate = newBooking.date;
-
-    // Daily price = hourly total for one day (used per booking)
-    const dailyPrice = newBookingPrice;
+    // Per-day price (newBookingPrice = total for numDays, so divide back)
+    const dailyPrice = Math.round(newBookingPrice / Math.max(1, newBookingNumDays));
 
     const baseBookingData = {
       nannyId: selectedNanny.id,
@@ -530,14 +509,9 @@ export default function AdminBookings() {
     };
 
     try {
-      if (multiDateMode) {
-        // Create one booking per selected date, each with the daily price
-        for (const d of multiDates) {
-          await addBooking({ ...baseBookingData, date: d, endDate: null, totalPrice: dailyPrice });
-        }
-      } else if (newBooking.recurring) {
+      if (newBooking.recurring) {
         const count = Math.max(1, Math.min(12, parseInt(newBooking.recurringCount) || 4));
-        const dates: string[] = [effectiveDate];
+        const dates: string[] = [newBooking.date];
         const offsetDays = newBooking.recurringType === 'weekly' ? 7 : newBooking.recurringType === 'biweekly' ? 14 : 30;
         for (let i = 1; i < count; i++) {
           const d = new Date(dates[dates.length - 1]);
@@ -545,27 +519,20 @@ export default function AdminBookings() {
           dates.push(d.toISOString().slice(0, 10));
         }
         for (const date of dates) {
-          await addBooking({ ...baseBookingData, date });
+          await addBooking({ ...baseBookingData, date, totalPrice: dailyPrice });
         }
       } else {
-        // Date range or single date — expand into per-day bookings
-        const startD = new Date(effectiveDate);
-        const endD = newBooking.endDate ? new Date(newBooking.endDate) : startD;
-        const rangeDates: string[] = [];
-        const cur = new Date(startD);
-        while (cur <= endD) {
-          rangeDates.push(cur.toISOString().slice(0, 10));
-          cur.setDate(cur.getDate() + 1);
-        }
-        for (const d of rangeDates) {
-          await addBooking({ ...baseBookingData, date: d, totalPrice: dailyPrice });
+        // Generate N consecutive daily bookings from start date
+        const startD = new Date(newBooking.date);
+        for (let i = 0; i < newBookingNumDays; i++) {
+          const d = new Date(startD);
+          d.setDate(d.getDate() + i);
+          await addBooking({ ...baseBookingData, date: d.toISOString().slice(0, 10), totalPrice: dailyPrice });
         }
       }
       setShowNewBooking(false);
       setRebookClientName(null);
-      setMultiDateMode(false);
-      setMultiDates([]);
-      setMultiDateInput("");
+      setNewBookingNumDays(1);
       setNewBooking({
         nannyId: "",
         clientName: "",
@@ -2473,108 +2440,48 @@ export default function AdminBookings() {
                 </div>
               </div>
 
-              {/* Date Range */}
-              {/* Date mode toggle */}
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => { setMultiDateMode(false); setMultiDates([]); setMultiDateInput(""); }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${!multiDateMode ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
-                >
-                  Date range
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setMultiDateMode(true); setMultiDates([]); setMultiDateInput(""); setNewBooking({ ...newBooking, endDate: "" }); }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${multiDateMode ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
-                >
-                  Multiple dates
-                </button>
-                {newBookingDays > 0 && newBookingPrice > 0 && (
-                  <span className="ml-auto text-xs text-muted-foreground font-medium">
-                    {multiDateMode
-                      ? `${newBookingDays} day${newBookingDays !== 1 ? "s" : ""} · ${Math.round(newBookingPrice / Math.max(1, newBookingDays))}€/day · ${newBookingPrice}€ total`
-                      : newBookingDays > 1
-                        ? `${newBookingDays} days · ${newBookingPrice}€`
-                        : `${newBookingPrice}€`}
-                  </span>
-                )}
-              </div>
-
-              {!multiDateMode ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                      Start Date <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={newBooking.date}
-                      onChange={(e) => setNewBooking({ ...newBooking, date: e.target.value })}
-                      required={!multiDateMode}
-                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
-                    />
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                      End Date
-                    </label>
-                    <input
-                      type="date"
-                      value={newBooking.endDate}
-                      min={newBooking.date}
-                      onChange={(e) => setNewBooking({ ...newBooking, endDate: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
-                    />
-                  </div>
-                </div>
-              ) : (
-                /* Multi-date picker */
-                <div className="space-y-2">
-                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+              {/* Start Date + Days Counter */}
+              <div className="space-y-3">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
                     <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                    Selected Dates <span className="text-destructive">*</span>
+                    Start Date <span className="text-destructive">*</span>
                   </label>
-                  {/* Chips of selected dates */}
-                  {multiDates.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {multiDates.map((d) => (
-                        <span key={d} className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary/10 text-primary text-xs font-medium rounded-full border border-primary/20">
-                          {d}
-                          <button type="button" onClick={() => removeMultiDate(d)} className="ml-0.5 text-primary/70 hover:text-red-500 transition-colors">×</button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {/* Add date input */}
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="date"
-                      value={multiDateInput}
-                      onChange={(e) => setMultiDateInput(e.target.value)}
-                      className="flex-1 px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (multiDateInput) {
-                          addMultiDate(multiDateInput);
-                          setMultiDateInput("");
-                        }
-                      }}
-                      disabled={!multiDateInput || multiDates.includes(multiDateInput)}
-                      className="px-3 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-40 transition hover:bg-primary/90 shrink-0"
-                    >
-                      + Add
-                    </button>
-                  </div>
-                  {multiDates.length === 0 && (
-                    <p className="text-xs text-amber-600">Pick a date and click + Add</p>
-                  )}
+                  <input
+                    type="date"
+                    value={newBooking.date}
+                    onChange={(e) => setNewBooking({ ...newBooking, date: e.target.value })}
+                    required
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  />
                 </div>
-              )}
+                <div className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border bg-muted/30">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Number of days</p>
+                    {newBooking.date && newBookingNumDays > 1 && (() => {
+                      const start = new Date(newBooking.date);
+                      const end = new Date(newBooking.date);
+                      end.setDate(end.getDate() + newBookingNumDays - 1);
+                      return (
+                        <p className="text-xs text-primary mt-0.5">
+                          {newBooking.date} → {end.toISOString().slice(0, 10)} · {newBookingNumDays} separate bookings
+                          {newBookingPrice > 0 && ` · ${Math.round(newBookingPrice / newBookingNumDays)}€/day · ${newBookingPrice}€ total`}
+                        </p>
+                      );
+                    })()}
+                    {(newBookingNumDays === 1 && newBookingPrice > 0) && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{newBookingPrice}€</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button type="button" onClick={() => setNewBookingNumDays(Math.max(1, newBookingNumDays - 1))} disabled={newBookingNumDays <= 1}
+                      className="w-8 h-8 rounded-full border border-border bg-background flex items-center justify-center text-lg font-bold hover:bg-muted transition-colors disabled:opacity-30">−</button>
+                    <span className="w-7 text-center font-bold text-foreground">{newBookingNumDays}</span>
+                    <button type="button" onClick={() => setNewBookingNumDays(Math.min(14, newBookingNumDays + 1))} disabled={newBookingNumDays >= 14}
+                      className="w-8 h-8 rounded-full border border-border bg-background flex items-center justify-center text-lg font-bold hover:bg-muted transition-colors disabled:opacity-30">+</button>
+                  </div>
+                </div>
+              </div>
 
               {/* Time */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2789,7 +2696,7 @@ export default function AdminBookings() {
                 </button>
                 <button
                   type="submit"
-                  disabled={newBookingLoading || !newBooking.nannyId || (multiDateMode ? multiDates.length === 0 : !newBooking.date) || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime || conflicts.length > 0 || (newBookingHours > 0 && newBookingHours < 3)}
+                  disabled={newBookingLoading || !newBooking.nannyId || !newBooking.date || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime || conflicts.length > 0 || (newBookingHours > 0 && newBookingHours < 3)}
                   className="flex-1 gradient-warm text-white rounded-xl px-4 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {newBookingLoading ? (
