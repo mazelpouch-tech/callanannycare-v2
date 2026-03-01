@@ -42,6 +42,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
+    // Ensure admin_notes column exists (added after initial schema)
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS admin_notes TEXT DEFAULT ''`;
+
     if (req.method === 'GET') {
       const result = await sql`
         SELECT b.*, n.name as nanny_name, n.image as nanny_image
