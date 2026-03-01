@@ -43,6 +43,10 @@ export default function AdminRevenue() {
   const [bulkNote, setBulkNote] = useState("");
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
 
+  // ── Collect date range filter ──
+  const [collectDateFrom, setCollectDateFrom] = useState<string>("");
+  const [collectDateTo, setCollectDateTo] = useState<string>("");
+
   // ── Financial period filter ──
   const [financialPeriod, setFinancialPeriod] = useState<FinancialPeriod>("month");
   const [customStart, setCustomStart] = useState<string>(() => format(startOfMonth(new Date()), "yyyy-MM-dd"));
@@ -105,13 +109,23 @@ export default function AdminRevenue() {
         (b) => b.clientName?.toLowerCase().includes(q) || b.clientPhone?.toLowerCase().includes(q) || b.hotel?.toLowerCase().includes(q)
       );
     }
+    if (collectDateFrom || collectDateTo) {
+      filtered = filtered.filter((b) => {
+        try {
+          const d = parseISO(b.date);
+          if (collectDateFrom && d < parseISO(collectDateFrom)) return false;
+          if (collectDateTo && d > parseISO(collectDateTo)) return false;
+          return true;
+        } catch { return true; }
+      });
+    }
     return filtered.sort((a, b) => {
       const aOv = isOverdue(a) ? 0 : 1;
       const bOv = isOverdue(b) ? 0 : 1;
       if (aOv !== bOv) return aOv - bOv;
       return a.date.localeCompare(b.date);
     });
-  }, [bookings, nannyFilter, search, isOverdue]);
+  }, [bookings, nannyFilter, search, isOverdue, collectDateFrom, collectDateTo]);
 
   const collected = useMemo(() => {
     let filtered = bookings.filter((b) => !!b.collectedAt);
@@ -536,27 +550,56 @@ export default function AdminRevenue() {
 
       {/* ── Filters ── */}
       {(tab === "to-collect" || tab === "collected") && (
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by client, phone, or hotel..."
-              className="w-full pl-10 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-            />
-            {search && (
-              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                <X className="w-4 h-4" />
-              </button>
-            )}
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by client, phone, or hotel..."
+                className="w-full pl-10 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+              />
+              {search && (
+                <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <select value={nannyFilter} onChange={(e) => setNannyFilter(e.target.value)}
+              className="px-3 py-2.5 bg-card border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">
+              <option value="all">All Nannies</option>
+              {nannies.filter((n) => n.status === "active").map((n) => (
+                <option key={n.id} value={String(n.id)}>{n.name}</option>
+              ))}
+            </select>
           </div>
-          <select value={nannyFilter} onChange={(e) => setNannyFilter(e.target.value)}
-            className="px-3 py-2.5 bg-card border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">
-            <option value="all">All Nannies</option>
-            {nannies.filter((n) => n.status === "active").map((n) => (
-              <option key={n.id} value={String(n.id)}>{n.name}</option>
-            ))}
-          </select>
+          {tab === "to-collect" && (
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
+              <input
+                type="date"
+                value={collectDateFrom}
+                onChange={(e) => setCollectDateFrom(e.target.value)}
+                className="flex-1 px-3 py-2 bg-card border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              <span className="text-xs text-muted-foreground shrink-0">→</span>
+              <input
+                type="date"
+                value={collectDateTo}
+                onChange={(e) => setCollectDateTo(e.target.value)}
+                className="flex-1 px-3 py-2 bg-card border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              {(collectDateFrom || collectDateTo) && (
+                <button
+                  onClick={() => { setCollectDateFrom(""); setCollectDateTo(""); }}
+                  className="text-muted-foreground hover:text-foreground shrink-0"
+                  title="Clear date filter"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
