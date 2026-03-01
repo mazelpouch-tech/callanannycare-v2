@@ -908,11 +908,110 @@ export default function AdminBookings() {
   }, [bookings, clientHistory]);
 
   const clientHistoryStats = useMemo(() => {
-    const total = clientHistoryBookings.reduce((s, b) => s + (b.totalPrice || 0), 0);
+    const activeBookings = clientHistoryBookings.filter((b) => b.status !== "cancelled");
+    const activeTotal = activeBookings.reduce((s, b) => s + (b.totalPrice || 0), 0);
     const confirmed = clientHistoryBookings.filter((b) => b.status === "confirmed" || b.status === "completed").length;
     const lastBooking = clientHistoryBookings[0];
-    return { total, confirmed, count: clientHistoryBookings.length, lastBooking };
+    return { activeTotal, confirmed, count: clientHistoryBookings.length, lastBooking };
   }, [clientHistoryBookings]);
+
+  const handlePrintClientFile = () => {
+    if (!clientHistory || !clientHistoryStats.lastBooking) return;
+    const lb = clientHistoryStats.lastBooking;
+    const activeBookings = clientHistoryBookings.filter((b) => b.status !== "cancelled");
+    const rows = clientHistoryBookings.map((b) => {
+      const statusColor: Record<string, string> = {
+        confirmed: "#16a34a", completed: "#2563eb", cancelled: "#9ca3af", pending: "#d97706"
+      };
+      return `<tr>
+        <td>${b.date}${b.endDate && b.endDate !== b.date ? ` → ${b.endDate}` : ""}</td>
+        <td>${b.startTime || ""}${b.endTime ? `–${b.endTime}` : ""}</td>
+        <td>${b.nannyName || "—"}</td>
+        <td>${b.hotel || "—"}</td>
+        <td>${b.childrenCount || 1}</td>
+        <td style="font-weight:600">${b.totalPrice ? b.totalPrice + "€" : "—"}</td>
+        <td style="color:${statusColor[b.status] || "#333"};font-weight:600;text-transform:capitalize">${b.status}</td>
+      </tr>`;
+    }).join("");
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+      <title>Client File — ${clientHistory}</title>
+      <style>
+        *{box-sizing:border-box}body{font-family:Arial,sans-serif;max-width:860px;margin:0 auto;padding:24px;color:#111}
+        .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #e5e7eb;padding-bottom:16px;margin-bottom:20px}
+        h1{margin:0;font-size:22px;color:#111}h2{margin:4px 0 8px;font-size:16px;color:#555;font-weight:normal}
+        .contact{font-size:13px;color:#555;line-height:1.7}
+        .logo{font-size:12px;color:#888;text-align:right;line-height:1.8}
+        .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+        .stat{border:1px solid #e5e7eb;border-radius:8px;padding:12px;text-align:center}
+        .stat-val{font-size:20px;font-weight:700;color:#111}.stat-lbl{font-size:11px;color:#888;margin-top:2px}
+        table{width:100%;border-collapse:collapse;font-size:13px}
+        th{background:#f3f4f6;border:1px solid #e5e7eb;padding:8px 10px;text-align:left;font-size:12px;color:#555}
+        td{border:1px solid #e5e7eb;padding:8px 10px}
+        .total-row td{background:#f9fafb;font-weight:700;font-size:14px}
+        .footer{margin-top:24px;text-align:center;font-size:11px;color:#9ca3af}
+        @media print{body{padding:0}.no-print{display:none}}
+      </style></head><body>
+      <div class="header">
+        <div>
+          <h1>Client File</h1>
+          <h2>${clientHistory}</h2>
+          <div class="contact">
+            ${lb.clientEmail ? `📧 ${lb.clientEmail}<br>` : ""}
+            ${lb.clientPhone ? `📞 ${lb.clientPhone}` : ""}
+          </div>
+        </div>
+        <div class="logo">
+          <strong>Call a Nanny</strong><br>Marrakech<br>
+          Generated: ${new Date().toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"numeric" })}
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="stat-val">${clientHistoryStats.count}</div><div class="stat-lbl">Total Bookings</div></div>
+        <div class="stat"><div class="stat-val">${clientHistoryStats.confirmed}</div><div class="stat-lbl">Confirmed / Completed</div></div>
+        <div class="stat"><div class="stat-val">${clientHistoryStats.activeTotal}€</div><div class="stat-lbl">Total Amount (active)</div></div>
+      </div>
+      <table>
+        <thead><tr><th>Date</th><th>Time</th><th>Nanny</th><th>Location</th><th>Children</th><th>Price</th><th>Status</th></tr></thead>
+        <tbody>${rows}
+          <tr class="total-row">
+            <td colspan="5">Total (active bookings — confirmed, pending, completed)</td>
+            <td>${clientHistoryStats.activeTotal}€</td><td></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="footer">Call a Nanny — Admin System · ${new Date().toLocaleString()}</div>
+      <script>window.onload=()=>window.print()</script>
+    </body></html>`);
+    win.document.close();
+  };
+
+  const handleSendWhatsAppSummary = () => {
+    if (!clientHistory || !clientHistoryStats.lastBooking) return;
+    const lb = clientHistoryStats.lastBooking;
+    const phone = (lb.clientPhone || "").replace(/[\s\-\(\)]/g, "").replace(/^0/, "212");
+    if (!phone) { alert("No phone number found for this client."); return; }
+    const activeBookings = clientHistoryBookings.filter((b) => b.status !== "cancelled");
+    const lines = [
+      `📋 *Booking Summary — Call a Nanny*`,
+      ``,
+      `Hello ${clientHistory},`,
+      `Here is a summary of your bookings:`,
+      ``,
+      ...activeBookings.map((b) =>
+        `📅 ${b.date}${b.endDate && b.endDate !== b.date ? ` → ${b.endDate}` : ""} — ${b.startTime || ""}${b.endTime ? `–${b.endTime}` : ""}\n👶 ${b.nannyName || "Nanny TBD"} · ${b.hotel || ""}\n💰 ${b.totalPrice || 0}€ (${b.status})`
+      ),
+      ``,
+      `─────────────────`,
+      `💰 *Total: ${clientHistoryStats.activeTotal}€*`,
+      ``,
+      `Thank you for choosing us!`,
+      `💕 Call a Nanny — Marrakech`,
+    ];
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(lines.join("\n"))}`;
+    window.open(url, "_blank");
+  };
   // ─────────────────────────────────────────────────────────────
 
   // ── Bulk selection ───────────────────────────────────────────
@@ -3225,8 +3324,8 @@ export default function AdminBookings() {
             <div className="grid grid-cols-3 divide-x divide-border border-b border-border">
               {[
                 { label: "Total bookings", value: clientHistoryStats.count },
-                { label: "Completed", value: clientHistoryStats.confirmed },
-                { label: "Total spent", value: `${clientHistoryStats.total}€` },
+                { label: "Confirmed", value: clientHistoryStats.confirmed },
+                { label: "Total (active)", value: `${clientHistoryStats.activeTotal}€` },
               ].map((s) => (
                 <div key={s.label} className="px-4 py-3 text-center">
                   <p className="text-lg font-bold text-foreground">{s.value}</p>
@@ -3247,6 +3346,24 @@ export default function AdminBookings() {
               </div>
             )}
 
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 px-6 py-3 border-b border-border bg-muted/20">
+              <button
+                onClick={handleSendWhatsAppSummary}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition-colors"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                Send Summary via WhatsApp
+              </button>
+              <button
+                onClick={handlePrintClientFile}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background text-xs font-medium hover:bg-muted transition-colors"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Print / Save PDF
+              </button>
+            </div>
+
             {/* Booking list */}
             <div className="flex-1 overflow-y-auto divide-y divide-border">
               {clientHistoryBookings.length === 0 ? (
@@ -3260,16 +3377,12 @@ export default function AdminBookings() {
                     cancelled: "bg-gray-100 text-gray-500",
                   };
                   return (
-                    <div key={b.id} className="px-6 py-4 hover:bg-muted/30 transition-colors">
+                    <div key={b.id} className={`px-6 py-4 hover:bg-muted/30 transition-colors ${b.status === "cancelled" ? "opacity-50" : ""}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <span className="text-sm font-semibold text-foreground">
-                              {b.extraDates && b.extraDates.length > 0
-                                ? [b.date, ...b.extraDates].join(", ")
-                                : b.endDate && b.endDate !== b.date
-                                  ? `${b.date} → ${b.endDate}`
-                                  : b.date}
+                              {b.endDate && b.endDate !== b.date ? `${b.date} → ${b.endDate}` : b.date}
                             </span>
                             {b.startTime && (
                               <span className="text-xs text-muted-foreground">{b.startTime}{b.endTime ? `–${b.endTime}` : ""}</span>
@@ -3278,9 +3391,7 @@ export default function AdminBookings() {
                           <p className="text-xs text-muted-foreground truncate">
                             👶 {b.nannyName || "Unassigned"} · {b.hotel || "No location"}
                           </p>
-                          {b.numChildren && (
-                            <p className="text-xs text-muted-foreground">{b.numChildren} child{b.numChildren !== 1 ? "ren" : ""}</p>
-                          )}
+                          <p className="text-xs text-muted-foreground">{b.childrenCount || 1} child{(b.childrenCount || 1) !== 1 ? "ren" : ""}</p>
                         </div>
                         <div className="flex flex-col items-end gap-1.5 shrink-0">
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize ${statusColors[b.status] || statusColors.pending}`}>
@@ -3302,6 +3413,20 @@ export default function AdminBookings() {
                 })
               )}
             </div>
+
+            {/* Sticky total footer */}
+            {clientHistoryStats.activeTotal > 0 && (
+              <div className="border-t border-border px-6 py-4 bg-card flex items-center justify-between shrink-0">
+                <div>
+                  <p className="text-xs text-muted-foreground">Active bookings total</p>
+                  <p className="text-[10px] text-muted-foreground">(excludes cancelled)</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold text-foreground">{clientHistoryStats.activeTotal}€</p>
+                  <p className="text-xs text-muted-foreground">{toDH(clientHistoryStats.activeTotal).toLocaleString()} DH</p>
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}
