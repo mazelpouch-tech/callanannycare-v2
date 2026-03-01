@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   format,
+  addDays,
   addMonths,
   subMonths,
   startOfMonth,
@@ -237,6 +238,31 @@ function StepDateTime({
   const [rangeStart, setRangeStart] = useState<Date | null>(null);
   const [hoveredDate, setHoveredDate] = useState<Date | null>(null);
 
+  // Recurring (daily repeat) state
+  const [recurringEnabled, setRecurringEnabled] = useState(false);
+  const [recurringDays, setRecurringDays] = useState(2);
+
+  const applyRecurring = (startDate: Date, days: number) => {
+    const dates = Array.from({ length: days }, (_, i) => startOfDay(addDays(startDate, i)));
+    onDatesChange(dates);
+  };
+
+  const handleRecurringToggle = () => {
+    if (!recurringEnabled) {
+      const start = selectedDates[0] || startOfDay(new Date());
+      applyRecurring(start, recurringDays);
+    }
+    setRecurringEnabled((v) => !v);
+  };
+
+  const handleRecurringDaysChange = (days: number) => {
+    const clamped = Math.max(2, Math.min(14, days));
+    setRecurringDays(clamped);
+    if (recurringEnabled && selectedDates.length > 0) {
+      applyRecurring(selectedDates[0], clamped);
+    }
+  };
+
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -267,6 +293,12 @@ function StepDateTime({
   }, [rangeStart, hoveredDate]);
 
   const handleDateClick = (day: Date) => {
+    if (recurringEnabled) {
+      // In recurring mode: tap any date to set it as start, auto-fill N days
+      applyRecurring(day, recurringDays);
+      setRangeStart(null);
+      return;
+    }
     if (!rangeStart) {
       // First click — set range start
       setRangeStart(day);
@@ -446,6 +478,57 @@ function StepDateTime({
           Minimum booking duration is <strong>3 hours</strong>. Please adjust your end time.
         </p>
       )}
+
+      {/* Daily recurring option */}
+      <div className="mb-6 p-4 rounded-xl border border-border bg-card">
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <div
+            onClick={handleRecurringToggle}
+            className={`relative w-10 h-5.5 rounded-full transition-colors flex-shrink-0 cursor-pointer ${recurringEnabled ? "bg-primary" : "bg-muted-foreground/30"}`}
+            style={{ width: 40, height: 22 }}
+          >
+            <span
+              className="absolute top-0.5 left-0.5 w-4.5 h-4.5 bg-white rounded-full shadow transition-transform"
+              style={{ width: 18, height: 18, transform: recurringEnabled ? "translateX(18px)" : "translateX(0)" }}
+            />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              {locale === "fr" ? "Réservation quotidienne récurrente" : "Repeat booking daily"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {locale === "fr"
+                ? "Sélectionnez une date de départ, puis le nombre de jours consécutifs"
+                : "Tap a start date on the calendar, then set how many consecutive days"}
+            </p>
+          </div>
+        </label>
+        {recurringEnabled && (
+          <div className="mt-3 flex items-center gap-3">
+            <span className="text-sm text-muted-foreground">{locale === "fr" ? "Nombre de jours :" : "Number of days:"}</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleRecurringDaysChange(recurringDays - 1)}
+                disabled={recurringDays <= 2}
+                className="w-8 h-8 rounded-full border border-border bg-background flex items-center justify-center text-lg font-bold hover:bg-muted transition-colors disabled:opacity-30"
+              >−</button>
+              <span className="w-8 text-center font-bold text-foreground text-lg">{recurringDays}</span>
+              <button
+                type="button"
+                onClick={() => handleRecurringDaysChange(recurringDays + 1)}
+                disabled={recurringDays >= 14}
+                className="w-8 h-8 rounded-full border border-border bg-background flex items-center justify-center text-lg font-bold hover:bg-muted transition-colors disabled:opacity-30"
+              >+</button>
+            </div>
+            {selectedDates.length > 0 && (
+              <span className="text-xs text-primary font-medium">
+                {recurringDays} {locale === "fr" ? "jours" : "days"} · {selectedDates.length === recurringDays ? `${format(selectedDates[0], "MMM d")} → ${format(selectedDates[selectedDates.length - 1], "MMM d")}` : ""}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Navigation */}
       <div className={`flex ${onBack ? "justify-between" : "justify-end"}`}>
@@ -1280,17 +1363,14 @@ export default function Book() {
       .join(", ");
 
     try {
-      // Create a single booking with date range
-      const firstDate = format(selectedDates[0], "yyyy-MM-dd");
-      const lastDate = selectedDates.length > 1 ? format(selectedDates[selectedDates.length - 1], "yyyy-MM-dd") : null;
+      // Create one booking per selected date (each with daily price)
+      const dailyPrice = Math.round(totalPrice / selectedDates.length);
 
-      const bookingPayload = {
-        date: firstDate,
-        endDate: lastDate,
+      const basePayload = {
         startTime: startLabel,
         endTime: endLabel,
         plan: "hourly" as BookingPlan,
-        totalPrice,
+        totalPrice: dailyPrice,
         clientName: details.fullName,
         clientEmail: details.email,
         clientPhone: details.phone,
@@ -1302,9 +1382,12 @@ export default function Book() {
         nannyName: "",
         nannyImage: "",
         status: "pending" as const,
+        endDate: null,
       };
 
-      await addBooking(bookingPayload, { locale });
+      for (const d of selectedDates) {
+        await addBooking({ ...basePayload, date: format(d, "yyyy-MM-dd") }, { locale });
+      }
 
       // Send booking info to Web3Forms (email to info@callanannycare.com)
       if (WEB3FORMS_KEY) {
@@ -1347,7 +1430,7 @@ export default function Book() {
         dates: selectedDates.map((d) => format(d, "yyyy-MM-dd")),
         startTime: startLabel,
         endTime: endLabel,
-        totalPrice,
+        totalPrice, // show grand total on success screen
         fullName: details.fullName,
         email: details.email,
         phone: details.phone,
