@@ -280,6 +280,8 @@ export default function AdminBookings() {
   });
   // ── Number of days for new booking ──────────────────────────
   const [newBookingNumDays, setNewBookingNumDays] = useState(1);
+  const [dayTimeOverrides, setDayTimeOverrides] = useState<Record<number, { startTime: string; endTime: string }>>({});
+  const [editingDayIdx, setEditingDayIdx] = useState<number | null>(null);
 
   // Edit Booking Modal
   const [showEditBooking, setShowEditBooking] = useState(false);
@@ -476,6 +478,16 @@ export default function AdminBookings() {
     return hourlyTotal + taxiFee;
   }, [selectedNanny, newBookingHours, newBookingDays, newBooking.startTime, newBooking.endTime]);
 
+  const calcDayPrice = (startT: string, endT: string, nanny: { rate: number }) => {
+    if (!startT || !endT) return 0;
+    const [sh, sm = 0] = startT.split(":").map(Number);
+    const [eh, em = 0] = endT.split(":").map(Number);
+    let hours = (eh + em / 60) - (sh + sm / 60);
+    if (hours <= 0) hours += 24;
+    const isEvening = sh >= 19 || sh < 7 || (eh + em / 60) > 19;
+    return Math.round(nanny.rate * hours) + (isEvening ? 10 : 0);
+  };
+
   const handleNewBookingSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const chosenNanny = selectedNanny || bestAutoNanny;
@@ -524,17 +536,31 @@ export default function AdminBookings() {
           await addBooking({ ...baseBookingData, date, totalPrice: dailyPrice });
         }
       } else {
-        // Generate N consecutive daily bookings from start date
+        // Generate N consecutive daily bookings from start date, respecting per-day time overrides
         const startD = new Date(newBooking.date);
         for (let i = 0; i < newBookingNumDays; i++) {
           const d = new Date(startD);
           d.setDate(d.getDate() + i);
-          await addBooking({ ...baseBookingData, date: d.toISOString().slice(0, 10), totalPrice: dailyPrice });
+          const override = dayTimeOverrides[i];
+          const dayStartVal = override?.startTime ?? newBooking.startTime;
+          const dayEndVal = override?.endTime ?? newBooking.endTime;
+          const dayStartLabel = TIME_SLOTS.find((s) => s.value === dayStartVal)?.label || dayStartVal;
+          const dayEndLabel = TIME_SLOTS.find((s) => s.value === dayEndVal)?.label || dayEndVal;
+          const dayPrice = override ? calcDayPrice(dayStartVal, dayEndVal, chosenNanny) : dailyPrice;
+          await addBooking({
+            ...baseBookingData,
+            date: d.toISOString().slice(0, 10),
+            startTime: dayStartLabel,
+            endTime: dayEndLabel,
+            totalPrice: dayPrice,
+          });
         }
       }
       setShowNewBooking(false);
       setRebookClientName(null);
       setNewBookingNumDays(1);
+      setDayTimeOverrides({});
+      setEditingDayIdx(null);
       setNewBooking({
         nannyId: "",
         clientName: "",
@@ -2614,6 +2640,69 @@ export default function AdminBookings() {
                   </select>
                 </div>
               </div>
+
+              {/* Per-day schedule overrides — shown when N > 1 and times are set */}
+              {newBookingNumDays > 1 && newBooking.startTime && newBooking.date && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Daily schedule</p>
+                  <div className="space-y-1">
+                    {Array.from({ length: newBookingNumDays }, (_, i) => {
+                      const d = new Date(newBooking.date);
+                      d.setDate(d.getDate() + i);
+                      const override = dayTimeOverrides[i];
+                      const dayStart = override?.startTime ?? newBooking.startTime;
+                      const dayEnd = override?.endTime ?? newBooking.endTime;
+                      const startLabel = TIME_SLOTS.find((s) => s.value === dayStart)?.label ?? dayStart;
+                      const endLabel = TIME_SLOTS.find((s) => s.value === dayEnd)?.label ?? dayEnd;
+                      const isEditing = editingDayIdx === i;
+                      return (
+                        <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${override ? "border-primary/40 bg-primary/5" : "border-border bg-muted/20"}`}>
+                          <span className="text-xs font-medium text-foreground w-24 shrink-0">
+                            {format(d, "EEE, MMM d")}
+                          </span>
+                          {isEditing ? (
+                            <>
+                              <select
+                                value={dayStart}
+                                onChange={(e) => setDayTimeOverrides((prev) => ({ ...prev, [i]: { startTime: e.target.value, endTime: dayEnd } }))}
+                                className="flex-1 px-2 py-1 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-primary/30"
+                              >
+                                {TIME_SLOTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                              </select>
+                              <span className="text-xs text-muted-foreground">→</span>
+                              <select
+                                value={dayEnd}
+                                onChange={(e) => setDayTimeOverrides((prev) => ({ ...prev, [i]: { startTime: dayStart, endTime: e.target.value } }))}
+                                className="flex-1 px-2 py-1 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-primary/30"
+                              >
+                                {TIME_SLOTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                              </select>
+                              <button type="button" onClick={() => setEditingDayIdx(null)} className="p-1 rounded hover:bg-muted transition-colors text-primary">
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span className={`text-xs flex-1 ${override ? "text-primary font-medium" : "text-muted-foreground"}`}>
+                                {startLabel} → {endLabel}
+                                {override && <span className="ml-1.5 text-[10px] bg-primary/10 text-primary px-1 py-0.5 rounded">custom</span>}
+                              </span>
+                              <button type="button" onClick={() => setEditingDayIdx(i)} className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              {override && (
+                                <button type="button" onClick={() => { setDayTimeOverrides((prev) => { const n = { ...prev }; delete n[i]; return n; }); }} className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-destructive">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Children & Status */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

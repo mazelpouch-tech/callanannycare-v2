@@ -54,6 +54,8 @@ interface StepDateTimeProps {
   onStartTimeChange: (time: string) => void;
   endTime: string;
   onEndTimeChange: (time: string) => void;
+  dayTimeOverrides: Record<number, { startTime: string; endTime: string }>;
+  onDayTimeOverridesChange: (overrides: Record<number, { startTime: string; endTime: string }>) => void;
   onBack?: () => void;
   onNext: () => void;
 }
@@ -226,6 +228,8 @@ function StepDateTime({
   onStartTimeChange,
   endTime,
   onEndTimeChange,
+  dayTimeOverrides,
+  onDayTimeOverridesChange,
   onBack,
   onNext,
 }: StepDateTimeProps) {
@@ -239,6 +243,7 @@ function StepDateTime({
   const [numDays, setNumDays] = useState(
     selectedDates.length > 1 ? selectedDates.length : 1
   );
+  const [editingDayIdx, setEditingDayIdx] = useState<number | null>(null);
 
   const applyDays = (startDate: Date, days: number) => {
     const dates = Array.from({ length: days }, (_, i) => startOfDay(addDays(startDate, i)));
@@ -454,6 +459,68 @@ function StepDateTime({
         </p>
       )}
 
+      {/* Per-day schedule overrides */}
+      {numDays > 1 && startTime && selectedDates.length > 1 && (
+        <div className="mb-6 space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            {locale === "fr" ? "Horaires par jour" : "Daily schedule"}
+          </p>
+          <div className="space-y-1.5">
+            {selectedDates.map((d, i) => {
+              const override = dayTimeOverrides[i];
+              const dayStart = override?.startTime ?? startTime;
+              const dayEnd = override?.endTime ?? endTime;
+              const startLabel = TIME_SLOTS.find((s) => s.value === dayStart)?.label ?? dayStart;
+              const endLabel = TIME_SLOTS.find((s) => s.value === dayEnd)?.label ?? dayEnd;
+              const isEditing = editingDayIdx === i;
+              return (
+                <div key={i} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${override ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
+                  <span className="text-xs font-medium text-foreground w-24 shrink-0">
+                    {format(d, "EEE, MMM d", { locale: dateFnsLocale })}
+                  </span>
+                  {isEditing ? (
+                    <>
+                      <select
+                        value={dayStart}
+                        onChange={(e) => onDayTimeOverridesChange({ ...dayTimeOverrides, [i]: { startTime: e.target.value, endTime: dayEnd } })}
+                        className="flex-1 px-2 py-1.5 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      >
+                        {TIME_SLOTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                      </select>
+                      <span className="text-xs text-muted-foreground">→</span>
+                      <select
+                        value={dayEnd}
+                        onChange={(e) => onDayTimeOverridesChange({ ...dayTimeOverrides, [i]: { startTime: dayStart, endTime: e.target.value } })}
+                        className="flex-1 px-2 py-1.5 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      >
+                        {TIME_SLOTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                      </select>
+                      <button type="button" onClick={() => setEditingDayIdx(null)} className="p-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className={`text-xs flex-1 ${override ? "text-primary font-medium" : "text-muted-foreground"}`}>
+                        {startLabel} → {endLabel}
+                        {override && <span className="ml-1.5 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">custom</span>}
+                      </span>
+                      <button type="button" onClick={() => setEditingDayIdx(i)} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      {override && (
+                        <button type="button" onClick={() => { const n = { ...dayTimeOverrides }; delete n[i]; onDayTimeOverridesChange(n); }} className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-destructive">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Navigation */}
       <div className={`flex ${onBack ? "justify-between" : "justify-end"}`}>
@@ -1204,6 +1271,7 @@ export default function Book() {
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [dayTimeOverrides, setDayTimeOverrides] = useState<Record<number, { startTime: string; endTime: string }>>({});
 
   // Step 2 state — initialize from localStorage
   const [details, setDetails] = useState<BookingDetails>(loadSavedParent);
@@ -1288,8 +1356,8 @@ export default function Book() {
       .join(", ");
 
     try {
-      // Create one booking per selected date (each with daily price)
-      const dailyPrice = Math.round(totalPrice / selectedDates.length);
+      // Create one booking per selected date (each with per-day price)
+      const defaultDailyPrice = Math.round(totalPrice / selectedDates.length);
 
       const basePayload = {
         startTime: startLabel,
@@ -1310,8 +1378,29 @@ export default function Book() {
         endDate: null,
       };
 
-      for (const d of selectedDates) {
-        await addBooking({ ...basePayload, date: format(d, "yyyy-MM-dd") }, { locale });
+      for (let i = 0; i < selectedDates.length; i++) {
+        const d = selectedDates[i];
+        const override = dayTimeOverrides[i];
+        if (override) {
+          const [osh, osm = 0] = override.startTime.split(":").map(Number);
+          const [oeh, oem = 0] = override.endTime.split(":").map(Number);
+          let oHours = (oeh + oem / 60) - (osh + osm / 60);
+          if (oHours <= 0) oHours += 24;
+          const [dsh, dsm = 0] = startTime.split(":").map(Number);
+          const [deh, dem = 0] = endTime.split(":").map(Number);
+          let defHours = (deh + dem / 60) - (dsh + dsm / 60);
+          if (defHours <= 0) defHours += 24;
+          const scaledPrice = defHours > 0 ? Math.round(defaultDailyPrice * oHours / defHours) : defaultDailyPrice;
+          await addBooking({
+            ...basePayload,
+            date: format(d, "yyyy-MM-dd"),
+            startTime: TIME_SLOTS.find((s) => s.value === override.startTime)?.label || override.startTime,
+            endTime: TIME_SLOTS.find((s) => s.value === override.endTime)?.label || override.endTime,
+            totalPrice: scaledPrice,
+          }, { locale });
+        } else {
+          await addBooking({ ...basePayload, date: format(d, "yyyy-MM-dd") }, { locale });
+        }
       }
 
       // Send booking info to Web3Forms (email to info@callanannycare.com)
@@ -1435,6 +1524,8 @@ export default function Book() {
             onStartTimeChange={setStartTime}
             endTime={endTime}
             onEndTimeChange={setEndTime}
+            dayTimeOverrides={dayTimeOverrides}
+            onDayTimeOverridesChange={setDayTimeOverrides}
             onBack={undefined}
             onNext={() => setStep(2)}
           />
