@@ -502,20 +502,16 @@ export default function AdminBookings() {
     const startLabel = TIME_SLOTS.find((s) => s.value === newBooking.startTime)?.label || newBooking.startTime;
     const endLabel = TIME_SLOTS.find((s) => s.value === newBooking.endTime)?.label || newBooking.endTime;
 
-    // For multi-date mode: one booking per date, each with daily price
-    // For date-range mode: one booking with start/end date, total price
+    // Always create one booking per day (multi-date, date-range, or single)
     const effectiveDate = newBooking.date;
-    const effectiveEndDate = multiDateMode ? null : (newBooking.endDate || null);
 
-    // Daily price (1 day worth of hours × rate + taxi)
-    const dailyPrice = multiDateMode && multiDates.length > 0
-      ? Math.round(newBookingPrice / multiDates.length)
-      : newBookingPrice;
+    // Daily price = hourly total for one day (used per booking)
+    const dailyPrice = newBookingPrice;
 
     const baseBookingData = {
       nannyId: selectedNanny.id,
       nannyName: selectedNanny.name,
-      endDate: effectiveEndDate,
+      endDate: null,
       startTime: startLabel,
       endTime: endLabel,
       plan: newBooking.plan as BookingPlan,
@@ -552,7 +548,18 @@ export default function AdminBookings() {
           await addBooking({ ...baseBookingData, date });
         }
       } else {
-        await addBooking({ ...baseBookingData, date: effectiveDate });
+        // Date range or single date — expand into per-day bookings
+        const startD = new Date(effectiveDate);
+        const endD = newBooking.endDate ? new Date(newBooking.endDate) : startD;
+        const rangeDates: string[] = [];
+        const cur = new Date(startD);
+        while (cur <= endD) {
+          rangeDates.push(cur.toISOString().slice(0, 10));
+          cur.setDate(cur.getDate() + 1);
+        }
+        for (const d of rangeDates) {
+          await addBooking({ ...baseBookingData, date: d, totalPrice: dailyPrice });
+        }
       }
       setShowNewBooking(false);
       setRebookClientName(null);

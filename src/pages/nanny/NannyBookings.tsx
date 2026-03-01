@@ -332,16 +332,18 @@ export default function NannyBookings() {
           await addBooking({ ...baseBooking, date: d, endDate: null, totalPrice: dailyPrice });
         }
       } else {
-        // Date range: calculate total price across all days
-        const startDate = new Date(formData.startDate);
-        const endDate = formData.endDate ? new Date(formData.endDate) : startDate;
-        const dayCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1);
-        await addBooking({
-          ...baseBooking,
-          date: formData.startDate,
-          endDate: formData.endDate || null,
-          totalPrice: dailyPrice * dayCount,
-        });
+        // Date range: expand into per-day bookings (one booking per day)
+        const startD = new Date(formData.startDate);
+        const endD = formData.endDate ? new Date(formData.endDate) : startD;
+        const rangeDates: string[] = [];
+        const cur = new Date(startD);
+        while (cur <= endD) {
+          rangeDates.push(cur.toISOString().slice(0, 10));
+          cur.setDate(cur.getDate() + 1);
+        }
+        for (const d of rangeDates) {
+          await addBooking({ ...baseBooking, date: d, endDate: null, totalPrice: dailyPrice });
+        }
       }
       setShowForm(false);
       setFormData(emptyForm);
