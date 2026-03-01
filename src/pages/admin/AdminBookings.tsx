@@ -280,6 +280,7 @@ export default function AdminBookings() {
   // ── Multi-date mode (non-contiguous date selection) ─────────
   const [multiDateMode, setMultiDateMode] = useState(false);
   const [multiDates, setMultiDates] = useState<string[]>([]);
+  const [multiDateInput, setMultiDateInput] = useState("");
   const addMultiDate = (d: string) => {
     if (!d || multiDates.includes(d)) return;
     setMultiDates((prev) => [...prev, d].sort());
@@ -547,6 +548,7 @@ export default function AdminBookings() {
       setRebookClientName(null);
       setMultiDateMode(false);
       setMultiDates([]);
+      setMultiDateInput("");
       setNewBooking({
         nannyId: "",
         clientName: "",
@@ -2360,14 +2362,14 @@ export default function AdminBookings() {
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => { setMultiDateMode(false); setMultiDates([]); }}
+                  onClick={() => { setMultiDateMode(false); setMultiDates([]); setMultiDateInput(""); }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${!multiDateMode ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
                 >
                   Date range
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setMultiDateMode(true); setNewBooking({ ...newBooking, endDate: "" }); }}
+                  onClick={() => { setMultiDateMode(true); setMultiDates([]); setMultiDateInput(""); setNewBooking({ ...newBooking, endDate: "" }); }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${multiDateMode ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
                 >
                   Multiple dates
@@ -2428,14 +2430,26 @@ export default function AdminBookings() {
                   <div className="flex items-center gap-2">
                     <input
                       type="date"
-                      id="multiDateInput"
+                      value={multiDateInput}
+                      onChange={(e) => setMultiDateInput(e.target.value)}
                       className="flex-1 px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
-                      onChange={(e) => { if (e.target.value) { addMultiDate(e.target.value); e.target.value = ""; } }}
                     />
-                    <span className="text-xs text-muted-foreground shrink-0">Pick each date</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (multiDateInput) {
+                          addMultiDate(multiDateInput);
+                          setMultiDateInput("");
+                        }
+                      }}
+                      disabled={!multiDateInput || multiDates.includes(multiDateInput)}
+                      className="px-3 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-40 transition hover:bg-primary/90 shrink-0"
+                    >
+                      + Add
+                    </button>
                   </div>
                   {multiDates.length === 0 && (
-                    <p className="text-xs text-amber-600">Add at least one date</p>
+                    <p className="text-xs text-amber-600">Pick a date and click + Add</p>
                   )}
                 </div>
               )}
