@@ -36,6 +36,7 @@ import {
   Repeat2,
   StickyNote,
   Activity,
+  Wand2,
 } from "lucide-react";
 import {
   format, parseISO, formatDistanceToNow, isToday,
@@ -477,7 +478,8 @@ export default function AdminBookings() {
 
   const handleNewBookingSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!selectedNanny || !newBooking.date || !newBooking.clientName) return;
+    const chosenNanny = selectedNanny || bestAutoNanny;
+    if (!chosenNanny || !newBooking.date || !newBooking.clientName) return;
     setNewBookingError(null);
     setNewBookingLoading(true);
 
@@ -488,8 +490,8 @@ export default function AdminBookings() {
     const dailyPrice = Math.round(newBookingPrice / Math.max(1, newBookingNumDays));
 
     const baseBookingData = {
-      nannyId: selectedNanny.id,
-      nannyName: selectedNanny.name,
+      nannyId: chosenNanny.id,
+      nannyName: chosenNanny.name,
       endDate: null,
       startTime: startLabel,
       endTime: endLabel,
@@ -659,14 +661,50 @@ export default function AdminBookings() {
     });
   }, [allActiveNannies, newBooking.nannyId, newBooking.date, newBooking.startTime, newBooking.endTime, conflicts.length, bookings]);
 
-  // Availability map: per nanny, whether they're free for the selected slot
+  // Availability map: per nanny, across ALL selected days
   const nannyAvailabilityMap = useMemo(() => {
     if (!newBooking.date || !newBooking.startTime) return null;
-    return allActiveNannies.map((n) => ({
-      nanny: n,
-      busy: getConflicts(String(n.id), newBooking.date, newBooking.startTime, newBooking.endTime).length > 0,
-    }));
-  }, [allActiveNannies, newBooking.date, newBooking.startTime, newBooking.endTime, bookings]);
+    const days: string[] = [];
+    for (let i = 0; i < newBookingNumDays; i++) {
+      const d = new Date(newBooking.date);
+      d.setDate(d.getDate() + i);
+      days.push(d.toISOString().slice(0, 10));
+    }
+    return allActiveNannies.map((n) => {
+      const busyDates = days.filter(
+        (date) => getConflicts(String(n.id), date, newBooking.startTime, newBooking.endTime).length > 0
+      );
+      return {
+        nanny: n,
+        freeDays: days.length - busyDates.length,
+        totalDays: days.length,
+        busyDates,
+        busy: busyDates.length === days.length,
+      };
+    });
+  }, [allActiveNannies, newBooking.date, newBooking.startTime, newBooking.endTime, newBookingNumDays, bookings]);
+
+  // Best nanny for auto-assign: free on ALL N days, prefer same hotel, then fewest bookings
+  const bestAutoNanny = useMemo(() => {
+    if (!nannyAvailabilityMap || !newBooking.date) return null;
+    const candidates = nannyAvailabilityMap
+      .filter(({ nanny: n, freeDays, totalDays }) => n.available && freeDays === totalDays)
+      .map(({ nanny: n }) => {
+        const totalActive = bookings.filter(
+          (b) => b.nannyId === n.id && b.status !== "cancelled" && !b.deletedAt
+        ).length;
+        const sameHotel = newBooking.hotel
+          ? bookings.some((b) => b.nannyId === n.id && b.hotel === newBooking.hotel && b.status !== "cancelled")
+          : false;
+        return { nanny: n, totalActive, sameHotel };
+      })
+      .sort((a, b) => {
+        if (a.sameHotel && !b.sameHotel) return -1;
+        if (!a.sameHotel && b.sameHotel) return 1;
+        return a.totalActive - b.totalActive;
+      });
+    return candidates[0]?.nanny ?? null;
+  }, [nannyAvailabilityMap, newBooking.date, newBooking.hotel, bookings]);
 
   // Unique nanny names for filter dropdown
   const uniqueNannyNames = useMemo(() => {
@@ -2342,36 +2380,81 @@ export default function AdminBookings() {
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
                   <User className="w-3.5 h-3.5 text-muted-foreground" />
-                  Select Nanny <span className="text-destructive">*</span>
+                  Assign Nanny
                 </label>
                 {/* Visual availability grid when date + time are set */}
                 {nannyAvailabilityMap ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {nannyAvailabilityMap.map(({ nanny: n, busy }) => {
+                    {/* Auto-assign card */}
+                    <button
+                      type="button"
+                      onClick={() => setNewBooking({ ...newBooking, nannyId: "" })}
+                      className={`flex flex-col items-start p-3 rounded-xl border-2 text-left transition-all ${
+                        !newBooking.nannyId
+                          ? "border-primary bg-primary/10 shadow-sm"
+                          : "border-dashed border-border bg-background hover:border-primary/40 hover:bg-primary/5"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 w-full mb-1">
+                        <Wand2 className={`w-3 h-3 shrink-0 ${!newBooking.nannyId ? "text-primary" : "text-muted-foreground"}`} />
+                        <span className="text-xs font-semibold text-foreground truncate flex-1">Auto-assign</span>
+                      </div>
+                      {bestAutoNanny ? (
+                        <>
+                          <span className="text-[11px] text-green-600 font-medium truncate w-full">{bestAutoNanny.name}</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {newBookingNumDays > 1 ? `Free all ${newBookingNumDays} days` : "Best available"}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-[10px] text-amber-500">
+                          {newBooking.date ? `No nanny free all ${newBookingNumDays} day${newBookingNumDays > 1 ? "s" : ""}` : "Set date first"}
+                        </span>
+                      )}
+                      {!newBooking.nannyId && (
+                        <span className="text-[10px] font-medium mt-1 text-primary">Selected</span>
+                      )}
+                    </button>
+                    {nannyAvailabilityMap.map(({ nanny: n, freeDays, totalDays, busy }) => {
                       const selected = String(n.id) === newBooking.nannyId;
+                      const partial = !busy && freeDays < totalDays;
+                      const dotColor = selected ? "bg-primary" : busy ? "bg-red-400" : partial ? "bg-amber-400" : "bg-green-400";
+                      const cardClass = selected
+                        ? "border-primary bg-primary/10 shadow-sm"
+                        : busy
+                        ? "border-border bg-muted/40 opacity-50 cursor-not-allowed"
+                        : partial
+                        ? "border-border bg-background hover:border-amber-400 hover:bg-amber-50/50"
+                        : "border-border bg-background hover:border-green-400 hover:bg-green-50";
+                      const statusLabel = selected
+                        ? "Selected"
+                        : busy
+                        ? "Busy"
+                        : totalDays > 1
+                        ? `Free ${freeDays}/${totalDays} days`
+                        : "Free";
+                      const statusColor = selected
+                        ? "text-primary"
+                        : busy
+                        ? "text-red-500"
+                        : partial
+                        ? "text-amber-500"
+                        : "text-green-600";
                       return (
                         <button
                           key={n.id}
                           type="button"
                           disabled={busy}
                           onClick={() => setNewBooking({ ...newBooking, nannyId: String(n.id) })}
-                          className={`flex flex-col items-start p-3 rounded-xl border-2 text-left transition-all ${
-                            selected
-                              ? "border-primary bg-primary/10 shadow-sm"
-                              : busy
-                              ? "border-border bg-muted/40 opacity-50 cursor-not-allowed"
-                              : "border-border bg-background hover:border-green-400 hover:bg-green-50"
-                          }`}
+                          className={`flex flex-col items-start p-3 rounded-xl border-2 text-left transition-all ${cardClass}`}
                         >
                           <div className="flex items-center gap-1.5 w-full mb-1">
-                            <span className={`w-2 h-2 rounded-full shrink-0 ${selected ? "bg-primary" : busy ? "bg-red-400" : "bg-green-400"}`} />
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
                             <span className="text-xs font-semibold text-foreground truncate flex-1">{n.name}</span>
                           </div>
                           <span className="text-[11px] text-muted-foreground">{n.rate}€/hr</span>
                           <span className="text-[10px] text-muted-foreground truncate w-full">{n.location}</span>
-                          <span className={`text-[10px] font-medium mt-1 ${selected ? "text-primary" : busy ? "text-red-500" : "text-green-600"}`}>
-                            {selected ? "Selected" : busy ? "Busy" : "Free"}
-                          </span>
+                          <span className={`text-[10px] font-medium mt-1 ${statusColor}`}>{statusLabel}</span>
                         </button>
                       );
                     })}
@@ -2381,10 +2464,9 @@ export default function AdminBookings() {
                   <select
                     value={newBooking.nannyId}
                     onChange={(e) => setNewBooking({ ...newBooking, nannyId: e.target.value })}
-                    required
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
                   >
-                    <option value="">Select date & time first to see availability...</option>
+                    <option value="">Auto-assign (set date & time first to preview)</option>
                     {availableNannies.map((n) => (
                       <option key={n.id} value={n.id}>
                         {n.name} — {n.rate}€/hr ({n.location})
@@ -2708,7 +2790,7 @@ export default function AdminBookings() {
                 </button>
                 <button
                   type="submit"
-                  disabled={newBookingLoading || !newBooking.nannyId || !newBooking.date || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime || conflicts.length > 0 || (newBookingHours > 0 && newBookingHours < 3)}
+                  disabled={newBookingLoading || (!newBooking.nannyId && !bestAutoNanny) || !newBooking.date || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime || conflicts.length > 0 || (newBookingHours > 0 && newBookingHours < 3)}
                   className="flex-1 gradient-warm text-white rounded-xl px-4 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {newBookingLoading ? (
