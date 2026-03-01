@@ -4,6 +4,7 @@ import {
   Phone, User, Calendar, ChevronDown, ChevronUp,
   Hotel, Search, X, AlertTriangle, MessageCircle,
   ArrowUpRight, ArrowDownRight, Banknote, CreditCard, Wallet,
+  Square, CheckSquare,
 } from "lucide-react";
 import {
   format, parseISO, isWithinInterval,
@@ -34,6 +35,13 @@ export default function AdminRevenue() {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [collectionNote, setCollectionNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ── Bulk selection ──
+  const [selectedIds, setSelectedIds] = useState<Set<number | string>>(new Set());
+  const [bulkModal, setBulkModal] = useState(false);
+  const [bulkPaymentMethod, setBulkPaymentMethod] = useState("cash");
+  const [bulkNote, setBulkNote] = useState("");
+  const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
 
   // ── Financial period filter ──
   const [financialPeriod, setFinancialPeriod] = useState<FinancialPeriod>("month");
@@ -173,6 +181,36 @@ export default function AdminRevenue() {
     }
   };
 
+  const handleBulkCollect = async () => {
+    if (selectedIds.size === 0) return;
+    setIsBulkSubmitting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      for (const id of ids) {
+        await markAsCollected(id, {
+          collectedBy: adminProfile?.name || "Admin",
+          paymentMethod: bulkPaymentMethod,
+          collectionNote: bulkNote.trim() || undefined,
+        });
+      }
+      setSelectedIds(new Set());
+      setBulkModal(false);
+      setBulkNote("");
+    } catch (err) {
+      console.error("Bulk collection failed:", err);
+    } finally {
+      setIsBulkSubmitting(false);
+    }
+  };
+
+  const toggleSelect = (id: number | string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   const openWhatsApp = (phone: string) => {
     window.open(`https://wa.me/${phone.replace(/\s+/g, "")}`, "_blank");
   };
@@ -181,19 +219,35 @@ export default function AdminRevenue() {
   const BookingCard = ({ b, variant }: { b: Booking; variant: "pending" | "collected" }) => {
     const overdue = variant === "pending" && isOverdue(b);
     const isOpen  = expandedId === b.id;
+    const isSelected = selectedIds.has(b.id);
 
     return (
       <div className={`bg-card rounded-2xl border overflow-hidden transition-shadow ${
         overdue       ? "border-red-300"   :
-        variant === "pending" ? "border-amber-200" :
+        variant === "pending" ? (isSelected ? "border-green-400 ring-1 ring-green-300" : "border-amber-200") :
         "border-green-200"
       } ${isOpen ? "shadow-md" : ""}`}>
 
         {/* ── Summary row — always visible ── */}
-        <button
-          className="w-full px-4 py-4 flex items-center gap-3 hover:bg-muted/20 transition-colors text-left"
-          onClick={() => setExpandedId(isOpen ? null : b.id)}
-        >
+        <div className="w-full px-4 py-4 flex items-center gap-3">
+          {/* Checkbox (pending only) */}
+          {variant === "pending" && (
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleSelect(b.id); }}
+              className="shrink-0 text-muted-foreground hover:text-green-600 transition-colors"
+              aria-label={isSelected ? "Deselect" : "Select"}
+            >
+              {isSelected
+                ? <CheckSquare className="w-5 h-5 text-green-600" />
+                : <Square className="w-5 h-5" />
+              }
+            </button>
+          )}
+
+          <button
+            className="flex-1 flex items-center gap-3 hover:bg-muted/20 transition-colors text-left -mx-1 px-1 rounded-xl"
+            onClick={() => setExpandedId(isOpen ? null : b.id)}
+          >
           {/* Icon */}
           <div className={`w-9 h-9 rounded-full shrink-0 flex items-center justify-center ${
             overdue ? "bg-red-50" : variant === "pending" ? "bg-amber-50" : "bg-green-50"
@@ -234,7 +288,8 @@ export default function AdminRevenue() {
           <div className="shrink-0 text-muted-foreground ml-1">
             {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </div>
-        </button>
+          </button>
+        </div>
 
         {/* ── Expanded panel ── */}
         {isOpen && (
@@ -516,7 +571,36 @@ export default function AdminRevenue() {
             </div>
           ) : (
             <>
+              {/* ── Select all bar ── */}
+              <div className="flex items-center gap-3 px-1">
+                <button
+                  onClick={() => {
+                    if (selectedIds.size === toCollect.length) {
+                      setSelectedIds(new Set());
+                    } else {
+                      setSelectedIds(new Set(toCollect.map((b) => b.id)));
+                    }
+                  }}
+                  className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {selectedIds.size === toCollect.length && toCollect.length > 0
+                    ? <CheckSquare className="w-4 h-4 text-green-600" />
+                    : <Square className="w-4 h-4" />
+                  }
+                  {selectedIds.size === toCollect.length && toCollect.length > 0
+                    ? "Deselect all"
+                    : "Select all"
+                  }
+                </button>
+                {selectedIds.size > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {selectedIds.size} of {toCollect.length} selected
+                  </span>
+                )}
+              </div>
+
               {toCollect.map((b) => <BookingCard key={b.id} b={b} variant="pending" />)}
+
               <div className={`rounded-2xl border p-4 flex items-center justify-between ${overdueCount > 0 ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}>
                 <p className={`text-sm font-medium ${overdueCount > 0 ? "text-red-800" : "text-amber-800"}`}>
                   {toCollect.length} booking{toCollect.length !== 1 ? "s" : ""}
@@ -526,6 +610,34 @@ export default function AdminRevenue() {
                   {totalToCollect}€ <span className="text-xs font-normal opacity-70">({toDH(totalToCollect)} DH)</span>
                 </p>
               </div>
+
+              {/* ── Bulk action bar ── */}
+              {selectedIds.size > 0 && (() => {
+                const selectedBookings = toCollect.filter((b) => selectedIds.has(b.id));
+                const bulkTotal = selectedBookings.reduce((s, b) => s + (b.totalPrice || 0), 0);
+                return (
+                  <div className="sticky bottom-4 z-30 rounded-2xl border border-green-400 bg-green-600 text-white shadow-xl p-4 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold">{selectedIds.size} booking{selectedIds.size !== 1 ? "s" : ""} selected</p>
+                      <p className="text-xs text-green-100">{bulkTotal}€ · {toDH(bulkTotal)} DH</p>
+                    </div>
+                    <button
+                      onClick={() => { setBulkPaymentMethod("cash"); setBulkNote(""); setBulkModal(true); }}
+                      className="shrink-0 flex items-center gap-2 px-4 py-2.5 bg-white text-green-700 font-semibold text-sm rounded-xl hover:bg-green-50 transition-colors"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Mark all collected
+                    </button>
+                    <button
+                      onClick={() => setSelectedIds(new Set())}
+                      className="shrink-0 p-1.5 rounded-lg hover:bg-green-700 transition-colors"
+                      aria-label="Clear selection"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>
@@ -610,6 +722,113 @@ export default function AdminRevenue() {
           )}
         </div>
       )}
+
+      {/* ── Bulk Collect Modal ── */}
+      {bulkModal && (() => {
+        const selectedBookings = toCollect.filter((b) => selectedIds.has(b.id));
+        const bulkTotal = selectedBookings.reduce((s, b) => s + (b.totalPrice || 0), 0);
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+            <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm" onClick={() => !isBulkSubmitting && setBulkModal(false)} />
+            <div className="relative bg-card rounded-t-3xl sm:rounded-2xl border border-border w-full sm:max-w-md mx-auto shadow-xl z-10 max-h-[90vh] overflow-y-auto">
+
+              {/* Header */}
+              <div className="px-6 pt-6 pb-4 border-b border-border flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-foreground">Confirm Bulk Collection</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">{selectedIds.size} booking{selectedIds.size !== 1 ? "s" : ""} selected</p>
+                </div>
+                <button
+                  onClick={() => !isBulkSubmitting && setBulkModal(false)}
+                  className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="px-6 py-5 space-y-5">
+                {/* Total highlight */}
+                <div className="bg-green-50 rounded-xl p-4 text-center border border-green-100">
+                  <p className="text-3xl font-bold text-green-700">{bulkTotal}€</p>
+                  <p className="text-sm text-green-600 mt-1">{toDH(bulkTotal)} DH · {selectedIds.size} bookings</p>
+                </div>
+
+                {/* Bookings summary list */}
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {selectedBookings.map((b) => (
+                    <div key={b.id} className="flex items-center justify-between text-xs bg-muted/30 rounded-lg px-3 py-2">
+                      <span className="font-medium text-foreground truncate mr-2">{b.clientName}</span>
+                      <span className="shrink-0 text-muted-foreground">{b.date} · {b.totalPrice}€</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Payment method */}
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Payment Method</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: "cash",  label: "Cash",      Icon: Banknote  },
+                      { value: "bank",  label: "Transfer",  Icon: CreditCard },
+                      { value: "card",  label: "Card / Tap", Icon: Wallet   },
+                    ].map(({ value, label, Icon }) => (
+                      <button
+                        key={value}
+                        onClick={() => setBulkPaymentMethod(value)}
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-sm font-medium transition-all ${
+                          bulkPaymentMethod === value
+                            ? "border-green-500 bg-green-50 text-green-700"
+                            : "border-border bg-card text-muted-foreground hover:border-green-300"
+                        }`}
+                      >
+                        <Icon className="w-5 h-5" />
+                        <span className="text-xs">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Note */}
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Note <span className="text-muted-foreground font-normal">(optional)</span></label>
+                  <textarea
+                    value={bulkNote}
+                    onChange={(e) => setBulkNote(e.target.value)}
+                    placeholder="Any additional notes..."
+                    rows={2}
+                    className="w-full px-4 py-2.5 bg-card border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="px-6 pb-6 pt-2 flex gap-3">
+                <button
+                  onClick={() => !isBulkSubmitting && setBulkModal(false)}
+                  disabled={isBulkSubmitting}
+                  className="flex-1 py-3 border border-border rounded-xl text-sm font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBulkCollect}
+                  disabled={isBulkSubmitting}
+                  className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isBulkSubmitting ? (
+                    <span className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      Collect {selectedIds.size} booking{selectedIds.size !== 1 ? "s" : ""}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Mark as Collected Modal ── */}
       {collectingBooking && (
