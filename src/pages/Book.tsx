@@ -235,32 +235,30 @@ function StepDateTime({
   const [currentMonth, setCurrentMonth] = useState(
     selectedDates.length > 0 ? startOfMonth(selectedDates[0]) : startOfMonth(new Date())
   );
-  const [rangeStart, setRangeStart] = useState<Date | null>(null);
-  const [hoveredDate, setHoveredDate] = useState<Date | null>(null);
+  // How many consecutive days to book (default 1)
+  const [numDays, setNumDays] = useState(
+    selectedDates.length > 1 ? selectedDates.length : 1
+  );
 
-  // Recurring (daily repeat) state
-  const [recurringEnabled, setRecurringEnabled] = useState(false);
-  const [recurringDays, setRecurringDays] = useState(2);
-
-  const applyRecurring = (startDate: Date, days: number) => {
+  const applyDays = (startDate: Date, days: number) => {
     const dates = Array.from({ length: days }, (_, i) => startOfDay(addDays(startDate, i)));
     onDatesChange(dates);
   };
 
-  const handleRecurringToggle = () => {
-    if (!recurringEnabled) {
-      const start = selectedDates[0] || startOfDay(new Date());
-      applyRecurring(start, recurringDays);
-    }
-    setRecurringEnabled((v) => !v);
+  const handleDateClick = (day: Date) => {
+    applyDays(day, numDays);
   };
 
-  const handleRecurringDaysChange = (days: number) => {
-    const clamped = Math.max(2, Math.min(14, days));
-    setRecurringDays(clamped);
-    if (recurringEnabled && selectedDates.length > 0) {
-      applyRecurring(selectedDates[0], clamped);
+  const handleNumDaysChange = (n: number) => {
+    const clamped = Math.max(1, Math.min(14, n));
+    setNumDays(clamped);
+    if (selectedDates.length > 0) {
+      applyDays(selectedDates[0], clamped);
     }
+  };
+
+  const clearDates = () => {
+    onDatesChange([]);
   };
 
   const monthStart = startOfMonth(currentMonth);
@@ -284,51 +282,13 @@ function StepDateTime({
     [selectedDates]
   );
 
-  // Preview range when hovering after first click (desktop only)
-  const previewSet = useMemo(() => {
-    if (!rangeStart || !hoveredDate) return new Set<string>();
-    const start = rangeStart <= hoveredDate ? rangeStart : hoveredDate;
-    const end = rangeStart <= hoveredDate ? hoveredDate : rangeStart;
-    return new Set(eachDayOfInterval({ start, end }).map((d) => d.toISOString()));
-  }, [rangeStart, hoveredDate]);
-
-  const handleDateClick = (day: Date) => {
-    if (recurringEnabled) {
-      // In recurring mode: tap any date to set it as start, auto-fill N days
-      applyRecurring(day, recurringDays);
-      setRangeStart(null);
-      return;
-    }
-    if (!rangeStart) {
-      // First click — set range start
-      setRangeStart(day);
-      onDatesChange([day]);
-    } else {
-      // Second click — complete the range
-      const start = rangeStart <= day ? rangeStart : day;
-      const end = rangeStart <= day ? day : rangeStart;
-      const range = eachDayOfInterval({ start, end });
-      onDatesChange(range);
-      setRangeStart(null);
-      setHoveredDate(null);
-    }
-  };
-
-  const clearDates = () => {
-    onDatesChange([]);
-    setRangeStart(null);
-    setHoveredDate(null);
-  };
-
   return (
     <div>
       <h2 className="font-serif text-2xl sm:text-3xl font-bold text-foreground mb-2">
         {t("book.chooseDateTitle")}
       </h2>
       <p className="text-muted-foreground mb-6">
-        {rangeStart
-          ? (locale === "fr" ? "Appuyez sur la date de fin pour sélectionner la période" : "Now tap the end date to select the range")
-          : t("book.chooseDateSubtitle")}
+        {t("book.chooseDateSubtitle")}
       </p>
 
       {/* Calendar */}
@@ -373,9 +333,8 @@ function StepDateTime({
             const isPast = isBefore(day, todayDate);
             const isCurrentMonth = isSameMonth(day, currentMonth);
             const isSelected = selectedSet.has(dayKey);
-            const isPreview = !isSelected && previewSet.has(dayKey);
             const isTodayDay = isToday(day);
-            const isRangeStartDay = rangeStart ? isSameDay(day, rangeStart) : false;
+            const isStartDay = selectedDates.length > 0 && isSameDay(day, selectedDates[0]);
 
             return (
               <button
@@ -383,19 +342,15 @@ function StepDateTime({
                 type="button"
                 disabled={isPast || !isCurrentMonth}
                 onClick={() => handleDateClick(day)}
-                onMouseEnter={() => rangeStart && setHoveredDate(day)}
-                onMouseLeave={() => setHoveredDate(null)}
                 className={`aspect-square flex items-center justify-center text-sm rounded-full transition-all duration-200 ${
                   isSelected
                     ? "gradient-warm text-white font-bold shadow-warm"
-                    : isPreview
-                    ? "bg-primary/15 text-primary font-semibold"
                     : isTodayDay
                     ? "ring-2 ring-primary text-foreground font-semibold hover:bg-primary/10"
                     : isPast || !isCurrentMonth
                     ? "text-muted-foreground/40 cursor-not-allowed"
                     : "text-foreground hover:bg-muted font-medium"
-                } ${isRangeStartDay ? "ring-2 ring-primary ring-offset-2" : ""}`}
+                } ${isStartDay && selectedDates.length > 1 ? "ring-2 ring-primary ring-offset-2" : ""}`}
               >
                 {format(day, "d")}
               </button>
@@ -404,33 +359,53 @@ function StepDateTime({
         </div>
       </div>
 
-      {/* Selected Range Chip */}
-      {selectedDates.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-6">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium">
-            {format(selectedDates[0], "EEE, MMM d", { locale: dateFnsLocale })}
-            {selectedDates.length === 1 && rangeStart && (
-              <span className="text-primary/60">→ ...</span>
+      {/* Days counter + selected range summary */}
+      <div className="mb-6 p-4 rounded-xl border border-border bg-card">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              {locale === "fr" ? "Nombre de jours" : "Number of days"}
+            </p>
+            {selectedDates.length > 0 && (
+              <p className="text-xs text-primary font-medium mt-0.5">
+                {format(selectedDates[0], "EEE, MMM d", { locale: dateFnsLocale })}
+                {selectedDates.length > 1 && (
+                  <> → {format(selectedDates[selectedDates.length - 1], "EEE, MMM d", { locale: dateFnsLocale })} · {selectedDates.length} {locale === "fr" ? "réservations séparées" : "separate bookings"}</>
+                )}
+              </p>
             )}
-            {selectedDates.length > 1 && (
-              <>
-                <span className="text-primary/60">→</span>
-                {format(selectedDates[selectedDates.length - 1], "EEE, MMM d", { locale: dateFnsLocale })}
-                <span className="text-primary/60 text-xs">
-                  ({selectedDates.length} {locale === "fr" ? "jours" : "days"})
-                </span>
-              </>
+            {selectedDates.length === 0 && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {locale === "fr" ? "Sélectionnez une date sur le calendrier" : "Tap a date on the calendar to select"}
+              </p>
             )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={clearDates}
-              className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </span>
+              onClick={() => handleNumDaysChange(numDays - 1)}
+              disabled={numDays <= 1}
+              className="w-9 h-9 rounded-full border border-border bg-background flex items-center justify-center text-xl font-bold hover:bg-muted transition-colors disabled:opacity-30"
+            >−</button>
+            <span className="w-8 text-center font-bold text-foreground text-lg">{numDays}</span>
+            <button
+              type="button"
+              onClick={() => handleNumDaysChange(numDays + 1)}
+              disabled={numDays >= 14}
+              className="w-9 h-9 rounded-full border border-border bg-background flex items-center justify-center text-xl font-bold hover:bg-muted transition-colors disabled:opacity-30"
+            >+</button>
+            {selectedDates.length > 0 && (
+              <button
+                type="button"
+                onClick={clearDates}
+                className="w-9 h-9 rounded-full border border-border bg-background flex items-center justify-center hover:bg-muted transition-colors ml-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
-      )}
+      </div>
 
       {/* Time Selectors */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
@@ -479,56 +454,6 @@ function StepDateTime({
         </p>
       )}
 
-      {/* Daily recurring option */}
-      <div className="mb-6 p-4 rounded-xl border border-border bg-card">
-        <label className="flex items-center gap-3 cursor-pointer select-none">
-          <div
-            onClick={handleRecurringToggle}
-            className={`relative w-10 h-5.5 rounded-full transition-colors flex-shrink-0 cursor-pointer ${recurringEnabled ? "bg-primary" : "bg-muted-foreground/30"}`}
-            style={{ width: 40, height: 22 }}
-          >
-            <span
-              className="absolute top-0.5 left-0.5 w-4.5 h-4.5 bg-white rounded-full shadow transition-transform"
-              style={{ width: 18, height: 18, transform: recurringEnabled ? "translateX(18px)" : "translateX(0)" }}
-            />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-foreground">
-              {locale === "fr" ? "Réservation quotidienne récurrente" : "Repeat booking daily"}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {locale === "fr"
-                ? "Sélectionnez une date de départ, puis le nombre de jours consécutifs"
-                : "Tap a start date on the calendar, then set how many consecutive days"}
-            </p>
-          </div>
-        </label>
-        {recurringEnabled && (
-          <div className="mt-3 flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">{locale === "fr" ? "Nombre de jours :" : "Number of days:"}</span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleRecurringDaysChange(recurringDays - 1)}
-                disabled={recurringDays <= 2}
-                className="w-8 h-8 rounded-full border border-border bg-background flex items-center justify-center text-lg font-bold hover:bg-muted transition-colors disabled:opacity-30"
-              >−</button>
-              <span className="w-8 text-center font-bold text-foreground text-lg">{recurringDays}</span>
-              <button
-                type="button"
-                onClick={() => handleRecurringDaysChange(recurringDays + 1)}
-                disabled={recurringDays >= 14}
-                className="w-8 h-8 rounded-full border border-border bg-background flex items-center justify-center text-lg font-bold hover:bg-muted transition-colors disabled:opacity-30"
-              >+</button>
-            </div>
-            {selectedDates.length > 0 && (
-              <span className="text-xs text-primary font-medium">
-                {recurringDays} {locale === "fr" ? "jours" : "days"} · {selectedDates.length === recurringDays ? `${format(selectedDates[0], "MMM d")} → ${format(selectedDates[selectedDates.length - 1], "MMM d")}` : ""}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* Navigation */}
       <div className={`flex ${onBack ? "justify-between" : "justify-end"}`}>
