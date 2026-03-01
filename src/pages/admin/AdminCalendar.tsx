@@ -55,16 +55,23 @@ export default function AdminCalendar() {
 
   const bookingsByDate = useMemo(() => {
     const map: Record<string, Booking[]> = {};
+    const addToDate = (key: string, b: Booking) => {
+      if (!map[key]) map[key] = [];
+      if (!map[key].find((x) => x.id === b.id)) map[key].push(b);
+    };
     bookings.forEach((b) => {
       if (!b.date) return;
+      // Expand contiguous date range
       const start = parseISO(b.date);
       const end = b.endDate ? parseISO(b.endDate) : start;
       let current = start;
       while (!isAfter(current, end)) {
-        const key = format(current, "yyyy-MM-dd");
-        if (!map[key]) map[key] = [];
-        map[key].push(b);
+        addToDate(format(current, "yyyy-MM-dd"), b);
         current = addDays(current, 1);
+      }
+      // Also show on non-contiguous extra dates
+      if (b.extraDates) {
+        b.extraDates.forEach((d) => addToDate(d, b));
       }
     });
     return map;

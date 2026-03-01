@@ -75,6 +75,7 @@ export interface DbBooking {
   deleted_at: string | null;
   deleted_by: string;
   admin_notes: string;
+  extra_dates: string | null; // JSON array of additional non-contiguous dates
 }
 
 /** Booking row from a JOIN with nannies (includes nanny_name, nanny_image) */
@@ -168,6 +169,7 @@ export interface Booking {
   deletedAt: string | null;
   deletedBy: string;
   adminNotes: string;
+  extraDates: string[] | null; // non-contiguous additional dates for multi-date bookings
 }
 
 export interface Notification {

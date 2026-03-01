@@ -23,6 +23,7 @@ interface CreateBookingBody {
   clock_out?: string | null;
   created_by?: BookingCreator;
   created_by_name?: string;
+  extra_dates?: string | null; // JSON array of additional non-contiguous dates
 }
 
 interface AvailableNannyRow {
@@ -68,6 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS review_token VARCHAR(64)`;
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS review_sent_at TIMESTAMPTZ`;
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS admin_notes TEXT DEFAULT ''`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS extra_dates TEXT DEFAULT NULL`;
 
     if (req.method === 'GET') {
       // ─── Cron: Send automated reminders for tomorrow's bookings ──
@@ -206,7 +208,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
-      const { nanny_id: provided_nanny_id, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, locale, status: reqStatus, clock_in, clock_out, created_by, created_by_name } = req.body as CreateBookingBody;
+      const { nanny_id: provided_nanny_id, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, locale, status: reqStatus, clock_in, clock_out, created_by, created_by_name, extra_dates } = req.body as CreateBookingBody;
 
       // ─── Minimum 3-hour duration check ──────────────────────────
       if (start_time && end_time && !clock_in) {
@@ -300,8 +302,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ────────────────────────────────────────────────────────────
 
       const result = await sql`
-        INSERT INTO bookings (nanny_id, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, status, locale, clock_in, clock_out, price_migrated_to_eur, created_by, created_by_name)
-        VALUES (${nanny_id}, ${client_name}, ${client_email}, ${client_phone || ''}, ${hotel || ''}, ${date}, ${end_date || null}, ${start_time}, ${end_time || ''}, ${plan || 'hourly'}, ${children_count || 1}, ${children_ages || ''}, ${notes || ''}, ${total_price || 0}, ${reqStatus || 'pending'}, ${locale || 'en'}, ${clock_in || null}, ${clock_out || null}, true, ${created_by || 'parent'}, ${created_by_name || ''})
+        INSERT INTO bookings (nanny_id, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, status, locale, clock_in, clock_out, price_migrated_to_eur, created_by, created_by_name, extra_dates)
+        VALUES (${nanny_id}, ${client_name}, ${client_email}, ${client_phone || ''}, ${hotel || ''}, ${date}, ${end_date || null}, ${start_time}, ${end_time || ''}, ${plan || 'hourly'}, ${children_count || 1}, ${children_ages || ''}, ${notes || ''}, ${total_price || 0}, ${reqStatus || 'pending'}, ${locale || 'en'}, ${clock_in || null}, ${clock_out || null}, true, ${created_by || 'parent'}, ${created_by_name || ''}, ${extra_dates || null})
         RETURNING *
       ` as DbBooking[];
       // Create notification for nanny

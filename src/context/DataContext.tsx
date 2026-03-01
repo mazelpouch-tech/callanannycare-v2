@@ -188,6 +188,7 @@ export function DataProvider({ children }: DataProviderProps) {
           deletedAt: b.deleted_at ?? null,
           deletedBy: b.deleted_by || '',
           adminNotes: b.admin_notes || '',
+          extraDates: b.extra_dates ? (() => { try { return JSON.parse(b.extra_dates!); } catch { return null; } })() : null,
         }));
         setBookings(normalizedBookings);
         saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -339,6 +340,7 @@ export function DataProvider({ children }: DataProviderProps) {
         deletedAt: b.deleted_at ?? null,
         deletedBy: b.deleted_by || '',
         adminNotes: b.admin_notes || '',
+        extraDates: b.extra_dates ? (() => { try { return JSON.parse(b.extra_dates!); } catch { return null; } })() : null,
       }));
       setBookings(normalizedBookings);
       saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -386,6 +388,7 @@ export function DataProvider({ children }: DataProviderProps) {
             clock_out: booking.clockOut || null,
             created_by: booking.createdBy || "parent",
             created_by_name: booking.createdByName || "",
+            extra_dates: booking.extraDates ? JSON.stringify(booking.extraDates) : null,
           }),
         });
 
@@ -424,6 +427,7 @@ export function DataProvider({ children }: DataProviderProps) {
           deletedAt: created.deleted_at ?? null,
           deletedBy: created.deleted_by || '',
           adminNotes: created.admin_notes || '',
+          extraDates: created.extra_dates ? (() => { try { return JSON.parse(created.extra_dates!); } catch { return null; } })() : null,
         };
         setBookings((prev) => {
           const updated = [...prev, normalized];
@@ -608,6 +612,7 @@ export function DataProvider({ children }: DataProviderProps) {
         deletedAt: b.deleted_at ?? null,
         deletedBy: b.deleted_by || '',
         adminNotes: b.admin_notes || '',
+        extraDates: b.extra_dates ? (() => { try { return JSON.parse(b.extra_dates!); } catch { return null; } })() : null,
       }));
     } catch {
       return [];
@@ -820,6 +825,7 @@ export function DataProvider({ children }: DataProviderProps) {
     deletedAt: b.deleted_at ?? null,
     deletedBy: b.deleted_by || '',
     adminNotes: b.admin_notes || '',
+    extraDates: b.extra_dates ? (() => { try { return JSON.parse(b.extra_dates!); } catch { return null; } })() : null,
   }), []);
 
   const fetchNannyBookings = useCallback(async () => {
