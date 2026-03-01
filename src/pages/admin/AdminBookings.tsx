@@ -502,10 +502,15 @@ export default function AdminBookings() {
     const startLabel = TIME_SLOTS.find((s) => s.value === newBooking.startTime)?.label || newBooking.startTime;
     const endLabel = TIME_SLOTS.find((s) => s.value === newBooking.endTime)?.label || newBooking.endTime;
 
-    // Compute dates for recurring / multi-date bookings
-    const effectiveDate = multiDateMode ? (multiDates[0] || newBooking.date) : newBooking.date;
+    // For multi-date mode: one booking per date, each with daily price
+    // For date-range mode: one booking with start/end date, total price
+    const effectiveDate = newBooking.date;
     const effectiveEndDate = multiDateMode ? null : (newBooking.endDate || null);
-    const effectiveExtraDates = multiDateMode && multiDates.length > 1 ? multiDates.slice(1) : null;
+
+    // Daily price (1 day worth of hours × rate + taxi)
+    const dailyPrice = multiDateMode && multiDates.length > 0
+      ? Math.round(newBookingPrice / multiDates.length)
+      : newBookingPrice;
 
     const baseBookingData = {
       nannyId: selectedNanny.id,
@@ -515,7 +520,7 @@ export default function AdminBookings() {
       endTime: endLabel,
       plan: newBooking.plan as BookingPlan,
       totalPrice: newBookingPrice,
-      extraDates: effectiveExtraDates,
+      extraDates: null,
       clientName: newBooking.clientName,
       clientEmail: newBooking.clientEmail,
       clientPhone: newBooking.clientPhone,
@@ -529,7 +534,12 @@ export default function AdminBookings() {
     };
 
     try {
-      if (newBooking.recurring) {
+      if (multiDateMode) {
+        // Create one booking per selected date, each with the daily price
+        for (const d of multiDates) {
+          await addBooking({ ...baseBookingData, date: d, endDate: null, totalPrice: dailyPrice });
+        }
+      } else if (newBooking.recurring) {
         const count = Math.max(1, Math.min(12, parseInt(newBooking.recurringCount) || 4));
         const dates: string[] = [effectiveDate];
         const offsetDays = newBooking.recurringType === 'weekly' ? 7 : newBooking.recurringType === 'biweekly' ? 14 : 30;
@@ -2374,8 +2384,14 @@ export default function AdminBookings() {
                 >
                   Multiple dates
                 </button>
-                {newBookingDays > 1 && (
-                  <span className="ml-auto text-xs text-muted-foreground font-medium">{newBookingDays} day{newBookingDays !== 1 ? "s" : ""} · {newBookingPrice}€</span>
+                {newBookingDays > 0 && newBookingPrice > 0 && (
+                  <span className="ml-auto text-xs text-muted-foreground font-medium">
+                    {multiDateMode
+                      ? `${newBookingDays} day${newBookingDays !== 1 ? "s" : ""} · ${Math.round(newBookingPrice / Math.max(1, newBookingDays))}€/day · ${newBookingPrice}€ total`
+                      : newBookingDays > 1
+                        ? `${newBookingDays} days · ${newBookingPrice}€`
+                        : `${newBookingPrice}€`}
+                  </span>
                 )}
               </div>
 
