@@ -20,6 +20,8 @@ import {
   isSameMonth,
   isSameDay,
   isToday,
+  parseISO,
+  isAfter,
 } from "date-fns";
 import { useData } from "../../context/DataContext";
 import type { Booking, BookingStatus } from "@/types";
@@ -55,9 +57,15 @@ export default function AdminCalendar() {
     const map: Record<string, Booking[]> = {};
     bookings.forEach((b) => {
       if (!b.date) return;
-      const key = b.date;
-      if (!map[key]) map[key] = [];
-      map[key].push(b);
+      const start = parseISO(b.date);
+      const end = b.endDate ? parseISO(b.endDate) : start;
+      let current = start;
+      while (!isAfter(current, end)) {
+        const key = format(current, "yyyy-MM-dd");
+        if (!map[key]) map[key] = [];
+        map[key].push(b);
+        current = addDays(current, 1);
+      }
     });
     return map;
   }, [bookings]);

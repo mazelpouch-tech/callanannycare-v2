@@ -13,6 +13,9 @@ import {
   subMonths,
   isBefore,
   startOfDay,
+  parseISO,
+  isAfter,
+  addDays,
 } from "date-fns";
 import { ChevronLeft, ChevronRight, MapPin, User, Clock, Ban, Loader2 } from "lucide-react";
 import { useData } from "../../context/DataContext";
@@ -95,8 +98,16 @@ export default function NannyCalendar() {
   const bookingsByDate = useMemo(() => {
     const map: Record<string, Booking[]> = {};
     nannyBookings.forEach((b: Booking) => {
-      if (!map[b.date]) map[b.date] = [];
-      map[b.date].push(b);
+      if (!b.date) return;
+      const start = parseISO(b.date);
+      const end = b.endDate ? parseISO(b.endDate) : start;
+      let current = start;
+      while (!isAfter(current, end)) {
+        const key = format(current, "yyyy-MM-dd");
+        if (!map[key]) map[key] = [];
+        map[key].push(b);
+        current = addDays(current, 1);
+      }
     });
     return map;
   }, [nannyBookings]);
