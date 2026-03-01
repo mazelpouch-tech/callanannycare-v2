@@ -413,94 +413,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // TEMPORARILY DISABLED — parent notifications paused until pricing is verified
       // Send WhatsApp booking confirmation to parent (automatic)
-      if (WHATSAPP_TOKEN && WHATSAPP_PHONE_ID && client_phone) {
-        try {
-          let parentPhone = client_phone.replace(/[\s\-\(\)]/g, '');
-          if (parentPhone.startsWith('0')) parentPhone = '212' + parentPhone.slice(1);
-          if (!parentPhone.startsWith('+') && !parentPhone.match(/^\d{10,}/)) parentPhone = '+' + parentPhone;
-          parentPhone = parentPhone.replace('+', '');
-
-          const siteUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
-          const trackUrl = `${siteUrl}/booking/${result[0].id}`;
-          const bookingLocale = locale || 'en';
-
-          const waParentMsg = bookingLocale === 'fr'
-            ? [
-                '✅ *Réservation Confirmée — Call a Nanny*',
-                '',
-                `Bonjour ${client_name},`,
-                'Merci pour votre réservation ! Voici les détails :',
-                '',
-                `📋 *Réservation #:* ${result[0].id}`,
-                `📅 *Date:* ${date}${end_date ? ` — ${end_date}` : ''}`,
-                `🕐 *Heure:* ${start_time}${end_time ? ` - ${end_time}` : ''}`,
-                `🏨 *Lieu:* ${hotel || 'N/A'}`,
-                `👶 *Enfants:* ${children_count || 1}`,
-                `💰 *Total:* ${total_price || 0}€`,
-                '',
-                '📌 *Prochaine étape :* Une nounou qualifiée vous sera assignée sous peu.',
-                '',
-                `📍 *Suivre votre réservation :* ${trackUrl}`,
-                '',
-                '_Merci de votre confiance !_',
-                '💕 Call a Nanny — Marrakech',
-              ].join('\n')
-            : [
-                '✅ *Booking Confirmed — Call a Nanny*',
-                '',
-                `Hi ${client_name},`,
-                'Thank you for your booking! Here are the details:',
-                '',
-                `📋 *Booking #:* ${result[0].id}`,
-                `📅 *Date:* ${date}${end_date ? ` — ${end_date}` : ''}`,
-                `🕐 *Time:* ${start_time}${end_time ? ` - ${end_time}` : ''}`,
-                `🏨 *Location:* ${hotel || 'N/A'}`,
-                `👶 *Children:* ${children_count || 1}`,
-                `💰 *Total:* ${total_price || 0}€`,
-                '',
-                '📌 *Next step:* A qualified nanny will be assigned to your booking shortly.',
-                '',
-                `📍 *Track your booking:* ${trackUrl}`,
-                '',
-                '_Thank you for choosing us!_',
-                '💕 Call a Nanny — Marrakech',
-              ].join('\n');
-
-          await fetch(`https://graph.facebook.com/v18.0/${WHATSAPP_PHONE_ID}/messages`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messaging_product: 'whatsapp', to: parentPhone, type: 'text', text: { body: waParentMsg } }),
-          });
-        } catch (waParentError: unknown) {
-          console.error('WhatsApp confirmation to parent failed:', waParentError);
-        }
-      }
+      // if (WHATSAPP_TOKEN && WHATSAPP_PHONE_ID && client_phone) { ... }
 
       // Send email to parent (best-effort)
-      if (result[0] && client_email) {
-        try {
-          // Send confirmation email
-          const { sendConfirmationEmail } = await import('./_emailTemplates.js');
-          await sendConfirmationEmail({
-            bookingId: result[0].id,
-            clientName: client_name,
-            clientEmail: client_email,
-            clientPhone: client_phone || '',
-            hotel: hotel || '',
-            date,
-            startTime: start_time,
-            endTime: end_time || '',
-            childrenCount: children_count || 1,
-            childrenAges: children_ages || '',
-            totalPrice: total_price || 0,
-            notes: notes || '',
-            locale: locale || 'en',
-          });
-        } catch (emailError: unknown) {
-          console.error('Email sending failed:', emailError);
-        }
-      }
+      // if (result[0] && client_email) { ... }
 
       return res.status(201).json(result[0]);
     }
