@@ -281,14 +281,14 @@ export function DataProvider({ children }: DataProviderProps) {
     });
   }, []);
 
-  const bulkDeleteNannies = useCallback(async (ids: number[]): Promise<{ success: boolean; deletedCount: number }> => {
+  const bulkDeleteNannies = useCallback(async (ids: number[], opts?: { deletedByName?: string; deletedByEmail?: string }): Promise<{ success: boolean; deletedCount: number }> => {
     try {
       const res = await apiFetch("/nannies", {
         method: "DELETE",
         body: JSON.stringify({
           ids,
-          deletedByName: adminProfile?.name || "Admin",
-          deletedByEmail: adminProfile?.email || "",
+          deletedByName: opts?.deletedByName || "Admin",
+          deletedByEmail: opts?.deletedByEmail || "",
         }),
       });
       const data = typeof res === "object" && res !== null ? res as { success: boolean; deletedCount: number } : { success: true, deletedCount: ids.length };
@@ -307,7 +307,7 @@ export function DataProvider({ children }: DataProviderProps) {
       });
       return { success: true, deletedCount: ids.length };
     }
-  }, [adminProfile]);
+  }, []);
 
   const toggleNannyAvailability = useCallback(async (id: number): Promise<void> => {
     const nanny = nannies.find((n) => n.id === id);

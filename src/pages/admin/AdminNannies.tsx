@@ -541,7 +541,7 @@ export default function AdminNannies() {
     nannies, bookings, addNanny, updateNanny, deleteNanny, bulkDeleteNannies,
     toggleNannyAvailability,
     inviteNanny, toggleNannyStatus, resendInvite, bulkUpdateNannyRate,
-    impersonateNanny,
+    impersonateNanny, adminProfile,
   } = useData();
   const navigate = useNavigate();
 
@@ -599,7 +599,10 @@ export default function AdminNannies() {
   const handleBulkDelete = async () => {
     if (bulkSelected.size === 0) return;
     setBulkDeleteLoading(true);
-    await bulkDeleteNannies(Array.from(bulkSelected));
+    await bulkDeleteNannies(Array.from(bulkSelected), {
+      deletedByName: adminProfile?.name || "Admin",
+      deletedByEmail: adminProfile?.email || "",
+    });
     setBulkSelected(new Set());
     setBulkDeleteConfirm(false);
     setBulkDeleteLoading(false);
