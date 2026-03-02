@@ -85,6 +85,16 @@ export default function Dashboard() {
     ? Math.round(stats.totalRevenue / Math.max(bookings.filter((b) => b.status === "confirmed" || b.status === "completed").length, 1))
     : 0;
 
+  // New bookings = bookings created today (any status: pending, confirmed, cancelled)
+  const newBookingsToday = useMemo(() => {
+    return bookings.filter((b) => {
+      try { return isToday(parseISO(b.createdAt)); } catch { return false; }
+    });
+  }, [bookings]);
+  const newBookingsTodayCount = newBookingsToday.length;
+  const newBookingsPending = newBookingsToday.filter((b) => b.status === "pending").length;
+  const newBookingsConfirmed = newBookingsToday.filter((b) => b.status === "confirmed").length;
+
   // ── 3-Day Agenda with navigation ──
   const [agendaStart, setAgendaStart] = useState(() => new Date());
   const agendaDays = useMemo(() => {
@@ -134,7 +144,21 @@ export default function Dashboard() {
       </div>
 
       {/* ── Stat Cards ── */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
+        {/* New Bookings (created today) */}
+        <Link to="/admin/bookings" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-purple-300/50 transition-all cursor-pointer group">
+          <div className="flex items-center justify-between mb-3">
+            <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+              <Activity className="w-5 h-5 text-purple-700" />
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] text-muted-foreground">{newBookingsPending} pending · {newBookingsConfirmed} confirmed</p>
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-foreground">{newBookingsTodayCount}</p>
+          <p className="text-xs text-muted-foreground mt-1">New Bookings Today</p>
+        </Link>
+
         {/* Pending Bookings */}
         <Link to="/admin/bookings?status=pending" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-orange-300/50 transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-3">
