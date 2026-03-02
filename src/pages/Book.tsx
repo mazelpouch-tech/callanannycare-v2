@@ -1363,7 +1363,7 @@ export default function Book() {
         startTime: startLabel,
         endTime: endLabel,
         plan: "hourly" as BookingPlan,
-        totalPrice: dailyPrice,
+        totalPrice: defaultDailyPrice,
         clientName: details.fullName,
         clientEmail: details.email,
         clientPhone: details.phone,
