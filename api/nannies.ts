@@ -37,6 +37,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
+    // Auto-create nanny_payments table if it doesn't exist
+    const ensurePaymentsTable = async () => {
+      await sql`
+        CREATE TABLE IF NOT EXISTS nanny_payments (
+          id SERIAL PRIMARY KEY,
+          nanny_id INTEGER REFERENCES nannies(id) ON DELETE CASCADE,
+          period_start VARCHAR(20) NOT NULL,
+          period_end VARCHAR(20) NOT NULL,
+          amount INTEGER NOT NULL DEFAULT 0,
+          paid_by VARCHAR(255) DEFAULT '',
+          note TEXT DEFAULT '',
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `;
+    };
+
     if (req.method === 'GET') {
       // Return nanny payments for a period
       if (req.query.action === 'payments') {
@@ -45,6 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!periodStart || !periodEnd) {
           return res.status(400).json({ error: 'period_start and period_end are required' });
         }
+        await ensurePaymentsTable();
         const payments = await sql`
           SELECT * FROM nanny_payments
           WHERE period_start = ${periodStart} AND period_end = ${periodEnd}
@@ -86,6 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!payments || !Array.isArray(payments) || payments.length === 0) {
           return res.status(400).json({ error: 'payments array is required' });
         }
+        await ensurePaymentsTable();
         const results = [];
         for (const p of payments) {
           // Upsert: delete existing payment for same nanny+period, then insert
@@ -114,10 +132,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!nannyIds || !periodStart || !periodEnd) {
           return res.status(400).json({ error: 'nannyIds, periodStart, and periodEnd are required' });
         }
-        await sql`
-          DELETE FROM nanny_payments
-          WHERE nanny_id = ANY(${nannyIds}) AND period_start = ${periodStart} AND period_end = ${periodEnd}
-        `;
+        await ensurePaymentsTable();
+        // Delete one by one to avoid ANY() compatibility issues
+        for (const nid of nannyIds) {
+          await sql`
+            DELETE FROM nanny_payments
+            WHERE nanny_id = ${nid} AND period_start = ${periodStart} AND period_end = ${periodEnd}
+          `;
+        }
         return res.status(200).json({ success: true });
       }
 

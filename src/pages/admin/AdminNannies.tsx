@@ -75,6 +75,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
   const [paidNannyIds, setPaidNannyIds] = useState<Set<number>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [payLoading, setPayLoading] = useState(false);
+  const [payError, setPayError] = useState("");
 
   const periodKey = `${toDateStr(periodStart)}|${toDateStr(periodEnd)}`;
 
@@ -187,6 +188,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
   const markSelectedPaid = async () => {
     if (selectedIds.size === 0) return;
     setPayLoading(true);
+    setPayError("");
     try {
       const payments = nannyHours
         .filter((n) => selectedIds.has(n.nannyId))
@@ -209,12 +211,18 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
           return next;
         });
         setSelectedIds(new Set());
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setPayError(data.error || "Failed to save payment. Please try again.");
       }
-    } catch { /* ignore */ }
+    } catch {
+      setPayError("Network error. Please check your connection.");
+    }
     setPayLoading(false);
   };
 
   const undoPaid = async (nannyId: number) => {
+    setPayError("");
     try {
       const res = await fetch("/api/nannies", {
         method: "POST",
@@ -232,8 +240,12 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
           next.delete(nannyId);
           return next;
         });
+      } else {
+        setPayError("Failed to undo payment.");
       }
-    } catch { /* ignore */ }
+    } catch {
+      setPayError("Network error.");
+    }
   };
 
   return (
@@ -341,6 +353,13 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 {payLoading ? "Saving..." : "Mark Paid"}
               </button>
+            </div>
+          )}
+
+          {payError && (
+            <div className="flex items-center gap-2 px-6 py-2 bg-red-50 border-b border-red-100">
+              <span className="text-xs text-red-700 font-medium">{payError}</span>
+              <button onClick={() => setPayError("")} className="ml-auto text-red-400 hover:text-red-600"><X className="w-3.5 h-3.5" /></button>
             </div>
           )}
 
