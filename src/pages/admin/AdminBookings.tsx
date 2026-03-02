@@ -285,6 +285,7 @@ export default function AdminBookings() {
   const [newBookingNumDays, setNewBookingNumDays] = useState(1);
   const [dayTimeOverrides, setDayTimeOverrides] = useState<Record<number, { startTime: string; endTime: string }>>({});
   const [editingDayIdx, setEditingDayIdx] = useState<number | null>(null);
+  const [extraTimeBlocks, setExtraTimeBlocks] = useState<Array<{ startTime: string; endTime: string }>>([]);
 
   // Edit Booking Modal
   const [showEditBooking, setShowEditBooking] = useState(false);
@@ -472,8 +473,18 @@ export default function AdminBookings() {
     const [eh, em] = newBooking.endTime.split(":").map(Number);
     const startH = sh + sm / 60;
     const endH = eh + em / 60;
-    return endH > startH ? endH - startH : (24 - startH) + endH;
-  }, [newBooking.startTime, newBooking.endTime]);
+    let total = endH > startH ? endH - startH : (24 - startH) + endH;
+    // Add extra time blocks
+    for (const block of extraTimeBlocks) {
+      if (!block.startTime || !block.endTime) continue;
+      const [bs, bsm] = block.startTime.split(":").map(Number);
+      const [be, bem] = block.endTime.split(":").map(Number);
+      const bStart = bs + bsm / 60;
+      const bEnd = be + bem / 60;
+      total += bEnd > bStart ? bEnd - bStart : (24 - bStart) + bEnd;
+    }
+    return total;
+  }, [newBooking.startTime, newBooking.endTime, extraTimeBlocks]);
 
   const newBookingDays = newBookingNumDays;
 
@@ -483,10 +494,20 @@ export default function AdminBookings() {
     const [sh] = (newBooking.startTime || "").split(":").map(Number);
     const [eh, em] = (newBooking.endTime || "").split(":").map(Number);
     const isOvernight = (eh + em / 60) <= (sh + 0);
-    const isEvening = isOvernight || sh >= 19 || sh < 7 || eh > 19 || (eh === 19 && em > 0);
+    let isEvening = isOvernight || sh >= 19 || sh < 7 || eh > 19 || (eh === 19 && em > 0);
+    // Check extra blocks for evening
+    if (!isEvening) {
+      for (const block of extraTimeBlocks) {
+        if (!block.startTime || !block.endTime) continue;
+        const [bs] = block.startTime.split(":").map(Number);
+        const [be, bem] = block.endTime.split(":").map(Number);
+        const bOvernight = (be + bem / 60) <= bs;
+        if (bOvernight || bs >= 19 || bs < 7 || be > 19 || (be === 19 && bem > 0)) { isEvening = true; break; }
+      }
+    }
     const taxiFee = isEvening ? 10 * newBookingDays : 0;
     return hourlyTotal + taxiFee;
-  }, [selectedNanny, newBookingHours, newBookingDays, newBooking.startTime, newBooking.endTime]);
+  }, [selectedNanny, newBookingHours, newBookingDays, newBooking.startTime, newBooking.endTime, extraTimeBlocks]);
 
   const calcDayPrice = (startT: string, endT: string, nanny: { rate: number }) => {
     if (!startT || !endT) return 0;
@@ -511,6 +532,14 @@ export default function AdminBookings() {
     // Per-day price (newBookingPrice = total for numDays, so divide back)
     const dailyPrice = Math.round(newBookingPrice / Math.max(1, newBookingNumDays));
 
+    // Convert extra time blocks to label format for DB storage
+    const extraTimesForApi = extraTimeBlocks.length > 0
+      ? extraTimeBlocks.filter(b => b.startTime && b.endTime).map(b => ({
+          startTime: TIME_SLOTS.find(s => s.value === b.startTime)?.label || b.startTime,
+          endTime: TIME_SLOTS.find(s => s.value === b.endTime)?.label || b.endTime,
+        }))
+      : null;
+
     const baseBookingData = {
       nannyId: chosenNanny.id,
       nannyName: chosenNanny.name,
@@ -520,6 +549,7 @@ export default function AdminBookings() {
       plan: newBooking.plan as BookingPlan,
       totalPrice: newBookingPrice,
       extraDates: null,
+      extraTimes: extraTimesForApi,
       clientName: newBooking.clientName,
       clientEmail: newBooking.clientEmail,
       clientPhone: newBooking.clientPhone,
@@ -571,6 +601,7 @@ export default function AdminBookings() {
       setNewBookingNumDays(1);
       setDayTimeOverrides({});
       setEditingDayIdx(null);
+      setExtraTimeBlocks([]);
       setOverrideMinHours(false);
       setOverrideConflict(false);
       setNewBooking({
@@ -1660,11 +1691,17 @@ export default function AdminBookings() {
                           </td>
                           <td className="px-4 py-3.5 text-sm text-muted-foreground">
                             {formatTime(booking.startTime)}{booking.endTime ? ` - ${booking.endTime}` : ""}
+                            {booking.extraTimes && booking.extraTimes.length > 0 && (
+                              <span className="text-primary font-medium">
+                                {booking.extraTimes.map((et, i) => <span key={i}>{" + "}{et.startTime}-{et.endTime}</span>)}
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3.5 text-sm font-medium text-foreground">
                             {(() => {
                               const h = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
-                              return h > 0 ? `${h}h` : "—";
+                              const extraH = booking.extraTimes ? booking.extraTimes.reduce((s, et) => s + calcBookedHours(et.startTime, et.endTime), 0) : 0;
+                              return (h + extraH) > 0 ? `${h + extraH}h` : "—";
                             })()}
                           </td>
                           <td className="px-4 py-3.5 text-sm text-muted-foreground capitalize">
@@ -1672,12 +1709,12 @@ export default function AdminBookings() {
                           </td>
                           <td className="px-4 py-3.5">
                             {(() => {
-                              const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                              const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate) + (booking.extraTimes ? booking.extraTimes.reduce((s, et) => s + calcBookedHours(et.startTime, et.endTime), 0) : 0);
                               const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 150;
                               const actualPay = calcNannyPayBreakdown(booking);
                               const estPay = actualPay.total > 0
                                 ? actualPay
-                                : estimateNannyPayBreakdown(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                                : estimateNannyPayBreakdown(booking.startTime, booking.endTime, booking.date, booking.endDate, booking.extraTimes);
                               const isActual = actualPay.total > 0;
 
                               return (
@@ -1856,12 +1893,12 @@ export default function AdminBookings() {
                                   </div>
                                 </div>
                                 {(() => {
-                                  const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                                  const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate) + (booking.extraTimes ? booking.extraTimes.reduce((s, et) => s + calcBookedHours(et.startTime, et.endTime), 0) : 0);
                                   const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 150;
                                   const actualPay = calcNannyPayBreakdown(booking);
                                   const estPay = actualPay.total > 0
                                     ? actualPay
-                                    : estimateNannyPayBreakdown(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                                    : estimateNannyPayBreakdown(booking.startTime, booking.endTime, booking.date, booking.endDate, booking.extraTimes);
                                   const isActual = actualPay.total > 0;
 
                                   return (
@@ -2710,6 +2747,65 @@ export default function AdminBookings() {
                   </select>
                 </div>
               </div>
+
+              {/* Extra time blocks (morning + evening) */}
+              {newBooking.startTime && newBooking.endTime && (
+                <div className="space-y-2">
+                  {extraTimeBlocks.map((block, idx) => (
+                    <div key={idx} className="flex items-end gap-2 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
+                      <div className="flex-1">
+                        <label className="text-xs font-medium text-muted-foreground mb-1 block">Start</label>
+                        <select
+                          value={block.startTime}
+                          onChange={(e) => {
+                            const updated = [...extraTimeBlocks];
+                            updated[idx] = { ...updated[idx], startTime: e.target.value };
+                            setExtraTimeBlocks(updated);
+                          }}
+                          className="w-full px-2 py-1.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        >
+                          <option value="">Select</option>
+                          {TIME_SLOTS.map((slot) => (
+                            <option key={`es-${idx}-${slot.value}`} value={slot.value}>{slot.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-xs font-medium text-muted-foreground mb-1 block">End</label>
+                        <select
+                          value={block.endTime}
+                          onChange={(e) => {
+                            const updated = [...extraTimeBlocks];
+                            updated[idx] = { ...updated[idx], endTime: e.target.value };
+                            setExtraTimeBlocks(updated);
+                          }}
+                          className="w-full px-2 py-1.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        >
+                          <option value="">Select</option>
+                          {TIME_SLOTS.map((slot) => (
+                            <option key={`ee-${idx}-${slot.value}`} value={slot.value}>{slot.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setExtraTimeBlocks(extraTimeBlocks.filter((_, i) => i !== idx))}
+                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors mb-0.5"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setExtraTimeBlocks([...extraTimeBlocks, { startTime: "", endTime: "" }])}
+                    className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add time block (e.g. evening)
+                  </button>
+                </div>
+              )}
 
               {/* Per-day schedule overrides — shown when N > 1 and times are set */}
               {newBookingNumDays > 1 && newBooking.startTime && newBooking.date && (

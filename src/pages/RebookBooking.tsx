@@ -12,6 +12,8 @@ import {
   Hotel,
   Baby,
   Calendar,
+  Plus,
+  X,
 } from "lucide-react";
 import { useParams, Link } from "react-router-dom";
 import {
@@ -173,6 +175,7 @@ export default function RebookBooking() {
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [extraTimeBlocks, setExtraTimeBlocks] = useState<Array<{ startTime: string; endTime: string }>>([]);
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
 
   const [submitting, setSubmitting] = useState(false);
@@ -228,19 +231,32 @@ export default function RebookBooking() {
     if (!startTime || !endTime) return 0;
     const start = parseTimeValue(startTime);
     const end = parseTimeValue(endTime);
-    // Handle overnight bookings (e.g. 18:00 → 01:00 = 7h)
-    return end > start ? end - start : (24 - start) + end;
-  }, [startTime, endTime]);
+    let total = end > start ? end - start : (24 - start) + end;
+    for (const block of extraTimeBlocks) {
+      if (block.startTime && block.endTime) {
+        const s = parseTimeValue(block.startTime);
+        const e = parseTimeValue(block.endTime);
+        total += e > s ? e - s : (24 - s) + e;
+      }
+    }
+    return total;
+  }, [startTime, endTime, extraTimeBlocks]);
 
   const isEveningBooking = useMemo(() => {
+    const checkEvening = (st: string, et: string) => {
+      const sH = parseInt(st.split(":")[0], 10);
+      const eH = parseInt(et.split(":")[0], 10);
+      const eM = parseInt(et.split(":")[1], 10);
+      const overnight = eH < sH || (eH === sH && eM === 0);
+      return overnight || sH >= NIGHT_START || sH < NIGHT_END || eH > NIGHT_START || (eH === NIGHT_START && eM > 0);
+    };
     if (!startTime || !endTime) return false;
-    const startHour = parseInt(startTime.split(":")[0], 10);
-    const endHour = parseInt(endTime.split(":")[0], 10);
-    const endMin = parseInt(endTime.split(":")[1], 10);
-    // Taxi fee if session touches 7 PM – 7 AM window (including overnight)
-    const isOvernight = endHour < startHour || (endHour === startHour && endMin === 0);
-    return isOvernight || startHour >= NIGHT_START || startHour < NIGHT_END || endHour > NIGHT_START || (endHour === NIGHT_START && endMin > 0);
-  }, [startTime, endTime]);
+    if (checkEvening(startTime, endTime)) return true;
+    for (const block of extraTimeBlocks) {
+      if (block.startTime && block.endTime && checkEvening(block.startTime, block.endTime)) return true;
+    }
+    return false;
+  }, [startTime, endTime, extraTimeBlocks]);
 
   const taxiFeeTotal = useMemo(() => {
     return isEveningBooking ? TAXI_FEE * selectedDates.length : 0;
@@ -301,6 +317,7 @@ export default function RebookBooking() {
           children_ages: booking.children_ages || "",
           notes: booking.notes || "",
           total_price: totalPrice,
+          extra_times: extraTimeBlocks.length > 0 ? JSON.stringify(extraTimeBlocks.filter(b => b.startTime && b.endTime).map(b => ({ start_time: TIME_SLOTS.find(s => s.value === b.startTime)?.label || b.startTime, end_time: TIME_SLOTS.find(s => s.value === b.endTime)?.label || b.endTime }))) : null,
           locale,
           status: "pending",
         }),
@@ -658,6 +675,49 @@ export default function RebookBooking() {
                 </div>
               </div>
             </div>
+
+            {/* Extra time blocks */}
+            {startTime && endTime && (
+              <div className="mt-3 space-y-2 px-5">
+                {extraTimeBlocks.map((block, idx) => (
+                  <div key={idx} className="flex items-end gap-2 bg-orange-50 border border-orange-200 rounded-xl px-3 py-2">
+                    <div className="flex-1">
+                      <label className="text-xs font-medium text-gray-500 mb-1 block">{locale === "fr" ? "Début" : "Start"}</label>
+                      <select
+                        value={block.startTime}
+                        onChange={(e) => { const u = [...extraTimeBlocks]; u[idx] = { ...u[idx], startTime: e.target.value }; setExtraTimeBlocks(u); }}
+                        className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-300/50"
+                      >
+                        <option value="">{locale === "fr" ? "Choisir" : "Select"}</option>
+                        {TIME_SLOTS.map((slot) => <option key={`es-${idx}-${slot.value}`} value={slot.value}>{slot.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-xs font-medium text-gray-500 mb-1 block">{locale === "fr" ? "Fin" : "End"}</label>
+                      <select
+                        value={block.endTime}
+                        onChange={(e) => { const u = [...extraTimeBlocks]; u[idx] = { ...u[idx], endTime: e.target.value }; setExtraTimeBlocks(u); }}
+                        className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-300/50"
+                      >
+                        <option value="">{locale === "fr" ? "Choisir" : "Select"}</option>
+                        {TIME_SLOTS.map((slot) => <option key={`ee-${idx}-${slot.value}`} value={slot.value}>{slot.label}</option>)}
+                      </select>
+                    </div>
+                    <button type="button" onClick={() => setExtraTimeBlocks(extraTimeBlocks.filter((_, i) => i !== idx))} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setExtraTimeBlocks([...extraTimeBlocks, { startTime: "", endTime: "" }])}
+                  className="flex items-center gap-1.5 text-xs font-medium text-orange-600 hover:text-orange-700"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {locale === "fr" ? "Ajouter un créneau (ex: soir)" : "Add time block (e.g. evening)"}
+                </button>
+              </div>
+            )}
 
             {/* Minimum duration warning */}
             {startTime && endTime && hours > 0 && hours < 3 && (

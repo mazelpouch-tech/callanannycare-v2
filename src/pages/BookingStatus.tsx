@@ -652,6 +652,7 @@ export default function BookingStatus() {
                   <span className="text-xs text-gray-500 w-20">{s.timeLabel}</span>
                   <span className="text-sm font-medium text-gray-900">
                     {booking.start_time} — {booking.end_time || "TBD"}
+                    {booking.extra_times && (() => { try { const arr = JSON.parse(booking.extra_times); return arr.map((t: { start_time: string; end_time: string }, i: number) => <span key={i} className="text-violet-600">{" + "}{t.start_time} — {t.end_time}</span>); } catch { return null; } })()}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 px-5 py-3">

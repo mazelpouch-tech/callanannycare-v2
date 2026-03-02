@@ -31,6 +31,7 @@ interface UpdateBookingBody {
   restore?: boolean; // Restore a soft-deleted booking
   admin_notes?: string;
   extra_dates?: string | null;
+  extra_times?: string | null;
   skip_conflict_check?: boolean;
 }
 
@@ -47,6 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Ensure migration columns exist
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS admin_notes TEXT DEFAULT ''`;
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS extra_dates TEXT DEFAULT NULL`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS extra_times TEXT`;
 
     if (req.method === 'GET') {
       const result = await sql`
@@ -132,7 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ────────────────────────────────────────────────────────────────
     
     if (req.method === 'PUT') {
-      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder, cancellation_reason, cancelled_by, collected_by, collected_at, collection_note, payment_method, restore, admin_notes, extra_dates, skip_conflict_check } = req.body as UpdateBookingBody;
+      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder, cancellation_reason, cancelled_by, collected_by, collected_at, collection_note, payment_method, restore, admin_notes, extra_dates, extra_times, skip_conflict_check } = req.body as UpdateBookingBody;
 
       // Restore a soft-deleted booking
       if (restore) {
@@ -206,6 +208,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           payment_method = COALESCE(${payment_method || null}, payment_method),
           admin_notes = COALESCE(${admin_notes !== undefined ? admin_notes : null}, admin_notes),
           extra_dates = COALESCE(${extra_dates !== undefined ? extra_dates : null}, extra_dates),
+          extra_times = COALESCE(${extra_times !== undefined ? extra_times : null}, extra_times),
           updated_at = NOW()
         WHERE id = ${id}
         RETURNING *

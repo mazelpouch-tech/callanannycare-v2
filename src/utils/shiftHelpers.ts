@@ -76,6 +76,23 @@ export function calcBookedHours(startTime: string, endTime: string, startDate?: 
   return hoursPerDay * days;
 }
 
+/** Calculate total booked hours including extra time blocks */
+export function calcTotalBookedHours(
+  startTime: string,
+  endTime: string,
+  extraTimes?: Array<{ startTime: string; endTime: string }> | null,
+  startDate?: string,
+  endDate?: string | null
+): number {
+  let total = calcBookedHours(startTime, endTime, startDate, endDate);
+  if (extraTimes && extraTimes.length > 0) {
+    for (const block of extraTimes) {
+      total += calcBookedHours(block.startTime, block.endTime, startDate, endDate);
+    }
+  }
+  return total;
+}
+
 /** Check if a shift overlaps with 7PM-7AM (evening/night window).
  *  Overnight shifts (end <= start) always cross midnight, so always evening. */
 function isEveningShift(startHour: number, endHour: number): boolean {
@@ -127,7 +144,7 @@ export function calcNannyPayBreakdown(booking: Booking): PayBreakdown {
 
   // Use booked hours (startTime/endTime) — not clock data
   if (booking.startTime && booking.endTime) {
-    return estimateNannyPayBreakdown(booking.startTime, booking.endTime, booking.date, booking.endDate);
+    return estimateNannyPayBreakdown(booking.startTime, booking.endTime, booking.date, booking.endDate, booking.extraTimes);
   }
 
   return { basePay: 0, taxiFee: 0, total: 0 };
@@ -137,25 +154,37 @@ export function calcNannyPayBreakdown(booking: Booking): PayBreakdown {
 export function calcBookedHoursForBooking(booking: Booking): number {
   if (booking.status !== 'completed') return 0;
   if (!booking.startTime || !booking.endTime) return 0;
-  return calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+  return calcTotalBookedHours(booking.startTime, booking.endTime, booking.extraTimes, booking.date, booking.endDate);
 }
 
 /**
  * Estimate nanny pay from booked time strings (before clock data exists).
  * Uses the booking's startTime/endTime to estimate hours and detect evening shifts.
+ * Includes extra time blocks if provided.
  */
 export function estimateNannyPayBreakdown(
   startTime: string,
   endTime: string,
   startDate?: string,
-  endDate?: string | null
+  endDate?: string | null,
+  extraTimes?: Array<{ startTime: string; endTime: string }> | null
 ): PayBreakdown {
-  const hours = calcBookedHours(startTime, endTime, startDate, endDate);
+  const hours = calcTotalBookedHours(startTime, endTime, extraTimes, startDate, endDate);
   if (hours <= 0) return { basePay: 0, taxiFee: 0, total: 0 };
   const basePay = Math.ceil(hours * HOURLY_RATE);
+  // Check if any block is evening
+  let hasEvening = false;
   const startH = parseTimeToHours(startTime);
   const endH = parseTimeToHours(endTime);
-  const taxiFee = startH !== null && endH !== null && isEveningShift(startH, endH) ? 100 : 0;
+  if (startH !== null && endH !== null && isEveningShift(startH, endH)) hasEvening = true;
+  if (!hasEvening && extraTimes) {
+    for (const block of extraTimes) {
+      const s = parseTimeToHours(block.startTime);
+      const e = parseTimeToHours(block.endTime);
+      if (s !== null && e !== null && isEveningShift(s, e)) { hasEvening = true; break; }
+    }
+  }
+  const taxiFee = hasEvening ? 100 : 0;
   return { basePay, taxiFee, total: basePay + taxiFee };
 }
 

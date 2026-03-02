@@ -200,6 +200,9 @@ export default function ExtendBookingModal({
             <div className="flex items-center gap-2 mt-2">
               <span className="text-sm text-foreground font-medium">
                 {booking.startTime} - {booking.endTime}
+                {booking.extraTimes && booking.extraTimes.length > 0 && (
+                  <span className="text-primary">{booking.extraTimes.map((et, i) => <span key={i}>{" + "}{et.startTime} - {et.endTime}</span>)}</span>
+                )}
               </span>
               <span className="text-xs text-muted-foreground">
                 ({currentHours}h)

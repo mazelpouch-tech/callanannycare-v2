@@ -32,6 +32,7 @@ import ForwardBookingModal from "../../components/ForwardBookingModal";
 import {
   statusColors,
   calcBookedHours,
+  calcTotalBookedHours,
   isToday,
 } from "@/utils/shiftHelpers";
 
@@ -805,10 +806,17 @@ export default function NannyBookings() {
                         <td className="px-5 py-3 text-sm text-muted-foreground">
                           {booking.startTime}
                           {booking.endTime ? ` - ${booking.endTime}` : ""}
+                          {booking.extraTimes && booking.extraTimes.length > 0 && (
+                            <span className="text-primary font-medium">
+                              {booking.extraTimes.map((et, i) => (
+                                <span key={i}>{" + "}{et.startTime} - {et.endTime}</span>
+                              ))}
+                            </span>
+                          )}
                         </td>
                         <td className="px-5 py-3 text-sm font-medium text-foreground">
                           {(() => {
-                            const h = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                            const h = calcTotalBookedHours(booking.startTime, booking.endTime, booking.extraTimes, booking.date, booking.endDate);
                             return h > 0 ? `${h}h` : "—";
                           })()}
                         </td>
@@ -999,12 +1007,19 @@ export default function NannyBookings() {
                     </span>
                   </div>
                   <div className="space-y-1 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <Clock className="w-3.5 h-3.5" />
                       {booking.date}{booking.endDate ? ` → ${booking.endDate}` : ""} · {booking.startTime}
                       {booking.endTime ? ` - ${booking.endTime}` : ""}
+                      {booking.extraTimes && booking.extraTimes.length > 0 && (
+                        <span className="text-primary font-medium">
+                          {booking.extraTimes.map((et, i) => (
+                            <span key={i}>{" + "}{et.startTime} - {et.endTime}</span>
+                          ))}
+                        </span>
+                      )}
                       {(() => {
-                        const h = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                        const h = calcTotalBookedHours(booking.startTime, booking.endTime, booking.extraTimes, booking.date, booking.endDate);
                         return h > 0 ? ` (${h}h)` : "";
                       })()}
                     </div>

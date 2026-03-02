@@ -104,7 +104,7 @@ export default function AdminRevenue() {
   const filteredExpenseDH = useMemo(() => {
     return filteredFinancialBookings.reduce((sum, b) => {
       if (b.clockIn && b.clockOut) return sum + calcShiftPayBreakdown(b.clockIn, b.clockOut).total;
-      return sum + estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate).total;
+      return sum + estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate, b.extraTimes).total;
     }, 0);
   }, [filteredFinancialBookings]);
 
@@ -170,7 +170,7 @@ export default function AdminRevenue() {
       if (b.status === "completed" || b.status === "confirmed") {
         const pay = b.clockIn && b.clockOut
           ? calcShiftPayBreakdown(b.clockIn, b.clockOut).total
-          : estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate).total;
+          : estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate, b.extraTimes).total;
         entry.estPayDH += pay;
         entry.completedCount++;
       }

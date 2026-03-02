@@ -189,6 +189,7 @@ export function DataProvider({ children }: DataProviderProps) {
           deletedBy: b.deleted_by || '',
           adminNotes: b.admin_notes || '',
           extraDates: b.extra_dates ? (() => { try { return JSON.parse(b.extra_dates!); } catch { return null; } })() : null,
+          extraTimes: b.extra_times ? (() => { try { const arr = JSON.parse(b.extra_times!); return arr.map((t: { start_time: string; end_time: string }) => ({ startTime: t.start_time, endTime: t.end_time })); } catch { return null; } })() : null,
         }));
         setBookings(normalizedBookings);
         saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -369,6 +370,7 @@ export function DataProvider({ children }: DataProviderProps) {
         deletedBy: b.deleted_by || '',
         adminNotes: b.admin_notes || '',
         extraDates: b.extra_dates ? (() => { try { return JSON.parse(b.extra_dates!); } catch { return null; } })() : null,
+        extraTimes: b.extra_times ? (() => { try { const arr = JSON.parse(b.extra_times!); return arr.map((t: { start_time: string; end_time: string }) => ({ startTime: t.start_time, endTime: t.end_time })); } catch { return null; } })() : null,
       }));
       setBookings(normalizedBookings);
       saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -417,6 +419,7 @@ export function DataProvider({ children }: DataProviderProps) {
             created_by: booking.createdBy || "parent",
             created_by_name: booking.createdByName || "",
             extra_dates: booking.extraDates ? JSON.stringify(booking.extraDates) : null,
+            extra_times: booking.extraTimes ? JSON.stringify(booking.extraTimes.map(t => ({ start_time: t.startTime, end_time: t.endTime }))) : null,
             skip_min_hours: meta?.skipMinHours || false,
             skip_conflict_check: meta?.skipConflictCheck || false,
           }),
@@ -458,6 +461,7 @@ export function DataProvider({ children }: DataProviderProps) {
           deletedBy: created.deleted_by || '',
           adminNotes: created.admin_notes || '',
           extraDates: created.extra_dates ? (() => { try { return JSON.parse(created.extra_dates!); } catch { return null; } })() : null,
+          extraTimes: created.extra_times ? (() => { try { const arr = JSON.parse(created.extra_times!); return arr.map((t: { start_time: string; end_time: string }) => ({ startTime: t.start_time, endTime: t.end_time })); } catch { return null; } })() : null,
         };
         setBookings((prev) => {
           const updated = [...prev, normalized];
@@ -530,6 +534,7 @@ export function DataProvider({ children }: DataProviderProps) {
     if (updates.childrenAges !== undefined) apiBody.children_ages = updates.childrenAges;
     if (updates.notes !== undefined) apiBody.notes = updates.notes;
     if (updates.adminNotes !== undefined) apiBody.admin_notes = updates.adminNotes;
+    if (updates.extraTimes !== undefined) apiBody.extra_times = updates.extraTimes ? JSON.stringify(updates.extraTimes.map(t => ({ start_time: t.startTime, end_time: t.endTime }))) : null;
     if (updates.totalPrice !== undefined) apiBody.total_price = updates.totalPrice;
     if (updates.status !== undefined) apiBody.status = updates.status;
     if (updates.clockIn !== undefined) apiBody.clock_in = updates.clockIn;
@@ -643,6 +648,7 @@ export function DataProvider({ children }: DataProviderProps) {
         deletedBy: b.deleted_by || '',
         adminNotes: b.admin_notes || '',
         extraDates: b.extra_dates ? (() => { try { return JSON.parse(b.extra_dates!); } catch { return null; } })() : null,
+        extraTimes: b.extra_times ? (() => { try { const arr = JSON.parse(b.extra_times!); return arr.map((t: { start_time: string; end_time: string }) => ({ startTime: t.start_time, endTime: t.end_time })); } catch { return null; } })() : null,
       }));
     } catch {
       return [];
@@ -856,6 +862,7 @@ export function DataProvider({ children }: DataProviderProps) {
     deletedBy: b.deleted_by || '',
     adminNotes: b.admin_notes || '',
     extraDates: b.extra_dates ? (() => { try { return JSON.parse(b.extra_dates!); } catch { return null; } })() : null,
+    extraTimes: b.extra_times ? (() => { try { const arr = JSON.parse(b.extra_times!); return arr.map((t: { start_time: string; end_time: string }) => ({ startTime: t.start_time, endTime: t.end_time })); } catch { return null; } })() : null,
   }), []);
 
   const fetchNannyBookings = useCallback(async () => {

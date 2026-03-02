@@ -76,6 +76,7 @@ export interface DbBooking {
   deleted_by: string;
   admin_notes: string;
   extra_dates: string | null; // JSON array of additional non-contiguous dates
+  extra_times: string | null; // JSON array of additional time blocks e.g. [{"start_time":"18h00","end_time":"21h00"}]
 }
 
 /** Booking row from a JOIN with nannies (includes nanny_name, nanny_image) */
@@ -170,6 +171,7 @@ export interface Booking {
   deletedBy: string;
   adminNotes: string;
   extraDates: string[] | null; // non-contiguous additional dates for multi-date bookings
+  extraTimes: Array<{ startTime: string; endTime: string }> | null; // additional time blocks (e.g. morning + evening)
 }
 
 export interface Notification {
