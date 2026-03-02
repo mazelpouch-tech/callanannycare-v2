@@ -31,6 +31,7 @@ interface UpdateBookingBody {
   restore?: boolean; // Restore a soft-deleted booking
   admin_notes?: string;
   extra_dates?: string | null;
+  skip_conflict_check?: boolean;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -131,7 +132,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ────────────────────────────────────────────────────────────────
     
     if (req.method === 'PUT') {
-      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder, cancellation_reason, cancelled_by, collected_by, collected_at, collection_note, payment_method, restore, admin_notes, extra_dates } = req.body as UpdateBookingBody;
+      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder, cancellation_reason, cancelled_by, collected_by, collected_at, collection_note, payment_method, restore, admin_notes, extra_dates, skip_conflict_check } = req.body as UpdateBookingBody;
 
       // Restore a soft-deleted booking
       if (restore) {
@@ -164,7 +165,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const overlapping = conflicts.filter(
               c => timesOverlap(effStartTime, effEndTime, c.start_time, c.end_time || '23h59')
             );
-            if (overlapping.length > 0) {
+            if (overlapping.length > 0 && !skip_conflict_check) {
               return res.status(409).json({
                 error: 'Scheduling conflict: this nanny already has a booking at this time.',
                 conflicts: overlapping.map(c => ({

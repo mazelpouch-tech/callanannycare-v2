@@ -1149,7 +1149,7 @@ export default function AdminBookings() {
         const res = await fetch(`/api/bookings/${id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nanny_id: bulkForwardNannyId }),
+          body: JSON.stringify({ nanny_id: bulkForwardNannyId, skip_conflict_check: true }),
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -3341,7 +3341,7 @@ export default function AdminBookings() {
             const res = await fetch(`/api/bookings/${forwardBooking.id}`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ nanny_id: newNannyId }),
+              body: JSON.stringify({ nanny_id: newNannyId, skip_conflict_check: true }),
             });
             if (!res.ok) {
               const data = await res.json().catch(() => ({}));
