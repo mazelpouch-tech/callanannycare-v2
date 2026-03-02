@@ -809,25 +809,38 @@ export default function AdminBookings() {
     return result;
   }, [bookings, search, statusFilter, nannyFilter, sortOrder, dateFrom, dateTo]);
 
-  // Split bookings into grouped sections: today / tomorrow / prev by status
+  // Split bookings into grouped sections: today / tomorrow / upcoming (future) / past (by status)
   const groupedBookings = useMemo(() => {
+    const todayStr = format(new Date(), "yyyy-MM-dd");
     const today: typeof filteredBookings = [];
     const tomorrow: typeof filteredBookings = [];
-    const prevPending: typeof filteredBookings = [];
-    const prevConfirmed: typeof filteredBookings = [];
-    const prevCompleted: typeof filteredBookings = [];
-    const prevCancelled: typeof filteredBookings = [];
+    const upcomingPending: typeof filteredBookings = [];
+    const upcomingConfirmed: typeof filteredBookings = [];
+    const pastPending: typeof filteredBookings = [];
+    const pastConfirmed: typeof filteredBookings = [];
+    const pastCompleted: typeof filteredBookings = [];
+    const pastCancelled: typeof filteredBookings = [];
     for (const b of filteredBookings) {
       try {
         if (isToday(parseISO(b.date))) { today.push(b); continue; }
         if (isTomorrowDate(b.date)) { tomorrow.push(b); continue; }
       } catch { /* ignore */ }
-      if (b.status === "pending")        prevPending.push(b);
-      else if (b.status === "confirmed") prevConfirmed.push(b);
-      else if (b.status === "completed") prevCompleted.push(b);
-      else                               prevCancelled.push(b);
+      const isFuture = (b.date || "") > todayStr;
+      if (isFuture) {
+        if (b.status === "pending") upcomingPending.push(b);
+        else upcomingConfirmed.push(b);
+      } else {
+        if (b.status === "pending")        pastPending.push(b);
+        else if (b.status === "confirmed") pastConfirmed.push(b);
+        else if (b.status === "completed") pastCompleted.push(b);
+        else                               pastCancelled.push(b);
+      }
     }
-    return { today, tomorrow, prevPending, prevConfirmed, prevCompleted, prevCancelled };
+    // Sort upcoming by date ascending (nearest first)
+    const byDateAsc = (a: Booking, b: Booking) => (a.date || "").localeCompare(b.date || "");
+    upcomingPending.sort(byDateAsc);
+    upcomingConfirmed.sort(byDateAsc);
+    return { today, tomorrow, upcomingPending, upcomingConfirmed, pastPending, pastConfirmed, pastCompleted, pastCancelled };
   }, [filteredBookings]);
 
   const formatDate = (dateStr: string) => {
@@ -861,12 +874,13 @@ export default function AdminBookings() {
     }
   };
 
-  // Previous sub-sections — each collapsed by default
-  const [prevExpanded, setPrevExpanded] = useState<Record<string, boolean>>({
-    pending: false, confirmed: false, completed: false, cancelled: false,
+  // Sub-sections — upcoming expanded by default, past collapsed
+  const [sectionExpanded, setSectionExpanded] = useState<Record<string, boolean>>({
+    upcomingPending: true, upcomingConfirmed: true,
+    pastPending: false, pastConfirmed: false, pastCompleted: false, pastCancelled: false,
   });
   const togglePrevSection = (key: string) =>
-    setPrevExpanded((p) => ({ ...p, [key]: !p[key] }));
+    setSectionExpanded((p) => ({ ...p, [key]: !p[key] }));
 
   const allGroups = [
     {
@@ -882,26 +896,38 @@ export default function AdminBookings() {
       lineColor: "bg-primary/50", badgeColor: "bg-primary", chevronColor: "text-primary",
     },
     {
-      key: "pending", label: "Previous \u00b7 Pending", items: groupedBookings.prevPending,
-      collapsible: true, isExpanded: prevExpanded.pending,
+      key: "upcomingPending", label: "Upcoming \u00b7 Pending", items: groupedBookings.upcomingPending,
+      collapsible: true, isExpanded: sectionExpanded.upcomingPending,
       bgColor: "bg-orange-50/70", textColor: "text-orange-700",
       lineColor: "bg-orange-300", badgeColor: "bg-orange-500", chevronColor: "text-orange-500",
     },
     {
-      key: "confirmed", label: "Previous \u00b7 Confirmed", items: groupedBookings.prevConfirmed,
-      collapsible: true, isExpanded: prevExpanded.confirmed,
+      key: "upcomingConfirmed", label: "Upcoming \u00b7 Confirmed", items: groupedBookings.upcomingConfirmed,
+      collapsible: true, isExpanded: sectionExpanded.upcomingConfirmed,
       bgColor: "bg-green-50/70", textColor: "text-green-700",
       lineColor: "bg-green-400", badgeColor: "bg-green-600", chevronColor: "text-green-600",
     },
     {
-      key: "completed", label: "Previous \u00b7 Completed", items: groupedBookings.prevCompleted,
-      collapsible: true, isExpanded: prevExpanded.completed,
+      key: "pastPending", label: "Past \u00b7 Pending", items: groupedBookings.pastPending,
+      collapsible: true, isExpanded: sectionExpanded.pastPending,
+      bgColor: "bg-orange-50/50", textColor: "text-orange-600",
+      lineColor: "bg-orange-200", badgeColor: "bg-orange-400", chevronColor: "text-orange-400",
+    },
+    {
+      key: "pastConfirmed", label: "Past \u00b7 Confirmed", items: groupedBookings.pastConfirmed,
+      collapsible: true, isExpanded: sectionExpanded.pastConfirmed,
+      bgColor: "bg-green-50/50", textColor: "text-green-600",
+      lineColor: "bg-green-300", badgeColor: "bg-green-500", chevronColor: "text-green-500",
+    },
+    {
+      key: "pastCompleted", label: "Past \u00b7 Completed", items: groupedBookings.pastCompleted,
+      collapsible: true, isExpanded: sectionExpanded.pastCompleted,
       bgColor: "bg-blue-50/70", textColor: "text-blue-700",
       lineColor: "bg-blue-400", badgeColor: "bg-blue-600", chevronColor: "text-blue-500",
     },
     {
-      key: "cancelled", label: "Previous \u00b7 Cancelled", items: groupedBookings.prevCancelled,
-      collapsible: true, isExpanded: prevExpanded.cancelled,
+      key: "pastCancelled", label: "Past \u00b7 Cancelled", items: groupedBookings.pastCancelled,
+      collapsible: true, isExpanded: sectionExpanded.pastCancelled,
       bgColor: "bg-gray-50/60", textColor: "text-gray-500",
       lineColor: "bg-gray-300", badgeColor: "bg-gray-400", chevronColor: "text-gray-400",
     },
