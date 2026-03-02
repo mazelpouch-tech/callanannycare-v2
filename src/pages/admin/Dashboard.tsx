@@ -1,38 +1,18 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  CalendarDays, Clock, DollarSign,
-  ArrowUpRight, ArrowDownRight, Timer,
+  CalendarDays, Clock,
+  Timer,
   Activity, ArrowRight, Eye, AlertTriangle,
   Banknote, CheckCircle2, ChevronLeft, ChevronRight, Calendar,
 } from "lucide-react";
 import {
-  format, parseISO, subMonths, startOfMonth, endOfMonth,
-  isWithinInterval, subDays, isAfter, isToday, formatDistanceToNow,
+  format, parseISO, addDays, isToday, formatDistanceToNow,
 } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import type { Booking, Nanny, BookingStatus } from "@/types";
 import { calcShiftPayBreakdown, HOURLY_RATE, getFridayPeriod, isDateInRange, toDateStr } from "@/utils/shiftHelpers";
-
-// ─── Mini Sparkline ──────────────────────────────────────────────
-
-function MiniSparkline({ data, width = 80, height = 28, color = "#cd6845" }: { data: number[]; width?: number; height?: number; color?: string }) {
-  if (!data || data.length < 2) return null;
-  const maxVal = Math.max(...data, 1);
-  const minVal = Math.min(...data, 0);
-  const range = maxVal - minVal || 1;
-  const points = data.map((v, i) => ({
-    x: (i / (data.length - 1)) * width,
-    y: height - ((v - minVal) / range) * (height - 4) - 2,
-  }));
-  const path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
-  return (
-    <svg width={width} height={height} className="inline-block">
-      <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 // ─── Urgency Badge ───────────────────────────────────────────────
 
@@ -324,61 +304,6 @@ export default function Dashboard() {
   const { bookings, nannies, stats, adminProfile, updateBookingStatus } = useData();
   const { toDH } = useExchangeRate();
 
-  // ── Weekly sparkline (last 8 weeks) ──
-  const weeklySparkline = useMemo(() => {
-    const now = new Date();
-    return Array.from({ length: 8 }, (_, i) => {
-      const weekEnd = subDays(now, (7 - i) * 7);
-      const weekStart = subDays(weekEnd, 7);
-      return bookings.filter((b) => {
-        try {
-          const d = parseISO(b.date);
-          return isAfter(d, weekStart) && !isAfter(d, weekEnd);
-        } catch { return false; }
-      }).length;
-    });
-  }, [bookings]);
-
-  const revenueSparkline = useMemo(() => {
-    const now = new Date();
-    return Array.from({ length: 8 }, (_, i) => {
-      const weekEnd = subDays(now, (7 - i) * 7);
-      const weekStart = subDays(weekEnd, 7);
-      return bookings
-        .filter((b) => b.status === "confirmed" || b.status === "completed")
-        .filter((b) => {
-          try {
-            const d = parseISO(b.date);
-            return isAfter(d, weekStart) && !isAfter(d, weekEnd);
-          } catch { return false; }
-        })
-        .reduce((s, b) => s + (b.totalPrice || 0), 0);
-    });
-  }, [bookings]);
-
-  // ── Trend calculations (this month vs last month) ──
-  const trends = useMemo(() => {
-    const now = new Date();
-    const thisMonthStart = startOfMonth(now);
-    const lastMonthStart = startOfMonth(subMonths(now, 1));
-    const lastMonthEnd = endOfMonth(subMonths(now, 1));
-
-    const thisMonthBookings = bookings.filter((b) => {
-      try { return isAfter(parseISO(b.date), thisMonthStart); } catch { return false; }
-    });
-    const lastMonthBookings = bookings.filter((b) => {
-      try { return isWithinInterval(parseISO(b.date), { start: lastMonthStart, end: lastMonthEnd }); } catch { return false; }
-    });
-
-    const thisRevenue = thisMonthBookings.filter((b) => b.status === "confirmed" || b.status === "completed").reduce((s, b) => s + (b.totalPrice || 0), 0);
-    const lastRevenue = lastMonthBookings.filter((b) => b.status === "confirmed" || b.status === "completed").reduce((s, b) => s + (b.totalPrice || 0), 0);
-
-    const bookingsTrend = lastMonthBookings.length > 0 ? ((thisMonthBookings.length - lastMonthBookings.length) / lastMonthBookings.length * 100) : 0;
-    const revenueTrend = lastRevenue > 0 ? ((thisRevenue - lastRevenue) / lastRevenue * 100) : 0;
-
-    return { bookingsTrend, revenueTrend };
-  }, [bookings]);
-
   const todaysBookings = bookings.filter((b) => { try { return isToday(parseISO(b.date)); } catch { return false; } });
   const todaysBookingsCount = todaysBookings.length;
 
@@ -405,12 +330,40 @@ export default function Dashboard() {
   }, [bookings]);
   const overdueTotal = overduePayments.reduce((s, b) => s + (b.totalPrice || 0), 0);
 
-  const formatDate = (dateStr: string) => {
-    try { return format(parseISO(dateStr), "MMM dd, yyyy"); } catch { return dateStr || "N/A"; }
-  };
   const avgBookingValue = stats.totalBookings > 0
     ? Math.round(stats.totalRevenue / Math.max(bookings.filter((b) => b.status === "confirmed" || b.status === "completed").length, 1))
     : 0;
+
+  // ── 3-Day Agenda (today + 2 days) ──
+  const agendaDays = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 3 }, (_, i) => {
+      const day = addDays(now, i);
+      const dateStr = format(day, "yyyy-MM-dd");
+      const dayBookings = bookings
+        .filter((b) => b.date === dateStr && b.status !== "cancelled")
+        .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
+      return { day, dateStr, bookings: dayBookings, isToday: i === 0 };
+    });
+  }, [bookings]);
+
+  const agendaStatusDot = (status: string) => {
+    switch (status) {
+      case "pending":   return "bg-orange-400";
+      case "confirmed": return "bg-green-500";
+      case "completed": return "bg-blue-500";
+      default:          return "bg-gray-400";
+    }
+  };
+
+  const agendaStatusChip = (status: string) => {
+    switch (status) {
+      case "pending":   return "border-l-2 border-orange-400 bg-orange-50/80";
+      case "confirmed": return "border-l-2 border-green-400 bg-green-50/80";
+      case "completed": return "border-l-2 border-blue-400 bg-blue-50/80";
+      default:          return "border-l-2 border-gray-300 bg-gray-50/80";
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -428,48 +381,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Stat Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Bookings */}
-        <Link to="/admin/bookings" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-primary/30 transition-all cursor-pointer group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-              <CalendarDays className="w-5 h-5 text-primary" />
-            </div>
-            <MiniSparkline data={weeklySparkline} color="#cd6845" />
-          </div>
-          <p className="text-2xl font-bold text-foreground">{stats.totalBookings}</p>
-          <div className="flex items-center justify-between mt-1">
-            <p className="text-xs text-muted-foreground">Total Bookings</p>
-            {trends.bookingsTrend !== 0 && (
-              <span className={`flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${trends.bookingsTrend >= 0 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
-                {trends.bookingsTrend >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                {Math.abs(Math.round(trends.bookingsTrend))}%
-              </span>
-            )}
-          </div>
-        </Link>
-
-        {/* Revenue — links to /admin/revenue */}
-        <Link to="/admin/revenue" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-green-300/50 transition-all cursor-pointer group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center group-hover:bg-green-100 transition-colors">
-              <DollarSign className="w-5 h-5 text-green-700" />
-            </div>
-            <MiniSparkline data={revenueSparkline} color="#4a9e6e" />
-          </div>
-          <p className="text-2xl font-bold text-foreground">{stats.totalRevenue.toLocaleString()} <span className="text-sm font-medium text-muted-foreground">€</span></p>
-          <p className="text-[10px] text-muted-foreground">{toDH(stats.totalRevenue).toLocaleString()} DH</p>
-          <div className="flex items-center justify-between mt-1">
-            <p className="text-xs text-muted-foreground">Total Revenue</p>
-            {trends.revenueTrend !== 0 && (
-              <span className={`flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${trends.revenueTrend >= 0 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
-                {trends.revenueTrend >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                {Math.abs(Math.round(trends.revenueTrend))}%
-              </span>
-            )}
-          </div>
-        </Link>
-
+      <div className="grid grid-cols-2 gap-4">
         {/* Pending Bookings */}
         <Link to="/admin/bookings?status=pending" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-orange-300/50 transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-3">
@@ -499,6 +411,90 @@ export default function Dashboard() {
           <p className="text-2xl font-bold text-foreground">{todaysBookingsCount}</p>
           <p className="text-xs text-muted-foreground mt-1">Today&apos;s Bookings</p>
         </Link>
+      </div>
+
+      {/* ── 3-Day Agenda ── */}
+      <div className="bg-card rounded-xl border border-border shadow-soft overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h2 className="font-serif text-base font-semibold text-foreground flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-primary" />
+            3-Day Agenda
+          </h2>
+          <Link to="/admin/bookings" className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors">
+            All Bookings <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
+          {agendaDays.map(({ day, dateStr, bookings: dayBookings, isToday: isDayToday }) => (
+            <div key={dateStr} className={`flex flex-col ${isDayToday ? "bg-primary/5" : ""}`}>
+              {/* Day header */}
+              <div className={`flex items-center gap-3 px-5 py-3 border-b border-border/60 ${isDayToday ? "bg-primary/10" : "bg-muted/30"}`}>
+                <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center shrink-0 ${isDayToday ? "bg-primary text-white" : "bg-background border border-border"}`}>
+                  <span className={`text-[9px] font-bold uppercase leading-none ${isDayToday ? "text-white/80" : "text-muted-foreground"}`}>
+                    {format(day, "EEE")}
+                  </span>
+                  <span className={`text-sm font-bold leading-tight ${isDayToday ? "text-white" : "text-foreground"}`}>
+                    {format(day, "d")}
+                  </span>
+                </div>
+                <div>
+                  <p className={`text-sm font-semibold ${isDayToday ? "text-primary" : "text-foreground"}`}>
+                    {isDayToday ? "Today" : format(day, "EEEE")}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">{format(day, "MMM d, yyyy")}</p>
+                </div>
+                {dayBookings.length > 0 && (
+                  <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold ${isDayToday ? "bg-primary text-white" : "bg-muted text-foreground"}`}>
+                    {dayBookings.length}
+                  </span>
+                )}
+              </div>
+
+              {/* Bookings list */}
+              <div className="flex-1 min-h-[80px]">
+                {dayBookings.length === 0 ? (
+                  <div className="flex items-center justify-center h-full py-6 text-xs text-muted-foreground/50">
+                    No bookings
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/50">
+                    {dayBookings.map((b) => (
+                      <div key={b.id} className={`px-4 py-3 ${agendaStatusChip(b.status)} transition-colors hover:brightness-95`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${agendaStatusDot(b.status)}`} />
+                          <span className="text-xs font-semibold text-foreground">
+                            {b.startTime || "—"}{b.endTime ? ` – ${b.endTime}` : ""}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 ml-3.5">
+                          {b.nannyName ? (
+                            <div className="flex items-center gap-1.5">
+                              {b.nannyImage ? (
+                                <img src={b.nannyImage} alt={b.nannyName} className="w-5 h-5 rounded-full object-cover border border-border" />
+                              ) : (
+                                <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-bold text-primary">
+                                  {b.nannyName.charAt(0)}
+                                </div>
+                              )}
+                              <span className="text-xs font-medium text-foreground">{b.nannyName}</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">Unassigned</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 ml-3.5 mt-0.5">
+                          <span className="text-[11px] text-muted-foreground truncate">{b.clientName}</span>
+                          {b.hotel && <span className="text-[10px] text-muted-foreground/70 truncate">· {b.hotel}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* ── Overdue Payment Alert ── */}
