@@ -28,6 +28,9 @@ import {
   Calendar,
   CheckCircle2,
   Circle,
+  CheckSquare,
+  Square,
+  AlertTriangle,
 } from "lucide-react";
 import ImageUpload from "../../components/ImageUpload";
 import { useData } from "../../context/DataContext";
@@ -535,7 +538,8 @@ const STATUS_BADGES: Record<NannyStatus, { label: string; bg: string; text: stri
 
 export default function AdminNannies() {
   const {
-    nannies, bookings, addNanny, updateNanny, deleteNanny, toggleNannyAvailability,
+    nannies, bookings, addNanny, updateNanny, deleteNanny, bulkDeleteNannies,
+    toggleNannyAvailability,
     inviteNanny, toggleNannyStatus, resendInvite, bulkUpdateNannyRate,
     impersonateNanny,
   } = useData();
@@ -547,6 +551,11 @@ export default function AdminNannies() {
   const [editingNanny, setEditingNanny] = useState<Nanny | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+
+  // Bulk selection state
+  const [bulkSelected, setBulkSelected] = useState<Set<number>>(new Set());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
 
   // Invite modal state
   const [inviteName, setInviteName] = useState("");
@@ -568,6 +577,43 @@ export default function AdminNannies() {
         n.email?.toLowerCase().includes(query)
     );
   }, [nannies, search]);
+
+  // Bulk selection helpers
+  const toggleBulkSelect = (id: number) => {
+    setBulkSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (bulkSelected.size === filteredNannies.length) {
+      setBulkSelected(new Set());
+    } else {
+      setBulkSelected(new Set(filteredNannies.map((n) => n.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (bulkSelected.size === 0) return;
+    setBulkDeleteLoading(true);
+    await bulkDeleteNannies(Array.from(bulkSelected));
+    setBulkSelected(new Set());
+    setBulkDeleteConfirm(false);
+    setBulkDeleteLoading(false);
+  };
+
+  const handleBulkToggleAvailability = async (available: boolean) => {
+    for (const id of bulkSelected) {
+      const nanny = nannies.find((n) => n.id === id);
+      if (nanny && nanny.available !== available) {
+        await toggleNannyAvailability(id);
+      }
+    }
+    setBulkSelected(new Set());
+  };
 
   // --- Add/Edit Modal ---
   const openAddModal = () => {
@@ -795,9 +841,7 @@ export default function AdminNannies() {
       const eP = estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate);
       const pay = aP.total > 0 ? aP : eP;
       s.pay += pay.total;
-      s.hours += b.clockIn && b.clockOut
-        ? calcActualHoursWorked(b.clockIn, b.clockOut)
-        : calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
+      s.hours += calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
     }
 
     const rows = Array.from(byNanny.entries())
@@ -894,6 +938,69 @@ export default function AdminNannies() {
       {/* Nanny Hours & Pay Report */}
       <NannyHoursReport bookings={bookings} />
 
+      {/* Bulk Selection Bar */}
+      {bulkSelected.size > 0 && (
+        <div className="bg-primary/5 border border-primary/20 rounded-xl px-5 py-3 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-primary">
+              {bulkSelected.size} nann{bulkSelected.size !== 1 ? "ies" : "y"} selected
+            </span>
+            <button
+              onClick={() => setBulkSelected(new Set())}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleBulkToggleAvailability(true)}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+            >
+              <ToggleRight className="w-3.5 h-3.5" />
+              Set Available
+            </button>
+            <button
+              onClick={() => handleBulkToggleAvailability(false)}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+            >
+              <ToggleLeft className="w-3.5 h-3.5" />
+              Set Unavailable
+            </button>
+            {bulkDeleteConfirm ? (
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleteLoading}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-destructive text-white hover:bg-destructive/90 transition-colors disabled:opacity-50"
+                >
+                  {bulkDeleteLoading ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                  )}
+                  {bulkDeleteLoading ? "Deleting..." : `Confirm Delete (${bulkSelected.size})`}
+                </button>
+                <button
+                  onClick={() => setBulkDeleteConfirm(false)}
+                  className="text-xs font-medium px-3 py-2 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setBulkDeleteConfirm(true)}
+                className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete Selected
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Nannies Grid */}
       {filteredNannies.length === 0 ? (
         <div className="bg-card rounded-xl border border-border p-12 text-center shadow-soft">
@@ -913,6 +1020,15 @@ export default function AdminNannies() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
+                    <th className="px-3 py-3 w-10">
+                      <button onClick={toggleSelectAll} className="text-muted-foreground hover:text-foreground transition-colors">
+                        {bulkSelected.size === filteredNannies.length && filteredNannies.length > 0 ? (
+                          <CheckSquare className="w-4 h-4 text-primary" />
+                        ) : (
+                          <Square className="w-4 h-4" />
+                        )}
+                      </button>
+                    </th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       Nanny
                     </th>
@@ -937,8 +1053,17 @@ export default function AdminNannies() {
                   {filteredNannies.map((nanny) => (
                     <tr
                       key={nanny.id}
-                      className={`hover:bg-muted/30 transition-colors ${nanny.status === "blocked" ? "opacity-60" : ""}`}
+                      className={`hover:bg-muted/30 transition-colors ${nanny.status === "blocked" ? "opacity-60" : ""} ${bulkSelected.has(nanny.id) ? "bg-primary/5" : ""}`}
                     >
+                      <td className="px-3 py-4">
+                        <button onClick={() => toggleBulkSelect(nanny.id)} className="text-muted-foreground hover:text-foreground transition-colors">
+                          {bulkSelected.has(nanny.id) ? (
+                            <CheckSquare className="w-4 h-4 text-primary" />
+                          ) : (
+                            <Square className="w-4 h-4" />
+                          )}
+                        </button>
+                      </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           {nanny.image ? (
@@ -1104,15 +1229,34 @@ export default function AdminNannies() {
           </div>
 
           {/* Mobile Cards */}
-          <div className="lg:hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="lg:hidden">
+            {/* Mobile Select All */}
+            <div className="flex items-center gap-3 mb-3 px-1">
+              <button onClick={toggleSelectAll} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                {bulkSelected.size === filteredNannies.length && filteredNannies.length > 0 ? (
+                  <CheckSquare className="w-4 h-4 text-primary" />
+                ) : (
+                  <Square className="w-4 h-4" />
+                )}
+                Select All
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {filteredNannies.map((nanny) => (
               <div
                 key={nanny.id}
-                className={`bg-card rounded-xl border border-border shadow-soft overflow-hidden ${nanny.status === "blocked" ? "opacity-60" : ""}`}
+                className={`bg-card rounded-xl border shadow-soft overflow-hidden ${nanny.status === "blocked" ? "opacity-60" : ""} ${bulkSelected.has(nanny.id) ? "border-primary/40 bg-primary/5" : "border-border"}`}
               >
                 <div className="p-4 space-y-3">
                   {/* Nanny Header */}
                   <div className="flex items-start gap-3">
+                    <button onClick={() => toggleBulkSelect(nanny.id)} className="mt-1 shrink-0 text-muted-foreground hover:text-foreground transition-colors">
+                      {bulkSelected.has(nanny.id) ? (
+                        <CheckSquare className="w-4 h-4 text-primary" />
+                      ) : (
+                        <Square className="w-4 h-4" />
+                      )}
+                    </button>
                     {nanny.image ? (
                       <img
                         src={nanny.image}
@@ -1249,6 +1393,7 @@ export default function AdminNannies() {
                 </div>
               </div>
             ))}
+            </div>
           </div>
         </>
       )}

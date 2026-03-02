@@ -1120,3 +1120,70 @@ export async function sendRateUpdateNotificationEmail(data: RateUpdateNotificati
     return false;
   }
 }
+
+// ─── Nanny Deletion Notification Email ────────────────────────────
+
+interface NannyDeletionNotificationData {
+  deletedByName: string;
+  deletedByEmail: string;
+  deletedNannies: { id: number; name: string; email?: string }[];
+  adminEmails: string[];
+}
+
+export async function sendNannyDeletionNotificationEmail(data: NannyDeletionNotificationData): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log('RESEND_API_KEY not configured. Nanny deletion notification email skipped.');
+    return false;
+  }
+
+  if (data.adminEmails.length === 0) return false;
+
+  const resend = new Resend(apiKey);
+  const fromAddress = process.env.RESEND_FROM_EMAIL || 'Call a Nanny <onboarding@resend.dev>';
+
+  const nannyListHtml = data.deletedNannies.map(n =>
+    `<tr><td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#1a1a1a;">${n.name}</td><td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#666;">${n.email || 'No email'}</td></tr>`
+  ).join('');
+
+  const content = `
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:48px;margin-bottom:8px;">&#128465;</div>
+      <h2 style="margin:0 0 6px;color:#1a1a1a;font-size:22px;font-family:Georgia,'Times New Roman',serif;">Nannies Deleted</h2>
+      <p style="margin:0;color:#666;font-size:15px;">${data.deletedNannies.length} nann${data.deletedNannies.length !== 1 ? 'ies have' : 'y has'} been removed from the system.</p>
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden;margin-bottom:24px;">
+      ${row('Deleted By', `${data.deletedByName} (${data.deletedByEmail})`)}
+      ${row('Count', `${data.deletedNannies.length} nann${data.deletedNannies.length !== 1 ? 'ies' : 'y'}`)}
+      ${row('Deleted At', new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }))}
+    </table>
+
+    <p style="margin:0 0 8px;color:#1a1a1a;font-size:14px;font-weight:600;">Deleted nannies:</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden;margin-bottom:24px;">
+      <tr style="background:#fafafa;"><th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;text-transform:uppercase;">Name</th><th style="padding:8px 12px;text-align:left;font-size:12px;color:#666;text-transform:uppercase;">Email</th></tr>
+      ${nannyListHtml}
+    </table>
+
+    <div style="margin:24px 0;padding:16px 20px;background-color:#fef2f2;border-radius:12px;border-left:4px solid #ef4444;">
+      <p style="margin:0;color:#991b1b;font-size:14px;line-height:1.5;">
+        This action cannot be undone. If this was not expected, please review it in the admin dashboard immediately.
+      </p>
+    </div>
+
+    <p style="margin:0;color:#999;font-size:13px;text-align:center;">Call a Nanny &mdash; <a href="mailto:info@callanannycare.com" style="color:#f97316;">info@callanannycare.com</a></p>
+  `;
+
+  try {
+    await resend.emails.send({
+      from: fromAddress,
+      to: data.adminEmails,
+      subject: `[Alert] ${data.deletedNannies.length} nann${data.deletedNannies.length !== 1 ? 'ies' : 'y'} deleted by ${data.deletedByName}`,
+      html: emailWrapper(content),
+    });
+    return true;
+  } catch (err) {
+    console.error('Failed to send nanny deletion notification email:', err);
+    return false;
+  }
+}

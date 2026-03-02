@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb } from './_db.js';
 import type { DbNanny, DbAdminUser } from '@/types';
-import { sendRateUpdateNotificationEmail } from './_emailTemplates.js';
+import { sendRateUpdateNotificationEmail, sendNannyDeletionNotificationEmail } from './_emailTemplates.js';
 
 interface BulkUpdateRateBody {
   action: 'bulk_update_rate';
@@ -197,6 +197,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       return res.status(200).json({ success: true, nannyCount });
+    }
+
+    if (req.method === 'DELETE') {
+      // Bulk delete nannies
+      const { ids, deletedByName, deletedByEmail } = req.body as {
+        ids: number[];
+        deletedByName?: string;
+        deletedByEmail?: string;
+      };
+
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: 'ids array is required' });
+      }
+
+      // Fetch nanny details before deleting (for notification)
+      const nannyDetails: { id: number; name: string; email: string | null }[] = [];
+      for (const id of ids) {
+        const rows = await sql`SELECT id, name, email FROM nannies WHERE id = ${id}` as { id: number; name: string; email: string | null }[];
+        if (rows.length > 0) nannyDetails.push(rows[0]);
+      }
+
+      // Delete nannies one by one
+      for (const id of ids) {
+        await sql`DELETE FROM nannies WHERE id = ${id}`;
+      }
+
+      // Notify all admins
+      try {
+        const superAdmins = await sql`
+          SELECT email FROM admin_users WHERE is_active = true
+        ` as Pick<DbAdminUser, 'email'>[];
+        const adminEmails = superAdmins.map(a => a.email).filter(Boolean);
+        if (adminEmails.length > 0 && nannyDetails.length > 0) {
+          await sendNannyDeletionNotificationEmail({
+            deletedByName: deletedByName || 'Admin',
+            deletedByEmail: deletedByEmail || '',
+            deletedNannies: nannyDetails.map(n => ({ id: n.id, name: n.name, email: n.email || undefined })),
+            adminEmails,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to send nanny deletion notification:', err);
+      }
+
+      return res.status(200).json({ success: true, deletedCount: nannyDetails.length });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });

@@ -398,6 +398,7 @@ export interface DataContextValue {
   addNanny: (nanny: Partial<Nanny>) => Promise<Nanny>;
   updateNanny: (id: number, updates: Partial<Nanny>) => Promise<void>;
   deleteNanny: (id: number) => Promise<void>;
+  bulkDeleteNannies: (ids: number[]) => Promise<{ success: boolean; deletedCount: number }>;
   toggleNannyAvailability: (id: number) => Promise<void>;
   inviteNanny: (data: { name: string; email: string }) => Promise<ApiResult<InviteResponse>>;
   toggleNannyStatus: (id: number) => Promise<void>;

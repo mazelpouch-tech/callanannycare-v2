@@ -281,6 +281,34 @@ export function DataProvider({ children }: DataProviderProps) {
     });
   }, []);
 
+  const bulkDeleteNannies = useCallback(async (ids: number[]): Promise<{ success: boolean; deletedCount: number }> => {
+    try {
+      const res = await apiFetch("/nannies", {
+        method: "DELETE",
+        body: JSON.stringify({
+          ids,
+          deletedByName: adminProfile?.name || "Admin",
+          deletedByEmail: adminProfile?.email || "",
+        }),
+      });
+      const data = typeof res === "object" && res !== null ? res as { success: boolean; deletedCount: number } : { success: true, deletedCount: ids.length };
+      setNannies((prev) => {
+        const updated = prev.filter((n) => !ids.includes(n.id));
+        saveToStorage(STORAGE_KEYS.nannies, updated);
+        return updated;
+      });
+      return { success: true, deletedCount: data.deletedCount || ids.length };
+    } catch {
+      // Fallback: delete locally
+      setNannies((prev) => {
+        const updated = prev.filter((n) => !ids.includes(n.id));
+        saveToStorage(STORAGE_KEYS.nannies, updated);
+        return updated;
+      });
+      return { success: true, deletedCount: ids.length };
+    }
+  }, [adminProfile]);
+
   const toggleNannyAvailability = useCallback(async (id: number): Promise<void> => {
     const nanny = nannies.find((n) => n.id === id);
     if (!nanny) return;
@@ -1379,6 +1407,7 @@ export function DataProvider({ children }: DataProviderProps) {
       addNanny,
       updateNanny,
       deleteNanny,
+      bulkDeleteNannies,
       toggleNannyAvailability,
       inviteNanny,
       toggleNannyStatus,
@@ -1442,7 +1471,7 @@ export function DataProvider({ children }: DataProviderProps) {
       setActiveChannel,
     }),
     [
-      nannies, addNanny, updateNanny, deleteNanny, toggleNannyAvailability, inviteNanny, toggleNannyStatus, resendInvite, bulkUpdateNannyRate,
+      nannies, addNanny, updateNanny, deleteNanny, bulkDeleteNannies, toggleNannyAvailability, inviteNanny, toggleNannyStatus, resendInvite, bulkUpdateNannyRate,
       bookings, fetchBookings, addBooking, updateBooking, updateBookingStatus, clockInBooking, clockOutBooking, deleteBooking, fetchDeletedBookings, restoreBooking, resendInvoice, sendBookingReminder,
       stats, isAdmin, adminProfile, adminUsers, adminLogin, adminLogout,
       fetchAdminUsers, addAdminUser, updateAdminUser, deleteAdminUser,
