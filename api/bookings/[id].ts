@@ -289,45 +289,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      // ─── Nanny confirmed → send parent a confirmation email with nanny profile ───
+      // ─── Nanny confirmed → send parent a confirmation email with nanny profile — DISABLED (parent emails paused) ───
       if (status === 'confirmed' && result[0] && result[0].nanny_id && result[0].client_email) {
-        try {
-          const nannyProfileRows = await sql`
-            SELECT name, image, bio, experience, rating, languages, specialties
-            FROM nannies WHERE id = ${result[0].nanny_id}
-          ` as { name: string; image: string; bio: string; experience: string; rating: number; languages: string | string[]; specialties: string | string[] }[];
-
-          if (nannyProfileRows[0]) {
-            const np = nannyProfileRows[0];
-            const parsedLangs = typeof np.languages === 'string' ? JSON.parse(np.languages || '[]') : np.languages;
-            const parsedSpecs = typeof np.specialties === 'string' ? JSON.parse(np.specialties || '[]') : np.specialties;
-
-            const { sendNannyConfirmedEmail } = await import('../_emailTemplates.js');
-            await sendNannyConfirmedEmail({
-              bookingId: result[0].id,
-              clientName: result[0].client_name,
-              clientEmail: result[0].client_email,
-              hotel: result[0].hotel || '',
-              date: result[0].date,
-              endDate: result[0].end_date || null,
-              startTime: result[0].start_time,
-              endTime: result[0].end_time || '',
-              childrenCount: result[0].children_count || 1,
-              childrenAges: result[0].children_ages || '',
-              totalPrice: result[0].total_price || 0,
-              nannyName: np.name,
-              nannyImage: np.image || '',
-              nannyBio: np.bio || '',
-              nannyExperience: np.experience || '',
-              nannyRating: np.rating || 5,
-              nannyLanguages: parsedLangs,
-              nannySpecialties: parsedSpecs,
-              locale: result[0].locale || 'en',
-            });
-          }
-        } catch (confirmedEmailError: unknown) {
-          console.error('Nanny confirmed email to parent failed:', confirmedEmailError);
-        }
+        // try {
+        //   const nannyProfileRows = await sql`
+        //     SELECT name, image, bio, experience, rating, languages, specialties
+        //     FROM nannies WHERE id = ${result[0].nanny_id}
+        //   ` as { name: string; image: string; bio: string; experience: string; rating: number; languages: string | string[]; specialties: string | string[] }[];
+        //
+        //   if (nannyProfileRows[0]) {
+        //     const np = nannyProfileRows[0];
+        //     const parsedLangs = typeof np.languages === 'string' ? JSON.parse(np.languages || '[]') : np.languages;
+        //     const parsedSpecs = typeof np.specialties === 'string' ? JSON.parse(np.specialties || '[]') : np.specialties;
+        //
+        //     const { sendNannyConfirmedEmail } = await import('../_emailTemplates.js');
+        //     await sendNannyConfirmedEmail({
+        //       bookingId: result[0].id,
+        //       clientName: result[0].client_name,
+        //       clientEmail: result[0].client_email,
+        //       hotel: result[0].hotel || '',
+        //       date: result[0].date,
+        //       endDate: result[0].end_date || null,
+        //       startTime: result[0].start_time,
+        //       endTime: result[0].end_time || '',
+        //       childrenCount: result[0].children_count || 1,
+        //       childrenAges: result[0].children_ages || '',
+        //       totalPrice: result[0].total_price || 0,
+        //       nannyName: np.name,
+        //       nannyImage: np.image || '',
+        //       nannyBio: np.bio || '',
+        //       nannyExperience: np.experience || '',
+        //       nannyRating: np.rating || 5,
+        //       nannyLanguages: parsedLangs,
+        //       nannySpecialties: parsedSpecs,
+        //       locale: result[0].locale || 'en',
+        //     });
+        //   }
+        // } catch (confirmedEmailError: unknown) {
+        //   console.error('Nanny confirmed email to parent failed:', confirmedEmailError);
+        // }
 
         // WhatsApp confirmation to parent (automatic — no button click needed)
         const WA_TOKEN_CF = process.env.WHATSAPP_TOKEN;
@@ -441,29 +441,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const hoursUntilBooking = (bookingDateTime.getTime() - Date.now()) / 3600000;
         const hasCancellationFee = hoursUntilBooking < 24;
 
-        // 1. Send cancellation email to parent
-        if (booking.client_email) {
-          try {
-            const { sendCancellationEmail } = await import('../_emailTemplates.js');
-            await sendCancellationEmail({
-              bookingId: booking.id,
-              clientName: booking.client_name,
-              clientEmail: booking.client_email,
-              hotel: booking.hotel || '',
-              date: booking.date,
-              startTime: booking.start_time,
-              endTime: booking.end_time || '',
-              childrenCount: booking.children_count || 1,
-              totalPrice: booking.total_price || 0,
-              cancellationReason: cancellation_reason || '',
-              cancelledBy: cancelled_by || 'admin',
-              hasCancellationFee,
-              locale: booking.locale || 'en',
-            });
-          } catch (cancelEmailErr: unknown) {
-            console.error('Cancellation email to parent failed:', cancelEmailErr);
-          }
-        }
+        // 1. Send cancellation email to parent — DISABLED (parent emails paused)
+        // if (booking.client_email) {
+        //   try {
+        //     const { sendCancellationEmail } = await import('../_emailTemplates.js');
+        //     await sendCancellationEmail({
+        //       bookingId: booking.id,
+        //       clientName: booking.client_name,
+        //       clientEmail: booking.client_email,
+        //       hotel: booking.hotel || '',
+        //       date: booking.date,
+        //       startTime: booking.start_time,
+        //       endTime: booking.end_time || '',
+        //       childrenCount: booking.children_count || 1,
+        //       totalPrice: booking.total_price || 0,
+        //       cancellationReason: cancellation_reason || '',
+        //       cancelledBy: cancelled_by || 'admin',
+        //       hasCancellationFee,
+        //       locale: booking.locale || 'en',
+        //     });
+        //   } catch (cancelEmailErr: unknown) {
+        //     console.error('Cancellation email to parent failed:', cancelEmailErr);
+        //   }
+        // }
 
         // 2. Send cancellation email to nanny (inline)
         if (booking.nanny_id) {
@@ -676,23 +676,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const reviewUrl = `${reviewBaseUrl}/review/${result[0].id}?token=${reviewToken}`;
           const reviewLocale = result[0].locale || 'en';
 
-          // Email
-          if (result[0].client_email) {
-            try {
-              const { sendReviewRequestEmail } = await import('../_emailTemplates.js');
-              await sendReviewRequestEmail({
-                bookingId: result[0].id,
-                clientName: result[0].client_name,
-                clientEmail: result[0].client_email,
-                date: result[0].date,
-                nannyName: invoiceNannyName,
-                reviewUrl,
-                locale: reviewLocale,
-              });
-            } catch (reviewEmailErr: unknown) {
-              console.error('Review request email failed:', reviewEmailErr);
-            }
-          }
+          // Email — DISABLED (parent emails paused)
+          // if (result[0].client_email) {
+          //   try {
+          //     const { sendReviewRequestEmail } = await import('../_emailTemplates.js');
+          //     await sendReviewRequestEmail({
+          //       bookingId: result[0].id,
+          //       clientName: result[0].client_name,
+          //       clientEmail: result[0].client_email,
+          //       date: result[0].date,
+          //       nannyName: invoiceNannyName,
+          //       reviewUrl,
+          //       locale: reviewLocale,
+          //     });
+          //   } catch (reviewEmailErr: unknown) {
+          //     console.error('Review request email failed:', reviewEmailErr);
+          //   }
+          // }
 
           // WhatsApp
           if (WA_TOKEN && WA_PHONE_ID && parentPhone) {
@@ -742,36 +742,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      // Resend invoice email on admin request
-      if (resend_invoice && result[0] && result[0].client_email && result[0].status === 'completed' && result[0].clock_out) {
-        try {
-          const nannyRows2 = await sql`
-            SELECT name FROM nannies WHERE id = ${result[0].nanny_id}
-          ` as { name: string }[];
-          const nannyName2 = nannyRows2[0]?.name || 'Your Nanny';
-
-          const { sendInvoiceEmail: resendInvoiceFn } = await import('../_emailTemplates.js');
-          await resendInvoiceFn({
-            bookingId: result[0].id,
-            clientName: result[0].client_name,
-            clientEmail: result[0].client_email,
-            clientPhone: result[0].client_phone,
-            hotel: result[0].hotel,
-            date: result[0].date,
-            startTime: result[0].start_time,
-            endTime: result[0].end_time,
-            clockIn: result[0].clock_in || result[0].clock_out,
-            clockOut: result[0].clock_out,
-            childrenCount: result[0].children_count,
-            childrenAges: result[0].children_ages,
-            totalPrice: result[0].total_price,
-            nannyName: nannyName2,
-            locale: result[0].locale || 'en',
-          });
-        } catch (resendError: unknown) {
-          console.error('Resend invoice email failed:', resendError);
-        }
-      }
+      // Resend invoice email on admin request — DISABLED (parent emails paused)
+      // if (resend_invoice && result[0] && result[0].client_email && result[0].status === 'completed' && result[0].clock_out) {
+      //   try {
+      //     const nannyRows2 = await sql`
+      //       SELECT name FROM nannies WHERE id = ${result[0].nanny_id}
+      //     ` as { name: string }[];
+      //     const nannyName2 = nannyRows2[0]?.name || 'Your Nanny';
+      //
+      //     const { sendInvoiceEmail: resendInvoiceFn } = await import('../_emailTemplates.js');
+      //     await resendInvoiceFn({
+      //       bookingId: result[0].id,
+      //       clientName: result[0].client_name,
+      //       clientEmail: result[0].client_email,
+      //       clientPhone: result[0].client_phone,
+      //       hotel: result[0].hotel,
+      //       date: result[0].date,
+      //       startTime: result[0].start_time,
+      //       endTime: result[0].end_time,
+      //       clockIn: result[0].clock_in || result[0].clock_out,
+      //       clockOut: result[0].clock_out,
+      //       childrenCount: result[0].children_count,
+      //       childrenAges: result[0].children_ages,
+      //       totalPrice: result[0].total_price,
+      //       nannyName: nannyName2,
+      //       locale: result[0].locale || 'en',
+      //     });
+      //   } catch (resendError: unknown) {
+      //     console.error('Resend invoice email failed:', resendError);
+      //   }
+      // }
 
       // Send reminder email to nanny for pending bookings
       if (send_reminder && result[0] && result[0].nanny_id && result[0].status === 'pending') {

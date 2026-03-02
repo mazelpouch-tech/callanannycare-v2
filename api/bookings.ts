@@ -116,25 +116,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             } catch (e) { console.error('Nanny reminder failed:', e); }
           }
 
-          // 2. Send parent reminder email
-          if (b.client_email) {
-            try {
-              const { sendParentReminderEmail } = await import('./_emailTemplates.js');
-              await sendParentReminderEmail({
-                bookingId: b.id,
-                clientName: b.client_name,
-                clientEmail: b.client_email,
-                date: b.date,
-                startTime: b.start_time,
-                endTime: b.end_time || '',
-                hotel: b.hotel || '',
-                childrenCount: b.children_count || 1,
-                nannyName: b.nanny_name || 'Your Nanny',
-                locale: b.locale || 'en',
-              });
-              parentReminders++;
-            } catch (e) { console.error('Parent reminder failed:', e); }
-          }
+          // 2. Send parent reminder email — DISABLED (parent emails paused)
+          // if (b.client_email) {
+          //   try {
+          //     const { sendParentReminderEmail } = await import('./_emailTemplates.js');
+          //     await sendParentReminderEmail({
+          //       bookingId: b.id,
+          //       clientName: b.client_name,
+          //       clientEmail: b.client_email,
+          //       date: b.date,
+          //       startTime: b.start_time,
+          //       endTime: b.end_time || '',
+          //       hotel: b.hotel || '',
+          //       childrenCount: b.children_count || 1,
+          //       nannyName: b.nanny_name || 'Your Nanny',
+          //       locale: b.locale || 'en',
+          //     });
+          //     parentReminders++;
+          //   } catch (e) { console.error('Parent reminder failed:', e); }
+          // }
 
           // 3. Send WhatsApp reminder to parent (if phone available)
           const WA_TOKEN = process.env.WHATSAPP_TOKEN;
@@ -479,29 +479,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      // Send email to parent (best-effort)
-      if (result[0] && client_email) {
-        try {
-          const { sendConfirmationEmail } = await import('./_emailTemplates.js');
-          await sendConfirmationEmail({
-            bookingId: result[0].id,
-            clientName: client_name,
-            clientEmail: client_email,
-            clientPhone: client_phone || '',
-            hotel: hotel || '',
-            date,
-            startTime: start_time,
-            endTime: end_time || '',
-            childrenCount: children_count || 1,
-            childrenAges: children_ages || '',
-            totalPrice: total_price || 0,
-            notes: notes || '',
-            locale: locale || 'en',
-          });
-        } catch (emailError: unknown) {
-          console.error('Email sending failed:', emailError);
-        }
-      }
+      // Send email to parent (best-effort) — DISABLED (parent emails paused)
+      // if (result[0] && client_email) {
+      //   try {
+      //     const { sendConfirmationEmail } = await import('./_emailTemplates.js');
+      //     await sendConfirmationEmail({
+      //       bookingId: result[0].id,
+      //       clientName: client_name,
+      //       clientEmail: client_email,
+      //       clientPhone: client_phone || '',
+      //       hotel: hotel || '',
+      //       date,
+      //       startTime: start_time,
+      //       endTime: end_time || '',
+      //       childrenCount: children_count || 1,
+      //       childrenAges: children_ages || '',
+      //       totalPrice: total_price || 0,
+      //       notes: notes || '',
+      //       locale: locale || 'en',
+      //     });
+      //   } catch (emailError: unknown) {
+      //     console.error('Email sending failed:', emailError);
+      //   }
+      // }
 
       return res.status(201).json(result[0]);
     }
