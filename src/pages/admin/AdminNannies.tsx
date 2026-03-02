@@ -41,9 +41,7 @@ import {
 import {
   calcNannyPayBreakdown,
   estimateNannyPayBreakdown,
-  calcActualHoursWorked,
   calcBookedHours,
-  calcShiftPayBreakdown,
   HOURLY_RATE,
   getFridayPeriod,
   isDateInRange,
@@ -129,22 +127,21 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
   })();
 
   const nannyHours = useMemo(() => {
-    const clockedBookings = bookings.filter(
-      (b) => b.clockIn && b.clockOut && isDateInRange(b.date, periodStart, periodEnd)
+    const completedBookings = bookings.filter(
+      (b) => b.status === "completed" && b.startTime && b.endTime && isDateInRange(b.date, periodStart, periodEnd)
     );
-    if (clockedBookings.length === 0) return [];
+    if (completedBookings.length === 0) return [];
 
     const nannyMap: Record<number, { nannyId: number; name: string; shifts: number; totalHours: number; basePay: number; taxiFee: number; totalPay: number }> = {};
-    clockedBookings.forEach((b) => {
+    completedBookings.forEach((b) => {
       const nannyId = b.nannyId;
       if (nannyId == null) return;
       const nannyName = b.nannyName || "Unknown";
       if (!nannyMap[nannyId]) {
         nannyMap[nannyId] = { nannyId, name: nannyName, shifts: 0, totalHours: 0, basePay: 0, taxiFee: 0, totalPay: 0 };
       }
-      const ms = new Date(b.clockOut!).getTime() - new Date(b.clockIn!).getTime();
-      const hours = ms / 3600000;
-      const bd = calcShiftPayBreakdown(b.clockIn!, b.clockOut!);
+      const hours = calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
+      const bd = estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate);
 
       nannyMap[nannyId].shifts += 1;
       nannyMap[nannyId].totalHours += hours;
@@ -315,9 +312,9 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
       {nannyHours.length === 0 && (
         <div className="px-6 py-10 text-center">
           <Timer className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-muted-foreground font-medium">No shift data for this period</p>
+          <p className="text-muted-foreground font-medium">No completed bookings for this period</p>
           <p className="text-sm text-muted-foreground/70 mt-1">
-            Hours will appear here once nannies start using Start Shift / End Shift.
+            Hours will appear here once bookings are marked as completed.
           </p>
         </div>
       )}

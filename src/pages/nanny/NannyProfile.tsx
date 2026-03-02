@@ -27,7 +27,7 @@ import { format } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
 import ImageUpload from "../../components/ImageUpload";
-import { calcActualHoursWorked, calcNannyPayBreakdown, getFridayPeriod, isDateInRange, toDateStr } from "@/utils/shiftHelpers";
+import { calcBookedHoursForBooking, calcNannyPayBreakdown, getFridayPeriod, isDateInRange, toDateStr } from "@/utils/shiftHelpers";
 import type { NannyProfile as NannyProfileType } from "@/types";
 
 export default function NannyProfile() {
@@ -100,16 +100,16 @@ export default function NannyProfile() {
     return `${format(periodStart, "MMM d")} — ${format(endDisplay, "MMM d")}`;
   })();
 
-  // Calculate total hours & pay breakdown from actual clock data within the period
+  // Calculate total hours from completed bookings within the period
   const totalHoursWorked = useMemo(() =>
     nannyBookings
-      .filter((b) => b.clockIn && b.clockOut && b.status !== "cancelled" && isDateInRange(b.date, periodStart, periodEnd))
-      .reduce((sum, b) => sum + calcActualHoursWorked(b.clockIn!, b.clockOut!), 0),
+      .filter((b) => b.status === "completed" && isDateInRange(b.date, periodStart, periodEnd))
+      .reduce((sum, b) => sum + calcBookedHoursForBooking(b), 0),
     [nannyBookings, periodStart, periodEnd]);
 
   const payBreakdown = useMemo(() =>
     nannyBookings
-      .filter((b) => b.status !== "cancelled" && isDateInRange(b.date, periodStart, periodEnd))
+      .filter((b) => b.status === "completed" && isDateInRange(b.date, periodStart, periodEnd))
       .reduce(
         (acc, b) => {
           const bd = calcNannyPayBreakdown(b);

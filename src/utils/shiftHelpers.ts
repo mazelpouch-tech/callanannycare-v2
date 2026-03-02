@@ -122,15 +122,22 @@ export function calcNannyPay(booking: Booking): number {
 }
 
 export function calcNannyPayBreakdown(booking: Booking): PayBreakdown {
-  if (booking.status === 'cancelled') return { basePay: 0, taxiFee: 0, total: 0 };
+  // Only pay when booking is completed (after guardianship of child)
+  if (booking.status !== 'completed') return { basePay: 0, taxiFee: 0, total: 0 };
 
-  // Only count pay from actual clock in/out data (real worked hours)
-  if (booking.clockIn && booking.clockOut) {
-    return calcShiftPayBreakdown(booking.clockIn, booking.clockOut);
+  // Use booked hours (startTime/endTime) — not clock data
+  if (booking.startTime && booking.endTime) {
+    return estimateNannyPayBreakdown(booking.startTime, booking.endTime, booking.date, booking.endDate);
   }
 
-  // No clock data = no pay yet (shift hasn't been worked)
   return { basePay: 0, taxiFee: 0, total: 0 };
+}
+
+/** Calculate booked hours for a completed booking (no clock data needed) */
+export function calcBookedHoursForBooking(booking: Booking): number {
+  if (booking.status !== 'completed') return 0;
+  if (!booking.startTime || !booking.endTime) return 0;
+  return calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
 }
 
 /**

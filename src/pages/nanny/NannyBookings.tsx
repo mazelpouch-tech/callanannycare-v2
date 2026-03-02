@@ -10,9 +10,6 @@ import {
   CheckCircle,
   MessageCircle,
   Loader2,
-  PlayCircle,
-  StopCircle,
-  Timer,
   TimerReset,
   Plus,
   X,
@@ -30,9 +27,6 @@ import ExtendBookingModal from "../../components/ExtendBookingModal";
 import ForwardBookingModal from "../../components/ForwardBookingModal";
 import {
   statusColors,
-  formatDuration,
-  formatHoursWorked,
-  calcShiftPay,
   calcBookedHours,
   isToday,
 } from "@/utils/shiftHelpers";
@@ -46,8 +40,6 @@ for (let i = 0; i < 48; i++) {
   const mm = m === 0 ? "00" : "30";
   TIME_SLOTS.push({ value: `${h}:${mm}`, label: `${hh}h${mm}` });
 }
-
-interface LiveTimerProps { clockIn: string }
 
 interface BookingFormData {
   clientName: string;
@@ -80,26 +72,8 @@ const emptyForm: BookingFormData = {
 const RATE = 10; // € per hour
 const TAXI_FEE = 10; // € flat fee for night bookings
 
-// Live timer component
-function LiveTimer({ clockIn }: LiveTimerProps) {
-  const [elapsed, setElapsed] = useState(Date.now() - new Date(clockIn).getTime());
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setElapsed(Date.now() - new Date(clockIn).getTime());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [clockIn]);
-
-  return (
-    <span className="font-mono text-sm font-bold tabular-nums">
-      {formatDuration(elapsed)}
-    </span>
-  );
-}
-
 export default function NannyBookings() {
-  const { nannyBookings, fetchNannyBookings, updateBookingStatus, updateBooking, clockInBooking, clockOutBooking, addBooking, nannyProfile, nannies } = useData();
+  const { nannyBookings, fetchNannyBookings, updateBookingStatus, updateBooking, addBooking, nannyProfile, nannies } = useData();
   const { t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
@@ -245,29 +219,9 @@ export default function NannyBookings() {
     fetchNannyBookings();
   }, [fetchNannyBookings]);
 
-  // Find active shift (clocked in but not clocked out)
-  const activeShift = useMemo(
-    () => nannyBookings.find((b) => b.clockIn && !b.clockOut && b.status !== "cancelled"),
-    [nannyBookings]
-  );
-
   const handleAccept = async (id: number | string) => {
     setActionLoading(id);
     await updateBookingStatus(id, "confirmed");
-    await fetchNannyBookings();
-    setActionLoading(null);
-  };
-
-  const handleClockIn = async (id: number | string) => {
-    setActionLoading(id);
-    await clockInBooking(id);
-    await fetchNannyBookings();
-    setActionLoading(null);
-  };
-
-  const handleClockOut = async (id: number | string) => {
-    setActionLoading(id);
-    await clockOutBooking(id);
     await fetchNannyBookings();
     setActionLoading(null);
   };
@@ -700,40 +654,6 @@ export default function NannyBookings() {
         </div>
       )}
 
-      {/* Active Shift Banner */}
-      {activeShift && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center animate-pulse">
-              <Timer className="w-5 h-5 text-green-700" />
-            </div>
-            <div>
-              <p className="font-semibold text-green-800">{t("nanny.bookings.activeShift")}</p>
-              <p className="text-sm text-green-700">
-                {activeShift.clientName} · {activeShift.hotel || t("shared.noHotel")}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="bg-green-100 px-3 py-1.5 rounded-lg">
-              <LiveTimer clockIn={activeShift.clockIn!} />
-            </div>
-            <button
-              onClick={() => handleClockOut(activeShift.id)}
-              disabled={actionLoading === activeShift.id}
-              className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-            >
-              {actionLoading === activeShift.id ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <StopCircle className="w-4 h-4" />
-              )}
-              {t("nanny.bookings.endShift")}
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -787,7 +707,6 @@ export default function NannyBookings() {
                     <th className="px-5 py-3 font-medium">{t("shared.hours")}</th>
                     <th className="px-5 py-3 font-medium">{t("shared.plan")}</th>
                     <th className="px-5 py-3 font-medium">{t("shared.status")}</th>
-                    <th className="px-5 py-3 font-medium">{t("nanny.bookings.shift")}</th>
                     <th className="px-5 py-3 font-medium">{t("shared.actions")}</th>
                   </tr>
                 </thead>
@@ -824,26 +743,6 @@ export default function NannyBookings() {
                           </span>
                         </td>
                         <td className="px-5 py-3">
-                          {/* Clock data */}
-                          {booking.clockIn && booking.clockOut ? (
-                            <div className="text-xs">
-                              <span className="font-medium text-blue-700">
-                                {formatHoursWorked(booking.clockIn!, booking.clockOut!)}
-                              </span>
-                              <span className="text-muted-foreground ml-1">
-                                · {calcShiftPay(booking.clockIn!, booking.clockOut!)} DH
-                              </span>
-                            </div>
-                          ) : booking.clockIn && !booking.clockOut ? (
-                            <div className="flex items-center gap-1.5 text-green-700">
-                              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                              <LiveTimer clockIn={booking.clockIn!} />
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3">
                           <div className="flex items-center gap-1.5">
                             {/* Accept for pending */}
                             {booking.status === "pending" && (
@@ -860,40 +759,8 @@ export default function NannyBookings() {
                                   )}
                                 </button>
                             )}
-                            {/* Start Shift for confirmed bookings today, no active shift elsewhere */}
-                            {booking.status === "confirmed" && !booking.clockIn && isToday(booking.date) && !activeShift && (
-                              <button
-                                onClick={() => handleClockIn(booking.id)}
-                                disabled={actionLoading === booking.id}
-                                className="flex items-center gap-1 px-2.5 py-1.5 bg-green-50 text-green-700 text-xs font-medium rounded-lg hover:bg-green-100 transition-colors disabled:opacity-50"
-                                title="Start Shift"
-                              >
-                                {actionLoading === booking.id ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <PlayCircle className="w-3.5 h-3.5" />
-                                )}
-                                {t("nanny.bookings.startShift")}
-                              </button>
-                            )}
-                            {/* End Shift for active shift */}
-                            {booking.clockIn && !booking.clockOut && booking.status !== "cancelled" && (
-                              <button
-                                onClick={() => handleClockOut(booking.id)}
-                                disabled={actionLoading === booking.id}
-                                className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 text-red-700 text-xs font-medium rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
-                                title="End Shift"
-                              >
-                                {actionLoading === booking.id ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <StopCircle className="w-3.5 h-3.5" />
-                                )}
-                                {t("nanny.bookings.endShift")}
-                              </button>
-                            )}
-                            {/* Extend for confirmed or active bookings */}
-                            {(booking.status === "confirmed" || (booking.clockIn && !booking.clockOut && booking.status !== "cancelled")) && (
+                            {/* Extend for confirmed bookings */}
+                            {booking.status === "confirmed" && (
                               <button
                                 onClick={() => setExtendBooking(booking)}
                                 className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-lg hover:bg-blue-100 transition-colors"
@@ -903,8 +770,8 @@ export default function NannyBookings() {
                                 {t("extend.extendShift")}
                               </button>
                             )}
-                            {/* Forward for pending/confirmed bookings (not mid-shift) */}
-                            {(booking.status === "confirmed" || booking.status === "pending") && !booking.clockIn && (
+                            {/* Forward for pending/confirmed bookings */}
+                            {(booking.status === "confirmed" || booking.status === "pending") && (
                               <button
                                 onClick={() => setForwardBooking(booking)}
                                 className="flex items-center gap-1 px-2.5 py-1.5 bg-orange-50 text-orange-700 text-xs font-medium rounded-lg hover:bg-orange-100 transition-colors"
@@ -914,8 +781,8 @@ export default function NannyBookings() {
                                 {t("forward.forwardShift")}
                               </button>
                             )}
-                            {/* Mark Complete (confirmed bookings without clock-in) */}
-                            {booking.status === "confirmed" && !booking.clockIn && (
+                            {/* Mark Complete */}
+                            {booking.status === "confirmed" && (
                               <button
                                 onClick={() => handleComplete(booking.id)}
                                 disabled={actionLoading === booking.id}
@@ -931,7 +798,7 @@ export default function NannyBookings() {
                               </button>
                             )}
                             {/* Edit booking (pending/confirmed only) */}
-                            {(booking.status === "pending" || booking.status === "confirmed") && !booking.clockIn && (
+                            {(booking.status === "pending" || booking.status === "confirmed") && (
                               <button
                                 onClick={() => openEditModal(booking)}
                                 className="p-1.5 rounded-lg text-violet-600 hover:bg-violet-50 transition-colors"
@@ -976,7 +843,7 @@ export default function NannyBookings() {
                       </tr>
                       {expandedId === booking.id && (
                         <tr className="bg-muted/20">
-                          <td colSpan={8} className="px-5 py-4">
+                          <td colSpan={7} className="px-5 py-4">
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                               <div>
                                 <span className="text-muted-foreground">{t("shared.email")}</span>
@@ -999,18 +866,6 @@ export default function NannyBookings() {
                                     : ""}
                                 </p>
                               </div>
-                              {booking.clockIn && (
-                                <div>
-                                  <span className="text-muted-foreground">{t("nanny.bookings.clockedIn")}</span>
-                                  <p className="font-medium">{new Date(booking.clockIn).toLocaleTimeString()}</p>
-                                </div>
-                              )}
-                              {booking.clockOut && (
-                                <div>
-                                  <span className="text-muted-foreground">{t("nanny.bookings.clockedOut")}</span>
-                                  <p className="font-medium">{new Date(booking.clockOut).toLocaleTimeString()}</p>
-                                </div>
-                              )}
                               {booking.notes && (
                                 <div className="col-span-full">
                                   <span className="text-muted-foreground">{t("shared.notes")}</span>
@@ -1073,25 +928,6 @@ export default function NannyBookings() {
                     </div>
                   </div>
 
-                  {/* Shift info */}
-                  {booking.clockIn && booking.clockOut && (
-                    <div className="mt-2 flex items-center gap-2 text-xs">
-                      <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded font-medium">
-                        {formatHoursWorked(booking.clockIn!, booking.clockOut!)}
-                      </span>
-                      <span className="bg-green-50 text-green-700 px-2 py-1 rounded font-medium">
-                        {calcShiftPay(booking.clockIn!, booking.clockOut!)} DH
-                      </span>
-                    </div>
-                  )}
-                  {booking.clockIn && !booking.clockOut && booking.status !== "cancelled" && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                      <span className="text-green-700 text-xs font-medium">{t("nanny.bookings.active")}</span>
-                      <LiveTimer clockIn={booking.clockIn!} />
-                    </div>
-                  )}
-
                   {/* Action buttons for mobile */}
                   <div className="flex flex-wrap gap-2 mt-3">
                     {booking.status === "pending" && (
@@ -1109,39 +945,8 @@ export default function NannyBookings() {
                         </button>
                     )}
 
-                    {/* Start Shift for confirmed bookings today */}
-                    {booking.status === "confirmed" && !booking.clockIn && isToday(booking.date) && !activeShift && (
-                      <button
-                        onClick={() => handleClockIn(booking.id)}
-                        disabled={actionLoading === booking.id}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
-                      >
-                        {actionLoading === booking.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <PlayCircle className="w-4 h-4" />
-                        )}
-                        Start Shift
-                      </button>
-                    )}
-
-                    {/* End Shift for active shift */}
-                    {booking.clockIn && !booking.clockOut && booking.status !== "cancelled" && (
-                      <button
-                        onClick={() => handleClockOut(booking.id)}
-                        disabled={actionLoading === booking.id}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
-                      >
-                        {actionLoading === booking.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <StopCircle className="w-4 h-4" />
-                        )}
-                        {t("nanny.bookings.endShift")}
-                      </button>
-                    )}
-                    {/* Extend for confirmed or active */}
-                    {(booking.status === "confirmed" || (booking.clockIn && !booking.clockOut && booking.status !== "cancelled")) && (
+                    {/* Extend for confirmed bookings */}
+                    {booking.status === "confirmed" && (
                       <button
                         onClick={() => setExtendBooking(booking)}
                         className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors"
@@ -1150,8 +955,8 @@ export default function NannyBookings() {
                         {t("extend.extendShift")}
                       </button>
                     )}
-                    {/* Forward for pending/confirmed (not mid-shift) */}
-                    {(booking.status === "confirmed" || booking.status === "pending") && !booking.clockIn && (
+                    {/* Forward for pending/confirmed */}
+                    {(booking.status === "confirmed" || booking.status === "pending") && (
                       <button
                         onClick={() => setForwardBooking(booking)}
                         className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg bg-orange-50 text-orange-700 text-sm font-medium hover:bg-orange-100 transition-colors"
@@ -1160,8 +965,8 @@ export default function NannyBookings() {
                         {t("forward.forwardShift")}
                       </button>
                     )}
-                    {/* Mark Complete (confirmed without clock-in) */}
-                    {booking.status === "confirmed" && !booking.clockIn && (
+                    {/* Mark Complete */}
+                    {booking.status === "confirmed" && (
                       <button
                         onClick={() => handleComplete(booking.id)}
                         disabled={actionLoading === booking.id}
@@ -1175,8 +980,8 @@ export default function NannyBookings() {
                         Complete
                       </button>
                     )}
-                    {/* Edit booking (pending/confirmed, not mid-shift) */}
-                    {(booking.status === "pending" || booking.status === "confirmed") && !booking.clockIn && (
+                    {/* Edit booking (pending/confirmed) */}
+                    {(booking.status === "pending" || booking.status === "confirmed") && (
                       <button
                         onClick={() => openEditModal(booking)}
                         className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors"
@@ -1227,18 +1032,6 @@ export default function NannyBookings() {
                           ? ` (ages: ${booking.childrenAges})`
                           : ""}
                       </p>
-                      {booking.clockIn && (
-                        <p>
-                          <span className="text-muted-foreground">{t("nanny.bookings.clockedIn")}:</span>{" "}
-                          {new Date(booking.clockIn).toLocaleTimeString()}
-                        </p>
-                      )}
-                      {booking.clockOut && (
-                        <p>
-                          <span className="text-muted-foreground">{t("nanny.bookings.clockedOut")}:</span>{" "}
-                          {new Date(booking.clockOut).toLocaleTimeString()}
-                        </p>
-                      )}
                       {booking.notes && (
                         <p>
                           <span className="text-muted-foreground">{t("shared.notes")}:</span>{" "}

@@ -9,12 +9,9 @@ import {
   MapPin,
   User,
   TrendingUp,
-  PlayCircle,
-  StopCircle,
   Timer,
   Loader2,
   Coffee,
-  TimerReset,
   ChevronLeft,
   ChevronRight,
   Calendar,
@@ -26,49 +23,26 @@ import type { Booking } from "@/types";
 import {
   statusColors,
   isToday,
-  formatDuration,
-  formatHoursWorked,
-  calcShiftPayBreakdown,
   calcNannyPayBreakdown,
-  calcActualHoursWorked,
+  calcBookedHoursForBooking,
   HOURLY_RATE,
   getFridayPeriod,
   isDateInRange,
   toDateStr,
+  estimateNannyPayBreakdown,
+  calcBookedHours,
 } from "@/utils/shiftHelpers";
 import ExtendBookingModal from "../../components/ExtendBookingModal";
 
 const MONTHS_SHORT_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MONTHS_SHORT_FR = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
 
-interface LiveTimerProps { clockIn: string; large?: boolean }
 interface PayChartProps { bookings: Booking[]; t: (key: string) => string; locale: string }
-interface MyShiftSectionProps {
+interface TodayBookingsSectionProps {
   bookings: Booking[];
-  clockInBooking: (id: number | string) => Promise<void>;
-  clockOutBooking: (id: number | string) => Promise<void>;
   updateBookingStatus: (id: number | string, status: string) => Promise<void>;
   fetchNannyBookings: () => Promise<void>;
-  onExtend: (booking: Booking) => void;
   t: (key: string) => string;
-}
-
-// Live timer component
-function LiveTimer({ clockIn, large }: LiveTimerProps) {
-  const [elapsed, setElapsed] = useState(Date.now() - new Date(clockIn).getTime());
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setElapsed(Date.now() - new Date(clockIn).getTime());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [clockIn]);
-
-  return (
-    <span className={`font-mono font-bold tabular-nums ${large ? "text-3xl sm:text-4xl" : "text-sm"}`}>
-      {formatDuration(elapsed)}
-    </span>
-  );
 }
 
 // Simple bar chart for nanny pay with breakdown
@@ -182,43 +156,22 @@ function DashboardSkeleton() {
   );
 }
 
-// ─── My Shift Section (prominent, always visible) ────────────────
+// ─── Today's Bookings Section ─────────────────────────────────────
 
-function MyShiftSection({ bookings, clockInBooking, clockOutBooking, updateBookingStatus, fetchNannyBookings, onExtend, t }: MyShiftSectionProps) {
-  const [actionLoading, setActionLoading] = useState(false);
+function TodayBookingsSection({ bookings, updateBookingStatus, fetchNannyBookings, t }: TodayBookingsSectionProps) {
   const [completeLoading, setCompleteLoading] = useState<number | string | null>(null);
 
-  // Find active shift (clocked in, not clocked out)
-  const activeShift = useMemo(
-    () => bookings.find((b) => b.clockIn && !b.clockOut && b.status !== "cancelled"),
+  // Today's bookings (confirmed, not yet completed)
+  const todayConfirmed = useMemo(
+    () => bookings.filter((b) => b.status === "confirmed" && isToday(b.date)),
     [bookings]
   );
 
-  // Today's confirmed bookings (not yet clocked in)
-  const todayReadyBookings = useMemo(
-    () => bookings.filter((b) => b.status === "confirmed" && !b.clockIn && isToday(b.date)),
-    [bookings]
-  );
-
-  // Today's completed shifts (has clock data)
+  // Today's completed bookings
   const todayCompleted = useMemo(
-    () => bookings.filter((b) => b.clockIn && b.clockOut && isToday(b.date)),
+    () => bookings.filter((b) => b.status === "completed" && isToday(b.date)),
     [bookings]
   );
-
-  const handleStartShift = async (id: number | string) => {
-    setActionLoading(true);
-    await clockInBooking(id);
-    await fetchNannyBookings();
-    setActionLoading(false);
-  };
-
-  const handleEndShift = async (id: number | string) => {
-    setActionLoading(true);
-    await clockOutBooking(id);
-    await fetchNannyBookings();
-    setActionLoading(false);
-  };
 
   const handleComplete = async (id: number | string) => {
     setCompleteLoading(id);
@@ -227,54 +180,8 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, updateBooki
     setCompleteLoading(null);
   };
 
-  // ── STATE 1: Active shift in progress ──
-  if (activeShift) {
-    return (
-      <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-2xl p-6 sm:p-8">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-          <h2 className="font-serif text-lg sm:text-xl font-bold text-green-800">
-            {t("nanny.dashboard.shiftInProgress")}
-          </h2>
-        </div>
-
-        <div className="text-center py-4">
-          <LiveTimer clockIn={activeShift.clockIn!} large />
-          <p className="text-sm text-green-700 mt-2">
-            {activeShift.clientName} · {activeShift.hotel || t("shared.noHotel")} · {activeShift.plan}
-          </p>
-          <p className="text-xs text-green-600 mt-1">
-            {t("nanny.dashboard.startedAt")} {new Date(activeShift.clockIn!).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          </p>
-        </div>
-
-        <div className="flex gap-3 mt-4">
-          <button
-            onClick={() => onExtend(activeShift)}
-            className="flex-1 flex items-center justify-center gap-2 py-4 px-4 bg-blue-600 text-white text-base font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-lg"
-          >
-            <TimerReset className="w-5 h-5" />
-            {t("extend.extendShift")}
-          </button>
-          <button
-            onClick={() => handleEndShift(activeShift.id)}
-            disabled={actionLoading}
-            className="flex-1 flex items-center justify-center gap-2 py-4 px-4 bg-red-600 text-white text-base font-bold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 shadow-lg"
-          >
-            {actionLoading ? (
-              <Loader2 className="w-6 h-6 animate-spin" />
-            ) : (
-              <StopCircle className="w-5 h-5" />
-            )}
-            {t("nanny.dashboard.endShift")}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── STATE 2: Today has confirmed bookings ready to start ──
-  if (todayReadyBookings.length > 0) {
+  // ── STATE 1: Today has confirmed bookings — show "Mark Complete" ──
+  if (todayConfirmed.length > 0) {
     return (
       <div className="bg-card border-2 border-primary/30 rounded-2xl p-6 sm:p-8">
         <div className="flex items-center gap-2 mb-4">
@@ -285,63 +192,56 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, updateBooki
         </div>
 
         <div className="space-y-3">
-          {todayReadyBookings.map((booking) => (
-            <div key={booking.id} className="bg-muted/30 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="font-semibold text-foreground">{booking.clientName}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {booking.startTime}{booking.endTime ? ` - ${booking.endTime}` : ""} · {booking.plan}
-                    {booking.hotel ? ` · ${booking.hotel}` : ""}
-                  </p>
+          {todayConfirmed.map((booking) => {
+            const hours = calcBookedHours(booking.startTime || "", booking.endTime || "", booking.date, booking.endDate);
+            const pay = estimateNannyPayBreakdown(booking.startTime || "", booking.endTime || "", booking.date, booking.endDate);
+            return (
+              <div key={booking.id} className="bg-muted/30 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="font-semibold text-foreground">{booking.clientName}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {booking.startTime}{booking.endTime ? ` - ${booking.endTime}` : ""} · {hours.toFixed(1)}h
+                      {booking.hotel ? ` · ${booking.hotel}` : ""}
+                    </p>
+                  </div>
+                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-green-100 text-green-700">
+                    {t("shared.confirmed")}
+                  </span>
                 </div>
-                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-green-100 text-green-700">
-                  {t("shared.confirmed")}
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{pay.total} DH</span>
+                  <button
+                    onClick={() => handleComplete(booking.id)}
+                    disabled={completeLoading === booking.id}
+                    className="flex items-center justify-center gap-2 py-3 px-6 bg-green-600 text-white text-base font-bold rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 shadow-lg"
+                  >
+                    {completeLoading === booking.id ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-5 h-5" />
+                    )}
+                    {t("nanny.dashboard.markComplete") || "Mark Complete"}
+                  </button>
+                </div>
               </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => handleStartShift(booking.id)}
-                  disabled={actionLoading}
-                  className="flex-1 flex items-center justify-center gap-2 py-4 px-6 bg-green-600 text-white text-lg font-bold rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 shadow-lg"
-                >
-                  {actionLoading ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    <PlayCircle className="w-6 h-6" />
-                  )}
-                  {t("nanny.dashboard.startShift")}
-                </button>
-                <button
-                  onClick={() => handleComplete(booking.id)}
-                  disabled={completeLoading === booking.id}
-                  className="flex items-center justify-center gap-2 py-4 px-5 bg-emerald-50 text-emerald-700 text-base font-bold rounded-xl hover:bg-emerald-100 transition-colors disabled:opacity-50 border-2 border-emerald-200"
-                >
-                  {completeLoading === booking.id ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <CheckCircle className="w-5 h-5" />
-                  )}
-                  Complete
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
   }
 
-  // ── STATE 3: Today's shift completed ──
+  // ── STATE 2: Today's bookings all completed ──
   if (todayCompleted.length > 0) {
     const todayBreakdown = todayCompleted.reduce(
       (acc, b) => {
-        const bd = calcShiftPayBreakdown(b.clockIn!, b.clockOut!);
+        const bd = calcNannyPayBreakdown(b);
         return { basePay: acc.basePay + bd.basePay, taxiFee: acc.taxiFee + bd.taxiFee, total: acc.total + bd.total };
       },
       { basePay: 0, taxiFee: 0, total: 0 }
     );
+    const todayHours = todayCompleted.reduce((sum, b) => sum + calcBookedHoursForBooking(b), 0);
 
     return (
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 sm:p-8">
@@ -358,7 +258,7 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, updateBooki
             <p className="text-xs text-blue-600">{todayCompleted.length > 1 ? t("nanny.dashboard.shifts") : t("nanny.dashboard.shift")}</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-blue-800">{formatHoursWorked(todayCompleted[0].clockIn!, todayCompleted[todayCompleted.length - 1].clockOut!)}</p>
+            <p className="text-2xl font-bold text-blue-800">{todayHours.toFixed(1)}h</p>
             <p className="text-xs text-blue-600">{t("nanny.dashboard.hoursLabel")}</p>
           </div>
           <div>
@@ -367,18 +267,17 @@ function MyShiftSection({ bookings, clockInBooking, clockOutBooking, updateBooki
           </div>
         </div>
 
-        {/* Pay breakdown */}
-        <div className="mt-4 flex items-center justify-center gap-4 text-xs text-blue-700">
-          <span>{t("nanny.dashboard.hourlyPay")}: {todayBreakdown.basePay} DH</span>
-          {todayBreakdown.taxiFee > 0 && (
+        {todayBreakdown.taxiFee > 0 && (
+          <div className="mt-4 flex items-center justify-center gap-4 text-xs text-blue-700">
+            <span>{t("nanny.dashboard.hourlyPay")}: {todayBreakdown.basePay} DH</span>
             <span>{t("nanny.dashboard.taxiFee")}: +{todayBreakdown.taxiFee} DH</span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  // ── STATE 4: No shifts today ──
+  // ── STATE 3: No bookings today ──
   return (
     <div className="bg-card border border-border rounded-2xl p-6 sm:p-8">
       <div className="flex items-center gap-2 mb-2">
@@ -407,8 +306,6 @@ export default function NannyDashboard() {
     nannyBookings,
     fetchNannyStats,
     fetchNannyBookings,
-    clockInBooking,
-    clockOutBooking,
     updateBooking,
     updateBookingStatus,
   } = useData();
@@ -475,17 +372,16 @@ export default function NannyDashboard() {
     return `${format(periodStart, "MMM d")} — ${format(endDisplay, "MMM d")}`;
   })();
 
-  // Calculate hours & pay ONLY from actual clock in/out data within the period
-  // (must be before any early return to respect React hooks rules)
+  // Calculate hours & pay from booked time for COMPLETED bookings within the period
   const totalActualHours = useMemo(() => {
     return nannyBookings
-      .filter((b) => b.clockIn && b.clockOut && b.status !== "cancelled" && isDateInRange(b.date, periodStart, periodEnd))
-      .reduce((sum, b) => sum + calcActualHoursWorked(b.clockIn!, b.clockOut!), 0);
+      .filter((b) => b.status === "completed" && isDateInRange(b.date, periodStart, periodEnd))
+      .reduce((sum, b) => sum + calcBookedHoursForBooking(b), 0);
   }, [nannyBookings, periodStart, periodEnd]);
 
   const payBreakdown = useMemo(() => {
     return nannyBookings
-      .filter((b) => b.status !== "cancelled" && isDateInRange(b.date, periodStart, periodEnd))
+      .filter((b) => b.status === "completed" && isDateInRange(b.date, periodStart, periodEnd))
       .reduce(
         (acc, b) => {
           const bd = calcNannyPayBreakdown(b);
@@ -544,14 +440,11 @@ export default function NannyDashboard() {
         </p>
       </div>
 
-      {/* ── MY SHIFT (prominent, always visible) ── */}
-      <MyShiftSection
+      {/* ── TODAY'S BOOKINGS ── */}
+      <TodayBookingsSection
         bookings={nannyBookings}
-        clockInBooking={clockInBooking}
-        clockOutBooking={clockOutBooking}
         updateBookingStatus={updateBookingStatus}
         fetchNannyBookings={fetchNannyBookings}
-        onExtend={setExtendBooking}
         t={t}
       />
 
