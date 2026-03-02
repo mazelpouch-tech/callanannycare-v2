@@ -1727,15 +1727,13 @@ export default function AdminBookings() {
                                   <MessageCircle className="w-3.5 h-3.5" />
                                   WhatsApp Nanny
                                 </button>
-                                {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
-                                  <button
-                                    onClick={() => setExtendBooking(booking)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
-                                  >
-                                    <TimerReset className="w-3.5 h-3.5" />
-                                    Extend
-                                  </button>
-                                )}
+                                <button
+                                  onClick={() => setExtendBooking(booking)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
+                                >
+                                  <TimerReset className="w-3.5 h-3.5" />
+                                  Modify Hours
+                                </button>
                                 {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
                                   <button
                                     onClick={() => setForwardBooking(booking)}
@@ -2188,15 +2186,13 @@ export default function AdminBookings() {
                             <MessageCircle className="w-3.5 h-3.5" />
                             WhatsApp Nanny
                           </button>
-                          {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
-                            <button
-                              onClick={() => setExtendBooking(booking)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
-                            >
-                              <TimerReset className="w-3.5 h-3.5" />
-                              Extend
-                            </button>
-                          )}
+                          <button
+                            onClick={() => setExtendBooking(booking)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
+                          >
+                            <TimerReset className="w-3.5 h-3.5" />
+                            Modify Hours
+                          </button>
                           {(booking.status === "confirmed" || booking.status === "pending" || (booking.clockIn && !booking.clockOut)) && (
                             <button
                               onClick={() => setForwardBooking(booking)}
@@ -3218,29 +3214,29 @@ export default function AdminBookings() {
         </div>
       )}
 
-      {/* Extend Booking Modal */}
+      {/* Modify Hours Modal */}
       {extendBooking && (
         <ExtendBookingModal
           booking={extendBooking}
           rate={nannies.find((n) => n.id === extendBooking.nannyId)?.rate || 150}
-          onConfirm={async (newEndTime, newTotalPrice) => {
-            await updateBooking(extendBooking.id, { endTime: newEndTime, totalPrice: newTotalPrice });
+          onConfirm={async (newStartTime, newEndTime, newTotalPrice) => {
+            await updateBooking(extendBooking.id, { startTime: newStartTime, endTime: newEndTime, totalPrice: newTotalPrice });
             await fetchBookings();
           }}
           onClose={() => setExtendBooking(null)}
           t={(key: string) => {
             const map: Record<string, string> = {
-              "extend.extendBooking": "Extend Booking",
-              "extend.newEndTime": "New End Time",
-              "extend.selectNewEnd": "Select new end time",
-              "extend.additionalHours": "Additional Hours",
-              "extend.additionalCost": "Additional Cost",
-              "extend.newTotal": "New Total",
-              "extend.confirmExtend": "Confirm Extension",
-              "extend.extending": "Extending...",
-              "extend.extendSuccess": "Booking extended successfully!",
-              "extend.noLaterSlots": "No later time slots available",
-              "extend.summary": "Extension Summary",
+              "modify.title": "Modify Hours",
+              "modify.newStartTime": "New Start Time",
+              "modify.newEndTime": "New End Time",
+              "modify.keepCurrent": "keep current",
+              "modify.hourChange": "Hour Change",
+              "modify.priceChange": "Price Change",
+              "modify.newTotal": "New Total",
+              "modify.confirm": "Save Changes",
+              "modify.saving": "Saving...",
+              "modify.success": "Hours updated successfully!",
+              "modify.summary": "Summary",
               "shared.cancel": "Cancel",
             };
             return map[key] || key;
