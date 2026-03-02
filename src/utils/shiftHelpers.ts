@@ -173,6 +173,37 @@ export function formatTime(timeStr: string): string {
   return `${h12}:${m} ${ampm}`;
 }
 
+/**
+ * Get the Friday-to-Friday pay period boundaries.
+ * Period runs from Friday 00:00:00 to the next Friday 00:00:00.
+ * @param refDate - reference date (defaults to today)
+ * @returns { start: Date, end: Date } — start is inclusive, end is exclusive
+ */
+export function getFridayPeriod(refDate?: Date): { start: Date; end: Date } {
+  const d = refDate ? new Date(refDate) : new Date();
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0=Sun, 5=Fri
+  // Days since last Friday (if today is Friday, daysSinceFri = 0)
+  const daysSinceFri = (day + 2) % 7; // Fri=0, Sat=1, Sun=2, Mon=3, …
+  const start = new Date(d);
+  start.setDate(d.getDate() - daysSinceFri);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 7);
+  return { start, end };
+}
+
+/** Format a date as YYYY-MM-DD (local timezone) */
+export function toDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Check if a booking date string falls within a [start, end) range */
+export function isDateInRange(dateStr: string, start: Date, end: Date): boolean {
+  if (!dateStr) return false;
+  const d = new Date(dateStr + 'T00:00:00');
+  return d >= start && d < end;
+}
+
 /** Shared time slots from 06:00 to 05:30 in 30-min steps (business-day ordering) */
 export const TIME_SLOTS: { value: string; label: string }[] = (() => {
   const slots: { value: string; label: string }[] = [];

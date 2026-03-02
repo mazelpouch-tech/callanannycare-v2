@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   CalendarDays, Clock, DollarSign,
   ArrowUpRight, ArrowDownRight, Timer,
   Activity, ArrowRight, Eye, AlertTriangle,
-  Banknote, CheckCircle2,
+  Banknote, CheckCircle2, ChevronLeft, ChevronRight, Calendar,
 } from "lucide-react";
 import {
   format, parseISO, subMonths, startOfMonth, endOfMonth,
@@ -13,7 +13,7 @@ import {
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import type { Booking, Nanny, BookingStatus } from "@/types";
-import { calcShiftPayBreakdown, HOURLY_RATE } from "@/utils/shiftHelpers";
+import { calcShiftPayBreakdown, HOURLY_RATE, getFridayPeriod, isDateInRange, toDateStr } from "@/utils/shiftHelpers";
 
 // ─── Mini Sparkline ──────────────────────────────────────────────
 
@@ -74,8 +74,51 @@ function DashboardUrgencyBadge({ booking }: { booking: Booking }) {
 // ─── Nanny Hours Report ─────────────────────────────────────────
 
 function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]; nannies: Nanny[] }) {
+  const currentPeriod = getFridayPeriod();
+  const [periodStart, setPeriodStart] = useState<Date>(currentPeriod.start);
+  const [periodEnd, setPeriodEnd] = useState<Date>(currentPeriod.end);
+  const [showCustom, setShowCustom] = useState(false);
+  const [customFrom, setCustomFrom] = useState(toDateStr(currentPeriod.start));
+  const [customTo, setCustomTo] = useState(toDateStr(currentPeriod.end));
+
+  const goToPeriod = (dir: -1 | 1) => {
+    const newStart = new Date(periodStart);
+    newStart.setDate(newStart.getDate() + dir * 7);
+    const newEnd = new Date(newStart);
+    newEnd.setDate(newStart.getDate() + 7);
+    setPeriodStart(newStart);
+    setPeriodEnd(newEnd);
+    setShowCustom(false);
+  };
+
+  const applyCustom = () => {
+    const from = new Date(customFrom + "T00:00:00");
+    const to = new Date(customTo + "T00:00:00");
+    if (from >= to) return;
+    setPeriodStart(from);
+    setPeriodEnd(to);
+    setShowCustom(false);
+  };
+
+  const resetToCurrentWeek = () => {
+    const p = getFridayPeriod();
+    setPeriodStart(p.start);
+    setPeriodEnd(p.end);
+    setShowCustom(false);
+  };
+
+  const isCurrentWeek = periodStart.getTime() === currentPeriod.start.getTime() && periodEnd.getTime() === currentPeriod.end.getTime();
+
+  const periodLabel = (() => {
+    const endDisplay = new Date(periodEnd);
+    endDisplay.setDate(endDisplay.getDate() - 1);
+    return `${format(periodStart, "MMM d")} — ${format(endDisplay, "MMM d, yyyy")}`;
+  })();
+
   const nannyHours = useMemo(() => {
-    const clockedBookings = bookings.filter((b) => b.clockIn && b.clockOut);
+    const clockedBookings = bookings.filter(
+      (b) => b.clockIn && b.clockOut && isDateInRange(b.date, periodStart, periodEnd)
+    );
     if (clockedBookings.length === 0) return [];
 
     const nannyMap: Record<string, { name: string; shifts: number; totalHours: number; basePay: number; taxiFee: number; totalPay: number }> = {};
@@ -100,7 +143,7 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
     return Object.values(nannyMap)
       .map((n) => ({ ...n, totalHours: Math.round(n.totalHours * 10) / 10 }))
       .sort((a, b) => b.totalHours - a.totalHours);
-  }, [bookings]);
+  }, [bookings, periodStart, periodEnd]);
 
   const totalAllHours = nannyHours.reduce((s, n) => s + n.totalHours, 0);
   const totalAllBasePay = nannyHours.reduce((s, n) => s + n.basePay, 0);
@@ -110,25 +153,72 @@ function NannyHoursReport({ bookings, nannies: _nannies }: { bookings: Booking[]
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-soft">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-        <h2 className="font-serif text-base font-semibold text-foreground flex items-center gap-2">
-          <Timer className="w-4 h-4 text-primary" />
-          Nanny Hours Report
-        </h2>
-        {nannyHours.length > 0 && (
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span>{totalAllShifts} shifts</span>
-            <span>{totalAllHours.toFixed(1)} hrs</span>
-            <span className="font-semibold text-foreground">{totalAllPay.toLocaleString()} DH</span>
-            <span className="text-muted-foreground/70">({totalAllBasePay.toLocaleString()} + {totalAllTaxi} taxi)</span>
+      {/* Header with period navigation */}
+      <div className="px-6 py-4 border-b border-border space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-serif text-base font-semibold text-foreground flex items-center gap-2">
+            <Timer className="w-4 h-4 text-primary" />
+            Nanny Hours Report
+          </h2>
+          {nannyHours.length > 0 && (
+            <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground">
+              <span>{totalAllShifts} shifts</span>
+              <span>{totalAllHours.toFixed(1)} hrs</span>
+              <span className="font-semibold text-foreground">{totalAllPay.toLocaleString()} DH</span>
+              <span className="text-muted-foreground/70">({totalAllBasePay.toLocaleString()} + {totalAllTaxi} taxi)</span>
+            </div>
+          )}
+        </div>
+
+        {/* Period navigation row */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => goToPeriod(-1)} className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Previous week">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-sm font-medium text-foreground min-w-[180px] text-center">{periodLabel}</span>
+          <button onClick={() => goToPeriod(1)} className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Next week">
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          {!isCurrentWeek && (
+            <button onClick={resetToCurrentWeek} className="text-xs text-primary hover:underline ml-1">
+              This week
+            </button>
+          )}
+          <button
+            onClick={() => { setShowCustom(!showCustom); setCustomFrom(toDateStr(periodStart)); const ed = new Date(periodEnd); ed.setDate(ed.getDate() - 1); setCustomTo(toDateStr(ed)); }}
+            className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            Custom
+          </button>
+        </div>
+
+        {/* Custom date picker */}
+        {showCustom && (
+          <div className="flex items-end gap-3 flex-wrap bg-muted/50 rounded-lg p-3">
+            <div>
+              <label className="block text-[10px] text-muted-foreground uppercase tracking-wider mb-1">From</label>
+              <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="text-sm border border-border rounded-lg px-3 py-1.5 bg-background" />
+            </div>
+            <div>
+              <label className="block text-[10px] text-muted-foreground uppercase tracking-wider mb-1">To</label>
+              <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="text-sm border border-border rounded-lg px-3 py-1.5 bg-background" />
+            </div>
+            <button onClick={applyCustom} className="text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg px-4 py-1.5 transition-colors">
+              Apply
+            </button>
           </div>
         )}
+
+        <p className="text-[10px] text-muted-foreground">
+          Pay period: Friday midnight → Friday midnight
+        </p>
       </div>
 
       {nannyHours.length === 0 && (
         <div className="px-6 py-10 text-center">
           <Timer className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-muted-foreground font-medium">No shift data yet</p>
+          <p className="text-muted-foreground font-medium">No shift data for this period</p>
           <p className="text-sm text-muted-foreground/70 mt-1">
             Hours will appear here once nannies start using Start Shift / End Shift.
           </p>

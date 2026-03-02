@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   User,
   Mail,
@@ -19,11 +19,15 @@ import {
   EyeOff,
   Link,
   Check,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
 } from "lucide-react";
+import { format } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
 import ImageUpload from "../../components/ImageUpload";
-import { calcActualHoursWorked, calcNannyPayBreakdown } from "@/utils/shiftHelpers";
+import { calcActualHoursWorked, calcNannyPayBreakdown, getFridayPeriod, isDateInRange, toDateStr } from "@/utils/shiftHelpers";
 import type { NannyProfile as NannyProfileType } from "@/types";
 
 export default function NannyProfile() {
@@ -54,20 +58,66 @@ export default function NannyProfile() {
     fetchNannyBookings();
   }, [fetchNannyBookings]);
 
-  // Calculate total hours & pay breakdown from actual clock data
-  const totalHoursWorked = nannyBookings
-    .filter((b) => b.clockIn && b.clockOut && b.status !== "cancelled")
-    .reduce((sum, b) => sum + calcActualHoursWorked(b.clockIn!, b.clockOut!), 0);
+  // ── Friday-to-Friday period state ──
+  const currentPeriod = useMemo(() => getFridayPeriod(), []);
+  const [periodStart, setPeriodStart] = useState<Date>(currentPeriod.start);
+  const [periodEnd, setPeriodEnd] = useState<Date>(currentPeriod.end);
+  const [showCustom, setShowCustom] = useState(false);
+  const [customFrom, setCustomFrom] = useState(toDateStr(currentPeriod.start));
+  const [customTo, setCustomTo] = useState(toDateStr(currentPeriod.end));
 
-  const payBreakdown = nannyBookings
-    .filter((b) => b.status !== "cancelled")
-    .reduce(
-      (acc, b) => {
-        const bd = calcNannyPayBreakdown(b);
-        return { basePay: acc.basePay + bd.basePay, taxiFee: acc.taxiFee + bd.taxiFee, total: acc.total + bd.total };
-      },
-      { basePay: 0, taxiFee: 0, total: 0 }
-    );
+  const goToPeriod = (dir: -1 | 1) => {
+    const newStart = new Date(periodStart);
+    newStart.setDate(newStart.getDate() + dir * 7);
+    const newEnd = new Date(newStart);
+    newEnd.setDate(newStart.getDate() + 7);
+    setPeriodStart(newStart);
+    setPeriodEnd(newEnd);
+    setShowCustom(false);
+  };
+
+  const applyCustom = () => {
+    const from = new Date(customFrom + "T00:00:00");
+    const to = new Date(customTo + "T00:00:00");
+    if (from >= to) return;
+    setPeriodStart(from);
+    setPeriodEnd(to);
+    setShowCustom(false);
+  };
+
+  const resetToCurrentWeek = () => {
+    const p = getFridayPeriod();
+    setPeriodStart(p.start);
+    setPeriodEnd(p.end);
+    setShowCustom(false);
+  };
+
+  const isCurrentWeek = periodStart.getTime() === currentPeriod.start.getTime() && periodEnd.getTime() === currentPeriod.end.getTime();
+
+  const periodLabel = (() => {
+    const endDisplay = new Date(periodEnd);
+    endDisplay.setDate(endDisplay.getDate() - 1);
+    return `${format(periodStart, "MMM d")} — ${format(endDisplay, "MMM d")}`;
+  })();
+
+  // Calculate total hours & pay breakdown from actual clock data within the period
+  const totalHoursWorked = useMemo(() =>
+    nannyBookings
+      .filter((b) => b.clockIn && b.clockOut && b.status !== "cancelled" && isDateInRange(b.date, periodStart, periodEnd))
+      .reduce((sum, b) => sum + calcActualHoursWorked(b.clockIn!, b.clockOut!), 0),
+    [nannyBookings, periodStart, periodEnd]);
+
+  const payBreakdown = useMemo(() =>
+    nannyBookings
+      .filter((b) => b.status !== "cancelled" && isDateInRange(b.date, periodStart, periodEnd))
+      .reduce(
+        (acc, b) => {
+          const bd = calcNannyPayBreakdown(b);
+          return { basePay: acc.basePay + bd.basePay, taxiFee: acc.taxiFee + bd.taxiFee, total: acc.total + bd.total };
+        },
+        { basePay: 0, taxiFee: 0, total: 0 }
+      ),
+    [nannyBookings, periodStart, periodEnd]);
 
   useEffect(() => {
     if (nannyProfile?.id) {
@@ -241,8 +291,49 @@ export default function NannyProfile() {
                 {profile.experience}
               </span>
             </div>
+            {/* Period Navigator */}
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button onClick={() => goToPeriod(-1)} className="p-1 rounded hover:bg-muted transition-colors">
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-xs font-medium text-foreground min-w-[140px] text-center">{periodLabel}</span>
+                <button onClick={() => goToPeriod(1)} className="p-1 rounded hover:bg-muted transition-colors">
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+                {!isCurrentWeek && (
+                  <button onClick={resetToCurrentWeek} className="text-[10px] text-primary hover:underline">
+                    {t("nanny.dashboard.thisWeek") || "This week"}
+                  </button>
+                )}
+                <button
+                  onClick={() => { setShowCustom(!showCustom); setCustomFrom(toDateStr(periodStart)); const ed = new Date(periodEnd); ed.setDate(ed.getDate() - 1); setCustomTo(toDateStr(ed)); }}
+                  className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Calendar className="w-3 h-3" />
+                  {t("nanny.dashboard.custom") || "Custom"}
+                </button>
+              </div>
+
+              {showCustom && (
+                <div className="flex items-end gap-2 flex-wrap bg-muted/50 rounded-lg p-2">
+                  <div>
+                    <label className="block text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">{t("nanny.dashboard.from") || "From"}</label>
+                    <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="text-xs border border-border rounded px-2 py-1 bg-background" />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">{t("nanny.dashboard.to") || "To"}</label>
+                    <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="text-xs border border-border rounded px-2 py-1 bg-background" />
+                  </div>
+                  <button onClick={applyCustom} className="text-xs font-medium text-white bg-primary hover:bg-primary/90 rounded px-3 py-1 transition-colors">
+                    {t("nanny.dashboard.apply") || "Apply"}
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Hours & Pay summary */}
-            <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="mt-3 grid grid-cols-2 gap-3">
               <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 text-center">
                 <p className="text-2xl font-bold text-primary">{parseFloat(totalHoursWorked.toFixed(1))}<span className="text-sm font-normal ml-1">hrs</span></p>
                 <p className="text-xs text-muted-foreground mt-0.5">{t("nanny.dashboard.hoursWorked")}</p>
