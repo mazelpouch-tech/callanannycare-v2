@@ -173,12 +173,17 @@ export default function NannyBookings() {
   const [editForm, setEditForm] = useState({ startDate: "", endDate: "", startTime: "", endTime: "", hotel: "", numChildren: "1", childrenAges: "", notes: "" });
   const [editLoading, setEditLoading] = useState(false);
 
+  /** Convert stored time label (e.g. "09h00") to TIME_SLOTS value (e.g. "9:00") */
+  const parseTime = (t: string) => {
+    if (!t) return "";
+    if (t.includes(":")) {
+      return TIME_SLOTS.find((s) => s.value === t) ? t : "";
+    }
+    const m = t.match(/^(\d{1,2})h(\d{2})$/i);
+    return m ? `${parseInt(m[1])}:${m[2]}` : "";
+  };
+
   const openEditModal = (booking: typeof nannyBookings[0]) => {
-    // Parse existing times back to select values (e.g. "09h00" → "9:00")
-    const parseTime = (t: string) => {
-      const m = t?.match(/^(\d{1,2})h(\d{2})$/i);
-      return m ? `${parseInt(m[1])}:${m[2]}` : "";
-    };
     setEditForm({
       startDate: booking.date || "",
       endDate: booking.endDate || "",
@@ -260,8 +265,8 @@ export default function NannyBookings() {
       hotel: booking.hotel || "",
       startDate: "",
       endDate: "",
-      startTime: "",
-      endTime: "",
+      startTime: parseTime(booking.startTime),
+      endTime: parseTime(booking.endTime),
       numChildren: String(booking.childrenCount || 1),
       childrenAges: booking.childrenAges || "",
       notes: booking.notes || "",
