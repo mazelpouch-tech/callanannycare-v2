@@ -17,6 +17,10 @@ import {
   Pencil,
   RotateCcw,
   Check,
+  Trash2,
+  XCircle,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -73,7 +77,7 @@ const RATE = 10; // € per hour
 const TAXI_FEE = 10; // € flat fee for night bookings
 
 export default function NannyBookings() {
-  const { nannyBookings, fetchNannyBookings, updateBookingStatus, updateBooking, addBooking, nannyProfile, nannies } = useData();
+  const { nannyBookings, fetchNannyBookings, updateBookingStatus, updateBooking, addBooking, deleteBooking, nannyProfile, nannies } = useData();
   const { t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
@@ -86,6 +90,58 @@ export default function NannyBookings() {
   // Track the booking ID we need to scroll to (from push notification)
   const [scrollToBooking, setScrollToBooking] = useState<string | null>(() => searchParams.get("booking"));
   const [actionLoading, setActionLoading] = useState<number | string | null>(null);
+
+  // ── Bulk selection ───────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<number | string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState<string | null>(null);
+
+  const toggleSelect = (id: number | string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((b) => b.id)));
+    }
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkAction = async (action: "confirmed" | "completed" | "cancelled") => {
+    if (selectedIds.size === 0) return;
+    setBulkLoading(action);
+    try {
+      await Promise.all(
+        [...selectedIds].map((id) => updateBookingStatus(id, action))
+      );
+      clearSelection();
+      await fetchNannyBookings();
+    } finally {
+      setBulkLoading(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.size} booking${selectedIds.size !== 1 ? "s" : ""}? This cannot be undone.`)) return;
+    setBulkLoading("delete");
+    try {
+      await Promise.all(
+        [...selectedIds].map((id) => deleteBooking(id, nannyProfile?.name || "Nanny"))
+      );
+      clearSelection();
+      await fetchNannyBookings();
+    } finally {
+      setBulkLoading(null);
+    }
+  };
+  // ─────────────────────────────────────────────────────────────
 
   // Extract booking deep-link param and clean up URL on mount
   useEffect(() => {
@@ -334,6 +390,9 @@ export default function NannyBookings() {
     );
     return result;
   }, [nannyBookings, search, statusFilter, sortOrder]);
+
+  // Clear bulk selection when filters change
+  useEffect(() => { clearSelection(); }, [search, statusFilter, sortOrder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formHours = useMemo(() => {
     if (!formData.startTime || !formData.endTime) return 0;
@@ -701,6 +760,15 @@ export default function NannyBookings() {
               <table className="w-full">
                 <thead>
                   <tr className="text-left text-sm text-muted-foreground border-b border-border">
+                    <th className="px-3 py-3 w-10">
+                      <button onClick={toggleSelectAll} className="p-1 rounded hover:bg-muted/50 transition-colors" title={selectedIds.size === filtered.length ? "Deselect all" : "Select all"}>
+                        {filtered.length > 0 && selectedIds.size === filtered.length ? (
+                          <CheckSquare className="w-4 h-4 text-accent" />
+                        ) : (
+                          <Square className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </button>
+                    </th>
                     <th className="px-5 py-3 font-medium">{t("shared.client")}</th>
                     <th className="px-5 py-3 font-medium">{t("shared.date")}</th>
                     <th className="px-5 py-3 font-medium">{t("shared.time")}</th>
@@ -713,7 +781,16 @@ export default function NannyBookings() {
                 <tbody>
                   {filtered.map((booking) => (
                     <Fragment key={booking.id}>
-                      <tr id={`booking-row-${booking.id}`} className="border-b border-border hover:bg-muted/30">
+                      <tr id={`booking-row-${booking.id}`} className={`border-b border-border hover:bg-muted/30 transition-colors ${selectedIds.has(booking.id) ? "bg-primary/5" : ""}`}>
+                        <td className="px-3 py-3">
+                          <button onClick={() => toggleSelect(booking.id)} className="p-1 rounded hover:bg-muted/50 transition-colors">
+                            {selectedIds.has(booking.id) ? (
+                              <CheckSquare className="w-4 h-4 text-accent" />
+                            ) : (
+                              <Square className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </button>
+                        </td>
                         <td className="px-5 py-3 font-medium text-foreground">
                           {booking.clientName}
                         </td>
@@ -843,7 +920,7 @@ export default function NannyBookings() {
                       </tr>
                       {expandedId === booking.id && (
                         <tr className="bg-muted/20">
-                          <td colSpan={7} className="px-5 py-4">
+                          <td colSpan={8} className="px-5 py-4">
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                               <div>
                                 <span className="text-muted-foreground">{t("shared.email")}</span>
@@ -894,11 +971,20 @@ export default function NannyBookings() {
             {/* Mobile cards */}
             <div className="md:hidden divide-y divide-border">
               {filtered.map((booking) => (
-                <div key={booking.id} id={`booking-row-${booking.id}`} className="p-4">
+                <div key={booking.id} id={`booking-row-${booking.id}`} className={`p-4 ${selectedIds.has(booking.id) ? "bg-primary/5" : ""}`}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-foreground">
-                      {booking.clientName}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => toggleSelect(booking.id)} className="p-0.5 rounded hover:bg-muted/50 transition-colors shrink-0">
+                        {selectedIds.has(booking.id) ? (
+                          <CheckSquare className="w-4.5 h-4.5 text-accent" />
+                        ) : (
+                          <Square className="w-4.5 h-4.5 text-muted-foreground" />
+                        )}
+                      </button>
+                      <span className="font-medium text-foreground">
+                        {booking.clientName}
+                      </span>
+                    </div>
                     <span
                       className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${
                         statusColors[booking.status] || "bg-gray-100 text-gray-600"
@@ -1055,6 +1141,66 @@ export default function NannyBookings() {
           </>
         )}
       </div>
+
+      {/* ── Bulk Action Floating Bar ── */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 sm:gap-3 px-4 sm:px-5 py-3 bg-card border border-border rounded-2xl shadow-xl backdrop-blur-sm">
+          <span className="text-sm font-semibold text-foreground pr-2 border-r border-border whitespace-nowrap">
+            {selectedIds.size} selected
+          </span>
+          {/* Accept All — only if any selected is pending */}
+          {[...selectedIds].some((id) => filtered.find((b) => b.id === id)?.status === "pending") && (
+            <button
+              onClick={() => handleBulkAction("confirmed")}
+              disabled={!!bulkLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-green-500 text-white hover:bg-green-600 transition-colors disabled:opacity-50"
+            >
+              {bulkLoading === "confirmed" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              Accept
+            </button>
+          )}
+          {/* Complete All — only if any selected is confirmed */}
+          {[...selectedIds].some((id) => filtered.find((b) => b.id === id)?.status === "confirmed") && (
+            <button
+              onClick={() => handleBulkAction("completed")}
+              disabled={!!bulkLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-500 text-white hover:bg-blue-600 transition-colors disabled:opacity-50"
+            >
+              {bulkLoading === "completed" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              Complete
+            </button>
+          )}
+          {/* Cancel All — only if any selected is pending or confirmed */}
+          {[...selectedIds].some((id) => {
+            const s = filtered.find((b) => b.id === id)?.status;
+            return s === "pending" || s === "confirmed";
+          }) && (
+            <button
+              onClick={() => handleBulkAction("cancelled")}
+              disabled={!!bulkLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50"
+            >
+              {bulkLoading === "cancelled" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+              Cancel
+            </button>
+          )}
+          <button
+            onClick={handleBulkDelete}
+            disabled={!!bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-700 text-white hover:bg-red-800 transition-colors disabled:opacity-50"
+          >
+            {bulkLoading === "delete" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            Delete
+          </button>
+          <button
+            onClick={clearSelection}
+            className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Clear selection"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Edit Booking Modal */}
       {editBooking && (
