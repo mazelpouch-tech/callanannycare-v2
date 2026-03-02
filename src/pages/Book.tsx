@@ -35,6 +35,7 @@ import {
   AlertTriangle,
   Shield,
   Info,
+  Pencil,
 } from "lucide-react";
 import { useData } from "../context/DataContext";
 import { useLanguage } from "../context/LanguageContext";
