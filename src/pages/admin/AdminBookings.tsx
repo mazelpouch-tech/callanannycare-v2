@@ -45,6 +45,7 @@ import {
 import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
 import ExtendBookingModal from "../../components/ExtendBookingModal";
+import type { DaySchedule } from "../../components/ExtendBookingModal";
 import ForwardBookingModal from "../../components/ForwardBookingModal";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
 import { calcBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE, isTomorrow as isTomorrowDate, timesOverlap } from "@/utils/shiftHelpers";
@@ -3219,8 +3220,35 @@ export default function AdminBookings() {
         <ExtendBookingModal
           booking={extendBooking}
           rate={nannies.find((n) => n.id === extendBooking.nannyId)?.rate || 150}
-          onConfirm={async (newStartTime, newEndTime, newTotalPrice) => {
-            await updateBooking(extendBooking.id, { startTime: newStartTime, endTime: newEndTime, totalPrice: newTotalPrice });
+          onConfirm={async (newStartTime: string, newEndTime: string, newTotalPrice: number, perDaySchedule?: DaySchedule[]) => {
+            if (perDaySchedule && perDaySchedule.length > 1) {
+              // Split into individual daily bookings
+              await deleteBooking(extendBooking.id, 'admin');
+              for (const day of perDaySchedule) {
+                await addBooking({
+                  nannyId: extendBooking.nannyId,
+                  nannyName: extendBooking.nannyName,
+                  clientName: extendBooking.clientName,
+                  clientEmail: extendBooking.clientEmail,
+                  clientPhone: extendBooking.clientPhone,
+                  hotel: extendBooking.hotel,
+                  date: day.date,
+                  endDate: null,
+                  startTime: day.startTime,
+                  endTime: day.endTime,
+                  plan: extendBooking.plan,
+                  childrenCount: extendBooking.childrenCount,
+                  childrenAges: extendBooking.childrenAges,
+                  notes: extendBooking.notes,
+                  totalPrice: day.price,
+                  status: extendBooking.status,
+                  createdBy: 'admin',
+                  createdByName: adminProfile?.name || 'Admin',
+                }, { skipMinHours: true });
+              }
+            } else {
+              await updateBooking(extendBooking.id, { startTime: newStartTime, endTime: newEndTime, totalPrice: newTotalPrice });
+            }
             await fetchBookings();
           }}
           onClose={() => setExtendBooking(null)}
@@ -3229,7 +3257,11 @@ export default function AdminBookings() {
               "modify.title": "Modify Hours",
               "modify.newStartTime": "New Start Time",
               "modify.newEndTime": "New End Time",
+              "modify.defaultStartTime": "Default Start Time",
+              "modify.defaultEndTime": "Default End Time",
               "modify.keepCurrent": "keep current",
+              "modify.differentHoursPerDay": "Set different hours per day",
+              "modify.dailySchedule": "Daily Schedule",
               "modify.hourChange": "Hour Change",
               "modify.priceChange": "Price Change",
               "modify.newTotal": "New Total",
