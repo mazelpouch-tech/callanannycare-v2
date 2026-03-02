@@ -38,6 +38,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     if (req.method === 'GET') {
+      // Return nanny payments for a period
+      if (req.query.action === 'payments') {
+        const periodStart = req.query.period_start as string;
+        const periodEnd = req.query.period_end as string;
+        if (!periodStart || !periodEnd) {
+          return res.status(400).json({ error: 'period_start and period_end are required' });
+        }
+        const payments = await sql`
+          SELECT * FROM nanny_payments
+          WHERE period_start = ${periodStart} AND period_end = ${periodEnd}
+          ORDER BY created_at DESC
+        `;
+        return res.status(200).json(payments);
+      }
+
       const nannies = await sql`SELECT * FROM nannies ORDER BY name ASC` as DbNanny[];
 
       // Optionally include blocked dates for all nannies (used by ForwardBookingModal)
@@ -62,6 +77,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     if (req.method === 'POST') {
+      // Record nanny payment(s)
+      if (req.body?.action === 'record_payments') {
+        const { payments } = req.body as {
+          action: 'record_payments';
+          payments: { nannyId: number; periodStart: string; periodEnd: string; amount: number; paidBy?: string; note?: string }[];
+        };
+        if (!payments || !Array.isArray(payments) || payments.length === 0) {
+          return res.status(400).json({ error: 'payments array is required' });
+        }
+        const results = [];
+        for (const p of payments) {
+          // Upsert: delete existing payment for same nanny+period, then insert
+          await sql`
+            DELETE FROM nanny_payments
+            WHERE nanny_id = ${p.nannyId} AND period_start = ${p.periodStart} AND period_end = ${p.periodEnd}
+          `;
+          const [row] = await sql`
+            INSERT INTO nanny_payments (nanny_id, period_start, period_end, amount, paid_by, note)
+            VALUES (${p.nannyId}, ${p.periodStart}, ${p.periodEnd}, ${p.amount}, ${p.paidBy || ''}, ${p.note || ''})
+            RETURNING *
+          `;
+          results.push(row);
+        }
+        return res.status(201).json({ success: true, count: results.length, payments: results });
+      }
+
+      // Undo nanny payment(s)
+      if (req.body?.action === 'undo_payments') {
+        const { nannyIds, periodStart, periodEnd } = req.body as {
+          action: 'undo_payments';
+          nannyIds: number[];
+          periodStart: string;
+          periodEnd: string;
+        };
+        if (!nannyIds || !periodStart || !periodEnd) {
+          return res.status(400).json({ error: 'nannyIds, periodStart, and periodEnd are required' });
+        }
+        await sql`
+          DELETE FROM nanny_payments
+          WHERE nanny_id = ANY(${nannyIds}) AND period_start = ${periodStart} AND period_end = ${periodEnd}
+        `;
+        return res.status(200).json({ success: true });
+      }
+
       const { name, location, rating, bio, specialties, languages, rate, image, experience, available, email, pin, phone } = req.body as CreateNannyBody;
       const result = await sql`
         INSERT INTO nannies (name, location, rating, bio, specialties, languages, rate, image, experience, available, email, pin, phone)

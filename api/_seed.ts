@@ -225,6 +225,23 @@ export default async function seedHandler(req: VercelRequest, res: VercelRespons
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS admin_notes TEXT DEFAULT ''`;
     // ────────────────────────────────────────────────────────────────
 
+    // ─── Nanny Period Payments (mark-as-paid tracking) ─────────────
+    await sql`
+      CREATE TABLE IF NOT EXISTS nanny_payments (
+        id SERIAL PRIMARY KEY,
+        nanny_id INTEGER REFERENCES nannies(id) ON DELETE CASCADE,
+        period_start VARCHAR(20) NOT NULL,
+        period_end VARCHAR(20) NOT NULL,
+        amount INTEGER NOT NULL DEFAULT 0,
+        paid_by VARCHAR(255) DEFAULT '',
+        note TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_nanny_payments_nanny ON nanny_payments(nanny_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_nanny_payments_period ON nanny_payments(period_start, period_end)`;
+    // ────────────────────────────────────────────────────────────────
+
     // ─── Push Subscriptions ─────────────────────────────────────────
     await sql`
       CREATE TABLE IF NOT EXISTS push_subscriptions (

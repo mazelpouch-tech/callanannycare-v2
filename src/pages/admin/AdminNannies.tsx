@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -22,22 +22,479 @@ import {
   Eye,
   Download,
   FileText,
+  Timer,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 import ImageUpload from "../../components/ImageUpload";
 import { useData } from "../../context/DataContext";
 import PhoneInput from "../../components/PhoneInput";
-import type { Nanny, NannyStatus } from "@/types";
+import type { Nanny, NannyStatus, Booking } from "@/types";
 import { exportPayrollExcel } from "@/utils/exportPayroll";
 import {
   startOfWeek, startOfMonth, endOfMonth,
-  subMonths, format as fmtDate,
+  subMonths, format as fmtDate, format,
 } from "date-fns";
 import {
   calcNannyPayBreakdown,
   estimateNannyPayBreakdown,
   calcActualHoursWorked,
   calcBookedHours,
+  calcShiftPayBreakdown,
+  HOURLY_RATE,
+  getFridayPeriod,
+  isDateInRange,
+  toDateStr,
 } from "@/utils/shiftHelpers";
+
+// ─── Nanny Hours Report with Mark-as-Paid ─────────────────────────
+
+interface NannyPaymentRecord {
+  id: number;
+  nanny_id: number;
+  period_start: string;
+  period_end: string;
+  amount: number;
+  paid_by: string;
+  created_at: string;
+}
+
+function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
+  const { adminProfile } = useData();
+  const currentPeriod = getFridayPeriod();
+  const [periodStart, setPeriodStart] = useState<Date>(currentPeriod.start);
+  const [periodEnd, setPeriodEnd] = useState<Date>(currentPeriod.end);
+  const [showCustom, setShowCustom] = useState(false);
+  const [customFrom, setCustomFrom] = useState(toDateStr(currentPeriod.start));
+  const [customTo, setCustomTo] = useState(toDateStr(currentPeriod.end));
+
+  // Payment tracking
+  const [paidNannyIds, setPaidNannyIds] = useState<Set<number>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [payLoading, setPayLoading] = useState(false);
+
+  const periodKey = `${toDateStr(periodStart)}|${toDateStr(periodEnd)}`;
+
+  // Fetch existing payments for this period
+  useEffect(() => {
+    const fetchPayments = async () => {
+      try {
+        const res = await fetch(`/api/nannies?action=payments&period_start=${toDateStr(periodStart)}&period_end=${toDateStr(periodEnd)}`);
+        if (res.ok) {
+          const data = await res.json() as NannyPaymentRecord[];
+          setPaidNannyIds(new Set(data.map((p) => p.nanny_id)));
+        }
+      } catch { /* ignore */ }
+    };
+    fetchPayments();
+    setSelectedIds(new Set());
+  }, [periodKey]);
+
+  const goToPeriod = (dir: -1 | 1) => {
+    const newStart = new Date(periodStart);
+    newStart.setDate(newStart.getDate() + dir * 7);
+    const newEnd = new Date(newStart);
+    newEnd.setDate(newStart.getDate() + 7);
+    setPeriodStart(newStart);
+    setPeriodEnd(newEnd);
+    setShowCustom(false);
+  };
+
+  const applyCustom = () => {
+    const from = new Date(customFrom + "T00:00:00");
+    const to = new Date(customTo + "T00:00:00");
+    if (from >= to) return;
+    setPeriodStart(from);
+    setPeriodEnd(to);
+    setShowCustom(false);
+  };
+
+  const resetToCurrentWeek = () => {
+    const p = getFridayPeriod();
+    setPeriodStart(p.start);
+    setPeriodEnd(p.end);
+    setShowCustom(false);
+  };
+
+  const isCurrentWeek = periodStart.getTime() === currentPeriod.start.getTime() && periodEnd.getTime() === currentPeriod.end.getTime();
+
+  const periodLabel = (() => {
+    const endDisplay = new Date(periodEnd);
+    endDisplay.setDate(endDisplay.getDate() - 1);
+    return `${format(periodStart, "MMM d")} — ${format(endDisplay, "MMM d, yyyy")}`;
+  })();
+
+  const nannyHours = useMemo(() => {
+    const clockedBookings = bookings.filter(
+      (b) => b.clockIn && b.clockOut && isDateInRange(b.date, periodStart, periodEnd)
+    );
+    if (clockedBookings.length === 0) return [];
+
+    const nannyMap: Record<number, { nannyId: number; name: string; shifts: number; totalHours: number; basePay: number; taxiFee: number; totalPay: number }> = {};
+    clockedBookings.forEach((b) => {
+      const nannyId = b.nannyId;
+      if (nannyId == null) return;
+      const nannyName = b.nannyName || "Unknown";
+      if (!nannyMap[nannyId]) {
+        nannyMap[nannyId] = { nannyId, name: nannyName, shifts: 0, totalHours: 0, basePay: 0, taxiFee: 0, totalPay: 0 };
+      }
+      const ms = new Date(b.clockOut!).getTime() - new Date(b.clockIn!).getTime();
+      const hours = ms / 3600000;
+      const bd = calcShiftPayBreakdown(b.clockIn!, b.clockOut!);
+
+      nannyMap[nannyId].shifts += 1;
+      nannyMap[nannyId].totalHours += hours;
+      nannyMap[nannyId].basePay += bd.basePay;
+      nannyMap[nannyId].taxiFee += bd.taxiFee;
+      nannyMap[nannyId].totalPay += bd.total;
+    });
+
+    return Object.values(nannyMap)
+      .map((n) => ({ ...n, totalHours: Math.round(n.totalHours * 10) / 10 }))
+      .sort((a, b) => b.totalHours - a.totalHours);
+  }, [bookings, periodStart, periodEnd]);
+
+  const totalAllHours = nannyHours.reduce((s, n) => s + n.totalHours, 0);
+  const totalAllBasePay = nannyHours.reduce((s, n) => s + n.basePay, 0);
+  const totalAllTaxi = nannyHours.reduce((s, n) => s + n.taxiFee, 0);
+  const totalAllPay = nannyHours.reduce((s, n) => s + n.totalPay, 0);
+  const totalAllShifts = nannyHours.reduce((s, n) => s + n.shifts, 0);
+
+  // Unpaid nannies (have hours but not paid)
+  const unpaidNannies = nannyHours.filter((n) => !paidNannyIds.has(n.nannyId));
+  const allPaid = nannyHours.length > 0 && unpaidNannies.length === 0;
+
+  const toggleSelect = (nannyId: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(nannyId)) next.delete(nannyId);
+      else next.add(nannyId);
+      return next;
+    });
+  };
+
+  const selectAllUnpaid = () => {
+    if (selectedIds.size === unpaidNannies.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(unpaidNannies.map((n) => n.nannyId)));
+    }
+  };
+
+  const markSelectedPaid = async () => {
+    if (selectedIds.size === 0) return;
+    setPayLoading(true);
+    try {
+      const payments = nannyHours
+        .filter((n) => selectedIds.has(n.nannyId))
+        .map((n) => ({
+          nannyId: n.nannyId,
+          periodStart: toDateStr(periodStart),
+          periodEnd: toDateStr(periodEnd),
+          amount: n.totalPay,
+          paidBy: adminProfile?.name || "Admin",
+        }));
+      const res = await fetch("/api/nannies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "record_payments", payments }),
+      });
+      if (res.ok) {
+        setPaidNannyIds((prev) => {
+          const next = new Set(prev);
+          selectedIds.forEach((id) => next.add(id));
+          return next;
+        });
+        setSelectedIds(new Set());
+      }
+    } catch { /* ignore */ }
+    setPayLoading(false);
+  };
+
+  const undoPaid = async (nannyId: number) => {
+    try {
+      const res = await fetch("/api/nannies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "undo_payments",
+          nannyIds: [nannyId],
+          periodStart: toDateStr(periodStart),
+          periodEnd: toDateStr(periodEnd),
+        }),
+      });
+      if (res.ok) {
+        setPaidNannyIds((prev) => {
+          const next = new Set(prev);
+          next.delete(nannyId);
+          return next;
+        });
+      }
+    } catch { /* ignore */ }
+  };
+
+  return (
+    <div className="bg-card rounded-xl border border-border shadow-soft">
+      {/* Header with period navigation */}
+      <div className="px-6 py-4 border-b border-border space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-serif text-base font-semibold text-foreground flex items-center gap-2">
+            <Timer className="w-4 h-4 text-primary" />
+            Nanny Hours &amp; Pay
+          </h2>
+          {nannyHours.length > 0 && (
+            <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground">
+              <span>{totalAllShifts} shifts</span>
+              <span>{totalAllHours.toFixed(1)} hrs</span>
+              <span className="font-semibold text-foreground">{totalAllPay.toLocaleString()} DH</span>
+              {allPaid && <span className="text-green-600 font-semibold flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />All Paid</span>}
+            </div>
+          )}
+        </div>
+
+        {/* Period navigation row */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => goToPeriod(-1)} className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Previous week">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-sm font-medium text-foreground min-w-[180px] text-center">{periodLabel}</span>
+          <button onClick={() => goToPeriod(1)} className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Next week">
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          {!isCurrentWeek && (
+            <button onClick={resetToCurrentWeek} className="text-xs text-primary hover:underline ml-1">
+              This week
+            </button>
+          )}
+          <button
+            onClick={() => { setShowCustom(!showCustom); setCustomFrom(toDateStr(periodStart)); const ed = new Date(periodEnd); ed.setDate(ed.getDate() - 1); setCustomTo(toDateStr(ed)); }}
+            className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            Custom
+          </button>
+        </div>
+
+        {/* Custom date picker */}
+        {showCustom && (
+          <div className="flex items-end gap-3 flex-wrap bg-muted/50 rounded-lg p-3">
+            <div>
+              <label className="block text-[10px] text-muted-foreground uppercase tracking-wider mb-1">From</label>
+              <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="text-sm border border-border rounded-lg px-3 py-1.5 bg-background" />
+            </div>
+            <div>
+              <label className="block text-[10px] text-muted-foreground uppercase tracking-wider mb-1">To</label>
+              <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="text-sm border border-border rounded-lg px-3 py-1.5 bg-background" />
+            </div>
+            <button onClick={applyCustom} className="text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg px-4 py-1.5 transition-colors">
+              Apply
+            </button>
+          </div>
+        )}
+
+        <p className="text-[10px] text-muted-foreground">
+          Pay period: Friday midnight → Friday midnight
+        </p>
+      </div>
+
+      {nannyHours.length === 0 && (
+        <div className="px-6 py-10 text-center">
+          <Timer className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-muted-foreground font-medium">No shift data for this period</p>
+          <p className="text-sm text-muted-foreground/70 mt-1">
+            Hours will appear here once nannies start using Start Shift / End Shift.
+          </p>
+        </div>
+      )}
+
+      {nannyHours.length > 0 && (
+        <>
+          {/* Mark as Paid toolbar */}
+          {unpaidNannies.length > 0 && (
+            <div className="flex items-center justify-between gap-3 px-6 py-3 bg-amber-50 border-b border-amber-100">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={selectAllUnpaid}
+                  className="flex items-center gap-1.5 text-xs font-medium text-amber-800 hover:text-amber-900 transition-colors"
+                >
+                  {selectedIds.size === unpaidNannies.length ? (
+                    <CheckCircle2 className="w-4 h-4 text-amber-600" />
+                  ) : (
+                    <Circle className="w-4 h-4 text-amber-400" />
+                  )}
+                  Select All ({unpaidNannies.length} unpaid)
+                </button>
+                {selectedIds.size > 0 && (
+                  <span className="text-xs text-amber-700">
+                    {selectedIds.size} selected — {nannyHours.filter((n) => selectedIds.has(n.nannyId)).reduce((s, n) => s + n.totalPay, 0).toLocaleString()} DH
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={markSelectedPaid}
+                disabled={selectedIds.size === 0 || payLoading}
+                className="flex items-center gap-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 px-4 py-2 rounded-lg transition-colors"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {payLoading ? "Saving..." : "Mark Paid"}
+              </button>
+            </div>
+          )}
+
+          {allPaid && (
+            <div className="flex items-center gap-2 px-6 py-3 bg-green-50 border-b border-green-100">
+              <CheckCircle2 className="w-4 h-4 text-green-600" />
+              <span className="text-sm font-medium text-green-800">All nannies are paid for this period</span>
+            </div>
+          )}
+
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-8"></th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nanny</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Shifts</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hours</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Avg/Shift</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hourly Pay</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Taxi Fee</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Pay</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {nannyHours.map((nanny) => {
+                  const isPaid = paidNannyIds.has(nanny.nannyId);
+                  const isSelected = selectedIds.has(nanny.nannyId);
+                  return (
+                    <tr key={nanny.nannyId} className={`transition-colors ${isPaid ? "bg-green-50/50" : "hover:bg-muted/50"}`}>
+                      <td className="px-6 py-3">
+                        {isPaid ? (
+                          <button onClick={() => undoPaid(nanny.nannyId)} title="Undo paid" className="text-green-600 hover:text-red-500 transition-colors">
+                            <CheckCircle2 className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <button onClick={() => toggleSelect(nanny.nannyId)} className="text-muted-foreground hover:text-foreground transition-colors">
+                            {isSelected ? <CheckCircle2 className="w-4 h-4 text-primary" /> : <Circle className="w-4 h-4" />}
+                          </button>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-sm font-medium text-foreground">{nanny.name}</p>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{nanny.shifts}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{nanny.totalHours}h</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                        {(nanny.totalHours / nanny.shifts).toFixed(1)}h
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground text-right">
+                        {nanny.basePay.toLocaleString()} DH
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right">
+                        {nanny.taxiFee > 0 ? (
+                          <span className="text-orange-600 font-medium">+{nanny.taxiFee} DH</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-semibold text-foreground text-right">
+                        {nanny.totalPay.toLocaleString()} DH
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {isPaid ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700">
+                            <CheckCircle2 className="w-3 h-3" /> Paid
+                          </span>
+                        ) : (
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">
+                            Unpaid
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border bg-muted/30">
+                  <td className="px-6 py-3"></td>
+                  <td className="px-4 py-3 text-sm font-bold text-foreground">Total</td>
+                  <td className="px-4 py-3 text-sm font-bold text-foreground">{totalAllShifts}</td>
+                  <td className="px-4 py-3 text-sm font-bold text-foreground">{totalAllHours.toFixed(1)}h</td>
+                  <td className="px-4 py-3 text-sm font-bold text-foreground">
+                    {totalAllShifts > 0 ? (totalAllHours / totalAllShifts).toFixed(1) : 0}h
+                  </td>
+                  <td className="px-4 py-3 text-sm font-bold text-foreground text-right">{totalAllBasePay.toLocaleString()} DH</td>
+                  <td className="px-4 py-3 text-sm font-bold text-orange-600 text-right">
+                    {totalAllTaxi > 0 ? `+${totalAllTaxi.toLocaleString()} DH` : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-bold text-foreground text-right">{totalAllPay.toLocaleString()} DH</td>
+                  <td className="px-4 py-3"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden divide-y divide-border">
+            {nannyHours.map((nanny) => {
+              const isPaid = paidNannyIds.has(nanny.nannyId);
+              const isSelected = selectedIds.has(nanny.nannyId);
+              return (
+                <div key={nanny.nannyId} className={`px-5 py-4 space-y-1 ${isPaid ? "bg-green-50/50" : ""}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {isPaid ? (
+                        <button onClick={() => undoPaid(nanny.nannyId)} className="text-green-600">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button onClick={() => toggleSelect(nanny.nannyId)} className="text-muted-foreground">
+                          {isSelected ? <CheckCircle2 className="w-4 h-4 text-primary" /> : <Circle className="w-4 h-4" />}
+                        </button>
+                      )}
+                      <p className="font-medium text-foreground text-sm">{nanny.name}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-foreground">{nanny.totalPay.toLocaleString()} DH</span>
+                      {isPaid ? (
+                        <span className="text-[10px] font-semibold text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full">Paid</span>
+                      ) : (
+                        <span className="text-[10px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">Unpaid</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground pl-6">
+                    <span>{nanny.shifts} shifts</span>
+                    <span>{nanny.totalHours}h total</span>
+                    <span>{(nanny.totalHours / nanny.shifts).toFixed(1)}h avg</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground pl-6">
+                    <span>Hourly: {nanny.basePay} DH</span>
+                    {nanny.taxiFee > 0 && (
+                      <span className="text-orange-600">Taxi: +{nanny.taxiFee} DH</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="px-6 py-3 border-t border-border text-[10px] text-muted-foreground">
+            Rate: {HOURLY_RATE} DH/hr ({Math.round(HOURLY_RATE * 8)} DH/8h) · +100 DH for evening shifts (7 PM - 7 AM)
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Admin Nannies Page ─────────────────────────────────────────
 
 const emptyForm = {
   name: "",
@@ -417,6 +874,9 @@ export default function AdminNannies() {
           className="w-full pl-10 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
         />
       </div>
+
+      {/* Nanny Hours & Pay Report */}
+      <NannyHoursReport bookings={bookings} />
 
       {/* Nannies Grid */}
       {filteredNannies.length === 0 ? (
