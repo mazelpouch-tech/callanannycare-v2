@@ -237,6 +237,7 @@ export default function AdminBookings() {
   const [rebookClientName, setRebookClientName] = useState<string | null>(null);
   const [newBookingError, setNewBookingError] = useState<string | null>(null);
   const [overrideMinHours, setOverrideMinHours] = useState(false);
+  const [overrideConflict, setOverrideConflict] = useState(false);
 
   const handleRebook = (booking: Booking) => {
     setNewBooking({
@@ -535,7 +536,7 @@ export default function AdminBookings() {
           dates.push(d.toISOString().slice(0, 10));
         }
         for (const date of dates) {
-          await addBooking({ ...baseBookingData, date, totalPrice: dailyPrice }, { skipMinHours: overrideMinHours });
+          await addBooking({ ...baseBookingData, date, totalPrice: dailyPrice }, { skipMinHours: overrideMinHours, skipConflictCheck: overrideConflict });
         }
       } else {
         // Generate N consecutive daily bookings from start date, respecting per-day time overrides
@@ -555,7 +556,7 @@ export default function AdminBookings() {
             startTime: dayStartLabel,
             endTime: dayEndLabel,
             totalPrice: dayPrice,
-          }, { skipMinHours: overrideMinHours });
+          }, { skipMinHours: overrideMinHours, skipConflictCheck: overrideConflict });
         }
       }
       setShowNewBooking(false);
@@ -564,6 +565,7 @@ export default function AdminBookings() {
       setDayTimeOverrides({});
       setEditingDayIdx(null);
       setOverrideMinHours(false);
+      setOverrideConflict(false);
       setNewBooking({
         nannyId: "",
         clientName: "",
@@ -2841,7 +2843,7 @@ export default function AdminBookings() {
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                     <div>
-                      <p className="font-semibold">Scheduling conflict — booking blocked</p>
+                      <p className="font-semibold">Scheduling conflict{overrideConflict ? " — override active" : ""}</p>
                       <p className="text-xs mt-0.5">
                         {selectedNanny?.name || "This nanny"} already has {conflicts.length} booking{conflicts.length > 1 ? "s" : ""} at this time.
                       </p>
@@ -2867,6 +2869,15 @@ export default function AdminBookings() {
                   {suggestedNannies.length === 0 && (
                     <p className="text-xs">No other nannies are available at this time.</p>
                   )}
+                  <label className="flex items-center gap-2 pt-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={overrideConflict}
+                      onChange={(e) => setOverrideConflict(e.target.checked)}
+                      className="w-4 h-4 rounded border-orange-400 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span className="text-xs font-medium">Override conflict (admin)</span>
+                  </label>
                 </div>
               )}
 
@@ -2915,7 +2926,7 @@ export default function AdminBookings() {
                 </button>
                 <button
                   type="submit"
-                  disabled={newBookingLoading || (!newBooking.nannyId && !bestAutoNanny) || !newBooking.date || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime || conflicts.length > 0 || (newBookingHours > 0 && newBookingHours < 3 && !overrideMinHours)}
+                  disabled={newBookingLoading || (!newBooking.nannyId && !bestAutoNanny) || !newBooking.date || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime || (conflicts.length > 0 && !overrideConflict) || (newBookingHours > 0 && newBookingHours < 3 && !overrideMinHours)}
                   className="flex-1 gradient-warm text-white rounded-xl px-4 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {newBookingLoading ? (

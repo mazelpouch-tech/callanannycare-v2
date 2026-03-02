@@ -25,6 +25,7 @@ interface CreateBookingBody {
   created_by_name?: string;
   extra_dates?: string | null; // JSON array of additional non-contiguous dates
   skip_min_hours?: boolean;
+  skip_conflict_check?: boolean;
 }
 
 interface AvailableNannyRow {
@@ -209,7 +210,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
-      const { nanny_id: provided_nanny_id, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, locale, status: reqStatus, clock_in, clock_out, created_by, created_by_name, extra_dates, skip_min_hours } = req.body as CreateBookingBody;
+      const { nanny_id: provided_nanny_id, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, locale, status: reqStatus, clock_in, clock_out, created_by, created_by_name, extra_dates, skip_min_hours, skip_conflict_check } = req.body as CreateBookingBody;
 
       // ─── Minimum 3-hour duration check (admin can override) ───
       if (start_time && end_time && !clock_in && !(skip_min_hours && created_by === 'admin')) {
@@ -291,7 +292,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const overlapping = conflicts.filter(
           c => timesOverlap(start_time, effectiveEndTime, c.start_time, c.end_time || '23h59')
         );
-        if (overlapping.length > 0) {
+        if (overlapping.length > 0 && !(skip_conflict_check && created_by === 'admin')) {
           return res.status(409).json({
             error: 'Scheduling conflict: this nanny already has a booking at this time.',
             conflicts: overlapping.map(c => ({
