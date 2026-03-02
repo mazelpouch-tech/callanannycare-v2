@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       SELECT b.*, n.name as nanny_name, n.image as nanny_image
       FROM bookings b
       LEFT JOIN nannies n ON b.nanny_id = n.id
-      WHERE b.nanny_id = ${nannyId}
+      WHERE b.nanny_id = ${nannyId} AND b.deleted_at IS NULL
       ORDER BY b.date DESC, b.start_time DESC
     ` as DbBookingWithNanny[];
     
