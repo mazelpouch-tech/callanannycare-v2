@@ -2519,7 +2519,7 @@ export default function AdminBookings() {
                       const cardClass = selected
                         ? "border-primary bg-primary/10 shadow-sm"
                         : busy
-                        ? "border-border bg-muted/40 opacity-50 cursor-not-allowed"
+                        ? "border-border bg-red-50/50 hover:border-red-300 hover:bg-red-50"
                         : partial
                         ? "border-border bg-background hover:border-amber-400 hover:bg-amber-50/50"
                         : "border-border bg-background hover:border-green-400 hover:bg-green-50";
@@ -2541,7 +2541,6 @@ export default function AdminBookings() {
                         <button
                           key={n.id}
                           type="button"
-                          disabled={busy}
                           onClick={() => setNewBooking({ ...newBooking, nannyId: String(n.id) })}
                           className={`flex flex-col items-start p-3 rounded-xl border-2 text-left transition-all ${cardClass}`}
                         >
@@ -2564,7 +2563,7 @@ export default function AdminBookings() {
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
                   >
                     <option value="">Auto-assign (set date & time first to preview)</option>
-                    {availableNannies.map((n) => (
+                    {allActiveNannies.map((n) => (
                       <option key={n.id} value={n.id}>
                         {n.name} — {n.rate}€/hr ({n.location})
                       </option>
