@@ -334,18 +334,20 @@ export default function Dashboard() {
     ? Math.round(stats.totalRevenue / Math.max(bookings.filter((b) => b.status === "confirmed" || b.status === "completed").length, 1))
     : 0;
 
-  // ── 3-Day Agenda (today + 2 days) ──
+  // ── 3-Day Agenda with navigation ──
+  const [agendaStart, setAgendaStart] = useState(() => new Date());
   const agendaDays = useMemo(() => {
-    const now = new Date();
+    const today = new Date();
+    const todayStr = format(today, "yyyy-MM-dd");
     return Array.from({ length: 3 }, (_, i) => {
-      const day = addDays(now, i);
+      const day = addDays(agendaStart, i);
       const dateStr = format(day, "yyyy-MM-dd");
       const dayBookings = bookings
         .filter((b) => b.date === dateStr && b.status !== "cancelled")
         .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
-      return { day, dateStr, bookings: dayBookings, isToday: i === 0 };
+      return { day, dateStr, bookings: dayBookings, isToday: dateStr === todayStr };
     });
-  }, [bookings]);
+  }, [bookings, agendaStart]);
 
   const agendaStatusDot = (status: string) => {
     switch (status) {
@@ -413,87 +415,88 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {/* ── 3-Day Agenda ── */}
-      <div className="bg-card rounded-xl border border-border shadow-soft overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-serif text-base font-semibold text-foreground flex items-center gap-2">
-            <CalendarDays className="w-4 h-4 text-primary" />
-            3-Day Agenda
-          </h2>
-          <Link to="/admin/bookings" className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors">
-            All Bookings <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+      {/* ── 3-Day Agenda (calendar-style) ── */}
+      <div className="space-y-4">
+        {/* Navigation */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setAgendaStart((d) => { const n = new Date(d); n.setDate(n.getDate() - 3); return n; })}
+              className="p-2 rounded-xl border border-border hover:bg-muted transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+            </button>
+            <button
+              onClick={() => setAgendaStart((d) => { const n = new Date(d); n.setDate(n.getDate() + 3); return n; })}
+              className="p-2 rounded-xl border border-border hover:bg-muted transition-colors"
+            >
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </button>
+            <span className="text-sm font-semibold text-foreground">
+              {format(agendaDays[0].day, "d MMM")} — {format(agendaDays[agendaDays.length - 1].day, "d MMM yyyy")}
+            </span>
+          </div>
+          <button
+            onClick={() => setAgendaStart(new Date())}
+            className="px-3 py-1.5 rounded-xl border border-border text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+          >
+            Today
+          </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
-          {agendaDays.map(({ day, dateStr, bookings: dayBookings, isToday: isDayToday }) => (
-            <div key={dateStr} className={`flex flex-col ${isDayToday ? "bg-primary/5" : ""}`}>
-              {/* Day header */}
-              <div className={`flex items-center gap-3 px-5 py-3 border-b border-border/60 ${isDayToday ? "bg-primary/10" : "bg-muted/30"}`}>
-                <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center shrink-0 ${isDayToday ? "bg-primary text-white" : "bg-background border border-border"}`}>
-                  <span className={`text-[9px] font-bold uppercase leading-none ${isDayToday ? "text-white/80" : "text-muted-foreground"}`}>
+        {/* Day columns */}
+        <div className="grid grid-cols-3 gap-2">
+          {agendaDays.map(({ day, dateStr, bookings: dayBookings, isToday: isDayToday }) => {
+            const dayTotal = dayBookings.reduce((s, b) => s + (b.totalPrice || 0), 0);
+            return (
+              <div key={dateStr} className={`flex flex-col gap-1.5 min-w-0 rounded-xl border p-2 ${isDayToday ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
+                {/* Day header */}
+                <div className={`flex flex-col items-center py-1 rounded-lg ${isDayToday ? "bg-primary text-white" : ""}`}>
+                  <span className={`text-[10px] font-semibold uppercase tracking-wide ${isDayToday ? "text-white/80" : "text-muted-foreground"}`}>
                     {format(day, "EEE")}
                   </span>
-                  <span className={`text-sm font-bold leading-tight ${isDayToday ? "text-white" : "text-foreground"}`}>
+                  <span className={`text-base font-bold leading-tight ${isDayToday ? "text-white" : "text-foreground"}`}>
                     {format(day, "d")}
                   </span>
                 </div>
-                <div>
-                  <p className={`text-sm font-semibold ${isDayToday ? "text-primary" : "text-foreground"}`}>
-                    {isDayToday ? "Today" : format(day, "EEEE")}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">{format(day, "MMM d, yyyy")}</p>
-                </div>
-                {dayBookings.length > 0 && (
-                  <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold ${isDayToday ? "bg-primary text-white" : "bg-muted text-foreground"}`}>
-                    {dayBookings.length}
-                  </span>
-                )}
-              </div>
 
-              {/* Bookings list */}
-              <div className="flex-1 min-h-[80px]">
+                {/* Booking cards */}
                 {dayBookings.length === 0 ? (
-                  <div className="flex items-center justify-center h-full py-6 text-xs text-muted-foreground/50">
-                    No bookings
-                  </div>
+                  <div className="flex items-center justify-center h-16 text-[10px] text-muted-foreground/40">—</div>
                 ) : (
-                  <div className="divide-y divide-border/50">
-                    {dayBookings.map((b) => (
-                      <div key={b.id} className={`px-4 py-3 ${agendaStatusChip(b.status)} transition-colors hover:brightness-95`}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${agendaStatusDot(b.status)}`} />
-                          <span className="text-xs font-semibold text-foreground">
-                            {b.startTime || "—"}{b.endTime ? ` – ${b.endTime}` : ""}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 ml-3.5">
-                          {b.nannyName ? (
-                            <div className="flex items-center gap-1.5">
-                              {b.nannyImage ? (
-                                <img src={b.nannyImage} alt={b.nannyName} className="w-5 h-5 rounded-full object-cover border border-border" />
-                              ) : (
-                                <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-bold text-primary">
-                                  {b.nannyName.charAt(0)}
-                                </div>
-                              )}
-                              <span className="text-xs font-medium text-foreground">{b.nannyName}</span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">Unassigned</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 ml-3.5 mt-0.5">
-                          <span className="text-[11px] text-muted-foreground truncate">{b.clientName}</span>
-                          {b.hotel && <span className="text-[10px] text-muted-foreground/70 truncate">· {b.hotel}</span>}
-                        </div>
+                  dayBookings.map((b) => (
+                    <div
+                      key={b.id}
+                      className={`w-full text-left px-2 py-1.5 rounded-lg text-[10px] leading-tight ${agendaStatusChip(b.status)}`}
+                    >
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${agendaStatusDot(b.status)}`} />
+                        <span className="font-semibold truncate">{b.startTime}–{b.endTime}</span>
                       </div>
-                    ))}
+                      <div className="truncate font-medium">{b.clientName}</div>
+                      <div className="truncate text-[9px] opacity-70">{b.nannyName || "Unassigned"}</div>
+                      {b.totalPrice ? <div className="font-semibold mt-0.5">{b.totalPrice}€</div> : null}
+                    </div>
+                  ))
+                )}
+
+                {/* Day footer */}
+                {dayBookings.length > 0 && (
+                  <div className="text-center text-[10px] text-muted-foreground pt-1 border-t border-border/50 mt-auto">
+                    {dayBookings.length} booking{dayBookings.length !== 1 ? "s" : ""} · <span className="font-semibold text-foreground">{dayTotal}€</span>
                   </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
+        </div>
+
+        {/* Status legend */}
+        <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-400" /> Pending</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" /> Confirmed</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" /> Completed</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-400" /> Cancelled</span>
         </div>
       </div>
 
