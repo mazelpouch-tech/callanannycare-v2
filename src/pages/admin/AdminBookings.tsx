@@ -297,6 +297,13 @@ export default function AdminBookings() {
   // Forward Booking Modal
   const [forwardBooking, setForwardBooking] = useState<Booking | null>(null);
 
+  // Bulk Forward Modal
+  const [bulkForwardModal, setBulkForwardModal] = useState(false);
+  const [bulkForwardNannyId, setBulkForwardNannyId] = useState<number | null>(null);
+  const [bulkForwardLoading, setBulkForwardLoading] = useState(false);
+  const [bulkForwardError, setBulkForwardError] = useState<string | null>(null);
+  const [bulkForwardSuccess, setBulkForwardSuccess] = useState(false);
+
   // Cancel Confirmation Modal
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
   const [cancelReason, setCancelReason] = useState("");
@@ -1128,6 +1135,43 @@ export default function AdminBookings() {
       clearSelection();
     } finally {
       setBulkLoading(null);
+    }
+  };
+
+  const handleBulkForward = async () => {
+    if (selectedIds.size === 0 || !bulkForwardNannyId) return;
+    setBulkForwardLoading(true);
+    setBulkForwardError(null);
+    const ids = [...selectedIds];
+    const failures: string[] = [];
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/bookings/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nanny_id: bulkForwardNannyId }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          const b = bookings.find((bk) => bk.id === id);
+          failures.push(`${b?.clientName || `#${id}`} (${b?.date || ""}): ${data.error || res.statusText}`);
+        }
+      } catch {
+        failures.push(`Booking #${id}: network error`);
+      }
+    }
+    await fetchBookings();
+    setBulkForwardLoading(false);
+    if (failures.length > 0) {
+      setBulkForwardError(`${ids.length - failures.length}/${ids.length} forwarded. Failed:\n${failures.join("\n")}`);
+    } else {
+      setBulkForwardSuccess(true);
+      clearSelection();
+      setTimeout(() => {
+        setBulkForwardModal(false);
+        setBulkForwardSuccess(false);
+        setBulkForwardNannyId(null);
+      }, 1200);
     }
   };
   // ─────────────────────────────────────────────────────────────
@@ -3329,6 +3373,92 @@ export default function AdminBookings() {
         />
       )}
 
+      {/* Bulk Forward Modal */}
+      {bulkForwardModal && (
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { if (!bulkForwardLoading) { setBulkForwardModal(false); setBulkForwardNannyId(null); setBulkForwardError(null); } }}>
+          <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            {bulkForwardSuccess ? (
+              <div className="p-8 text-center">
+                <CheckCircle className="w-14 h-14 text-green-500 mx-auto mb-4" />
+                <p className="text-lg font-semibold text-foreground">All bookings forwarded successfully!</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                  <h2 className="font-serif text-lg font-bold text-foreground flex items-center gap-2">
+                    <ArrowRightLeft className="w-5 h-5 text-orange-500" />
+                    Forward {selectedIds.size} Booking{selectedIds.size !== 1 ? "s" : ""}
+                  </h2>
+                  <button onClick={() => { setBulkForwardModal(false); setBulkForwardNannyId(null); setBulkForwardError(null); }} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="px-6 py-5 space-y-4">
+                  {/* Selected bookings summary */}
+                  <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+                    <p className="text-sm font-semibold text-orange-800 mb-2">{selectedIds.size} booking{selectedIds.size !== 1 ? "s" : ""} selected</p>
+                    <div className="max-h-32 overflow-y-auto space-y-1">
+                      {[...selectedIds].map((id) => {
+                        const b = bookings.find((bk) => bk.id === id);
+                        return b ? (
+                          <p key={id} className="text-xs text-orange-700">
+                            {b.clientName} · {b.date} · {b.startTime}–{b.endTime} {b.nannyName ? `(${b.nannyName})` : ""}
+                          </p>
+                        ) : null;
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Nanny selector */}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">Forward to</label>
+                    <select
+                      value={bulkForwardNannyId ?? ""}
+                      onChange={(e) => { setBulkForwardNannyId(e.target.value ? Number(e.target.value) : null); setBulkForwardError(null); }}
+                      className="w-full px-4 py-3 border border-border rounded-xl bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none"
+                    >
+                      <option value="">Select a nanny...</option>
+                      {nannies.filter((n) => n.status === "active").map((n) => (
+                        <option key={n.id} value={n.id}>{n.name} — {n.location}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Error */}
+                  {bulkForwardError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm whitespace-pre-wrap">
+                      ⚠️ {bulkForwardError}
+                    </div>
+                  )}
+
+                  <p className="text-xs text-muted-foreground text-center">All selected bookings will be reassigned to the chosen nanny.</p>
+                </div>
+                <div className="px-6 py-4 border-t border-border flex gap-3">
+                  <button
+                    onClick={() => { setBulkForwardModal(false); setBulkForwardNannyId(null); setBulkForwardError(null); }}
+                    disabled={bulkForwardLoading}
+                    className="flex-1 py-3 border border-border rounded-xl text-sm font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleBulkForward}
+                    disabled={!bulkForwardNannyId || bulkForwardLoading}
+                    className="flex-1 py-3 gradient-warm text-white rounded-xl text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
+                  >
+                    {bulkForwardLoading ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Forwarding...</>
+                    ) : (
+                      `Forward ${selectedIds.size} Booking${selectedIds.size !== 1 ? "s" : ""}`
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Cancel Confirmation Modal */}
       {cancelTarget && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setCancelTarget(null); setCancelReason(""); }}>
@@ -3635,6 +3765,14 @@ export default function AdminBookings() {
           >
             {bulkLoading === "cancelled" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
             Cancel All
+          </button>
+          <button
+            onClick={() => { setBulkForwardModal(true); setBulkForwardError(null); setBulkForwardNannyId(null); setBulkForwardSuccess(false); }}
+            disabled={!!bulkLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-colors disabled:opacity-50"
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5" />
+            Forward All
           </button>
           <button
             onClick={handleBulkDelete}
