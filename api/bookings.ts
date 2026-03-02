@@ -24,6 +24,7 @@ interface CreateBookingBody {
   created_by?: BookingCreator;
   created_by_name?: string;
   extra_dates?: string | null; // JSON array of additional non-contiguous dates
+  skip_min_hours?: boolean;
 }
 
 interface AvailableNannyRow {
@@ -208,10 +209,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
-      const { nanny_id: provided_nanny_id, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, locale, status: reqStatus, clock_in, clock_out, created_by, created_by_name, extra_dates } = req.body as CreateBookingBody;
+      const { nanny_id: provided_nanny_id, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, locale, status: reqStatus, clock_in, clock_out, created_by, created_by_name, extra_dates, skip_min_hours } = req.body as CreateBookingBody;
 
-      // ─── Minimum 3-hour duration check ──────────────────────────
-      if (start_time && end_time && !clock_in) {
+      // ─── Minimum 3-hour duration check (admin can override) ───
+      if (start_time && end_time && !clock_in && !(skip_min_hours && created_by === 'admin')) {
         const parseT = (t: string) => {
           const [h, m] = t.replace('h', ':').split(':').map(Number);
           return h + (m || 0) / 60;

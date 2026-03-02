@@ -235,6 +235,7 @@ export default function AdminBookings() {
   const [newBookingLoading, setNewBookingLoading] = useState(false);
   const [rebookClientName, setRebookClientName] = useState<string | null>(null);
   const [newBookingError, setNewBookingError] = useState<string | null>(null);
+  const [overrideMinHours, setOverrideMinHours] = useState(false);
 
   const handleRebook = (booking: Booking) => {
     setNewBooking({
@@ -533,7 +534,7 @@ export default function AdminBookings() {
           dates.push(d.toISOString().slice(0, 10));
         }
         for (const date of dates) {
-          await addBooking({ ...baseBookingData, date, totalPrice: dailyPrice });
+          await addBooking({ ...baseBookingData, date, totalPrice: dailyPrice }, { skipMinHours: overrideMinHours });
         }
       } else {
         // Generate N consecutive daily bookings from start date, respecting per-day time overrides
@@ -553,7 +554,7 @@ export default function AdminBookings() {
             startTime: dayStartLabel,
             endTime: dayEndLabel,
             totalPrice: dayPrice,
-          });
+          }, { skipMinHours: overrideMinHours });
         }
       }
       setShowNewBooking(false);
@@ -561,6 +562,7 @@ export default function AdminBookings() {
       setNewBookingNumDays(1);
       setDayTimeOverrides({});
       setEditingDayIdx(null);
+      setOverrideMinHours(false);
       setNewBooking({
         nannyId: "",
         clientName: "",
@@ -2871,16 +2873,27 @@ export default function AdminBookings() {
                 </div>
               )}
 
-              {/* 3-hour minimum warning */}
+              {/* 3-hour minimum warning with admin override */}
               {newBookingHours > 0 && newBookingHours < 3 && (
-                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  Minimum booking duration is 3 hours (current: {newBookingHours}h)
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    Minimum booking duration is 3 hours (current: {Math.round(newBookingHours * 10) / 10}h)
+                  </div>
+                  <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={overrideMinHours}
+                      onChange={(e) => setOverrideMinHours(e.target.checked)}
+                      className="w-4 h-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+                    />
+                    <span className="text-xs font-medium">Override minimum hours (admin)</span>
+                  </label>
                 </div>
               )}
 
               {/* Price Summary */}
-              {selectedNanny && newBookingHours >= 3 && (
+              {selectedNanny && (newBookingHours >= 3 || (overrideMinHours && newBookingHours > 0)) && (
                 <div className="bg-muted/50 rounded-xl p-4 flex items-center justify-between">
                   <div className="text-sm text-muted-foreground">
                     <span className="font-medium text-foreground">{selectedNanny.name}</span>
@@ -2905,7 +2918,7 @@ export default function AdminBookings() {
                 </button>
                 <button
                   type="submit"
-                  disabled={newBookingLoading || (!newBooking.nannyId && !bestAutoNanny) || !newBooking.date || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime || conflicts.length > 0 || (newBookingHours > 0 && newBookingHours < 3)}
+                  disabled={newBookingLoading || (!newBooking.nannyId && !bestAutoNanny) || !newBooking.date || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime || conflicts.length > 0 || (newBookingHours > 0 && newBookingHours < 3 && !overrideMinHours)}
                   className="flex-1 gradient-warm text-white rounded-xl px-4 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {newBookingLoading ? (

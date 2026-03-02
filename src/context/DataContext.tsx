@@ -390,7 +390,7 @@ export function DataProvider({ children }: DataProviderProps) {
   }, [fetchBookings]);
 
   const addBooking = useCallback(
-    async (booking: Partial<Booking>, meta?: { locale?: string }): Promise<Booking> => {
+    async (booking: Partial<Booking>, meta?: { locale?: string; skipMinHours?: boolean }): Promise<Booking> => {
       const nanny = nannies.find((n) => n.id === booking.nannyId);
       try {
         const created = await apiFetch<DbBookingWithNanny>("/bookings", {
@@ -417,6 +417,7 @@ export function DataProvider({ children }: DataProviderProps) {
             created_by: booking.createdBy || "parent",
             created_by_name: booking.createdByName || "",
             extra_dates: booking.extraDates ? JSON.stringify(booking.extraDates) : null,
+            skip_min_hours: meta?.skipMinHours || false,
           }),
         });
 
