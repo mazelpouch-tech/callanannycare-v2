@@ -29,6 +29,7 @@ export default function AdminRevenue() {
   const [expandedId, setExpandedId] = useState<number | string | null>(null);
   const [search, setSearch] = useState("");
   const [nannyFilter, setNannyFilter] = useState("all");
+  const [parentFilter, setParentFilter] = useState("all");
 
   // ── Collection modal ──
   const [collectingBooking, setCollectingBooking] = useState<Booking | null>(null);
@@ -58,6 +59,13 @@ export default function AdminRevenue() {
     try { return parseISO(b.date) < now; } catch { return false; }
   }, [now]);
 
+  // ── Unique parent names (for filter dropdown) ──
+  const uniqueParents = useMemo(() => {
+    const names = new Set<string>();
+    bookings.forEach((b) => { if (b.clientName) names.add(b.clientName); });
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [bookings]);
+
   // ── Financial summary ──
   const filteredFinancialBookings = useMemo(() => {
     let start: Date;
@@ -79,11 +87,15 @@ export default function AdminRevenue() {
       } catch { return []; }
     }
     return bookings
-      .filter((b) => b.status === "confirmed" || b.status === "completed")
+      .filter((b) => {
+        // When filtering by parent, include ALL statuses for total revenue
+        if (parentFilter !== "all") return b.clientName === parentFilter;
+        return b.status === "confirmed" || b.status === "completed";
+      })
       .filter((b) => {
         try { return isWithinInterval(parseISO(b.date), { start, end }); } catch { return false; }
       });
-  }, [bookings, financialPeriod, customStart, customEnd]);
+  }, [bookings, financialPeriod, customStart, customEnd, parentFilter]);
 
   const filteredRevenue = useMemo(
     () => filteredFinancialBookings.reduce((s, b) => s + (b.totalPrice || 0), 0),
@@ -103,6 +115,7 @@ export default function AdminRevenue() {
   const toCollect = useMemo(() => {
     let filtered = bookings.filter((b) => b.status === "confirmed" && !b.collectedAt);
     if (nannyFilter !== "all") filtered = filtered.filter((b) => String(b.nannyId) === nannyFilter);
+    if (parentFilter !== "all") filtered = filtered.filter((b) => b.clientName === parentFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
       filtered = filtered.filter(
@@ -125,11 +138,12 @@ export default function AdminRevenue() {
       if (aOv !== bOv) return aOv - bOv;
       return a.date.localeCompare(b.date);
     });
-  }, [bookings, nannyFilter, search, isOverdue, collectDateFrom, collectDateTo]);
+  }, [bookings, nannyFilter, parentFilter, search, isOverdue, collectDateFrom, collectDateTo]);
 
   const collected = useMemo(() => {
     let filtered = bookings.filter((b) => !!b.collectedAt);
     if (nannyFilter !== "all") filtered = filtered.filter((b) => String(b.nannyId) === nannyFilter);
+    if (parentFilter !== "all") filtered = filtered.filter((b) => b.clientName === parentFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
       filtered = filtered.filter(
@@ -137,7 +151,7 @@ export default function AdminRevenue() {
       );
     }
     return filtered.sort((a, b) => (b.collectedAt || "").localeCompare(a.collectedAt || ""));
-  }, [bookings, nannyFilter, search]);
+  }, [bookings, nannyFilter, parentFilter, search]);
 
   const byNanny = useMemo(() => {
     const map = new Map<number, {
@@ -417,20 +431,29 @@ export default function AdminRevenue() {
             <h3 className="font-serif text-base font-semibold text-foreground">Financial Summary</h3>
           </div>
           <div className="flex flex-col gap-2 self-start sm:self-auto">
-            <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/60 border border-border">
-              {(["week", "month", "year", "custom"] as const).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setFinancialPeriod(p)}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                    financialPeriod === p
-                      ? "bg-background text-foreground shadow-sm border border-border"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {p === "week" ? "Weekly" : p === "month" ? "Monthly" : p === "year" ? "Annually" : "Custom"}
-                </button>
-              ))}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/60 border border-border">
+                {(["week", "month", "year", "custom"] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setFinancialPeriod(p)}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                      financialPeriod === p
+                        ? "bg-background text-foreground shadow-sm border border-border"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {p === "week" ? "Weekly" : p === "month" ? "Monthly" : p === "year" ? "Annually" : "Custom"}
+                  </button>
+                ))}
+              </div>
+              <select value={parentFilter} onChange={(e) => setParentFilter(e.target.value)}
+                className="px-3 py-1.5 bg-card border border-border rounded-lg text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 max-w-[160px]">
+                <option value="all">All Parents</option>
+                {uniqueParents.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
             </div>
             {financialPeriod === "custom" && (
               <div className="flex items-center gap-2">
@@ -565,6 +588,13 @@ export default function AdminRevenue() {
                 </button>
               )}
             </div>
+            <select value={parentFilter} onChange={(e) => setParentFilter(e.target.value)}
+              className="px-3 py-2.5 bg-card border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 max-w-[160px]">
+              <option value="all">All Parents</option>
+              {uniqueParents.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
             <select value={nannyFilter} onChange={(e) => setNannyFilter(e.target.value)}
               className="px-3 py-2.5 bg-card border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">
               <option value="all">All Nannies</option>
