@@ -46,6 +46,7 @@ interface BookingData {
   clock_out: string | null;
   plan: string;
   created_at: string;
+  extra_times: string | null;
 }
 
 type Step = "verify" | "status";
