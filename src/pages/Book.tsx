@@ -58,6 +58,8 @@ interface StepDateTimeProps {
   onEndTimeChange: (time: string) => void;
   dayTimeOverrides: Record<number, { startTime: string; endTime: string }>;
   onDayTimeOverridesChange: (overrides: Record<number, { startTime: string; endTime: string }>) => void;
+  extraTimeBlocks: Array<{ startTime: string; endTime: string }>;
+  setExtraTimeBlocks: (blocks: Array<{ startTime: string; endTime: string }>) => void;
   onBack?: () => void;
   onNext: () => void;
 }
@@ -232,6 +234,8 @@ function StepDateTime({
   onEndTimeChange,
   dayTimeOverrides,
   onDayTimeOverridesChange,
+  extraTimeBlocks,
+  setExtraTimeBlocks,
   onBack,
   onNext,
 }: StepDateTimeProps) {
@@ -1611,6 +1615,8 @@ export default function Book() {
             onEndTimeChange={setEndTime}
             dayTimeOverrides={dayTimeOverrides}
             onDayTimeOverridesChange={setDayTimeOverrides}
+            extraTimeBlocks={extraTimeBlocks}
+            setExtraTimeBlocks={setExtraTimeBlocks}
             onBack={undefined}
             onNext={() => setStep(2)}
           />
