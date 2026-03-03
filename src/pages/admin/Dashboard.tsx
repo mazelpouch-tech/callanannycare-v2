@@ -136,7 +136,7 @@ export default function Dashboard() {
       {/* ── Stat Cards ── */}
       <div className="grid grid-cols-3 gap-4">
         {/* New Bookings (created today) */}
-        <Link to="/admin/bookings" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-purple-300/50 transition-all cursor-pointer group">
+        <Link to="/admin/bookings?createdToday=true" className="bg-card rounded-xl border border-border p-5 shadow-soft hover:shadow-warm hover:border-purple-300/50 transition-all cursor-pointer group">
           <div className="flex items-center justify-between mb-3">
             <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center group-hover:bg-purple-100 transition-colors">
               <Activity className="w-5 h-5 text-purple-700" />
