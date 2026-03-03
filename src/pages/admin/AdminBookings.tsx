@@ -180,6 +180,7 @@ export default function AdminBookings() {
   const [sortOrder, setSortOrder] = useState("newest");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [createdTodayFilter, setCreatedTodayFilter] = useState(() => searchParams.get("createdToday") === "true");
   const [expandedRow, setExpandedRow] = useState<number | string | null>(() => {
     const bookingParam = searchParams.get("booking");
     return bookingParam ? Number(bookingParam) : null;
@@ -195,8 +196,11 @@ export default function AdminBookings() {
       setExpandedRow(Number(bookingParam));
       setScrollToBooking(bookingParam);
       searchParams.delete("booking");
-      setSearchParams(searchParams, { replace: true });
     }
+    if (searchParams.has("createdToday")) {
+      searchParams.delete("createdToday");
+    }
+    setSearchParams(searchParams, { replace: true });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Scroll to the target booking once it appears in the DOM (retries as bookings load)
@@ -854,6 +858,13 @@ export default function AdminBookings() {
     if (dateFrom) result = result.filter((b) => b.date >= dateFrom);
     if (dateTo)   result = result.filter((b) => b.date <= dateTo);
 
+    // Created today filter — only bookings created today
+    if (createdTodayFilter) {
+      result = result.filter((b) => {
+        try { return isToday(parseISO(b.createdAt)); } catch { return false; }
+      });
+    }
+
     // Sort
     result.sort((a, b) => {
       const dateA = new Date(a.createdAt || a.date);
@@ -862,7 +873,7 @@ export default function AdminBookings() {
     });
 
     return result;
-  }, [bookings, search, statusFilter, nannyFilter, sortOrder, dateFrom, dateTo]);
+  }, [bookings, search, statusFilter, nannyFilter, sortOrder, dateFrom, dateTo, createdTodayFilter]);
 
   // Split bookings into grouped sections: today / tomorrow / upcoming (future) / past (by status)
   const groupedBookings = useMemo(() => {
@@ -1442,6 +1453,19 @@ export default function AdminBookings() {
             </button>
           )}
         </div>
+
+        {/* Created Today active filter chip */}
+        {createdTodayFilter && (
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/60">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+              <Activity className="w-3 h-3" />
+              Showing only bookings created today
+              <button onClick={() => setCreatedTodayFilter(false)} className="ml-1 hover:text-purple-900 transition-colors">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ── Calendar View ── */}
