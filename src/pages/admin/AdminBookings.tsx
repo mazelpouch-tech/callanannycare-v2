@@ -509,13 +509,25 @@ export default function AdminBookings() {
     return hourlyTotal + taxiFee;
   }, [selectedNanny, newBookingHours, newBookingDays, newBooking.startTime, newBooking.endTime, extraTimeBlocks]);
 
-  const calcDayPrice = (startT: string, endT: string, nanny: { rate: number }) => {
+  const calcDayPrice = (startT: string, endT: string, nanny: { rate: number }, extras?: Array<{ startTime: string; endTime: string }>) => {
     if (!startT || !endT) return 0;
     const [sh, sm = 0] = startT.split(":").map(Number);
     const [eh, em = 0] = endT.split(":").map(Number);
     let hours = (eh + em / 60) - (sh + sm / 60);
     if (hours <= 0) hours += 24;
-    const isEvening = sh >= 19 || sh < 7 || (eh + em / 60) > 19;
+    let isEvening = sh >= 19 || sh < 7 || (eh + em / 60) > 19;
+    // Include extra time blocks in hours and evening check
+    if (extras) {
+      for (const block of extras) {
+        if (!block.startTime || !block.endTime) continue;
+        const [bs, bsm = 0] = block.startTime.split(":").map(Number);
+        const [be, bem = 0] = block.endTime.split(":").map(Number);
+        let bHours = (be + bem / 60) - (bs + bsm / 60);
+        if (bHours <= 0) bHours += 24;
+        hours += bHours;
+        if (!isEvening && (bs >= 19 || bs < 7 || (be + bem / 60) > 19)) isEvening = true;
+      }
+    }
     return Math.round(nanny.rate * hours) + (isEvening ? 10 : 0);
   };
 
@@ -586,7 +598,7 @@ export default function AdminBookings() {
           const dayEndVal = override?.endTime ?? newBooking.endTime;
           const dayStartLabel = TIME_SLOTS.find((s) => s.value === dayStartVal)?.label || dayStartVal;
           const dayEndLabel = TIME_SLOTS.find((s) => s.value === dayEndVal)?.label || dayEndVal;
-          const dayPrice = override ? calcDayPrice(dayStartVal, dayEndVal, chosenNanny) : dailyPrice;
+          const dayPrice = override ? calcDayPrice(dayStartVal, dayEndVal, chosenNanny, extraTimeBlocks) : dailyPrice;
           await addBooking({
             ...baseBookingData,
             date: d.toISOString().slice(0, 10),
