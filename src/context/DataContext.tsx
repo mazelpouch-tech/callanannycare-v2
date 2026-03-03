@@ -486,6 +486,21 @@ export function DataProvider({ children }: DataProviderProps) {
       console.error(`Invalid booking status: ${status}`);
       return;
     }
+    // Optimistic local update for immediate UI feedback
+    const patch = {
+      status,
+      ...(status === "cancelled" ? {
+        cancelledAt: new Date().toISOString(),
+        cancellationReason: meta?.reason || "",
+        cancelledBy: meta?.cancelledBy || "",
+      } : {}),
+    };
+    setBookings((prev) => {
+      const updated = prev.map((b) => b.id === id ? { ...b, ...patch } : b);
+      saveToStorage(STORAGE_KEYS.bookings, updated);
+      return updated;
+    });
+    setNannyBookings((prev) => prev.map((b) => b.id === id ? { ...b, ...patch } : b));
     try {
       await apiFetch(`/bookings/${id}`, {
         method: "PUT",
@@ -497,25 +512,12 @@ export function DataProvider({ children }: DataProviderProps) {
           } : {}),
         }),
       });
+      // Re-fetch from DB to ensure full consistency
+      await fetchBookings();
     } catch {
-      console.warn("API status update failed, updating locally");
+      console.warn("API status update failed, local state updated");
     }
-    setBookings((prev) => {
-      const updated = prev.map((b) =>
-        b.id === id ? {
-          ...b,
-          status,
-          ...(status === "cancelled" ? {
-            cancelledAt: new Date().toISOString(),
-            cancellationReason: meta?.reason || "",
-            cancelledBy: meta?.cancelledBy || "",
-          } : {}),
-        } : b
-      );
-      saveToStorage(STORAGE_KEYS.bookings, updated);
-      return updated;
-    });
-  }, []);
+  }, [fetchBookings]);
 
   const updateBooking = useCallback(async (id: number | string, updates: Partial<Booking>): Promise<void> => {
     // Map camelCase to snake_case for API
@@ -539,76 +541,82 @@ export function DataProvider({ children }: DataProviderProps) {
     if (updates.status !== undefined) apiBody.status = updates.status;
     if (updates.clockIn !== undefined) apiBody.clock_in = updates.clockIn;
     if (updates.clockOut !== undefined) apiBody.clock_out = updates.clockOut;
+    // Optimistic local update
+    setBookings((prev) => {
+      const updated = prev.map((b) => b.id === id ? { ...b, ...updates } : b);
+      saveToStorage(STORAGE_KEYS.bookings, updated);
+      return updated;
+    });
+    setNannyBookings((prev) => prev.map((b) => b.id === id ? { ...b, ...updates } : b));
     try {
       await apiFetch(`/bookings/${id}`, {
         method: "PUT",
         body: JSON.stringify(apiBody),
       });
+      await fetchBookings();
     } catch {
-      console.warn("API update failed, updating locally");
+      console.warn("API update failed, local state updated");
     }
-    setBookings((prev) => {
-      const updated = prev.map((b) =>
-        b.id === id ? { ...b, ...updates } : b
-      );
-      saveToStorage(STORAGE_KEYS.bookings, updated);
-      return updated;
-    });
-  }, []);
+  }, [fetchBookings]);
 
   const clockInBooking = useCallback(async (id: number | string): Promise<void> => {
     const clockTime = new Date().toISOString();
-    try {
-      await apiFetch(`/bookings/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({ clock_in: clockTime }),
-      });
-    } catch {
-      console.warn("API clock-in failed, updating locally");
-    }
+    // Optimistic local update
     setBookings((prev) => {
       const updated = prev.map((b) => b.id === id ? { ...b, clockIn: clockTime } : b);
       saveToStorage(STORAGE_KEYS.bookings, updated);
       return updated;
     });
-    // Also update nanny bookings
     setNannyBookings((prev) => prev.map((b) => b.id === id ? { ...b, clockIn: clockTime } : b));
-  }, []);
-
-  const clockOutBooking = useCallback(async (id: number | string): Promise<void> => {
-    const clockTime = new Date().toISOString();
     try {
       await apiFetch(`/bookings/${id}`, {
         method: "PUT",
-        body: JSON.stringify({ clock_out: clockTime, status: "completed" }),
+        body: JSON.stringify({ clock_in: clockTime }),
       });
+      await fetchBookings();
     } catch {
-      console.warn("API clock-out failed, updating locally");
+      console.warn("API clock-in failed, local state updated");
     }
+  }, [fetchBookings]);
+
+  const clockOutBooking = useCallback(async (id: number | string): Promise<void> => {
+    const clockTime = new Date().toISOString();
+    // Optimistic local update
     setBookings((prev) => {
       const updated = prev.map((b) => b.id === id ? { ...b, clockOut: clockTime, status: "completed" as BookingStatus } : b);
       saveToStorage(STORAGE_KEYS.bookings, updated);
       return updated;
     });
-    // Also update nanny bookings
     setNannyBookings((prev) => prev.map((b) => b.id === id ? { ...b, clockOut: clockTime, status: "completed" as BookingStatus } : b));
-  }, []);
-
-  const deleteBooking = useCallback(async (id: number | string, deletedBy?: string): Promise<void> => {
     try {
       await apiFetch(`/bookings/${id}`, {
-        method: "DELETE",
-        body: JSON.stringify({ deleted_by: deletedBy || 'Admin' }),
+        method: "PUT",
+        body: JSON.stringify({ clock_out: clockTime, status: "completed" }),
       });
+      await fetchBookings();
     } catch {
-      console.warn("API delete failed, deleting locally");
+      console.warn("API clock-out failed, local state updated");
     }
+  }, [fetchBookings]);
+
+  const deleteBooking = useCallback(async (id: number | string, deletedBy?: string): Promise<void> => {
+    // Optimistic local update
     setBookings((prev) => {
       const updated = prev.filter((b) => b.id !== id);
       saveToStorage(STORAGE_KEYS.bookings, updated);
       return updated;
     });
-  }, []);
+    setNannyBookings((prev) => prev.filter((b) => b.id !== id));
+    try {
+      await apiFetch(`/bookings/${id}`, {
+        method: "DELETE",
+        body: JSON.stringify({ deleted_by: deletedBy || 'Admin' }),
+      });
+      await fetchBookings();
+    } catch {
+      console.warn("API delete failed, local state updated");
+    }
+  }, [fetchBookings]);
 
   const fetchDeletedBookings = useCallback(async (): Promise<Booking[]> => {
     try {
@@ -668,6 +676,19 @@ export function DataProvider({ children }: DataProviderProps) {
     data: { collectedBy: string; paymentMethod: string; collectionNote?: string }
   ): Promise<void> => {
     const collectedAt = new Date().toISOString();
+    const patch = {
+      collectedBy: data.collectedBy,
+      collectedAt: collectedAt,
+      collectionNote: data.collectionNote || '',
+      paymentMethod: data.paymentMethod,
+    };
+    // Optimistic local update
+    setBookings((prev) => {
+      const updated = prev.map((b) => b.id === id ? { ...b, ...patch } : b);
+      saveToStorage(STORAGE_KEYS.bookings, updated);
+      return updated;
+    });
+    setNannyBookings((prev) => prev.map((b) => b.id === id ? { ...b, ...patch } : b));
     try {
       await apiFetch(`/bookings/${id}`, {
         method: "PUT",
@@ -678,23 +699,11 @@ export function DataProvider({ children }: DataProviderProps) {
           payment_method: data.paymentMethod,
         }),
       });
+      await fetchBookings();
     } catch {
-      console.warn("API mark-collected failed, updating locally");
+      console.warn("API mark-collected failed, local state updated");
     }
-    setBookings((prev) => {
-      const updated = prev.map((b) =>
-        b.id === id ? {
-          ...b,
-          collectedBy: data.collectedBy,
-          collectedAt: collectedAt,
-          collectionNote: data.collectionNote || '',
-          paymentMethod: data.paymentMethod,
-        } : b
-      );
-      saveToStorage(STORAGE_KEYS.bookings, updated);
-      return updated;
-    });
-  }, []);
+  }, [fetchBookings]);
 
   const resendInvoice = useCallback(async (id: number | string): Promise<void> => {
     await apiFetch(`/bookings/${id}`, {
