@@ -58,8 +58,6 @@ interface StepDateTimeProps {
   onEndTimeChange: (time: string) => void;
   dayTimeOverrides: Record<number, { startTime: string; endTime: string }>;
   onDayTimeOverridesChange: (overrides: Record<number, { startTime: string; endTime: string }>) => void;
-  extraTimeBlocks: Array<{ startTime: string; endTime: string }>;
-  setExtraTimeBlocks: (blocks: Array<{ startTime: string; endTime: string }>) => void;
   onBack?: () => void;
   onNext: () => void;
 }
@@ -234,8 +232,6 @@ function StepDateTime({
   onEndTimeChange,
   dayTimeOverrides,
   onDayTimeOverridesChange,
-  extraTimeBlocks,
-  setExtraTimeBlocks,
   onBack,
   onNext,
 }: StepDateTimeProps) {
@@ -465,68 +461,6 @@ function StepDateTime({
         </p>
       )}
 
-      {/* Extra time blocks (morning + evening) */}
-      {startTime && endTime && (
-        <div className="mb-4 space-y-2">
-          {extraTimeBlocks.map((block, idx) => (
-            <div key={idx} className="flex items-end gap-2 bg-primary/5 border border-primary/20 rounded-xl px-3 py-2.5">
-              <div className="flex-1">
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                  {locale === "fr" ? "Début" : "Start"}
-                </label>
-                <select
-                  value={block.startTime}
-                  onChange={(e) => {
-                    const updated = [...extraTimeBlocks];
-                    updated[idx] = { ...updated[idx], startTime: e.target.value };
-                    setExtraTimeBlocks(updated);
-                  }}
-                  className="w-full rounded-lg border border-border bg-card p-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                >
-                  <option value="">{locale === "fr" ? "Choisir" : "Select"}</option>
-                  {TIME_SLOTS.map((slot) => (
-                    <option key={`es-${idx}-${slot.value}`} value={slot.value}>{slot.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex-1">
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                  {locale === "fr" ? "Fin" : "End"}
-                </label>
-                <select
-                  value={block.endTime}
-                  onChange={(e) => {
-                    const updated = [...extraTimeBlocks];
-                    updated[idx] = { ...updated[idx], endTime: e.target.value };
-                    setExtraTimeBlocks(updated);
-                  }}
-                  className="w-full rounded-lg border border-border bg-card p-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                >
-                  <option value="">{locale === "fr" ? "Choisir" : "Select"}</option>
-                  {TIME_SLOTS.map((slot) => (
-                    <option key={`ee-${idx}-${slot.value}`} value={slot.value}>{slot.label}</option>
-                  ))}
-                </select>
-              </div>
-              <button
-                type="button"
-                onClick={() => setExtraTimeBlocks(extraTimeBlocks.filter((_, i) => i !== idx))}
-                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => setExtraTimeBlocks([...extraTimeBlocks, { startTime: "", endTime: "" }])}
-            className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            {locale === "fr" ? "Ajouter un créneau (ex: soir)" : "Add time block (e.g. evening)"}
-          </button>
-        </div>
-      )}
 
       {/* Per-day schedule overrides */}
       {numDays > 1 && startTime && selectedDates.length > 1 && (
@@ -1341,7 +1275,6 @@ export default function Book() {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [dayTimeOverrides, setDayTimeOverrides] = useState<Record<number, { startTime: string; endTime: string }>>({});
-  const [extraTimeBlocks, setExtraTimeBlocks] = useState<Array<{ startTime: string; endTime: string }>>([]);
 
   // Step 2 state — initialize from localStorage
   const [details, setDetails] = useState<BookingDetails>(loadSavedParent);
@@ -1368,12 +1301,8 @@ export default function Book() {
 
   const hours = useMemo(() => {
     if (!startTime || !endTime) return 0;
-    let total = calculateHours(startTime, endTime);
-    for (const block of extraTimeBlocks) {
-      if (block.startTime && block.endTime) total += calculateHours(block.startTime, block.endTime);
-    }
-    return total;
-  }, [startTime, endTime, extraTimeBlocks]);
+    return calculateHours(startTime, endTime);
+  }, [startTime, endTime]);
 
   const isEveningBooking = useMemo(() => {
     const checkEvening = (st: string, et: string) => {
@@ -1384,12 +1313,8 @@ export default function Book() {
       return overnight || sH >= NIGHT_START || sH < NIGHT_END || eH > NIGHT_START || (eH === NIGHT_START && eM > 0);
     };
     if (!startTime || !endTime) return false;
-    if (checkEvening(startTime, endTime)) return true;
-    for (const block of extraTimeBlocks) {
-      if (block.startTime && block.endTime && checkEvening(block.startTime, block.endTime)) return true;
-    }
-    return false;
-  }, [startTime, endTime, extraTimeBlocks]);
+    return checkEvening(startTime, endTime);
+  }, [startTime, endTime]);
 
   const taxiFeeTotal = useMemo(() => {
     return isEveningBooking ? TAXI_FEE * selectedDates.length : 0;
@@ -1439,20 +1364,12 @@ export default function Book() {
       // Create one booking per selected date (each with per-day price)
       const defaultDailyPrice = Math.round(totalPrice / selectedDates.length);
 
-      // Convert extra time blocks to label format
-      const extraTimesForApi = extraTimeBlocks.length > 0
-        ? extraTimeBlocks.filter(b => b.startTime && b.endTime).map(b => ({
-            startTime: TIME_SLOTS.find(s => s.value === b.startTime)?.label || b.startTime,
-            endTime: TIME_SLOTS.find(s => s.value === b.endTime)?.label || b.endTime,
-          }))
-        : null;
-
       const basePayload = {
         startTime: startLabel,
         endTime: endLabel,
         plan: "hourly" as BookingPlan,
         totalPrice: defaultDailyPrice,
-        extraTimes: extraTimesForApi,
+        extraTimes: null,
         clientName: details.fullName,
         clientEmail: details.email,
         clientPhone: details.phone,
@@ -1615,8 +1532,6 @@ export default function Book() {
             onEndTimeChange={setEndTime}
             dayTimeOverrides={dayTimeOverrides}
             onDayTimeOverridesChange={setDayTimeOverrides}
-            extraTimeBlocks={extraTimeBlocks}
-            setExtraTimeBlocks={setExtraTimeBlocks}
             onBack={undefined}
             onNext={() => setStep(2)}
           />
