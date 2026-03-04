@@ -350,45 +350,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               if (nnRows[0]) confirmedNannyName = nnRows[0].name;
             } catch { /* ignore */ }
 
-            const bookingLocale = result[0].locale || 'en';
             const baseUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
             const trackUrl = `${baseUrl}/booking/${result[0].id}`;
 
-            const waConfirmMsg = bookingLocale === 'fr'
-              ? [
-                  '🎉 *Bonne Nouvelle — Nounou Confirmée !*',
-                  '',
-                  `Bonjour ${result[0].client_name},`,
-                  `Votre nounou *${confirmedNannyName}* a accepté votre réservation !`,
-                  '',
-                  `📋 *Réservation #:* ${result[0].id}`,
-                  `📅 *Date:* ${result[0].date}`,
-                  `🕐 *Heure:* ${result[0].start_time} - ${result[0].end_time || ''}`,
-                  `🏨 *Lieu:* ${result[0].hotel || 'N/A'}`,
-                  `👶 *Enfants:* ${result[0].children_count || 1}`,
-                  `💰 *Total:* ${result[0].total_price || 0}€`,
-                  '',
-                  `📍 Suivez votre réservation : ${trackUrl}`,
-                  '',
-                  '_Merci de votre confiance !_',
-                  '💕 Call a Nanny — Marrakech',
-                ].join('\n')
-              : [
+            const waConfirmMsg = [
                   '🎉 *Great News — Nanny Confirmed!*',
+                  '🎉 *Bonne Nouvelle — Nounou Confirmée !*',
                   '',
                   `Hi ${result[0].client_name},`,
                   `Your nanny *${confirmedNannyName}* has accepted your booking!`,
                   '',
-                  `📋 *Booking #:* ${result[0].id}`,
+                  `Bonjour ${result[0].client_name},`,
+                  `Votre nounou *${confirmedNannyName}* a accepté votre réservation !`,
+                  '',
+                  `📋 *Booking / Réservation #:* ${result[0].id}`,
                   `📅 *Date:* ${result[0].date}`,
-                  `🕐 *Time:* ${result[0].start_time} - ${result[0].end_time || ''}`,
-                  `🏨 *Location:* ${result[0].hotel || 'N/A'}`,
-                  `👶 *Children:* ${result[0].children_count || 1}`,
+                  `🕐 *Time / Heure:* ${result[0].start_time} - ${result[0].end_time || ''}`,
+                  `🏨 *Location / Lieu:* ${result[0].hotel || 'N/A'}`,
+                  `👶 *Children / Enfants:* ${result[0].children_count || 1}`,
                   `💰 *Total:* ${result[0].total_price || 0}€`,
                   '',
-                  `📍 Track your booking: ${trackUrl}`,
+                  `📍 Track your booking / Suivez votre réservation : ${trackUrl}`,
                   '',
-                  '_Thank you for choosing us!_',
+                  '_Thank you for choosing us! / Merci de votre confiance !_',
                   '💕 Call a Nanny — Marrakech',
                 ].join('\n');
 
@@ -413,17 +397,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             } catch { /* ignore */ }
 
             const waBizConfirm = [
-              '✅ *Nanny Confirmed Booking*',
+              '✅ *Nanny Confirmed Booking / Nounou a confirmé la réservation*',
               '',
-              `📋 *Booking #:* ${result[0].id}`,
+              `📋 *Booking / Réservation #:* ${result[0].id}`,
               `👤 *Parent:* ${result[0].client_name}`,
-              `👩‍👧 *Nanny:* ${bizNannyName}`,
+              `👩‍👧 *Nanny / Nounou:* ${bizNannyName}`,
               `📅 *Date:* ${result[0].date}`,
-              `🕐 *Time:* ${result[0].start_time} - ${result[0].end_time || ''}`,
-              `🏨 *Hotel:* ${result[0].hotel || 'N/A'}`,
-              `💰 *Amount:* ${result[0].total_price || 0}€`,
+              `🕐 *Time / Heure:* ${result[0].start_time} - ${result[0].end_time || ''}`,
+              `🏨 *Hotel / Hôtel:* ${result[0].hotel || 'N/A'}`,
+              `💰 *Amount / Montant:* ${result[0].total_price || 0}€`,
               '',
-              '_Confirmation email + WhatsApp sent to parent._',
+              '_Confirmation WhatsApp sent to parent / WhatsApp de confirmation envoyé au parent._',
             ].join('\n');
 
             await fetch(`https://graph.facebook.com/v18.0/${WA_PHONE_ID_CF}/messages`, {

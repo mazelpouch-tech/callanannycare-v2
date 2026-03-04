@@ -381,19 +381,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
           const siteUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
           const waMessage = [
-            "🔔 *New Booking Received!*",
+            "🔔 *New Booking Received! / Nouvelle Réservation Reçue !*",
             "",
             `👤 *Client:* ${client_name}`,
-            `📱 *Phone:* ${client_phone || "N/A"}`,
-            `🏨 *Hotel:* ${hotel || "N/A"}`,
+            `📱 *Phone / Téléphone:* ${client_phone || "N/A"}`,
+            `🏨 *Hotel / Hôtel:* ${hotel || "N/A"}`,
             `📅 *Date:* ${date}`,
-            `🕐 *Time:* ${start_time}${end_time ? ` - ${end_time}` : ""}`,
-            `👶 *Children:* ${children_count || 1}`,
+            `🕐 *Time / Heure:* ${start_time}${end_time ? ` - ${end_time}` : ""}`,
+            `👶 *Children / Enfants:* ${children_count || 1}`,
             `💰 *Total:* ${total_price || 0}€`,
             "",
-            `📍 *Track:* ${siteUrl}/booking/${result[0].id}`,
+            `📍 *Track / Suivre:* ${siteUrl}/booking/${result[0].id}`,
             "",
-            "_Sent automatically by Call a Nanny_",
+            "_Sent automatically by Call a Nanny / Envoyé automatiquement par Call a Nanny_",
           ].join("\n");
 
           await fetch(
