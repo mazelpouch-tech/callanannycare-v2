@@ -381,19 +381,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
           const siteUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
           const waMessage = [
-            "🔔 *New Booking Received! / Nouvelle Réservation Reçue !*",
+            "🔔 *Nouvelle Réservation Reçue ! / New Booking Received!*",
             "",
-            `👤 *Client:* ${client_name}`,
-            `📱 *Phone / Téléphone:* ${client_phone || "N/A"}`,
-            `🏨 *Hotel / Hôtel:* ${hotel || "N/A"}`,
-            `📅 *Date:* ${date}`,
-            `🕐 *Time / Heure:* ${start_time}${end_time ? ` - ${end_time}` : ""}`,
-            `👶 *Children / Enfants:* ${children_count || 1}`,
-            `💰 *Total:* ${total_price || 0}€`,
+            `👤 *Client :* ${client_name}`,
+            `📱 *Téléphone / Phone :* ${client_phone || "N/A"}`,
+            `🏨 *Hôtel / Hotel :* ${hotel || "N/A"}`,
+            `📅 *Date :* ${date}`,
+            `🕐 *Heure / Time :* ${start_time}${end_time ? ` - ${end_time}` : ""}`,
+            `👶 *Enfants / Children :* ${children_count || 1}`,
+            `💰 *Total :* ${total_price || 0}€`,
             "",
-            `📍 *Track / Suivre:* ${siteUrl}/booking/${result[0].id}`,
+            `📍 *Suivre / Track :* ${siteUrl}/booking/${result[0].id}`,
             "",
-            "_Sent automatically by Call a Nanny / Envoyé automatiquement par Call a Nanny_",
+            "_Envoyé automatiquement par Call a Nanny_",
           ].join("\n");
 
           await fetch(
@@ -427,47 +427,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           const siteUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
           const trackUrl = `${siteUrl}/booking/${result[0].id}`;
-          const bookingLocale = locale || 'en';
-
-          const waParentMsg = bookingLocale === 'fr'
-            ? [
+          const waParentMsg = [
                 '✅ *Réservation Confirmée — Call a Nanny*',
+                '✅ *Booking Confirmed — Call a Nanny*',
                 '',
                 `Bonjour ${client_name},`,
                 'Merci pour votre réservation ! Voici les détails :',
                 '',
-                `📋 *Réservation #:* ${result[0].id}`,
-                `📅 *Date:* ${date}${end_date ? ` — ${end_date}` : ''}`,
-                `🕐 *Heure:* ${start_time}${end_time ? ` - ${end_time}` : ''}`,
-                `🏨 *Lieu:* ${hotel || 'N/A'}`,
-                `👶 *Enfants:* ${children_count || 1}`,
-                `💰 *Total:* ${total_price || 0}€`,
-                '',
-                '📌 *Prochaine étape :* Une nounou qualifiée vous sera assignée sous peu.',
-                '',
-                `📍 *Suivre votre réservation :* ${trackUrl}`,
-                '',
-                '_Merci de votre confiance !_',
-                '💕 Call a Nanny — Marrakech',
-              ].join('\n')
-            : [
-                '✅ *Booking Confirmed — Call a Nanny*',
-                '',
                 `Hi ${client_name},`,
                 'Thank you for your booking! Here are the details:',
                 '',
-                `📋 *Booking #:* ${result[0].id}`,
-                `📅 *Date:* ${date}${end_date ? ` — ${end_date}` : ''}`,
-                `🕐 *Time:* ${start_time}${end_time ? ` - ${end_time}` : ''}`,
-                `🏨 *Location:* ${hotel || 'N/A'}`,
-                `👶 *Children:* ${children_count || 1}`,
-                `💰 *Total:* ${total_price || 0}€`,
+                `📋 *Réservation / Booking #:* ${result[0].id}`,
+                `📅 *Date :* ${date}${end_date ? ` — ${end_date}` : ''}`,
+                `🕐 *Heure / Time :* ${start_time}${end_time ? ` - ${end_time}` : ''}`,
+                `🏨 *Lieu / Location :* ${hotel || 'N/A'}`,
+                `👶 *Enfants / Children :* ${children_count || 1}`,
+                `💰 *Total :* ${total_price || 0}€`,
                 '',
+                '📌 *Prochaine étape :* Une nounou qualifiée vous sera assignée sous peu.',
                 '📌 *Next step:* A qualified nanny will be assigned to your booking shortly.',
                 '',
-                `📍 *Track your booking:* ${trackUrl}`,
+                `📍 *Suivre votre réservation / Track your booking :* ${trackUrl}`,
                 '',
-                '_Thank you for choosing us!_',
+                '_Merci de votre confiance ! / Thank you for choosing us!_',
                 '💕 Call a Nanny — Marrakech',
               ].join('\n');
 

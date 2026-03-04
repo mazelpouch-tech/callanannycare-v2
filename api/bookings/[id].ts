@@ -354,25 +354,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const trackUrl = `${baseUrl}/booking/${result[0].id}`;
 
             const waConfirmMsg = [
-                  '🎉 *Great News — Nanny Confirmed!*',
                   '🎉 *Bonne Nouvelle — Nounou Confirmée !*',
-                  '',
-                  `Hi ${result[0].client_name},`,
-                  `Your nanny *${confirmedNannyName}* has accepted your booking!`,
+                  '🎉 *Great News — Nanny Confirmed!*',
                   '',
                   `Bonjour ${result[0].client_name},`,
                   `Votre nounou *${confirmedNannyName}* a accepté votre réservation !`,
                   '',
-                  `📋 *Booking / Réservation #:* ${result[0].id}`,
-                  `📅 *Date:* ${result[0].date}`,
-                  `🕐 *Time / Heure:* ${result[0].start_time} - ${result[0].end_time || ''}`,
-                  `🏨 *Location / Lieu:* ${result[0].hotel || 'N/A'}`,
-                  `👶 *Children / Enfants:* ${result[0].children_count || 1}`,
-                  `💰 *Total:* ${result[0].total_price || 0}€`,
+                  `Hi ${result[0].client_name},`,
+                  `Your nanny *${confirmedNannyName}* has accepted your booking!`,
                   '',
-                  `📍 Track your booking / Suivez votre réservation : ${trackUrl}`,
+                  `📋 *Réservation / Booking #:* ${result[0].id}`,
+                  `📅 *Date :* ${result[0].date}`,
+                  `🕐 *Heure / Time :* ${result[0].start_time} - ${result[0].end_time || ''}`,
+                  `🏨 *Lieu / Location :* ${result[0].hotel || 'N/A'}`,
+                  `👶 *Enfants / Children :* ${result[0].children_count || 1}`,
+                  `💰 *Total :* ${result[0].total_price || 0}€`,
                   '',
-                  '_Thank you for choosing us! / Merci de votre confiance !_',
+                  `📍 Suivez votre réservation / Track your booking : ${trackUrl}`,
+                  '',
+                  '_Merci de votre confiance ! / Thank you for choosing us!_',
                   '💕 Call a Nanny — Marrakech',
                 ].join('\n');
 
@@ -397,17 +397,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             } catch { /* ignore */ }
 
             const waBizConfirm = [
-              '✅ *Nanny Confirmed Booking / Nounou a confirmé la réservation*',
+              '✅ *Nounou a confirmé la réservation / Nanny Confirmed Booking*',
               '',
-              `📋 *Booking / Réservation #:* ${result[0].id}`,
-              `👤 *Parent:* ${result[0].client_name}`,
-              `👩‍👧 *Nanny / Nounou:* ${bizNannyName}`,
-              `📅 *Date:* ${result[0].date}`,
-              `🕐 *Time / Heure:* ${result[0].start_time} - ${result[0].end_time || ''}`,
-              `🏨 *Hotel / Hôtel:* ${result[0].hotel || 'N/A'}`,
-              `💰 *Amount / Montant:* ${result[0].total_price || 0}€`,
+              `📋 *Réservation / Booking #:* ${result[0].id}`,
+              `👤 *Parent :* ${result[0].client_name}`,
+              `👩‍👧 *Nounou / Nanny :* ${bizNannyName}`,
+              `📅 *Date :* ${result[0].date}`,
+              `🕐 *Heure / Time :* ${result[0].start_time} - ${result[0].end_time || ''}`,
+              `🏨 *Hôtel / Hotel :* ${result[0].hotel || 'N/A'}`,
+              `💰 *Montant / Amount :* ${result[0].total_price || 0}€`,
               '',
-              '_Confirmation WhatsApp sent to parent / WhatsApp de confirmation envoyé au parent._',
+              '_WhatsApp de confirmation envoyé au parent / Confirmation WhatsApp sent to parent._',
             ].join('\n');
 
             await fetch(`https://graph.facebook.com/v18.0/${WA_PHONE_ID_CF}/messages`, {
@@ -491,16 +491,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (WA_TOKEN_C && WA_PHONE_ID_C && WA_BIZ_C) {
           try {
             const waCancelBiz = [
-              '❌ *Booking Cancelled*',
+              '❌ *Réservation Annulée / Booking Cancelled*',
               '',
-              `📋 *Booking #:* ${booking.id}`,
-              `👤 *Parent:* ${booking.client_name}`,
-              `📅 *Date:* ${booking.date}`,
-              `🕐 *Time:* ${booking.start_time} - ${booking.end_time || ''}`,
-              `💰 *Amount:* ${booking.total_price || 0}€`,
-              cancellation_reason ? `📝 *Reason:* ${cancellation_reason}` : '',
-              `👤 *Cancelled by:* ${cancelled_by || 'admin'}`,
-              hasCancellationFee ? '⚠️ *24h fee applies*' : '✅ *No fee (>24h)*',
+              `📋 *Réservation / Booking #:* ${booking.id}`,
+              `👤 *Parent :* ${booking.client_name}`,
+              `📅 *Date :* ${booking.date}`,
+              `🕐 *Heure / Time :* ${booking.start_time} - ${booking.end_time || ''}`,
+              `💰 *Montant / Amount :* ${booking.total_price || 0}€`,
+              cancellation_reason ? `📝 *Raison / Reason :* ${cancellation_reason}` : '',
+              `👤 *Annulé par / Cancelled by :* ${cancelled_by || 'admin'}`,
+              hasCancellationFee ? '⚠️ *Frais 24h appliqués / 24h fee applies*' : '✅ *Pas de frais (>24h) / No fee (>24h)*',
             ].filter(Boolean).join('\n');
 
             await fetch(`https://graph.facebook.com/v18.0/${WA_PHONE_ID_C}/messages`, {
@@ -521,27 +521,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!parentPhoneC.startsWith('+') && !parentPhoneC.match(/^\d{10,}/)) parentPhoneC = '+' + parentPhoneC;
             parentPhoneC = parentPhoneC.replace('+', '');
 
-            const locale = booking.locale || 'en';
-            const waCancelParent = locale === 'fr'
-              ? [
-                  '❌ *Réservation Annulée*',
+            const waCancelParent = [
+                  '❌ *Réservation Annulée / Booking Cancelled*',
                   '',
                   `Bonjour ${booking.client_name},`,
                   `Votre réservation #${booking.id} du ${booking.date} a été annulée.`,
-                  cancellation_reason ? `📝 *Raison:* ${cancellation_reason}` : '',
-                  hasCancellationFee ? '⚠️ Des frais d\'annulation peuvent s\'appliquer (annulation <24h).' : '✅ Aucun frais d\'annulation.',
-                  '',
-                  '💕 Vous pouvez réserver à nouveau sur callanannycare.com',
-                ].filter(Boolean).join('\n')
-              : [
-                  '❌ *Booking Cancelled*',
                   '',
                   `Hi ${booking.client_name},`,
                   `Your booking #${booking.id} on ${booking.date} has been cancelled.`,
-                  cancellation_reason ? `📝 *Reason:* ${cancellation_reason}` : '',
-                  hasCancellationFee ? '⚠️ A cancellation fee may apply (cancelled <24h before service).' : '✅ No cancellation fee applies.',
+                  cancellation_reason ? `📝 *Raison / Reason :* ${cancellation_reason}` : '',
+                  hasCancellationFee ? '⚠️ Des frais d\'annulation peuvent s\'appliquer (annulation <24h). / A cancellation fee may apply (cancelled <24h before service).' : '✅ Aucun frais d\'annulation. / No cancellation fee applies.',
                   '',
-                  '💕 You can rebook anytime at callanannycare.com',
+                  '💕 Vous pouvez réserver à nouveau sur callanannycare.com / You can rebook anytime at callanannycare.com',
                 ].filter(Boolean).join('\n');
 
             await fetch(`https://graph.facebook.com/v18.0/${WA_PHONE_ID_C}/messages`, {
@@ -621,14 +612,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (WA_TOKEN && WA_PHONE_ID && WA_BIZ_NUMBER) {
           try {
             const waBizMsg = [
-              '✅ *Shift Completed*',
+              '✅ *Service Terminé / Shift Completed*',
               '',
-              `📋 *Booking #:* ${result[0].id}`,
-              `👤 *Parent:* ${result[0].client_name}`,
-              `👩‍👧 *Nanny:* ${invoiceNannyName}`,
-              `📅 *Date:* ${result[0].date}`,
-              `⏱ *Hours:* ${hoursWorked}h`,
-              `💰 *Amount:* ${result[0].total_price || 0}€`,
+              `📋 *Réservation / Booking #:* ${result[0].id}`,
+              `👤 *Parent :* ${result[0].client_name}`,
+              `👩‍👧 *Nounou / Nanny :* ${invoiceNannyName}`,
+              `📅 *Date :* ${result[0].date}`,
+              `⏱ *Heures / Hours :* ${hoursWorked}h`,
+              `💰 *Montant / Amount :* ${result[0].total_price || 0}€`,
             ].join('\n');
 
             await fetch(
@@ -689,29 +680,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               if (!reviewPhone.startsWith('+') && !reviewPhone.match(/^\d{10,}/)) reviewPhone = '+' + reviewPhone;
               reviewPhone = reviewPhone.replace('+', '');
 
-              const waReviewMsg = reviewLocale === 'fr'
-                ? [
-                    '⭐ *Votre avis compte !*',
+              const waReviewMsg = [
+                    '⭐ *Votre avis compte ! / Your Feedback Matters!*',
                     '',
                     `Bonjour ${result[0].client_name},`,
                     `Nous espérons que vous avez apprécié le service de *${invoiceNannyName}*.`,
                     '',
-                    `Pourriez-vous prendre un instant pour laisser un avis ?`,
-                    `📝 ${reviewUrl}`,
-                    '',
-                    '_Merci beaucoup !_',
-                    '💕 Call a Nanny',
-                  ].join('\n')
-                : [
-                    '⭐ *Your Feedback Matters!*',
-                    '',
                     `Hi ${result[0].client_name},`,
                     `We hope you enjoyed the service from *${invoiceNannyName}*.`,
                     '',
-                    `Could you take a moment to leave a review?`,
+                    `Pourriez-vous prendre un instant pour laisser un avis ? / Could you take a moment to leave a review?`,
                     `📝 ${reviewUrl}`,
                     '',
-                    '_Thank you!_',
+                    '_Merci beaucoup ! / Thank you!_',
                     '💕 Call a Nanny',
                   ].join('\n');
 
