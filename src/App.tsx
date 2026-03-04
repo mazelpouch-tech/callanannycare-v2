@@ -1,4 +1,5 @@
-import { Routes, Route } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import Layout from './components/Layout'
 import Home from './pages/Home'
 import Nannies from './pages/Nannies'
@@ -41,6 +42,36 @@ import NannyMessages from './pages/nanny/NannyMessages'
 import NannyProfile from './pages/nanny/NannyProfile'
 
 export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Listen for notification click URLs from the service worker (iOS PWA fix)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'NOTIFICATION_CLICK' && event.data.url) {
+        const targetUrl = event.data.url as string;
+        // Only navigate if we're not already on that URL
+        if (location.pathname + location.search !== targetUrl) {
+          navigate(targetUrl);
+        }
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleMessage);
+
+    // On app startup, ask the SW if there's a pending notification URL
+    // (for when iOS opens the PWA to start_url instead of the notification URL)
+    navigator.serviceWorker.ready.then((reg) => {
+      reg.active?.postMessage({ type: 'GET_NOTIFICATION_URL' });
+    });
+
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleMessage);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <Routes>
       {/* Public routes with Navbar + Footer */}

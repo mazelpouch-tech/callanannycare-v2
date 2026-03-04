@@ -59,6 +59,10 @@ registerRoute(
 
 // ─── Push Notification Handlers ──────────────────────────────────
 
+// Store the last notification URL so we can send it to the app via postMessage
+// (iOS PWA doesn't reliably navigate via openWindow/navigate)
+let pendingNotificationUrl: string | null = null;
+
 self.addEventListener('push', (event: PushEvent) => {
   if (!event.data) return;
 
@@ -86,6 +90,10 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
   const url = event.notification.data?.url || '/';
   const fullUrl = new URL(url, self.location.origin).href;
 
+  // Store the URL so the app can retrieve it via postMessage
+  // (iOS PWA doesn't reliably honor openWindow/navigate URLs)
+  pendingNotificationUrl = url;
+
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       // Find any open window from our origin (don't require exact URL match)
@@ -94,6 +102,8 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
       );
 
       if (appClient) {
+        // Send the URL to the app via postMessage as a fallback
+        appClient.postMessage({ type: 'NOTIFICATION_CLICK', url });
         // Navigate the existing window to the booking URL, then focus it
         return (appClient as WindowClient).navigate(fullUrl).then((c) => c?.focus());
       }
@@ -102,4 +112,13 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
       return self.clients.openWindow(fullUrl);
     })
   );
+});
+
+// When the app starts/loads, it can ask the SW for any pending notification URL
+self.addEventListener('message', (event: ExtendableMessageEvent) => {
+  if (event.data?.type === 'GET_NOTIFICATION_URL') {
+    const url = pendingNotificationUrl;
+    pendingNotificationUrl = null; // Clear after reading
+    event.source?.postMessage({ type: 'NOTIFICATION_CLICK', url });
+  }
 });
