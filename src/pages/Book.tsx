@@ -1191,26 +1191,39 @@ function BookingSuccess({ onBookAnother, onGoHome, bookingData }: BookingSuccess
       <h2 className="font-serif text-3xl sm:text-4xl font-bold text-foreground mb-3">
         {t("book.successTitle")}
       </h2>
-      <p className="text-muted-foreground text-lg max-w-md mb-2">
+      <p className="text-muted-foreground text-lg max-w-md mb-6">
         {t("book.successMessage")}
       </p>
-      <p className="text-muted-foreground text-sm max-w-md mb-8">
-        📧 {t("email.confirmationSent")}
-      </p>
 
-      <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
+      {/* WhatsApp urgent callout */}
+      <div className="w-full max-w-md mb-6 bg-green-50 border-2 border-green-400 rounded-2xl p-5 shadow-lg">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0 animate-pulse">
+            <MessageCircle className="w-5 h-5 text-white" />
+          </div>
+          <p className="text-green-800 font-semibold text-left text-sm leading-relaxed">
+            {t("book.whatsappUrgent")}
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => window.open(buildWhatsAppUrl(), "_blank")}
-          className="flex-1 bg-green-500 text-white font-semibold px-5 py-3 rounded-full hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
+          className="w-full bg-green-500 text-white font-bold px-6 py-4 rounded-full hover:bg-green-600 transition-colors flex items-center justify-center gap-2 text-lg shadow-md"
         >
-          <MessageCircle className="w-4 h-4" />
+          <MessageCircle className="w-5 h-5" />
           {t("book.sendWhatsApp")}
         </button>
+      </div>
+
+      <p className="text-muted-foreground text-sm max-w-md mb-6">
+        📧 {t("email.confirmationSent")}
+      </p>
+
+      <div className="w-full max-w-md">
         <button
           type="button"
           onClick={onBookAnother}
-          className="flex-1 gradient-warm text-white font-semibold px-5 py-3 rounded-full hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2"
+          className="w-full gradient-warm text-white font-semibold px-5 py-3 rounded-full hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2"
         >
           <Calendar className="w-4 h-4" />
           {t("book.bookAnother")}
