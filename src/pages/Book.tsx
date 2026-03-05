@@ -1251,18 +1251,30 @@ function BookingSuccess({ onBookAnother, onGoHome, bookingData }: BookingSuccess
 }
 
 const PARENT_STORAGE_KEY = "callanannycare_parent";
+const CHILDREN_STORAGE_KEY = "callanannycare_children";
 
 function loadSavedParent(): BookingDetails {
   try {
     const raw = localStorage.getItem(PARENT_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      // Sync numChildren with saved children array if available
+      let numChildren = parsed.numChildren || "1";
+      try {
+        const childRaw = localStorage.getItem(CHILDREN_STORAGE_KEY);
+        if (childRaw) {
+          const children = JSON.parse(childRaw);
+          if (Array.isArray(children) && children.length > 0 && children[0].childFirstName) {
+            numChildren = String(children.length);
+          }
+        }
+      } catch { /* ignore */ }
       return {
         fullName: parsed.fullName || "",
         email: parsed.email || "",
         phone: parsed.phone || "",
         accommodation: parsed.accommodation || "",
-        numChildren: parsed.numChildren || "1",
+        numChildren,
         notes: "",
       };
     }
@@ -1279,6 +1291,25 @@ function saveParentDetails(details: BookingDetails) {
       accommodation: details.accommodation,
       numChildren: details.numChildren,
     }));
+  } catch { /* ignore */ }
+}
+
+function loadSavedChildren(): ChildInfo[] {
+  try {
+    const raw = localStorage.getItem(CHILDREN_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as ChildInfo[];
+      if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].childFirstName) {
+        return parsed;
+      }
+    }
+  } catch { /* ignore */ }
+  return [{ ...EMPTY_CHILD }];
+}
+
+function saveChildrenInfo(children: ChildInfo[]) {
+  try {
+    localStorage.setItem(CHILDREN_STORAGE_KEY, JSON.stringify(children));
   } catch { /* ignore */ }
 }
 
@@ -1302,8 +1333,8 @@ export default function Book() {
   // Step 2 state — initialize from localStorage
   const [details, setDetails] = useState<BookingDetails>(loadSavedParent);
 
-  // Step 3 state — array of children
-  const [childrenInfo, setChildrenInfo] = useState<ChildInfo[]>([{ ...EMPTY_CHILD }]);
+  // Step 3 state — array of children (initialize from localStorage)
+  const [childrenInfo, setChildrenInfo] = useState<ChildInfo[]>(loadSavedChildren);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [wantUpdates, setWantUpdates] = useState(false);
 
@@ -1487,6 +1518,7 @@ export default function Book() {
 
       setLastBookingData(lastBooking);
       saveParentDetails(details);
+      saveChildrenInfo(childrenInfo);
       setIsSubmitting(false);
       setIsSuccess(true);
     } catch (err) {
@@ -1503,7 +1535,7 @@ export default function Book() {
     setStartTime("");
     setEndTime("");
     setDetails(loadSavedParent());
-    setChildrenInfo([{ ...EMPTY_CHILD }]);
+    setChildrenInfo(loadSavedChildren());
     setAgreeTerms(false);
     setWantUpdates(false);
     setIsSuccess(false);
@@ -1568,7 +1600,7 @@ export default function Book() {
             details={details}
             onChange={setDetails}
             onBack={() => setStep(1)}
-            onNext={() => setStep(3)}
+            onNext={() => { saveParentDetails(details); setStep(3); }}
           />
         )}
 
@@ -1581,7 +1613,7 @@ export default function Book() {
             wantUpdates={wantUpdates}
             onWantUpdatesChange={setWantUpdates}
             onBack={() => setStep(2)}
-            onNext={() => setStep(4)}
+            onNext={() => { saveChildrenInfo(childrenInfo); setStep(4); }}
           />
         )}
 

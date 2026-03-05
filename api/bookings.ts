@@ -233,6 +233,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const effectiveEndTime = end_time || '23h59';
 
       let nanny_id = provided_nanny_id;
+      let unassigned = false;
       if (!nanny_id) {
         // Auto-assign: find conflict-free nanny with fewest bookings
         const available = await sql`
@@ -244,9 +245,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ORDER BY booking_count ASC, n.id ASC
         ` as AvailableNannyRow[];
         if (available.length === 0) {
-          return res.status(400).json({ error: 'No nannies are currently available. Please try again later.' });
-        }
-
+          // No nannies at all — accept booking unassigned
+          nanny_id = null;
+          unassigned = true;
+        } else {
         // Check blocked dates
         const blockedRows = await sql`
           SELECT DISTINCT nanny_id FROM nanny_blocked_dates WHERE date = ANY(${bookingDates})
@@ -278,12 +280,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         if (eligibleCandidates.length === 0) {
-          return res.status(400).json({ error: 'No nannies are currently available for this time slot. Please try a different time.' });
-        }
-
+          // All nannies busy — accept booking unassigned
+          nanny_id = null;
+          unassigned = true;
+        } else {
         // Prefer nanny already at the same hotel (saves transportation)
         const sameHotelMatch = eligibleCandidates.find(c => c.sameHotel);
         nanny_id = sameHotelMatch ? sameHotelMatch.id : eligibleCandidates[0].id;
+        }
+        }
       } else {
         // Manual assign: check for conflicts with the chosen nanny
         const conflicts = await sql`
@@ -362,12 +367,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             tag: `booking-new-${result[0].id}`,
           });
         }
-        await sendPushToAllAdmins({
-          title: 'New Booking',
-          body: pushNannyName ? `${client_name} booked for ${date} — ${pushNannyName}` : `${client_name} booked for ${date}`,
-          url: `/admin/bookings?booking=${result[0].id}`,
-          tag: `admin-booking-new-${result[0].id}`,
-        });
+        if (unassigned) {
+          await sendPushToAllAdmins({
+            title: '🚨 URGENT: No Nanny Assigned!',
+            body: `${client_name} booked for ${date} (${start_time}${end_time ? '-' + end_time : ''}) but NO nanny is available. Please assign one ASAP!`,
+            url: `/admin/bookings?booking=${result[0].id}`,
+            tag: `admin-booking-urgent-${result[0].id}`,
+          });
+        } else {
+          await sendPushToAllAdmins({
+            title: 'New Booking',
+            body: pushNannyName ? `${client_name} booked for ${date} — ${pushNannyName}` : `${client_name} booked for ${date}`,
+            url: `/admin/bookings?booking=${result[0].id}`,
+            tag: `admin-booking-new-${result[0].id}`,
+          });
+        }
       } catch (pushError: unknown) {
         console.error('Push notification failed:', pushError);
       }
@@ -380,21 +394,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (WHATSAPP_TOKEN && WHATSAPP_PHONE_ID && WHATSAPP_BUSINESS_NUMBER) {
         try {
           const siteUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
-          const waMessage = [
-            "🔔 *Nouvelle Réservation Reçue ! / New Booking Received!*",
-            "",
-            `👤 *Client :* ${client_name}`,
-            `📱 *Téléphone / Phone :* ${client_phone || "N/A"}`,
-            `🏨 *Hôtel / Hotel :* ${hotel || "N/A"}`,
-            `📅 *Date :* ${date}`,
-            `🕐 *Heure / Time :* ${start_time}${end_time ? ` - ${end_time}` : ""}`,
-            `👶 *Enfants / Children :* ${children_count || 1}`,
-            `💰 *Total :* ${total_price || 0}€`,
-            "",
-            `📍 *Suivre / Track :* ${siteUrl}/booking/${result[0].id}`,
-            "",
-            "_Envoyé automatiquement par Call a Nanny_",
-          ].join("\n");
+          const waLines = unassigned
+            ? [
+                "🚨 *URGENT — Réservation SANS Nounou ! / Booking WITHOUT Nanny!*",
+                "",
+                "⚠️ Aucune nounou disponible. Veuillez en assigner une au plus vite !",
+                "⚠️ No nanny available. Please assign one ASAP!",
+                "",
+                `👤 *Client :* ${client_name}`,
+                `📱 *Téléphone / Phone :* ${client_phone || "N/A"}`,
+                `🏨 *Hôtel / Hotel :* ${hotel || "N/A"}`,
+                `📅 *Date :* ${date}`,
+                `🕐 *Heure / Time :* ${start_time}${end_time ? ` - ${end_time}` : ""}`,
+                `👶 *Enfants / Children :* ${children_count || 1}`,
+                `💰 *Total :* ${total_price || 0}€`,
+                "",
+                `📍 *Gérer / Manage :* ${siteUrl}/admin/bookings?booking=${result[0].id}`,
+                "",
+                "_Envoyé automatiquement par Call a Nanny_",
+              ]
+            : [
+                "🔔 *Nouvelle Réservation Reçue ! / New Booking Received!*",
+                "",
+                `👤 *Client :* ${client_name}`,
+                `📱 *Téléphone / Phone :* ${client_phone || "N/A"}`,
+                `🏨 *Hôtel / Hotel :* ${hotel || "N/A"}`,
+                `📅 *Date :* ${date}`,
+                `🕐 *Heure / Time :* ${start_time}${end_time ? ` - ${end_time}` : ""}`,
+                `👶 *Enfants / Children :* ${children_count || 1}`,
+                `💰 *Total :* ${total_price || 0}€`,
+                "",
+                `📍 *Suivre / Track :* ${siteUrl}/booking/${result[0].id}`,
+                "",
+                "_Envoyé automatiquement par Call a Nanny_",
+              ];
+          const waMessage = waLines.join("\n");
 
           await fetch(
             `https://graph.facebook.com/v18.0/${WHATSAPP_PHONE_ID}/messages`,
