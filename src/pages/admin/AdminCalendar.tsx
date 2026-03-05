@@ -85,7 +85,7 @@ export default function AdminCalendar() {
   }, [selectedDate, bookingsByDate]);
 
   const whatsAppParent = (phone: string, name: string, date: string) => {
-    const text = encodeURIComponent(`Hi ${name}, this is call a nanny regarding your booking on ${date} — `);
+    const text = encodeURIComponent(`Bonjour ${name}, c'est Call a Nanny concernant votre réservation du ${date} —\n\nHi ${name}, this is Call a Nanny regarding your booking on ${date} — `);
     window.open(`https://wa.me/${phone?.replace(/\D/g, "")}?text=${text}`, "_blank");
   };
 

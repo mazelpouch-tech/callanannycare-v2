@@ -670,23 +670,23 @@ export default function AdminBookings() {
     return [
       {
         emoji: "✅", label: "Confirmation",
-        message: `Hi ${b.clientName}! Your booking with Call a Nanny is confirmed ✅\n📅 Date: ${b.date}\n🕐 Time: ${time}\n📍 ${loc}\n👶 Nanny: ${b.nannyName || "TBA"}\nSee you soon! 🤗`,
+        message: `Bonjour ${b.clientName} ! Votre réservation avec Call a Nanny est confirmée ✅\n📅 Date : ${b.date}\n🕐 Heure : ${time}\n📍 ${loc}\n👶 Nounou : ${b.nannyName || "À confirmer"}\nÀ bientôt ! 🤗\n\nHi ${b.clientName}! Your booking with Call a Nanny is confirmed ✅\n📅 Date: ${b.date}\n🕐 Time: ${time}\n📍 ${loc}\n👶 Nanny: ${b.nannyName || "TBA"}\nSee you soon! 🤗`,
       },
       {
         emoji: "🔔", label: "Reminder",
-        message: `Hi ${b.clientName}! Just a reminder that your nanny booking is tomorrow 🗓️\n📅 ${b.date} · ${time}\n👶 ${b.nannyName || "your nanny"} will be at ${loc}\nSee you then!`,
+        message: `Bonjour ${b.clientName} ! Petit rappel : votre réservation nounou est demain 🗓️\n📅 ${b.date} · ${time}\n👶 ${b.nannyName || "votre nounou"} sera à ${loc}\nÀ demain !\n\nHi ${b.clientName}! Just a reminder that your nanny booking is tomorrow 🗓️\n📅 ${b.date} · ${time}\n👶 ${b.nannyName || "your nanny"} will be at ${loc}\nSee you then!`,
       },
       {
         emoji: "💰", label: "Payment Due",
-        message: `Hi ${b.clientName}! Your session on ${b.date} (${time}) is now complete 🎉\n💶 Amount due: ${price}\nPlease arrange payment at your earliest convenience. Thank you! 🙏`,
+        message: `Bonjour ${b.clientName} ! Votre séance du ${b.date} (${time}) est terminée 🎉\n💶 Montant dû : ${price}\nMerci de procéder au paiement dès que possible. Merci ! 🙏\n\nHi ${b.clientName}! Your session on ${b.date} (${time}) is now complete 🎉\n💶 Amount due: ${price}\nPlease arrange payment at your earliest convenience. Thank you! 🙏`,
       },
       {
         emoji: "🕐", label: "Running Late",
-        message: `Hi ${b.clientName}! We wanted to let you know that ${b.nannyName || "your nanny"} is running a few minutes late today. She will arrive shortly — sorry for the wait! 🙏`,
+        message: `Bonjour ${b.clientName} ! Nous voulions vous informer que ${b.nannyName || "votre nounou"} a quelques minutes de retard. Elle arrive bientôt — désolés pour l'attente ! 🙏\n\nHi ${b.clientName}! We wanted to let you know that ${b.nannyName || "your nanny"} is running a few minutes late today. She will arrive shortly — sorry for the wait! 🙏`,
       },
       {
         emoji: "❌", label: "Cancellation",
-        message: `Hi ${b.clientName}, unfortunately your booking on ${b.date} (${time}) has been cancelled. We're sorry for the inconvenience — please contact us to reschedule. 🙏`,
+        message: `Bonjour ${b.clientName}, malheureusement votre réservation du ${b.date} (${time}) a été annulée. Nous sommes désolés — veuillez nous contacter pour reprogrammer. 🙏\n\nHi ${b.clientName}, unfortunately your booking on ${b.date} (${time}) has been cancelled. We're sorry for the inconvenience — please contact us to reschedule. 🙏`,
       },
     ];
   };
@@ -702,19 +702,19 @@ export default function AdminBookings() {
       templates: [
         {
           emoji: "📋", label: "New Assignment",
-          message: `Hi ${nannyName}! You have a new booking 🎉\n📅 Date: ${b.date}\n🕐 Time: ${time}\n📍 ${loc}\n👤 Client: ${b.clientName}\n👶 Children: ${b.numChildren || 1}\nPlease confirm your availability ✅`,
+          message: `Bonjour ${nannyName} ! Vous avez une nouvelle réservation 🎉\n📅 Date : ${b.date}\n🕐 Heure : ${time}\n📍 ${loc}\n👤 Client : ${b.clientName}\n👶 Enfants : ${b.numChildren || 1}\nMerci de confirmer votre disponibilité ✅\n\nHi ${nannyName}! You have a new booking 🎉\n📅 Date: ${b.date}\n🕐 Time: ${time}\n📍 ${loc}\n👤 Client: ${b.clientName}\n👶 Children: ${b.numChildren || 1}\nPlease confirm your availability ✅`,
         },
         {
           emoji: "🔔", label: "Tomorrow Reminder",
-          message: `Hi ${nannyName}! Just a reminder — you have a booking tomorrow 📅\n📅 ${b.date} · ${time}\n📍 ${loc}\n👤 ${b.clientName}\nDon't forget! See you there 💪`,
+          message: `Bonjour ${nannyName} ! Petit rappel — vous avez une réservation demain 📅\n📅 ${b.date} · ${time}\n📍 ${loc}\n👤 ${b.clientName}\nN'oubliez pas ! À demain 💪\n\nHi ${nannyName}! Just a reminder — you have a booking tomorrow 📅\n📅 ${b.date} · ${time}\n📍 ${loc}\n👤 ${b.clientName}\nDon't forget! See you there 💪`,
         },
         {
           emoji: "✅", label: "Booking Confirmed",
-          message: `Hi ${nannyName}! Your booking for ${b.date} (${time}) with ${b.clientName} at ${loc} is officially confirmed ✅. Thank you!`,
+          message: `Bonjour ${nannyName} ! Votre réservation du ${b.date} (${time}) avec ${b.clientName} à ${loc} est officiellement confirmée ✅. Merci !\n\nHi ${nannyName}! Your booking for ${b.date} (${time}) with ${b.clientName} at ${loc} is officially confirmed ✅. Thank you!`,
         },
         {
           emoji: "💰", label: "Payout Ready",
-          message: `Hi ${nannyName}! Your payout for the session on ${b.date} (${time}) has been processed. Please check your payment details. Thank you! 🙏`,
+          message: `Bonjour ${nannyName} ! Votre paiement pour la séance du ${b.date} (${time}) a été traité. Veuillez vérifier vos détails de paiement. Merci ! 🙏\n\nHi ${nannyName}! Your payout for the session on ${b.date} (${time}) has been processed. Please check your payment details. Thank you! 🙏`,
         },
       ],
     };
@@ -1124,19 +1124,23 @@ export default function AdminBookings() {
     if (!phone) { alert("No phone number found for this client."); return; }
     const activeBookings = clientHistoryBookings.filter((b) => b.status !== "cancelled");
     const lines = [
+      `📋 *Récapitulatif des Réservations — Call a Nanny*`,
       `📋 *Booking Summary — Call a Nanny*`,
+      ``,
+      `Bonjour ${clientHistory},`,
+      `Voici un récapitulatif de vos réservations :`,
       ``,
       `Hello ${clientHistory},`,
       `Here is a summary of your bookings:`,
       ``,
       ...activeBookings.map((b) =>
-        `📅 ${b.date}${b.endDate && b.endDate !== b.date ? ` → ${b.endDate}` : ""} — ${b.startTime || ""}${b.endTime ? `–${b.endTime}` : ""}\n👶 ${b.nannyName || "Nanny TBD"} · ${b.hotel || ""}\n💰 ${b.totalPrice || 0}€ (${b.status})`
+        `📅 ${b.date}${b.endDate && b.endDate !== b.date ? ` → ${b.endDate}` : ""} — ${b.startTime || ""}${b.endTime ? `–${b.endTime}` : ""}\n👶 ${b.nannyName || "Nounou à confirmer / Nanny TBD"} · ${b.hotel || ""}\n💰 ${b.totalPrice || 0}€ (${b.status})`
       ),
       ``,
       `─────────────────`,
-      `💰 *Total: ${clientHistoryStats.activeTotal}€*`,
+      `💰 *Total : ${clientHistoryStats.activeTotal}€*`,
       ``,
-      `Thank you for choosing us!`,
+      `Merci de votre confiance ! / Thank you for choosing us!`,
       `💕 Call a Nanny — Marrakech`,
     ];
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(lines.join("\n"))}`;

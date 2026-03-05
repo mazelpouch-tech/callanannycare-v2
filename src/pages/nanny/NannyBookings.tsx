@@ -290,7 +290,7 @@ export default function NannyBookings() {
 
   const openWhatsApp = (phone: string, clientName: string, date: string) => {
     const text = encodeURIComponent(
-      `Hi ${clientName}, this is your nanny from call a nanny regarding your booking on ${date}. `
+      `Bonjour ${clientName}, c'est votre nounou de Call a Nanny concernant votre réservation du ${date}.\n\nHi ${clientName}, this is your nanny from Call a Nanny regarding your booking on ${date}. `
     );
     const num = phone?.replace(/\D/g, "");
     window.open(`https://wa.me/${num}?text=${text}`, "_blank");
