@@ -48,7 +48,7 @@ import ExtendBookingModal from "../../components/ExtendBookingModal";
 import type { DaySchedule } from "../../components/ExtendBookingModal";
 import ForwardBookingModal from "../../components/ForwardBookingModal";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
-import { calcBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE, isTomorrow as isTomorrowDate, timesOverlap } from "@/utils/shiftHelpers";
+import { calcBookedHours, calcTotalBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE, isTomorrow as isTomorrowDate, timesOverlap } from "@/utils/shiftHelpers";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 
 interface EditBookingForm {
@@ -1040,9 +1040,13 @@ export default function AdminBookings() {
   const clientHistoryStats = useMemo(() => {
     const activeBookings = clientHistoryBookings.filter((b) => b.status !== "cancelled");
     const activeTotal = activeBookings.reduce((s, b) => s + (b.totalPrice || 0), 0);
+    const totalHours = activeBookings.reduce((s, b) => {
+      if (!b.startTime || !b.endTime) return s;
+      return s + calcTotalBookedHours(b.startTime, b.endTime, b.extraTimes, b.date, b.endDate);
+    }, 0);
     const confirmed = clientHistoryBookings.filter((b) => b.status === "confirmed" || b.status === "completed").length;
     const lastBooking = clientHistoryBookings[0];
-    return { activeTotal, confirmed, count: clientHistoryBookings.length, lastBooking };
+    return { activeTotal, confirmed, count: clientHistoryBookings.length, lastBooking, totalHours };
   }, [clientHistoryBookings]);
 
   const handlePrintClientFile = () => {
@@ -3761,13 +3765,14 @@ export default function AdminBookings() {
             </div>
 
             {/* Stats bar */}
-            <div className="grid grid-cols-3 divide-x divide-border border-b border-border">
+            <div className="grid grid-cols-4 divide-x divide-border border-b border-border">
               {[
                 { label: "Total bookings", value: clientHistoryStats.count },
                 { label: "Confirmed", value: clientHistoryStats.confirmed },
+                { label: "Total hours", value: `${Math.round(clientHistoryStats.totalHours * 10) / 10}h` },
                 { label: "Total (active)", value: `${clientHistoryStats.activeTotal}€` },
               ].map((s) => (
-                <div key={s.label} className="px-4 py-3 text-center">
+                <div key={s.label} className="px-3 py-3 text-center">
                   <p className="text-lg font-bold text-foreground">{s.value}</p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">{s.label}</p>
                 </div>
