@@ -4,6 +4,7 @@ import {
   AlertCircle, CheckCircle, Loader2, Eye, EyeOff, Clock,
   LogIn, Copy, Search, X, ShieldCheck, Crown, Pencil
 } from "lucide-react";
+import { format } from "date-fns";
 import { useData } from "../../context/DataContext";
 import type { AdminUser, AdminRole } from "@/types";
 
@@ -191,13 +192,7 @@ export default function AdminUsers() {
 
   const formatDate = (d: string | null | undefined) => {
     if (!d) return "Never";
-    return new Date(d).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return format(new Date(d), "EEEE do MMMM, HH:mm");
   };
 
   if (loading) {

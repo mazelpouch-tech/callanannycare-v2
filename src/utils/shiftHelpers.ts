@@ -1,4 +1,5 @@
 import type { Booking, BookingStatus } from '../types';
+import { format } from 'date-fns';
 
 export const HOURLY_RATE = 31.25; // DH/hr
 
@@ -197,7 +198,7 @@ export function calcActualHoursWorked(clockIn: string, clockOut: string): number
 export function formatDate(dateStr: string): string {
   if (!dateStr) return '';
   const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  return format(d, 'EEEE do MMMM');
 }
 
 export function formatTime(timeStr: string): string {

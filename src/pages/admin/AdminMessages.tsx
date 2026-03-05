@@ -97,7 +97,7 @@ export default function AdminMessages() {
       if (diffMin < 60) return `${diffMin}m`;
       const diffHr = Math.floor(diffMin / 60);
       if (diffHr < 24) return `${diffHr}h`;
-      return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
     } catch {
       return "";
     }

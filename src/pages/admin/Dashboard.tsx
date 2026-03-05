@@ -130,7 +130,7 @@ export default function Dashboard() {
             Here is your business overview.
           </p>
         </div>
-        <p className="text-xs text-muted-foreground">{format(new Date(), "EEEE, MMMM d, yyyy")}</p>
+        <p className="text-xs text-muted-foreground">{format(new Date(), "EEEE do MMMM")}</p>
       </div>
 
       {/* ── Stat Cards ── */}
