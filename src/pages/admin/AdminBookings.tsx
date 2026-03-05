@@ -295,6 +295,7 @@ export default function AdminBookings() {
   const [showEditBooking, setShowEditBooking] = useState(false);
   const [editBookingLoading, setEditBookingLoading] = useState(false);
   const [editBookingData, setEditBookingData] = useState<EditBookingForm | null>(null);
+  const [editExtraTimeBlocks, setEditExtraTimeBlocks] = useState<Array<{ startTime: string; endTime: string }>>([]);
 
   // Extend Booking Modal
   const [extendBooking, setExtendBooking] = useState<Booking | null>(null);
@@ -372,6 +373,14 @@ export default function AdminBookings() {
       notes: booking.notes || "",
       status: booking.status || "pending",
     });
+    setEditExtraTimeBlocks(
+      booking.extraTimes
+        ? booking.extraTimes.map((et) => ({
+            startTime: timeToSlotValue(et.startTime),
+            endTime: timeToSlotValue(et.endTime),
+          }))
+        : []
+    );
     setShowEditBooking(true);
   };
 
@@ -392,8 +401,18 @@ export default function AdminBookings() {
     const [eh, em] = editBookingData.endTime.split(":").map(Number);
     const startH = sh + sm / 60;
     const endH = eh + em / 60;
-    return endH > startH ? endH - startH : (24 - startH) + endH;
-  }, [editBookingData]);
+    let hours = endH > startH ? endH - startH : (24 - startH) + endH;
+    // Add extra time blocks
+    for (const block of editExtraTimeBlocks) {
+      if (!block.startTime || !block.endTime) continue;
+      const [bs, bsm] = block.startTime.split(":").map(Number);
+      const [be, bem] = block.endTime.split(":").map(Number);
+      const bStart = bs + bsm / 60;
+      const bEnd = be + bem / 60;
+      hours += bEnd > bStart ? bEnd - bStart : (24 - bStart) + bEnd;
+    }
+    return hours;
+  }, [editBookingData, editExtraTimeBlocks]);
 
   const editBookingDays = useMemo(() => {
     if (!editBookingData?.date) return 1;
@@ -410,10 +429,20 @@ export default function AdminBookings() {
     const [sh] = (editBookingData?.startTime || "").split(":").map(Number);
     const [eh, em] = (editBookingData?.endTime || "").split(":").map(Number);
     const isOvernight = (eh + em / 60) <= (sh + 0);
-    const isEvening = isOvernight || sh >= 19 || sh < 7 || eh > 19 || (eh === 19 && em > 0);
+    let isEvening = isOvernight || sh >= 19 || sh < 7 || eh > 19 || (eh === 19 && em > 0);
+    // Check extra time blocks for evening hours too
+    if (!isEvening) {
+      for (const block of editExtraTimeBlocks) {
+        if (!block.startTime || !block.endTime) continue;
+        const [bs] = block.startTime.split(":").map(Number);
+        const [be, bem] = block.endTime.split(":").map(Number);
+        const blockOvernight = (be + bem / 60) <= bs;
+        if (blockOvernight || bs >= 19 || bs < 7 || be > 19 || (be === 19 && bem > 0)) { isEvening = true; break; }
+      }
+    }
     const taxiFee = isEvening ? 10 * editBookingDays : 0;
     return hourlyTotal + taxiFee;
-  }, [editSelectedNanny, editBookingHours, editBookingDays, editBookingData]);
+  }, [editSelectedNanny, editBookingHours, editBookingDays, editBookingData, editExtraTimeBlocks]);
 
   const editConflicts = useMemo(() => {
     if (!editBookingData?.nannyId || !editBookingData?.date) return [];
@@ -437,6 +466,13 @@ export default function AdminBookings() {
     const startLabel = TIME_SLOTS.find((s) => s.value === editBookingData.startTime)?.label || editBookingData.startTime;
     const endLabel = TIME_SLOTS.find((s) => s.value === editBookingData.endTime)?.label || editBookingData.endTime;
 
+    const extraTimesForApi = editExtraTimeBlocks.length > 0
+      ? editExtraTimeBlocks.filter(b => b.startTime && b.endTime).map(b => ({
+          startTime: TIME_SLOTS.find(s => s.value === b.startTime)?.label || b.startTime,
+          endTime: TIME_SLOTS.find(s => s.value === b.endTime)?.label || b.endTime,
+        }))
+      : null;
+
     await updateBooking(editBookingData.id, {
       nannyId: Number(editBookingData.nannyId),
       nannyName: editSelectedNanny?.name || "",
@@ -454,11 +490,13 @@ export default function AdminBookings() {
       notes: editBookingData.notes,
       totalPrice: editBookingPrice,
       status: editBookingData.status as BookingStatus,
+      extraTimes: extraTimesForApi,
     });
 
     setEditBookingLoading(false);
     setShowEditBooking(false);
     setEditBookingData(null);
+    setEditExtraTimeBlocks([]);
   };
 
   const availableNannies = useMemo(
@@ -3134,7 +3172,7 @@ export default function AdminBookings() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-serif text-lg font-bold text-foreground">Edit Booking</h2>
               <button
-                onClick={() => { setShowEditBooking(false); setEditBookingData(null); }}
+                onClick={() => { setShowEditBooking(false); setEditBookingData(null); setEditExtraTimeBlocks([]); }}
                 className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"
               >
                 <X className="w-5 h-5" />
@@ -3289,6 +3327,65 @@ export default function AdminBookings() {
                 </div>
               </div>
 
+              {/* Extra Time Blocks */}
+              {editBookingData.startTime && editBookingData.endTime && (
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground mb-1.5">
+                    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                    Extra time blocks <span className="text-xs text-muted-foreground font-normal">(morning + evening)</span>
+                  </label>
+                  {editExtraTimeBlocks.map((block, i) => (
+                    <div key={i} className="flex items-center gap-2 mb-2">
+                      <select
+                        value={block.startTime}
+                        onChange={(e) => {
+                          const updated = [...editExtraTimeBlocks];
+                          updated[i] = { ...updated[i], startTime: e.target.value };
+                          setEditExtraTimeBlocks(updated);
+                        }}
+                        className="flex-1 px-3 py-2 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                      >
+                        <option value="">Start</option>
+                        {TIME_SLOTS.map((slot) => (
+                          <option key={`eeb-s-${i}-${slot.value}`} value={slot.value}>{slot.label}</option>
+                        ))}
+                      </select>
+                      <span className="text-muted-foreground text-xs">to</span>
+                      <select
+                        value={block.endTime}
+                        onChange={(e) => {
+                          const updated = [...editExtraTimeBlocks];
+                          updated[i] = { ...updated[i], endTime: e.target.value };
+                          setEditExtraTimeBlocks(updated);
+                        }}
+                        className="flex-1 px-3 py-2 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                      >
+                        <option value="">End</option>
+                        {TIME_SLOTS.map((slot) => (
+                          <option key={`eeb-e-${i}-${slot.value}`} value={slot.value}>{slot.label}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setEditExtraTimeBlocks(editExtraTimeBlocks.filter((_, idx) => idx !== i))}
+                        className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors"
+                        title="Remove this time block"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setEditExtraTimeBlocks([...editExtraTimeBlocks, { startTime: "", endTime: "" }])}
+                    className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-medium mt-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add time block (e.g. evening)
+                  </button>
+                </div>
+              )}
+
               {/* Children & Status */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
@@ -3371,7 +3468,10 @@ export default function AdminBookings() {
                   <div className="text-sm text-muted-foreground">
                     <span className="font-medium text-foreground">{editSelectedNanny.name}</span>
                     <span className="mx-1.5">·</span>
-                    {editSelectedNanny.rate}€/hr × {editBookingHours} hrs
+                    {editSelectedNanny.rate}€/hr × {Math.round(editBookingHours * 10) / 10} hrs
+                    {editExtraTimeBlocks.filter(b => b.startTime && b.endTime).length > 0 && (
+                      <span className="text-xs"> (incl. {editExtraTimeBlocks.filter(b => b.startTime && b.endTime).length} extra block{editExtraTimeBlocks.filter(b => b.startTime && b.endTime).length > 1 ? "s" : ""})</span>
+                    )}
                   </div>
                   <div className="text-right">
                     <div className="text-lg font-bold text-foreground">{editBookingPrice.toLocaleString()}€</div>
@@ -3384,7 +3484,7 @@ export default function AdminBookings() {
               <div className="flex items-center gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => { setShowEditBooking(false); setEditBookingData(null); }}
+                  onClick={() => { setShowEditBooking(false); setEditBookingData(null); setEditExtraTimeBlocks([]); }}
                   className="flex-1 px-4 py-3 border border-border rounded-xl text-sm font-medium text-foreground hover:bg-muted transition-colors"
                 >
                   Cancel
