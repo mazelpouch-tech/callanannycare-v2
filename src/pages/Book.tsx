@@ -113,6 +113,7 @@ interface StepReviewProps {
   onEdit: (step: number) => void;
   onConfirm: () => void;
   isSubmitting: boolean;
+  bookingError: string | null;
 }
 
 interface LastBookingData extends BookingDetails {
@@ -951,6 +952,7 @@ function StepReview({
   onEdit,
   onConfirm,
   isSubmitting,
+  bookingError,
 }: StepReviewProps) {
   const { t, locale } = useLanguage();
   const dateFnsLocale = locale === "fr" ? fr : undefined;
@@ -1123,26 +1125,33 @@ function StepReview({
         </div>
 
         {/* Total */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">
-              {RATE}€ &times; {hours} {t("book.hrs")} &times; {dateCount} {t("book.dateUnit")}
-              {" = "}{RATE * hours * dateCount}€
-            </p>
-            {isEveningBooking && (
-              <p className="text-sm text-amber-600 font-medium mt-1">
-                🚕 {t("book.taxiFee")}: +{taxiFeeTotal}€ ({t("book.taxiFeeNote")})
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">
+                {RATE}€ &times; {hours} {t("book.hrs")} &times; {dateCount} {t("book.dateUnit")}
+                {" = "}{RATE * hours * dateCount}€
               </p>
-            )}
-            <p className="text-2xl font-bold text-foreground mt-1">
+              {isEveningBooking && (
+                <p className="text-sm text-amber-600 font-medium mt-1">
+                  🚕 {t("book.taxiFee")}: +{taxiFeeTotal}€ ({t("book.taxiFeeNote")})
+                </p>
+              )}
+            </div>
+            <p className="text-2xl font-bold text-foreground">
               {totalPrice}€
             </p>
           </div>
+          {bookingError && (
+            <p className="text-red-600 text-sm font-medium bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+              {bookingError}
+            </p>
+          )}
           <button
             type="button"
             onClick={onConfirm}
             disabled={isSubmitting}
-            className="gradient-warm text-white font-bold px-8 py-3.5 rounded-full hover:opacity-90 transition-opacity shadow-warm text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="w-full gradient-warm text-white font-bold px-8 py-4 rounded-full hover:opacity-90 transition-opacity shadow-warm text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isSubmitting ? (
               <span className="animate-pulse">{t("common.submitting")}</span>
@@ -1281,6 +1290,7 @@ export default function Book() {
 
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
 
   // Step 1 state
@@ -1346,6 +1356,7 @@ export default function Book() {
   const handleConfirm = async () => {
     if (selectedDates.length === 0) return;
 
+    setBookingError(null);
     setIsSubmitting(true);
 
     const startLabel = TIME_SLOTS.find((s) => s.value === startTime)?.label || startTime;
@@ -1480,6 +1491,8 @@ export default function Book() {
       setIsSuccess(true);
     } catch (err) {
       console.error("Booking failed:", err);
+      const msg = err instanceof Error ? err.message : "Booking failed. Please try again.";
+      setBookingError(msg);
       setIsSubmitting(false);
     }
   };
@@ -1587,6 +1600,7 @@ export default function Book() {
             onEdit={(s: number) => setStep(s)}
             onConfirm={handleConfirm}
             isSubmitting={isSubmitting}
+            bookingError={bookingError}
           />
         )}
       </div>
