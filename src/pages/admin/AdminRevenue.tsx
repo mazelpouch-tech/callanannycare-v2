@@ -375,7 +375,7 @@ export default function AdminRevenue() {
                   <div className="text-xs text-green-700 bg-green-100 rounded-lg px-2 py-1">
                     Collected {(() => {
                       try {
-                        return parseISO(b.collectedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                        return format(parseISO(b.collectedAt), "EEEE do MMMM");
                       } catch { return b.collectedAt; }
                     })()}
                     {b.collectedBy ? ` by ${b.collectedBy}` : ""}

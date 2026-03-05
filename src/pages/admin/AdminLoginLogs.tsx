@@ -3,6 +3,7 @@ import {
   Search, ChevronLeft, ChevronRight, Shield, User,
   CheckCircle, XCircle, Key, RotateCcw, Loader2,
 } from "lucide-react";
+import { format } from "date-fns";
 import type { LoginLog } from "@/types";
 
 const ACTION_BADGES: Record<string, { label: string; color: string; icon: typeof CheckCircle }> = {
@@ -63,13 +64,7 @@ export default function AdminLoginLogs() {
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
-    return d.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return format(d, "EEEE do MMMM, HH:mm");
   };
 
   return (

@@ -949,7 +949,7 @@ export default function AdminBookings() {
 
   const formatDate = (dateStr: string) => {
     try {
-      return format(parseISO(dateStr), "MMM dd, yyyy");
+      return format(parseISO(dateStr), "EEEE do MMMM");
     } catch {
       return dateStr || "N/A";
     }
@@ -1543,8 +1543,8 @@ export default function AdminBookings() {
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </button>
               <span className="text-sm font-semibold text-foreground">
-                {format(calWeekStart, "d MMM")} —{" "}
-                {format(addDays(calWeekStart, calDayCount - 1), "d MMM yyyy")}
+                {format(calWeekStart, "do MMM")} —{" "}
+                {format(addDays(calWeekStart, calDayCount - 1), "do MMM")}
               </span>
             </div>
             <button
@@ -2071,7 +2071,7 @@ export default function AdminBookings() {
                                               {ev.detail && <span className="text-[10px] text-muted-foreground ml-1.5">{ev.detail}</span>}
                                             </div>
                                             <span className="text-[10px] text-muted-foreground/60 shrink-0 whitespace-nowrap">
-                                              {(() => { try { return format(new Date(ev.time), "dd MMM, HH:mm"); } catch { return ""; } })()}
+                                              {(() => { try { return format(new Date(ev.time), "do MMM, HH:mm"); } catch { return ""; } })()}
                                             </span>
                                           </div>
                                         </div>
@@ -2423,7 +2423,7 @@ export default function AdminBookings() {
                               <div className="flex flex-wrap gap-1">
                                 {events.map((ev, i) => (
                                   <span key={i} className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
-                                    {ev.label}{ev.detail ? ` · ${ev.detail}` : ""} <span className="opacity-50">{(() => { try { return format(new Date(ev.time), "dd/MM HH:mm"); } catch { return ""; } })()}</span>
+                                    {ev.label}{ev.detail ? ` · ${ev.detail}` : ""} <span className="opacity-50">{(() => { try { return format(new Date(ev.time), "do MMM HH:mm"); } catch { return ""; } })()}</span>
                                   </span>
                                 ))}
                               </div>
@@ -2906,7 +2906,7 @@ export default function AdminBookings() {
                       return (
                         <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${override ? "border-primary/40 bg-primary/5" : "border-border bg-muted/20"}`}>
                           <span className="text-xs font-medium text-foreground w-24 shrink-0">
-                            {format(d, "EEE, MMM d")}
+                            {format(d, "EEE do MMM")}
                           </span>
                           {isEditing ? (
                             <>

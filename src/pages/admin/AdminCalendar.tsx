@@ -202,7 +202,7 @@ export default function AdminCalendar() {
           <div className="bg-card rounded-xl border border-border shadow-soft">
             <div className="p-4 border-b border-border">
               <h3 className="font-semibold text-foreground">
-                {format(selectedDate, "EEEE, MMM d")}
+                {format(selectedDate, "EEEE do MMMM")}
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {selectedBookings.length} booking{selectedBookings.length !== 1 ? "s" : ""}

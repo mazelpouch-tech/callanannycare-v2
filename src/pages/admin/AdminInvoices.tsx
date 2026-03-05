@@ -41,7 +41,7 @@ function formatClockTime(iso: string | null): string {
 }
 
 function fmtDate(dateStr: string): string {
-  try { return format(parseISO(dateStr), "MMM dd, yyyy"); } catch { return dateStr || "N/A"; }
+  try { return format(parseISO(dateStr), "EEEE do MMMM"); } catch { return dateStr || "N/A"; }
 }
 
 // ─── Default Form ───────────────────────────────────────────
