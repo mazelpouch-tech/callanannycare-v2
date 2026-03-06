@@ -45,6 +45,7 @@ import {
   calcNannyPayBreakdown,
   estimateNannyPayBreakdown,
   calcBookedHours,
+  calcActualHoursWorked,
   HOURLY_RATE,
   getFridayPeriod,
   isDateInRange,
@@ -135,13 +136,13 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
     );
     if (completedBookings.length === 0) return [];
 
-    const nannyMap: Record<number, { nannyId: number; name: string; shifts: number; totalHours: number; basePay: number; taxiFee: number; totalPay: number }> = {};
+    const nannyMap: Record<number, { nannyId: number; name: string; shifts: number; totalHours: number; actualHours: number; clockedShifts: number; basePay: number; taxiFee: number; totalPay: number }> = {};
     completedBookings.forEach((b) => {
       const nannyId = b.nannyId;
       if (nannyId == null) return;
       const nannyName = b.nannyName || "Unknown";
       if (!nannyMap[nannyId]) {
-        nannyMap[nannyId] = { nannyId, name: nannyName, shifts: 0, totalHours: 0, basePay: 0, taxiFee: 0, totalPay: 0 };
+        nannyMap[nannyId] = { nannyId, name: nannyName, shifts: 0, totalHours: 0, actualHours: 0, clockedShifts: 0, basePay: 0, taxiFee: 0, totalPay: 0 };
       }
       const hours = calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
       const bd = estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate);
@@ -151,14 +152,22 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
       nannyMap[nannyId].basePay += bd.basePay;
       nannyMap[nannyId].taxiFee += bd.taxiFee;
       nannyMap[nannyId].totalPay += bd.total;
+
+      // Track actual clock in/out hours for comparison
+      if (b.clockIn && b.clockOut) {
+        nannyMap[nannyId].actualHours += calcActualHoursWorked(b.clockIn, b.clockOut);
+        nannyMap[nannyId].clockedShifts += 1;
+      }
     });
 
     return Object.values(nannyMap)
-      .map((n) => ({ ...n, totalHours: Math.round(n.totalHours * 10) / 10 }))
+      .map((n) => ({ ...n, totalHours: Math.round(n.totalHours * 10) / 10, actualHours: Math.round(n.actualHours * 10) / 10 }))
       .sort((a, b) => b.totalHours - a.totalHours);
   }, [bookings, periodStart, periodEnd]);
 
   const totalAllHours = nannyHours.reduce((s, n) => s + n.totalHours, 0);
+  const totalAllActual = nannyHours.reduce((s, n) => s + n.actualHours, 0);
+  const totalAllClocked = nannyHours.reduce((s, n) => s + n.clockedShifts, 0);
   const totalAllBasePay = nannyHours.reduce((s, n) => s + n.basePay, 0);
   const totalAllTaxi = nannyHours.reduce((s, n) => s + n.taxiFee, 0);
   const totalAllPay = nannyHours.reduce((s, n) => s + n.totalPay, 0);
@@ -405,8 +414,9 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                   <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-8"></th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nanny</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Shifts</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hours</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Avg/Shift</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Booked</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actual</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Diff</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hourly Pay</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Taxi Fee</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Pay</th>
@@ -436,7 +446,16 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                       <td className="px-4 py-3 text-sm text-muted-foreground">{nanny.shifts}</td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{nanny.totalHours}h</td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {(nanny.totalHours / nanny.shifts).toFixed(1)}h
+                        {nanny.clockedShifts > 0 ? `${nanny.actualHours}h` : <span className="text-muted-foreground/50">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {nanny.clockedShifts > 0 ? (() => {
+                          const diff = Math.round((nanny.actualHours - nanny.totalHours) * 10) / 10;
+                          if (Math.abs(diff) < 0.2) return <span className="text-green-600">0h</span>;
+                          return diff > 0
+                            ? <span className="text-red-600 font-medium">+{diff}h</span>
+                            : <span className="text-blue-600 font-medium">{diff}h</span>;
+                        })() : <span className="text-muted-foreground/50">—</span>}
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground text-right">
                         {nanny.basePay.toLocaleString()} DH
@@ -473,7 +492,16 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                   <td className="px-4 py-3 text-sm font-bold text-foreground">{totalAllShifts}</td>
                   <td className="px-4 py-3 text-sm font-bold text-foreground">{totalAllHours.toFixed(1)}h</td>
                   <td className="px-4 py-3 text-sm font-bold text-foreground">
-                    {totalAllShifts > 0 ? (totalAllHours / totalAllShifts).toFixed(1) : 0}h
+                    {totalAllClocked > 0 ? `${Math.round(totalAllActual * 10) / 10}h` : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-bold">
+                    {totalAllClocked > 0 ? (() => {
+                      const diff = Math.round((totalAllActual - totalAllHours) * 10) / 10;
+                      if (Math.abs(diff) < 0.2) return <span className="text-green-600">0h</span>;
+                      return diff > 0
+                        ? <span className="text-red-600">+{diff}h</span>
+                        : <span className="text-blue-600">{diff}h</span>;
+                    })() : "—"}
                   </td>
                   <td className="px-4 py-3 text-sm font-bold text-foreground text-right">{totalAllBasePay.toLocaleString()} DH</td>
                   <td className="px-4 py-3 text-sm font-bold text-orange-600 text-right">
@@ -517,8 +545,17 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground pl-6">
                     <span>{nanny.shifts} shifts</span>
-                    <span>{nanny.totalHours}h total</span>
-                    <span>{(nanny.totalHours / nanny.shifts).toFixed(1)}h avg</span>
+                    <span>Booked: {nanny.totalHours}h</span>
+                    {nanny.clockedShifts > 0 && (
+                      <span>Actual: {nanny.actualHours}h</span>
+                    )}
+                    {nanny.clockedShifts > 0 && (() => {
+                      const diff = Math.round((nanny.actualHours - nanny.totalHours) * 10) / 10;
+                      if (Math.abs(diff) < 0.2) return null;
+                      return diff > 0
+                        ? <span className="text-red-600 font-medium">+{diff}h over</span>
+                        : <span className="text-blue-600 font-medium">{diff}h under</span>;
+                    })()}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground pl-6">
                     <span>Hourly: {nanny.basePay} DH</span>
