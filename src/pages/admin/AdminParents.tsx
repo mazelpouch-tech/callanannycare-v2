@@ -57,12 +57,23 @@ export default function AdminParents() {
   const [sortBy, setSortBy] = useState<"spent" | "bookings" | "recent" | "hours">("spent");
   const [expandedParent, setExpandedParent] = useState<string | null>(null);
 
-  // Collection modal state
+  // Collection modal state (single booking OR bulk parent)
   const [collectingBooking, setCollectingBooking] = useState<Booking | null>(null);
+  const [collectingParent, setCollectingParent] = useState<ParentSummary | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [collectionNote, setCollectionNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
 
+  const closeModal = () => {
+    setCollectingBooking(null);
+    setCollectingParent(null);
+    setPaymentMethod("cash");
+    setCollectionNote("");
+    setBulkProgress(0);
+  };
+
+  // Single booking collection
   const handleCollect = async () => {
     if (!collectingBooking) return;
     setIsSubmitting(true);
@@ -72,11 +83,33 @@ export default function AdminParents() {
         paymentMethod,
         collectionNote: collectionNote.trim() || undefined,
       });
-      setCollectingBooking(null);
-      setPaymentMethod("cash");
-      setCollectionNote("");
+      closeModal();
     } catch (err) {
       console.error("Collection failed:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Bulk collection for all unpaid bookings of a parent
+  const handleBulkCollect = async () => {
+    if (!collectingParent) return;
+    const unpaid = collectingParent.bookings.filter((b) => b.status !== "cancelled" && !b.collectedAt);
+    if (unpaid.length === 0) return;
+    setIsSubmitting(true);
+    setBulkProgress(0);
+    try {
+      for (let i = 0; i < unpaid.length; i++) {
+        await markAsCollected(unpaid[i].id, {
+          collectedBy: adminProfile?.name || "Admin",
+          paymentMethod,
+          collectionNote: collectionNote.trim() || undefined,
+        });
+        setBulkProgress(i + 1);
+      }
+      closeModal();
+    } catch (err) {
+      console.error("Bulk collection failed:", err);
     } finally {
       setIsSubmitting(false);
     }
@@ -221,7 +254,7 @@ export default function AdminParents() {
   };
 
   // Payment status badge for parent row
-  const paymentBadge = (p: ParentSummary) => {
+  const paymentBadge = (p: ParentSummary, showCollectAll = false) => {
     if (p.unpaidCount === 0 && p.paidCount > 0) {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
@@ -231,9 +264,22 @@ export default function AdminParents() {
     }
     if (p.unpaidCount > 0) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-700 border border-red-200">
-          <CircleDashed className="w-3 h-3" /> {p.unpaidCount} unpaid
-        </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-700 border border-red-200">
+            <CircleDashed className="w-3 h-3" /> {p.unpaidCount} unpaid
+          </span>
+          {showCollectAll && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setCollectingParent(p);
+              }}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-green-600 text-white hover:bg-green-700 transition-colors cursor-pointer"
+            >
+              <CheckCircle className="w-3 h-3" /> Collect All
+            </button>
+          )}
+        </div>
       );
     }
     return null;
@@ -355,7 +401,7 @@ export default function AdminParents() {
                       <p className="text-[10px] text-muted-foreground">{toDH(p.totalPrice).toLocaleString()} DH</p>
                     </td>
                     <td className="px-5 py-3">
-                      {paymentBadge(p)}
+                      {paymentBadge(p, true)}
                       {p.unpaidCount > 0 && p.paidCount > 0 && (
                         <p className="text-[10px] text-muted-foreground mt-1">{p.paidCount} paid · {p.unpaidCount} unpaid</p>
                       )}
@@ -405,7 +451,7 @@ export default function AdminParents() {
                 <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
                   <span>{p.totalBookings} bookings</span>
                   <span>{p.totalHours.toFixed(1)}h</span>
-                  {paymentBadge(p)}
+                  {paymentBadge(p, true)}
                   {expandedParent === p.key ? (
                     <ChevronUp className="w-4 h-4 ml-auto shrink-0" />
                   ) : (
@@ -424,34 +470,28 @@ export default function AdminParents() {
         </div>
       )}
 
-      {/* Collection modal */}
-      {collectingBooking && (
+      {/* Single booking collection modal */}
+      {collectingBooking && !collectingParent && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-          <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm" onClick={() => !isSubmitting && setCollectingBooking(null)} />
+          <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm" onClick={() => !isSubmitting && closeModal()} />
           <div className="relative bg-card rounded-t-3xl sm:rounded-2xl border border-border w-full sm:max-w-md mx-auto shadow-xl z-10 max-h-[90vh] overflow-y-auto">
 
-            {/* Modal header */}
             <div className="px-6 pt-6 pb-4 border-b border-border flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-foreground">Confirm Collection</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">{collectingBooking.clientName} · {collectingBooking.date}</p>
               </div>
-              <button
-                onClick={() => !isSubmitting && setCollectingBooking(null)}
-                className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
-              >
+              <button onClick={() => !isSubmitting && closeModal()} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="px-6 py-5 space-y-5">
-              {/* Amount */}
               <div className="bg-green-50 rounded-xl p-4 text-center border border-green-100">
                 <p className="text-3xl font-bold text-green-700">{collectingBooking.totalPrice}&euro;</p>
                 <p className="text-sm text-green-600 mt-1">{toDH(collectingBooking.totalPrice)} DH</p>
               </div>
 
-              {/* Booking summary */}
               <div className="space-y-1 text-sm bg-muted/30 rounded-xl px-4 py-3">
                 <div><span className="text-muted-foreground">Nanny: </span><span className="font-medium">{collectingBooking.nannyName}</span></div>
                 <div><span className="text-muted-foreground">Date: </span><span>{collectingBooking.date} · {collectingBooking.startTime}–{collectingBooking.endTime}</span></div>
@@ -460,7 +500,6 @@ export default function AdminParents() {
                 )}
               </div>
 
-              {/* Payment method */}
               <div>
                 <label className="text-sm font-medium text-foreground mb-2 block">Payment Method</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -485,7 +524,6 @@ export default function AdminParents() {
                 </div>
               </div>
 
-              {/* Note */}
               <div>
                 <label className="text-sm font-medium text-foreground mb-2 block">Note <span className="text-muted-foreground font-normal">(optional)</span></label>
                 <textarea
@@ -498,33 +536,129 @@ export default function AdminParents() {
               </div>
             </div>
 
-            {/* Actions */}
             <div className="px-6 pb-6 pt-2 flex gap-3">
-              <button
-                onClick={() => !isSubmitting && setCollectingBooking(null)}
-                disabled={isSubmitting}
-                className="flex-1 py-3 border border-border rounded-xl text-sm font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
-              >
+              <button onClick={() => !isSubmitting && closeModal()} disabled={isSubmitting} className="flex-1 py-3 border border-border rounded-xl text-sm font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50">
                 Cancel
               </button>
-              <button
-                onClick={handleCollect}
-                disabled={isSubmitting}
-                className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-              >
+              <button onClick={handleCollect} disabled={isSubmitting} className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
                 {isSubmitting ? (
                   <span className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
                 ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4" />
-                    Confirm Collection
-                  </>
+                  <><CheckCircle className="w-4 h-4" /> Confirm Collection</>
                 )}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Bulk collection modal (collect all for a parent) */}
+      {collectingParent && (() => {
+        const unpaid = collectingParent.bookings.filter((b) => b.status !== "cancelled" && !b.collectedAt);
+        const bulkTotal = unpaid.reduce((s, b) => s + (b.totalPrice || 0), 0);
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+            <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm" onClick={() => !isSubmitting && closeModal()} />
+            <div className="relative bg-card rounded-t-3xl sm:rounded-2xl border border-border w-full sm:max-w-md mx-auto shadow-xl z-10 max-h-[90vh] overflow-y-auto">
+
+              <div className="px-6 pt-6 pb-4 border-b border-border flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-foreground">Collect All Payments</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">{collectingParent.name} · {unpaid.length} bookings</p>
+                </div>
+                <button onClick={() => !isSubmitting && closeModal()} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="px-6 py-5 space-y-5">
+                {/* Total amount */}
+                <div className="bg-green-50 rounded-xl p-4 text-center border border-green-100">
+                  <p className="text-xs text-green-600 mb-1 font-medium">Total to collect</p>
+                  <p className="text-3xl font-bold text-green-700">{bulkTotal.toLocaleString()}&euro;</p>
+                  <p className="text-sm text-green-600 mt-1">{toDH(bulkTotal).toLocaleString()} DH</p>
+                </div>
+
+                {/* List of unpaid bookings */}
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Unpaid Bookings</label>
+                  <div className="bg-muted/30 rounded-xl overflow-hidden divide-y divide-border/50">
+                    {unpaid.map((b, idx) => (
+                      <div key={b.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {isSubmitting && bulkProgress > idx ? (
+                            <CheckCircle className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                          ) : isSubmitting && bulkProgress === idx ? (
+                            <span className="animate-spin w-3.5 h-3.5 border-2 border-green-300 border-t-green-600 rounded-full shrink-0" />
+                          ) : (
+                            <CircleDashed className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+                          )}
+                          <span className="text-muted-foreground whitespace-nowrap">
+                            {b.date ? format(parseISO(b.date), "dd MMM yy") : "—"}
+                          </span>
+                          <span className="text-foreground whitespace-nowrap">{b.startTime}–{b.endTime}</span>
+                          <span className="text-foreground truncate">{b.nannyName || "—"}</span>
+                        </div>
+                        <span className="font-bold text-foreground shrink-0">{(b.totalPrice || 0).toLocaleString()}&euro;</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Payment method */}
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Payment Method</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: "cash", label: "Cash", Icon: Banknote },
+                      { value: "bank", label: "Transfer", Icon: CreditCard },
+                      { value: "card", label: "Card / Tap", Icon: Wallet },
+                    ].map(({ value, label, Icon }) => (
+                      <button
+                        key={value}
+                        onClick={() => setPaymentMethod(value)}
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-sm font-medium transition-all ${
+                          paymentMethod === value
+                            ? "border-green-500 bg-green-50 text-green-700"
+                            : "border-border bg-card text-muted-foreground hover:border-green-300"
+                        }`}
+                      >
+                        <Icon className="w-5 h-5" />
+                        <span className="text-xs">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Note */}
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Note <span className="text-muted-foreground font-normal">(optional)</span></label>
+                  <textarea
+                    value={collectionNote}
+                    onChange={(e) => setCollectionNote(e.target.value)}
+                    placeholder="Any additional notes..."
+                    rows={2}
+                    className="w-full px-4 py-2.5 bg-card border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="px-6 pb-6 pt-2 flex gap-3">
+                <button onClick={() => !isSubmitting && closeModal()} disabled={isSubmitting} className="flex-1 py-3 border border-border rounded-xl text-sm font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50">
+                  Cancel
+                </button>
+                <button onClick={handleBulkCollect} disabled={isSubmitting} className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
+                  {isSubmitting ? (
+                    <><span className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full" /> {bulkProgress}/{unpaid.length}</>
+                  ) : (
+                    <><CheckCircle className="w-4 h-4" /> Collect All ({unpaid.length})</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
