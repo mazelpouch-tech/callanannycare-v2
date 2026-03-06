@@ -12,8 +12,10 @@ import {
   Banknote,
   CreditCard,
   Wallet,
+  Filter,
+  CalendarDays,
 } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { calcTotalBookedHours } from "@/utils/shiftHelpers";
@@ -55,6 +57,10 @@ export default function AdminParents() {
 
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"spent" | "bookings" | "recent" | "hours">("spent");
+  const [paymentFilter, setPaymentFilter] = useState<"all" | "unpaid" | "paid">("all");
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month" | "custom">("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [expandedParent, setExpandedParent] = useState<string | null>(null);
 
   // Collection modal state (single booking OR bulk parent)
@@ -115,11 +121,39 @@ export default function AdminParents() {
     }
   };
 
+  // Compute date range from filter
+  const dateRange = useMemo(() => {
+    const today = new Date();
+    switch (dateFilter) {
+      case "today":
+        return { from: format(today, "yyyy-MM-dd"), to: format(today, "yyyy-MM-dd") };
+      case "week":
+        return { from: format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd"), to: format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd") };
+      case "month":
+        return { from: format(startOfMonth(today), "yyyy-MM-dd"), to: format(endOfMonth(today), "yyyy-MM-dd") };
+      case "custom":
+        return { from: dateFrom, to: dateTo };
+      default:
+        return null;
+    }
+  }, [dateFilter, dateFrom, dateTo]);
+
+  // Filter bookings by date range first
+  const dateFilteredBookings = useMemo(() => {
+    if (!dateRange || (!dateRange.from && !dateRange.to)) return bookings;
+    return bookings.filter((b) => {
+      if (!b.date) return false;
+      if (dateRange.from && b.date < dateRange.from) return false;
+      if (dateRange.to && b.date > dateRange.to) return false;
+      return true;
+    });
+  }, [bookings, dateRange]);
+
   // Group bookings by parent
   const parents = useMemo(() => {
     const map = new Map<string, ParentSummary>();
 
-    bookings.forEach((b) => {
+    dateFilteredBookings.forEach((b) => {
       const key = `${(b.clientName || "").trim().toLowerCase()}|${(b.clientEmail || "").trim().toLowerCase()}`;
 
       if (!map.has(key)) {
@@ -172,7 +206,7 @@ export default function AdminParents() {
     });
 
     return Array.from(map.values()).sort((a, b) => b.totalPrice - a.totalPrice);
-  }, [bookings]);
+  }, [dateFilteredBookings]);
 
   // Filter + sort
   const filteredParents = useMemo(() => {
@@ -189,6 +223,12 @@ export default function AdminParents() {
       );
     }
 
+    if (paymentFilter === "unpaid") {
+      result = result.filter((p) => p.unpaidCount > 0);
+    } else if (paymentFilter === "paid") {
+      result = result.filter((p) => p.unpaidCount === 0 && p.paidCount > 0);
+    }
+
     switch (sortBy) {
       case "bookings":
         return [...result].sort((a, b) => b.totalBookings - a.totalBookings);
@@ -199,7 +239,7 @@ export default function AdminParents() {
       default:
         return result;
     }
-  }, [parents, search, sortBy]);
+  }, [parents, search, sortBy, paymentFilter]);
 
   // Totals for stat cards
   const totalHours = filteredParents.reduce((s, p) => s + p.totalHours, 0);
@@ -335,28 +375,110 @@ export default function AdminParents() {
         </div>
       </div>
 
-      {/* Search + Sort */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, email, phone or hotel..."
-            className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-          />
+      {/* Search + Filters */}
+      <div className="space-y-3">
+        {/* Row 1: Search + Sort */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name, email, phone or hotel..."
+              className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+            />
+          </div>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+          >
+            <option value="spent">Sort: Most Spent</option>
+            <option value="bookings">Sort: Most Bookings</option>
+            <option value="recent">Sort: Most Recent</option>
+            <option value="hours">Sort: Most Hours</option>
+          </select>
         </div>
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          className="px-4 py-2.5 bg-background border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-        >
-          <option value="spent">Sort: Most Spent</option>
-          <option value="bookings">Sort: Most Bookings</option>
-          <option value="recent">Sort: Most Recent</option>
-          <option value="hours">Sort: Most Hours</option>
-        </select>
+
+        {/* Row 2: Payment filter + Date filter */}
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Payment status pills */}
+          <div className="flex items-center gap-1 bg-muted/40 rounded-xl p-1">
+            {([
+              { value: "all", label: "All" },
+              { value: "unpaid", label: "Unpaid" },
+              { value: "paid", label: "Paid" },
+            ] as const).map((f) => (
+              <button
+                key={f.value}
+                onClick={() => setPaymentFilter(f.value)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  paymentFilter === f.value
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {f.value === "unpaid" && <CircleDashed className="w-3 h-3 inline mr-1 -mt-0.5" />}
+                {f.value === "paid" && <CheckCircle className="w-3 h-3 inline mr-1 -mt-0.5" />}
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Date period pills */}
+          <div className="flex items-center gap-1 bg-muted/40 rounded-xl p-1">
+            {([
+              { value: "all", label: "All Time" },
+              { value: "today", label: "Today" },
+              { value: "week", label: "This Week" },
+              { value: "month", label: "This Month" },
+              { value: "custom", label: "Custom" },
+            ] as const).map((f) => (
+              <button
+                key={f.value}
+                onClick={() => setDateFilter(f.value)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+                  dateFilter === f.value
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {f.value === "custom" && <CalendarDays className="w-3 h-3 inline mr-1 -mt-0.5" />}
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Custom date inputs */}
+          {dateFilter === "custom" && (
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="px-3 py-1.5 bg-background border border-border rounded-xl text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+              />
+              <span className="text-xs text-muted-foreground">to</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="px-3 py-1.5 bg-background border border-border rounded-xl text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+              />
+            </div>
+          )}
+
+          {/* Active filter count + reset */}
+          {(paymentFilter !== "all" || dateFilter !== "all") && (
+            <button
+              onClick={() => { setPaymentFilter("all"); setDateFilter("all"); setDateFrom(""); setDateTo(""); }}
+              className="px-3 py-1.5 rounded-xl text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Empty state */}
