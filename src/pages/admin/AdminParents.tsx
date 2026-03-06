@@ -6,6 +6,12 @@ import {
   DollarSign,
   ChevronDown,
   ChevronUp,
+  CheckCircle,
+  CircleDashed,
+  X,
+  Banknote,
+  CreditCard,
+  Wallet,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -22,6 +28,10 @@ interface ParentSummary {
   totalBookings: number;
   totalHours: number;
   totalPrice: number;
+  paidAmount: number;
+  unpaidAmount: number;
+  paidCount: number;
+  unpaidCount: number;
   nannyNames: string[];
   lastBookingDate: string;
   bookings: Booking[];
@@ -40,12 +50,37 @@ function hoursForBooking(b: Booking): number {
 }
 
 export default function AdminParents() {
-  const { bookings } = useData();
+  const { bookings, markAsCollected, adminProfile } = useData();
   const { toDH } = useExchangeRate();
 
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"spent" | "bookings" | "recent" | "hours">("spent");
   const [expandedParent, setExpandedParent] = useState<string | null>(null);
+
+  // Collection modal state
+  const [collectingBooking, setCollectingBooking] = useState<Booking | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [collectionNote, setCollectionNote] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleCollect = async () => {
+    if (!collectingBooking) return;
+    setIsSubmitting(true);
+    try {
+      await markAsCollected(collectingBooking.id, {
+        collectedBy: adminProfile?.name || "Admin",
+        paymentMethod,
+        collectionNote: collectionNote.trim() || undefined,
+      });
+      setCollectingBooking(null);
+      setPaymentMethod("cash");
+      setCollectionNote("");
+    } catch (err) {
+      console.error("Collection failed:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Group bookings by parent
   const parents = useMemo(() => {
@@ -64,6 +99,10 @@ export default function AdminParents() {
           totalBookings: 0,
           totalHours: 0,
           totalPrice: 0,
+          paidAmount: 0,
+          unpaidAmount: 0,
+          paidCount: 0,
+          unpaidCount: 0,
           nannyNames: [],
           lastBookingDate: "",
           bookings: [],
@@ -73,7 +112,6 @@ export default function AdminParents() {
       const parent = map.get(key)!;
       parent.bookings.push(b);
 
-      // Use most recent booking's info
       if (!parent.lastBookingDate || b.date > parent.lastBookingDate) {
         parent.lastBookingDate = b.date;
         parent.hotel = b.hotel || parent.hotel;
@@ -81,11 +119,18 @@ export default function AdminParents() {
         parent.name = b.clientName || parent.name;
       }
 
-      // Only count non-cancelled bookings
       if (b.status !== "cancelled") {
         parent.totalBookings++;
         parent.totalPrice += b.totalPrice || 0;
         parent.totalHours += hoursForBooking(b);
+
+        if (b.collectedAt) {
+          parent.paidAmount += b.totalPrice || 0;
+          parent.paidCount++;
+        } else {
+          parent.unpaidAmount += b.totalPrice || 0;
+          parent.unpaidCount++;
+        }
       }
 
       if (b.nannyName && !parent.nannyNames.includes(b.nannyName)) {
@@ -126,6 +171,8 @@ export default function AdminParents() {
   // Totals for stat cards
   const totalHours = filteredParents.reduce((s, p) => s + p.totalHours, 0);
   const totalRevenue = filteredParents.reduce((s, p) => s + p.totalPrice, 0);
+  const totalPaid = filteredParents.reduce((s, p) => s + p.paidAmount, 0);
+  const totalUnpaid = filteredParents.reduce((s, p) => s + p.unpaidAmount, 0);
 
   const toggle = (key: string) => setExpandedParent(expandedParent === key ? null : key);
 
@@ -135,9 +182,11 @@ export default function AdminParents() {
     return sorted.map((b) => {
       const hours = hoursForBooking(b);
       const st = statusConfig[b.status] || statusConfig.pending;
+      const isPaid = !!b.collectedAt;
+      const isCancelled = b.status === "cancelled";
       return (
-        <div key={b.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2 text-xs border-b border-border/50 last:border-0">
-          <div className="flex items-center gap-3 min-w-0">
+        <div key={b.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2.5 text-xs border-b border-border/50 last:border-0">
+          <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
             <span className="text-muted-foreground whitespace-nowrap">
               {b.date ? format(parseISO(b.date), "dd MMM yy") : "—"}
             </span>
@@ -148,10 +197,46 @@ export default function AdminParents() {
           <div className="flex items-center gap-2 shrink-0">
             <span className="font-bold text-foreground">{(b.totalPrice || 0).toLocaleString()}&euro;</span>
             <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.cls}`}>{st.label}</span>
+            {!isCancelled && (
+              isPaid ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
+                  <CheckCircle className="w-3 h-3" /> Paid
+                </span>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCollectingBooking(b);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors cursor-pointer"
+                >
+                  <CircleDashed className="w-3 h-3" /> Collect
+                </button>
+              )
+            )}
           </div>
         </div>
       );
     });
+  };
+
+  // Payment status badge for parent row
+  const paymentBadge = (p: ParentSummary) => {
+    if (p.unpaidCount === 0 && p.paidCount > 0) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
+          <CheckCircle className="w-3 h-3" /> All Paid
+        </span>
+      );
+    }
+    if (p.unpaidCount > 0) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-700 border border-red-200">
+          <CircleDashed className="w-3 h-3" /> {p.unpaidCount} unpaid
+        </span>
+      );
+    }
+    return null;
   };
 
   return (
@@ -163,21 +248,45 @@ export default function AdminParents() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        {[
-          { label: "Total Parents", value: filteredParents.length, icon: Users, color: "text-primary", bg: "bg-primary/10" },
-          { label: "Total Hours", value: `${totalHours.toFixed(1)}h`, icon: Clock, color: "text-blue-700", bg: "bg-blue-50" },
-          { label: "Total Revenue", value: `${totalRevenue.toLocaleString()}\u20AC`, sub: `${toDH(totalRevenue).toLocaleString()} DH`, icon: DollarSign, color: "text-green-700", bg: "bg-green-50" },
-        ].map((s) => (
-          <div key={s.label} className="bg-card rounded-xl border border-border p-5 shadow-soft">
-            <div className={`w-10 h-10 ${s.bg} rounded-xl flex items-center justify-center mb-3`}>
-              <s.icon className={`w-5 h-5 ${s.color}`} />
-            </div>
-            <p className="text-2xl font-bold text-foreground">{s.value}</p>
-            <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
-            {"sub" in s && s.sub && <p className="text-[10px] text-muted-foreground/70 mt-0.5">{s.sub}</p>}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="bg-card rounded-xl border border-border p-5 shadow-soft">
+          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center mb-3">
+            <Users className="w-5 h-5 text-primary" />
           </div>
-        ))}
+          <p className="text-2xl font-bold text-foreground">{filteredParents.length}</p>
+          <p className="text-xs text-muted-foreground mt-1">Total Parents</p>
+        </div>
+        <div className="bg-card rounded-xl border border-border p-5 shadow-soft">
+          <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center mb-3">
+            <Clock className="w-5 h-5 text-blue-700" />
+          </div>
+          <p className="text-2xl font-bold text-foreground">{totalHours.toFixed(1)}h</p>
+          <p className="text-xs text-muted-foreground mt-1">Total Hours</p>
+        </div>
+        <div className="bg-card rounded-xl border border-border p-5 shadow-soft">
+          <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center mb-3">
+            <DollarSign className="w-5 h-5 text-purple-700" />
+          </div>
+          <p className="text-2xl font-bold text-foreground">{totalRevenue.toLocaleString()}&euro;</p>
+          <p className="text-[10px] text-muted-foreground/70 mt-0.5">{toDH(totalRevenue).toLocaleString()} DH</p>
+          <p className="text-xs text-muted-foreground mt-1">Total Revenue</p>
+        </div>
+        <div className="bg-card rounded-xl border border-border p-5 shadow-soft">
+          <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center mb-3">
+            <CheckCircle className="w-5 h-5 text-green-700" />
+          </div>
+          <p className="text-2xl font-bold text-green-700">{totalPaid.toLocaleString()}&euro;</p>
+          <p className="text-[10px] text-muted-foreground/70 mt-0.5">{toDH(totalPaid).toLocaleString()} DH</p>
+          <p className="text-xs text-muted-foreground mt-1">Collected</p>
+        </div>
+        <div className="bg-card rounded-xl border border-border p-5 shadow-soft col-span-2 lg:col-span-1">
+          <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center mb-3">
+            <CircleDashed className="w-5 h-5 text-red-600" />
+          </div>
+          <p className="text-2xl font-bold text-red-600">{totalUnpaid.toLocaleString()}&euro;</p>
+          <p className="text-[10px] text-muted-foreground/70 mt-0.5">{toDH(totalUnpaid).toLocaleString()} DH</p>
+          <p className="text-xs text-muted-foreground mt-1">To Collect</p>
+        </div>
       </div>
 
       {/* Search + Sort */}
@@ -220,7 +329,7 @@ export default function AdminParents() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                {["#", "Parent", "Hotel", "Bookings", "Hours", "Total Spent", "Nannies", "Last Booking"].map((h) => (
+                {["#", "Parent", "Hotel", "Bookings", "Hours", "Total Spent", "Payment", "Nannies", "Last Booking"].map((h) => (
                   <th key={h} className="px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-left">{h}</th>
                 ))}
               </tr>
@@ -245,14 +354,20 @@ export default function AdminParents() {
                       <p className="text-sm font-bold text-foreground">{p.totalPrice.toLocaleString()}&euro;</p>
                       <p className="text-[10px] text-muted-foreground">{toDH(p.totalPrice).toLocaleString()} DH</p>
                     </td>
-                    <td className="px-5 py-3 text-xs text-muted-foreground max-w-[160px] truncate">{p.nannyNames.join(", ") || "—"}</td>
+                    <td className="px-5 py-3">
+                      {paymentBadge(p)}
+                      {p.unpaidCount > 0 && p.paidCount > 0 && (
+                        <p className="text-[10px] text-muted-foreground mt-1">{p.paidCount} paid · {p.unpaidCount} unpaid</p>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-xs text-muted-foreground max-w-[140px] truncate">{p.nannyNames.join(", ") || "—"}</td>
                     <td className="px-5 py-3 text-sm text-muted-foreground whitespace-nowrap">
                       {p.lastBookingDate ? format(parseISO(p.lastBookingDate), "dd MMM yyyy") : "—"}
                     </td>
                   </tr>
                   {expandedParent === p.key && (
                     <tr>
-                      <td colSpan={8} className="px-8 py-4 bg-muted/30">
+                      <td colSpan={9} className="px-8 py-4 bg-muted/30">
                         <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Booking History</p>
                         {renderHistory(p)}
                       </td>
@@ -287,10 +402,10 @@ export default function AdminParents() {
                     <p className="text-[10px] text-muted-foreground">{toDH(p.totalPrice).toLocaleString()} DH</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
                   <span>{p.totalBookings} bookings</span>
                   <span>{p.totalHours.toFixed(1)}h</span>
-                  <span className="truncate">{p.hotel || "—"}</span>
+                  {paymentBadge(p)}
                   {expandedParent === p.key ? (
                     <ChevronUp className="w-4 h-4 ml-auto shrink-0" />
                   ) : (
@@ -306,6 +421,108 @@ export default function AdminParents() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Collection modal */}
+      {collectingBooking && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm" onClick={() => !isSubmitting && setCollectingBooking(null)} />
+          <div className="relative bg-card rounded-t-3xl sm:rounded-2xl border border-border w-full sm:max-w-md mx-auto shadow-xl z-10 max-h-[90vh] overflow-y-auto">
+
+            {/* Modal header */}
+            <div className="px-6 pt-6 pb-4 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-foreground">Confirm Collection</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">{collectingBooking.clientName} · {collectingBooking.date}</p>
+              </div>
+              <button
+                onClick={() => !isSubmitting && setCollectingBooking(null)}
+                className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-5">
+              {/* Amount */}
+              <div className="bg-green-50 rounded-xl p-4 text-center border border-green-100">
+                <p className="text-3xl font-bold text-green-700">{collectingBooking.totalPrice}&euro;</p>
+                <p className="text-sm text-green-600 mt-1">{toDH(collectingBooking.totalPrice)} DH</p>
+              </div>
+
+              {/* Booking summary */}
+              <div className="space-y-1 text-sm bg-muted/30 rounded-xl px-4 py-3">
+                <div><span className="text-muted-foreground">Nanny: </span><span className="font-medium">{collectingBooking.nannyName}</span></div>
+                <div><span className="text-muted-foreground">Date: </span><span>{collectingBooking.date} · {collectingBooking.startTime}–{collectingBooking.endTime}</span></div>
+                {collectingBooking.hotel && (
+                  <div><span className="text-muted-foreground">Hotel: </span><span>{collectingBooking.hotel}</span></div>
+                )}
+              </div>
+
+              {/* Payment method */}
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">Payment Method</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: "cash", label: "Cash", Icon: Banknote },
+                    { value: "bank", label: "Transfer", Icon: CreditCard },
+                    { value: "card", label: "Card / Tap", Icon: Wallet },
+                  ].map(({ value, label, Icon }) => (
+                    <button
+                      key={value}
+                      onClick={() => setPaymentMethod(value)}
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-sm font-medium transition-all ${
+                        paymentMethod === value
+                          ? "border-green-500 bg-green-50 text-green-700"
+                          : "border-border bg-card text-muted-foreground hover:border-green-300"
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span className="text-xs">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Note */}
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">Note <span className="text-muted-foreground font-normal">(optional)</span></label>
+                <textarea
+                  value={collectionNote}
+                  onChange={(e) => setCollectionNote(e.target.value)}
+                  placeholder="Any additional notes..."
+                  rows={2}
+                  className="w-full px-4 py-2.5 bg-card border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 pb-6 pt-2 flex gap-3">
+              <button
+                onClick={() => !isSubmitting && setCollectingBooking(null)}
+                disabled={isSubmitting}
+                className="flex-1 py-3 border border-border rounded-xl text-sm font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCollect}
+                disabled={isSubmitting}
+                className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <span className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    Confirm Collection
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
