@@ -28,6 +28,8 @@ const strings = {
     rebookTitle: 'Book Again?',
     rebookText: 'Loved the experience? Rebook in seconds with your details pre-filled.',
     rebookBtn: 'Book Again',
+    paymentCollectedBy: 'Payment Information',
+    paymentCollectedByText: 'Please note that payment for your childcare service will be collected directly by Call a Nanny agency at the end of the service — not by your hotel or accommodation.',
     invoice: 'INVOICE',
     invoiceGreeting: 'Please find below the invoice for the childcare service provided by Call a Nanny.',
     caregiver: 'Caregiver',
@@ -96,6 +98,8 @@ const strings = {
     rebookTitle: 'Réserver à Nouveau ?',
     rebookText: 'Vous avez aimé l\'expérience ? Réservez à nouveau en quelques secondes avec vos informations pré-remplies.',
     rebookBtn: 'Réserver à Nouveau',
+    paymentCollectedBy: 'Informations de Paiement',
+    paymentCollectedByText: 'Veuillez noter que le paiement de votre service de garde sera collecté directement par l\'agence Call a Nanny à la fin du service — et non par votre hôtel ou hébergement.',
     invoice: 'FACTURE',
     invoiceGreeting: 'Veuillez trouver ci-dessous la facture pour le service de garde fourni par Call a Nanny.',
     caregiver: 'Garde d\'enfants',
@@ -246,6 +250,12 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData): Promis
     <div style="margin:28px 0;padding:20px;background-color:#fff7ed;border-radius:12px;border-left:4px solid #f97316;">
       <h3 style="margin:0 0 8px;color:#1a1a1a;font-size:15px;font-weight:600;">${s.whatNext}</h3>
       <p style="margin:0;color:#666;font-size:14px;line-height:1.5;">${s.whatNextText}</p>
+    </div>
+
+    <!-- Payment Notice -->
+    <div style="margin:28px 0;padding:20px;background-color:#eff6ff;border-radius:12px;border-left:4px solid #3b82f6;">
+      <h3 style="margin:0 0 8px;color:#1a1a1a;font-size:15px;font-weight:600;">💳 ${s.paymentCollectedBy}</h3>
+      <p style="margin:0;color:#666;font-size:14px;line-height:1.5;">${s.paymentCollectedByText}</p>
     </div>
 
     <!-- Track Booking CTA -->

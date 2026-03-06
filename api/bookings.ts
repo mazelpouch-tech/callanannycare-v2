@@ -497,29 +497,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      // Send email to parent (best-effort) — DISABLED (parent emails paused)
-      // if (result[0] && client_email) {
-      //   try {
-      //     const { sendConfirmationEmail } = await import('./_emailTemplates.js');
-      //     await sendConfirmationEmail({
-      //       bookingId: result[0].id,
-      //       clientName: client_name,
-      //       clientEmail: client_email,
-      //       clientPhone: client_phone || '',
-      //       hotel: hotel || '',
-      //       date,
-      //       startTime: start_time,
-      //       endTime: end_time || '',
-      //       childrenCount: children_count || 1,
-      //       childrenAges: children_ages || '',
-      //       totalPrice: total_price || 0,
-      //       notes: notes || '',
-      //       locale: locale || 'en',
-      //     });
-      //   } catch (emailError: unknown) {
-      //     console.error('Email sending failed:', emailError);
-      //   }
-      // }
+      // Send confirmation email to parent (best-effort)
+      if (result[0] && client_email) {
+        try {
+          const { sendConfirmationEmail } = await import('./_emailTemplates.js');
+          await sendConfirmationEmail({
+            bookingId: result[0].id,
+            clientName: client_name,
+            clientEmail: client_email,
+            clientPhone: client_phone || '',
+            hotel: hotel || '',
+            date,
+            startTime: start_time,
+            endTime: end_time || '',
+            childrenCount: children_count || 1,
+            childrenAges: children_ages || '',
+            totalPrice: total_price || 0,
+            notes: notes || '',
+            locale: locale || 'en',
+          });
+        } catch (emailError: unknown) {
+          console.error('Email sending failed:', emailError);
+        }
+      }
 
       return res.status(201).json(result[0]);
     }
