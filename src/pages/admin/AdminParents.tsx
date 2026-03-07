@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, Fragment, useRef, useEffect } from "react";
 import {
   Search,
   Users,
@@ -17,6 +17,11 @@ import {
   Download,
   TimerReset,
   Loader2,
+  Share2,
+  Mail,
+  MessageCircle,
+  FileText,
+  ArrowLeft,
 } from "lucide-react";
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -78,8 +83,13 @@ function formatClockTime(iso: string | null): string {
 }
 
 export default function AdminParents() {
-  const { bookings, markAsCollected, updateBooking, adminProfile } = useData();
+  const { bookings, markAsCollected, updateBooking, adminProfile, resendInvoice } = useData();
   const { toDH } = useExchangeRate();
+
+  // Invoice detail view
+  const [viewParentInvoice, setViewParentInvoice] = useState<ParentSummary | null>(null);
+  const [emailSending, setEmailSending] = useState<number | string | null>(null);
+  const [emailSendingParent, setEmailSendingParent] = useState(false);
 
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"spent" | "bookings" | "recent" | "hours">("spent");
@@ -391,6 +401,120 @@ export default function AdminParents() {
 
   const toggle = (key: string) => setExpandedParent(expandedParent === key ? null : key);
 
+  // WhatsApp share for a combined parent invoice
+  const buildParentWhatsAppLink = (p: ParentSummary) => {
+    const activeBookings = [...p.bookings]
+      .filter((b) => b.status !== "cancelled")
+      .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    const total = p.totalPrice;
+    const totalDH = toDH(total);
+    const isPaid = p.unpaidCount === 0 && p.paidCount > 0;
+
+    const bookingLines = activeBookings.map((b) => {
+      const hours = hoursForBooking(b);
+      const dateStr = b.date ? format(parseISO(b.date), "dd MMM yyyy") : "—";
+      return `  ${dateStr} · ${b.startTime || "—"} – ${b.endTime || "—"} · ${hours.toFixed(1)}h · ${(b.totalPrice || 0)}€`;
+    }).join("\n");
+
+    const msg = [
+      `*Invoice - ${p.name}*`,
+      `From: Call a Nanny`,
+      `Date: ${format(new Date(), "dd MMMM yyyy")}`,
+      ``,
+      `*Booking Details*`,
+      bookingLines,
+      ``,
+      `*Total: ${total}€ (${totalDH.toLocaleString()} DH)*`,
+      `Bookings: ${activeBookings.length} · Hours: ${p.totalHours.toFixed(1)}h`,
+      isPaid ? `Status: PAID` : ``,
+      ``,
+      `Issued by Call a Nanny · callanannycare.com`,
+    ].filter(Boolean).join("\n");
+
+    const phone = (p.phone || "").replace(/[^0-9]/g, "");
+    return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+  };
+
+  const handleParentShareWhatsApp = (p: ParentSummary) => {
+    if (!p.phone) {
+      alert("No phone number on file for this parent.");
+      return;
+    }
+    window.open(buildParentWhatsAppLink(p), "_blank");
+  };
+
+  const handleParentSendEmail = async (p: ParentSummary) => {
+    if (!p.email) {
+      alert("No email address on file for this parent.");
+      return;
+    }
+    const completedBookings = p.bookings.filter((b) => b.status === "completed" && b.clockOut);
+    if (completedBookings.length === 0) {
+      alert("No completed bookings to send invoices for.");
+      return;
+    }
+    setEmailSendingParent(true);
+    try {
+      for (const b of completedBookings) {
+        await resendInvoice(b.id);
+      }
+      alert(`Invoice email(s) sent to ${p.email}`);
+    } catch {
+      alert("Failed to send invoice email. Please try again.");
+    }
+    setEmailSendingParent(false);
+  };
+
+  // WhatsApp/Email for single booking in history
+  const buildBookingWhatsAppLink = (b: Booking) => {
+    const hours = hoursForBooking(b);
+    const total = b.totalPrice || 0;
+    const totalDH = toDH(total);
+    const dateStr = b.date ? format(parseISO(b.date), "EEEE do MMMM yyyy") : "N/A";
+    const msg = [
+      `*Invoice #INV-${b.id}*`,
+      `From: Call a Nanny`,
+      `Date: ${dateStr}`,
+      ``,
+      `*Service Details*`,
+      `Caregiver: ${b.nannyName || "Unassigned"}`,
+      `Time: ${b.startTime || "—"} – ${b.endTime || "—"}`,
+      `Hours: ${hours.toFixed(1)}h`,
+      `Children: ${b.childrenCount || 1}${b.childrenAges ? ` (${b.childrenAges})` : ""}`,
+      ``,
+      `*Total: ${total}€ (${totalDH.toLocaleString()} DH)*`,
+      b.collectedAt ? `Status: PAID` : ``,
+      ``,
+      `Issued by Call a Nanny · callanannycare.com`,
+    ].filter(Boolean).join("\n");
+
+    const phone = (b.clientPhone || "").replace(/[^0-9]/g, "");
+    return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+  };
+
+  const handleBookingShareWhatsApp = (b: Booking) => {
+    if (!b.clientPhone) {
+      alert("No phone number on file for this client.");
+      return;
+    }
+    window.open(buildBookingWhatsAppLink(b), "_blank");
+  };
+
+  const handleBookingSendEmail = async (b: Booking) => {
+    if (!b.clientEmail) {
+      alert("No email address on file for this client.");
+      return;
+    }
+    setEmailSending(b.id);
+    try {
+      await resendInvoice(b.id);
+      alert(`Invoice emailed to ${b.clientEmail}`);
+    } catch {
+      alert("Failed to send invoice email. Please try again.");
+    }
+    setEmailSending(null);
+  };
+
   // Download a combined invoice PDF for all (non-cancelled) bookings of a parent
   const downloadParentInvoice = (p: ParentSummary) => {
     const activeBookings = [...p.bookings]
@@ -591,6 +715,23 @@ export default function AdminParents() {
                   <CircleDashed className="w-3 h-3" /> Collect
                 </button>
               )
+            )}
+            {!isCancelled && b.status === "completed" && (
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleBookingSendEmail(b); }}
+                  disabled={emailSending === b.id}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer"
+                >
+                  {emailSending === b.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Email
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleBookingShareWhatsApp(b); }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors cursor-pointer"
+                >
+                  <MessageCircle className="w-3 h-3" /> WhatsApp
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -845,6 +986,12 @@ export default function AdminParents() {
                         >
                           <Download className="w-3 h-3" /> Invoice PDF
                         </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setViewParentInvoice(p); }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors cursor-pointer w-fit"
+                        >
+                          <Share2 className="w-3 h-3" /> Share Invoice
+                        </button>
                       </div>
                     </td>
                     <td className="px-5 py-3 text-xs text-muted-foreground max-w-[140px] truncate">{p.nannyNames.join(", ") || "—"}</td>
@@ -904,6 +1051,12 @@ export default function AdminParents() {
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer"
                   >
                     <Download className="w-3 h-3" /> Invoice PDF
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setViewParentInvoice(p); }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" /> Share
                   </button>
                   {expandedParent === p.key ? (
                     <ChevronUp className="w-4 h-4 ml-auto shrink-0" />
@@ -1402,6 +1555,147 @@ export default function AdminParents() {
           </div>
         </div>
       )}
+
+      {/* ── Parent Invoice Share Modal ── */}
+      {viewParentInvoice && (() => {
+        const p = viewParentInvoice;
+        const activeBookings = [...p.bookings]
+          .filter((b) => b.status !== "cancelled")
+          .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+        const total = p.totalPrice;
+        const totalDH = toDH(total);
+        const isPaid = p.unpaidCount === 0 && p.paidCount > 0;
+        return (
+          <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-[8vh] overflow-y-auto" onClick={() => setViewParentInvoice(null)}>
+            <div className="w-full max-w-lg bg-card rounded-2xl shadow-xl border border-border overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              {/* Header */}
+              <div className="gradient-warm px-6 py-5 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-white/70 text-xs font-semibold uppercase tracking-wider">Invoice</p>
+                    <h2 className="text-2xl font-serif font-bold">{p.name}</h2>
+                  </div>
+                  <button onClick={() => setViewParentInvoice(null)} className="p-1.5 rounded-lg hover:bg-white/20 text-white/80 transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <p className="text-white/70 text-xs mt-1">{format(new Date(), "dd MMMM yyyy")} · {activeBookings.length} booking{activeBookings.length !== 1 ? "s" : ""}</p>
+                {isPaid && (
+                  <div className="mt-2 inline-flex items-center gap-1.5 bg-green-500/90 text-white px-4 py-1.5 rounded-full text-sm font-bold tracking-wide shadow-lg">
+                    <DollarSign className="w-4 h-4" /> PAID
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 space-y-5">
+                {/* From / To */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold mb-1">From</p>
+                    <p className="text-sm font-semibold text-foreground">Call a Nanny</p>
+                    <p className="text-xs text-muted-foreground">Professional Childcare</p>
+                    <p className="text-xs text-muted-foreground">Marrakech, Morocco</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold mb-1">Billed To</p>
+                    <p className="text-sm font-semibold text-foreground">{p.name}</p>
+                    {p.email && <p className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="w-3 h-3" />{p.email}</p>}
+                    {p.phone && <p className="text-xs text-muted-foreground flex items-center gap-1">{p.phone}</p>}
+                    {p.hotel && <p className="text-xs text-muted-foreground flex items-center gap-1">{p.hotel}</p>}
+                  </div>
+                </div>
+
+                {/* Booking Details */}
+                <div className="border border-border rounded-xl overflow-hidden">
+                  <div className="bg-muted/30 px-4 py-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Booking Details</p>
+                  </div>
+                  <div className="divide-y divide-border max-h-48 overflow-y-auto">
+                    {activeBookings.map((b) => {
+                      const hours = hoursForBooking(b);
+                      return (
+                        <div key={b.id} className="flex justify-between px-4 py-2 text-xs">
+                          <div className="flex items-center gap-3">
+                            <span className="text-muted-foreground">{b.date ? format(parseISO(b.date), "dd MMM") : "—"}</span>
+                            <span className="text-foreground">{b.startTime || "—"} – {b.endTime || "—"}</span>
+                            <span className="text-muted-foreground">{hours.toFixed(1)}h</span>
+                          </div>
+                          <span className="font-bold text-foreground">{(b.totalPrice || 0)}€</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Summary */}
+                <div className="border border-border rounded-xl overflow-hidden">
+                  <div className="bg-muted/30 px-4 py-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Summary</p>
+                  </div>
+                  <div className="divide-y divide-border">
+                    <div className="flex justify-between px-4 py-2.5">
+                      <span className="text-sm text-muted-foreground">Bookings</span>
+                      <span className="text-sm font-medium text-foreground">{activeBookings.length}</span>
+                    </div>
+                    <div className="flex justify-between px-4 py-2.5">
+                      <span className="text-sm text-muted-foreground">Total Hours</span>
+                      <span className="text-sm font-medium text-foreground">{p.totalHours.toFixed(1)}h</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Total */}
+                <div className={`rounded-xl p-5 text-center ${isPaid ? "bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200" : "bg-gradient-to-r from-orange-50 to-pink-50"}`}>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{isPaid ? "Total Charged" : "Total Amount"}</p>
+                  <p className="text-3xl font-bold text-foreground">{total.toLocaleString()} <span className="text-lg text-muted-foreground">€</span></p>
+                  <p className="text-sm text-muted-foreground mt-1">{totalDH.toLocaleString()} DH</p>
+                  {isPaid && (
+                    <p className="text-base font-bold text-green-600 mt-2 tracking-widest">PAID</p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={() => setViewParentInvoice(null)}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium text-muted-foreground border border-border rounded-xl hover:bg-muted transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4" /> Back
+                  </button>
+                  <button
+                    onClick={() => { downloadParentInvoice(p); }}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium text-white gradient-warm rounded-xl hover:opacity-90 transition-opacity shadow-warm"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download PDF
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleParentSendEmail(p)}
+                    disabled={emailSendingParent}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors"
+                  >
+                    {emailSendingParent ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                    Send by Email
+                  </button>
+                  <button
+                    onClick={() => handleParentShareWhatsApp(p)}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-xl hover:bg-green-100 transition-colors"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Share via WhatsApp
+                  </button>
+                </div>
+              </div>
+
+              <div className="px-6 py-3 border-t border-border text-center">
+                <p className="text-[10px] text-muted-foreground">Issued by Call a Nanny · callanannycare.com</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
