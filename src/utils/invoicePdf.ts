@@ -11,21 +11,36 @@ export function downloadInvoicePdf(
   invoiceBodyHtml: string,
   filename: string,
 ) {
-  const wrapper = `<div style="width:750px;font-family:Helvetica,Arial,sans-serif;">${invoiceBodyHtml}</div>`;
+  // Create an on-screen container (visible to html2canvas but hidden from user)
+  const container = document.createElement("div");
+  container.style.position = "absolute";
+  container.style.left = "0";
+  container.style.top = "0";
+  container.style.zIndex = "-9999";
+  container.style.opacity = "0";
+  container.style.width = "750px";
+  container.style.fontFamily = "Helvetica, Arial, sans-serif";
+  container.style.overflow = "hidden";
+  container.innerHTML = invoiceBodyHtml;
+  document.body.appendChild(container);
 
   const opt = {
     margin: [0, 0, 0, 0],
     filename,
     image: { type: "jpeg", quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, logging: false },
+    html2canvas: { scale: 2, useCORS: true, logging: true },
     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" as const },
   };
 
   html2pdf()
     .set(opt)
-    .from(wrapper, "string")
+    .from(container)
     .save()
+    .then(() => {
+      document.body.removeChild(container);
+    })
     .catch((err: unknown) => {
       console.error("Invoice PDF generation failed:", err);
+      if (container.parentNode) document.body.removeChild(container);
     });
 }
