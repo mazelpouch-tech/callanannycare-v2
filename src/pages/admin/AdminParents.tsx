@@ -404,11 +404,11 @@ export default function AdminParents() {
         : `${b.startTime || "—"} – ${b.endTime || "—"}`;
       const dateStr = b.date ? format(parseISO(b.date), "dd MMM yyyy") : "—";
       return `<tr>
-        <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:12px;color:#666;">${dateStr}</td>
-        <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:12px;">${timeRange}</td>
-        <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:12px;">${hours.toFixed(1)}h</td>
-        <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:12px;">${b.nannyName || "—"}</td>
-        <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:12px;font-weight:600;text-align:right;">${(b.totalPrice || 0).toLocaleString()}€</td>
+        <td>${dateStr}</td>
+        <td>${timeRange}</td>
+        <td>${hours.toFixed(1)}h</td>
+        <td>${b.nannyName || "—"}</td>
+        <td>${(b.totalPrice || 0).toLocaleString()}€</td>
       </tr>`;
     }).join("");
 
@@ -416,77 +416,104 @@ export default function AdminParents() {
     const totalDH = toDH(total);
     const invoiceDate = format(new Date(), "dd MMMM yyyy");
 
+    const isPaid = p.unpaidCount === 0 && p.paidCount > 0;
+
     const html = `<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8"/>
 <title>Invoice - ${p.name}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; padding: 40px; max-width: 750px; margin: 0 auto; }
-  .header { background: linear-gradient(135deg, #f97316, #ec4899); color: white; padding: 32px; border-radius: 16px 16px 0 0; display: flex; align-items: center; justify-content: space-between; }
-  .header-left { display: flex; align-items: center; gap: 14px; }
-  .header-logo { width: 56px; height: 56px; border-radius: 12px; background: white; padding: 3px; }
-  .header h1 { font-size: 28px; font-weight: 700; }
-  .header .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.8; margin-bottom: 4px; }
-  .header .date { font-size: 12px; opacity: 0.7; margin-top: 6px; }
-  .content { border: 1px solid #e5e5e5; border-top: none; padding: 32px; border-radius: 0 0 16px 16px; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
-  .grid2 .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; font-weight: 600; margin-bottom: 6px; }
-  .grid2 .name { font-size: 14px; font-weight: 600; }
-  .grid2 .sub { font-size: 12px; color: #666; margin-top: 2px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-  thead th { background: #f9f9f9; padding: 10px 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #888; text-align: left; border-bottom: 2px solid #e5e5e5; }
-  thead th:last-child { text-align: right; }
-  .summary { display: flex; justify-content: flex-end; margin-bottom: 24px; }
-  .summary-box { border: 1px solid #e5e5e5; border-radius: 12px; padding: 8px 0; min-width: 220px; }
-  .summary-row { display: flex; justify-content: space-between; padding: 6px 16px; font-size: 13px; }
-  .summary-row .key { color: #666; }
-  .summary-row .val { font-weight: 500; }
-  .summary-row.total { border-top: 2px solid #e5e5e5; margin-top: 4px; padding-top: 10px; font-weight: 700; font-size: 15px; }
-  .total-box { background: linear-gradient(135deg, #fff7ed, #fdf2f8); border-radius: 12px; padding: 28px; text-align: center; margin: 24px 0; }
-  .total-box .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 4px; }
-  .total-box .amount { font-size: 32px; font-weight: 700; }
-  .total-box .sub { font-size: 14px; color: #888; margin-top: 4px; }
-  .footer { text-align: center; padding-top: 20px; border-top: 1px solid #e5e5e5; font-size: 10px; color: #aaa; }
-  .note { background: #f9f9f9; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 12px; color: #666; }
-  @media print { body { padding: 20px; } @page { margin: 10mm; } }
+  body { font-family: 'Segoe UI', Roboto, -apple-system, sans-serif; color: #2d3748; background: #fff; padding: 0; margin: 0; }
+  .page { max-width: 720px; margin: 0 auto; padding: 48px 44px; }
+  .top-bar { height: 6px; background: linear-gradient(90deg, #f97316, #fb923c, #fdba74); }
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 36px 0 28px; border-bottom: 1px solid #e2e8f0; }
+  .brand { display: flex; align-items: center; gap: 16px; }
+  .brand img { width: 52px; height: 52px; border-radius: 14px; }
+  .brand-name { font-size: 20px; font-weight: 700; color: #1a202c; }
+  .brand-sub { font-size: 11px; color: #a0aec0; margin-top: 2px; letter-spacing: 0.5px; }
+  .inv-title { text-align: right; }
+  .inv-title h1 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 3px; color: #f97316; }
+  .inv-title .num { font-size: 20px; font-weight: 800; color: #1a202c; margin-top: 4px; }
+  .inv-title .date { font-size: 12px; color: #a0aec0; margin-top: 4px; }
+  .addresses { display: flex; gap: 40px; padding: 28px 0; }
+  .addr { flex: 1; }
+  .addr-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #f97316; margin-bottom: 10px; }
+  .addr-name { font-size: 15px; font-weight: 700; color: #1a202c; margin-bottom: 4px; }
+  .addr-line { font-size: 12px; color: #718096; line-height: 1.8; }
+  .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #a0aec0; margin: 28px 0 12px; padding-bottom: 8px; border-bottom: 2px solid #f97316; display: inline-block; }
+  .detail-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  .detail-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #a0aec0; font-weight: 600; padding: 10px 16px; text-align: left; border-bottom: 2px solid #edf2f7; }
+  .detail-table th:last-child { text-align: right; }
+  .detail-table td { font-size: 13px; padding: 11px 16px; border-bottom: 1px solid #f7fafc; color: #4a5568; }
+  .detail-table td:last-child { text-align: right; font-weight: 600; color: #2d3748; }
+  .detail-table tr:nth-child(even) { background: #fafbfc; }
+  .totals { display: flex; justify-content: flex-end; margin: 24px 0; }
+  .totals-box { min-width: 260px; }
+  .totals-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; color: #718096; }
+  .totals-row .val { font-weight: 600; color: #2d3748; }
+  .totals-row.grand { border-top: 2px solid #f97316; margin-top: 8px; padding-top: 14px; }
+  .totals-row.grand span { font-size: 22px; font-weight: 800; color: #1a202c; }
+  .totals-row .dh { font-size: 12px; color: #a0aec0; font-weight: 400; margin-left: 8px; }
+  .paid-badge { display: inline-block; background: #dcfce7; color: #166534; padding: 6px 20px; border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; margin-top: 8px; }
+  .paid .totals-row.grand span { color: #16a34a; }
+  .notes-box { background: #fffbeb; border-left: 3px solid #f97316; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  .notes-box .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #b45309; font-weight: 700; margin-bottom: 4px; }
+  .notes-box p { font-size: 12px; color: #78350f; line-height: 1.6; }
+  .footer { text-align: center; padding: 28px 0 0; margin-top: 32px; border-top: 1px solid #edf2f7; }
+  .footer-brand { font-size: 14px; font-weight: 700; color: #1a202c; }
+  .footer-sub { font-size: 11px; color: #a0aec0; margin-top: 4px; }
+  .footer-thanks { font-size: 12px; color: #f97316; font-weight: 600; margin-top: 10px; }
+  .status-badge { display: inline-block; padding: 4px 14px; border-radius: 12px; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+  @media print { body { padding: 0; } .page { padding: 24px; } @page { margin: 8mm; } .top-bar { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
 </style>
 </head><body>
-<div class="header" style="${p.unpaidCount === 0 && p.paidCount > 0 ? "background: linear-gradient(135deg, #16a34a, #059669);" : ""}">
-  <div class="header-left">
-    <img class="header-logo" src="${INVOICE_LOGO_BASE64}" />
-    <div>
-      <div class="label">Invoice${p.unpaidCount === 0 && p.paidCount > 0 ? " · Paid" : ""}</div>
-      <h1>${p.name}</h1>
+<div class="top-bar"></div>
+<div class="page">
+  <div class="header">
+    <div class="brand">
+      <img src="${INVOICE_LOGO_BASE64}" />
+      <div>
+        <div class="brand-name">Call a Nanny</div>
+        <div class="brand-sub">Professional Childcare Services</div>
+      </div>
+    </div>
+    <div class="inv-title">
+      <h1>Invoice</h1>
+      <div class="num">${p.name}</div>
       <div class="date">${invoiceDate} · ${activeBookings.length} booking${activeBookings.length !== 1 ? "s" : ""}</div>
-    </div>
-  </div>
-</div>
-<div class="content">
-  <div class="grid2">
-    <div>
-      <div class="label">From</div>
-      <div class="name">Call a Nanny</div>
-      <div class="sub">Professional Childcare</div>
-      <div class="sub">Marrakech, Morocco</div>
-    </div>
-    <div>
-      <div class="label">Billed To</div>
-      <div class="name">${p.name}</div>
-      ${p.email ? `<div class="sub">${p.email}</div>` : ""}
-      ${p.phone ? `<div class="sub">${p.phone}</div>` : ""}
-      ${p.hotel ? `<div class="sub">${p.hotel}</div>` : ""}
+      <div style="margin-top:8px;">
+        <span class="status-badge" style="background:${isPaid ? "#dcfce7" : "#fef3c7"};color:${isPaid ? "#166534" : "#92400e"};">${isPaid ? "PAID" : "UNPAID"}</span>
+      </div>
     </div>
   </div>
 
-  <table>
+  <div class="addresses">
+    <div class="addr">
+      <div class="addr-label">From</div>
+      <div class="addr-name">Call a Nanny</div>
+      <div class="addr-line">Professional Childcare</div>
+      <div class="addr-line">Marrakech, Morocco</div>
+      <div class="addr-line" style="color:#f97316;font-weight:600;margin-top:4px;">callanannycare.com</div>
+    </div>
+    <div class="addr">
+      <div class="addr-label">Billed To</div>
+      <div class="addr-name">${p.name}</div>
+      ${p.email ? `<div class="addr-line">${p.email}</div>` : ""}
+      ${p.phone ? `<div class="addr-line">${p.phone}</div>` : ""}
+      ${p.hotel ? `<div class="addr-line">${p.hotel}</div>` : ""}
+    </div>
+  </div>
+
+  <div class="section-title">Booking Details</div>
+  <table class="detail-table">
     <thead>
       <tr>
         <th>Date</th>
         <th>Time</th>
         <th>Hours</th>
         <th>Caregiver</th>
-        <th style="text-align:right">Amount</th>
+        <th>Amount</th>
       </tr>
     </thead>
     <tbody>
@@ -494,33 +521,28 @@ export default function AdminParents() {
     </tbody>
   </table>
 
-  <div class="summary">
-    <div class="summary-box">
-      <div class="summary-row">
-        <span class="key">Bookings</span>
-        <span class="val">${activeBookings.length}</span>
+  <div class="totals ${isPaid ? "paid" : ""}">
+    <div class="totals-box">
+      <div class="totals-row"><span>Bookings</span><span class="val">${activeBookings.length}</span></div>
+      <div class="totals-row"><span>Total Hours</span><span class="val">${p.totalHours.toFixed(1)}h</span></div>
+      <div class="totals-row grand">
+        <span>${isPaid ? "Paid" : "Total Due"}</span>
+        <span>${total.toLocaleString()} €<span class="dh">(${totalDH.toLocaleString()} DH)</span></span>
       </div>
-      <div class="summary-row">
-        <span class="key">Total Hours</span>
-        <span class="val">${p.totalHours.toFixed(1)}h</span>
-      </div>
-      <div class="summary-row total">
-        <span>Total</span>
-        <span>${total.toLocaleString()}€</span>
-      </div>
+      ${isPaid ? `<div style="text-align:right;"><span class="paid-badge">PAID</span></div>` : ""}
     </div>
   </div>
 
-  <div class="total-box" style="${p.unpaidCount === 0 && p.paidCount > 0 ? "background: linear-gradient(135deg, #ecfdf5, #d1fae5);" : ""}">
-    <div class="label">${p.unpaidCount === 0 && p.paidCount > 0 ? "Balance" : "Total Amount Due"}</div>
-    <div class="amount" style="${p.unpaidCount === 0 && p.paidCount > 0 ? "color: #16a34a;" : ""}">${p.unpaidCount === 0 && p.paidCount > 0 ? "0 €" : `${total.toLocaleString()} €`}</div>
-    <div class="sub">${p.unpaidCount === 0 && p.paidCount > 0 ? "0 DH" : `${totalDH.toLocaleString()} DH`}</div>
-    ${p.unpaidCount === 0 && p.paidCount > 0 ? `<div style="margin-top:10px;display:inline-block;background:#16a34a;color:white;padding:4px 16px;border-radius:20px;font-size:13px;font-weight:700;letter-spacing:1px;">PAID</div>` : ""}
+  <div class="notes-box">
+    <div class="lbl">Note</div>
+    <p>${isPaid ? "All payments have been received. Thank you for choosing Call a Nanny." : "Payment is due upon completion of service. Thank you for choosing Call a Nanny."}</p>
   </div>
 
-  <div class="note">${p.unpaidCount === 0 && p.paidCount > 0 ? "All payments have been received. Thank you for choosing Call a Nanny." : "Payment is due upon completion of service. Thank you for choosing Call a Nanny."}</div>
-
-  <div class="footer">Issued by Call a Nanny · callanannycare.com</div>
+  <div class="footer">
+    <div class="footer-brand">Call a Nanny</div>
+    <div class="footer-sub">Professional Childcare Services · Marrakech, Morocco</div>
+    <div class="footer-thanks">Thank you for choosing Call a Nanny!</div>
+  </div>
 </div>
 </body></html>`;
 

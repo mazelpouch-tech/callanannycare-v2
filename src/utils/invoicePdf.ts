@@ -10,10 +10,10 @@ export function downloadInvoicePdf(
   invoiceFullHtml: string,
   _filename: string,
 ) {
-  const printWindow = window.open("", "_blank");
+  const printWindow = window.open("", "_blank", "toolbar=no,location=no,menubar=no,scrollbars=yes,width=820,height=1100");
   if (printWindow) {
     printWindow.document.write(invoiceFullHtml);
     printWindow.document.close();
-    setTimeout(() => printWindow.print(), 300);
+    setTimeout(() => printWindow.print(), 400);
   }
 }

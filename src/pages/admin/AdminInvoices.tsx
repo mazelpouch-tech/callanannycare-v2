@@ -312,87 +312,128 @@ export default function AdminInvoices() {
 <title>Invoice #INV-${inv.id}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; padding: 40px; max-width: 700px; margin: 0 auto; }
-  .header { background: linear-gradient(135deg, #f97316, #ec4899); color: white; padding: 32px; border-radius: 16px 16px 0 0; display: flex; align-items: center; justify-content: space-between; }
-  .header-left { display: flex; align-items: center; gap: 14px; }
-  .header-logo { width: 56px; height: 56px; border-radius: 12px; background: white; padding: 3px; }
-  .header h1 { font-size: 28px; font-weight: 700; }
-  .header .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.8; margin-bottom: 4px; }
-  .header .date { font-size: 12px; opacity: 0.7; margin-top: 6px; }
-  .content { border: 1px solid #e5e5e5; border-top: none; padding: 32px; border-radius: 0 0 16px 16px; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
-  .grid2 .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; font-weight: 600; margin-bottom: 6px; }
-  .grid2 .name { font-size: 14px; font-weight: 600; }
-  .grid2 .sub { font-size: 12px; color: #666; margin-top: 2px; }
-  .table-section { border: 1px solid #e5e5e5; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
-  .table-section .title { background: #f9f9f9; padding: 10px 16px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #888; }
-  .table-section .row { display: flex; justify-content: space-between; padding: 10px 16px; border-top: 1px solid #e5e5e5; font-size: 13px; }
-  .table-section .row .key { color: #666; }
-  .table-section .row .val { font-weight: 500; }
-  .table-section .row.taxi { color: #b45309; }
-  .total-box { background: linear-gradient(135deg, #fff7ed, #fdf2f8); border-radius: 12px; padding: 28px; text-align: center; margin: 24px 0; }
-  .total-box .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 4px; }
-  .total-box .amount { font-size: 32px; font-weight: 700; }
-  .total-box .sub { font-size: 14px; color: #888; margin-top: 4px; }
-  .notes { background: #f9f9f9; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
-  .notes .label { font-size: 11px; font-weight: 600; color: #888; margin-bottom: 4px; }
-  .notes p { font-size: 13px; }
-  .footer { text-align: center; padding-top: 20px; border-top: 1px solid #e5e5e5; font-size: 10px; color: #aaa; }
-  @media print { body { padding: 20px; } @page { margin: 10mm; } }
+  body { font-family: 'Segoe UI', Roboto, -apple-system, sans-serif; color: #2d3748; background: #fff; padding: 0; margin: 0; }
+  .page { max-width: 720px; margin: 0 auto; padding: 48px 44px; }
+  .top-bar { height: 6px; background: linear-gradient(90deg, #f97316, #fb923c, #fdba74); }
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 36px 0 28px; border-bottom: 1px solid #e2e8f0; }
+  .brand { display: flex; align-items: center; gap: 16px; }
+  .brand img { width: 52px; height: 52px; border-radius: 14px; }
+  .brand-name { font-size: 20px; font-weight: 700; color: #1a202c; }
+  .brand-sub { font-size: 11px; color: #a0aec0; margin-top: 2px; letter-spacing: 0.5px; }
+  .inv-title { text-align: right; }
+  .inv-title h1 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 3px; color: #f97316; }
+  .inv-title .num { font-size: 24px; font-weight: 800; color: #1a202c; margin-top: 4px; }
+  .inv-title .date { font-size: 12px; color: #a0aec0; margin-top: 4px; }
+  .addresses { display: flex; gap: 40px; padding: 28px 0; }
+  .addr { flex: 1; }
+  .addr-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #f97316; margin-bottom: 10px; }
+  .addr-name { font-size: 15px; font-weight: 700; color: #1a202c; margin-bottom: 4px; }
+  .addr-line { font-size: 12px; color: #718096; line-height: 1.8; }
+  .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #a0aec0; margin: 28px 0 12px; padding-bottom: 8px; border-bottom: 2px solid #f97316; display: inline-block; }
+  .detail-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  .detail-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #a0aec0; font-weight: 600; padding: 10px 16px; text-align: left; border-bottom: 2px solid #edf2f7; }
+  .detail-table th:last-child { text-align: right; }
+  .detail-table td { font-size: 13px; padding: 11px 16px; border-bottom: 1px solid #f7fafc; color: #4a5568; }
+  .detail-table td:last-child { text-align: right; font-weight: 600; color: #2d3748; }
+  .detail-table tr:nth-child(even) { background: #fafbfc; }
+  .detail-table .taxi td { color: #c2410c; font-style: italic; }
+  .totals { display: flex; justify-content: flex-end; margin: 24px 0; }
+  .totals-box { min-width: 260px; }
+  .totals-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; color: #718096; }
+  .totals-row .val { font-weight: 600; color: #2d3748; }
+  .totals-row.grand { border-top: 2px solid #f97316; margin-top: 8px; padding-top: 14px; }
+  .totals-row.grand span { font-size: 22px; font-weight: 800; color: #1a202c; }
+  .totals-row .dh { font-size: 12px; color: #a0aec0; font-weight: 400; margin-left: 8px; }
+  .paid-badge { display: inline-block; background: #dcfce7; color: #166534; padding: 6px 20px; border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; margin-top: 8px; }
+  .paid .totals-row.grand span { color: #16a34a; }
+  .notes-box { background: #fffbeb; border-left: 3px solid #f97316; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+  .notes-box .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #b45309; font-weight: 700; margin-bottom: 4px; }
+  .notes-box p { font-size: 12px; color: #78350f; line-height: 1.6; }
+  .footer { text-align: center; padding: 28px 0 0; margin-top: 32px; border-top: 1px solid #edf2f7; }
+  .footer-brand { font-size: 14px; font-weight: 700; color: #1a202c; }
+  .footer-sub { font-size: 11px; color: #a0aec0; margin-top: 4px; }
+  .footer-thanks { font-size: 12px; color: #f97316; font-weight: 600; margin-top: 10px; }
+  .status-badge { display: inline-block; padding: 4px 14px; border-radius: 12px; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+  @media print { body { padding: 0; } .page { padding: 24px; } @page { margin: 8mm; } .top-bar { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
 </style>
 </head><body>
-<div class="header" style="${inv.collectedAt ? "background: linear-gradient(135deg, #16a34a, #059669);" : ""}">
-  <div class="header-left">
-    <img class="header-logo" src="${INVOICE_LOGO_BASE64}" />
-    <div>
-      <div class="label">Invoice${inv.collectedAt ? " · Paid" : ""}</div>
-      <h1>#INV-${inv.id}</h1>
+<div class="top-bar"></div>
+<div class="page">
+  <div class="header">
+    <div class="brand">
+      <img src="${INVOICE_LOGO_BASE64}" />
+      <div>
+        <div class="brand-name">Call a Nanny</div>
+        <div class="brand-sub">Professional Childcare Services</div>
+      </div>
+    </div>
+    <div class="inv-title">
+      <h1>Invoice</h1>
+      <div class="num">#INV-${inv.id}</div>
       <div class="date">${dateStr}</div>
-    </div>
-  </div>
-</div>
-<div class="content">
-  <div class="grid2">
-    <div>
-      <div class="label">From</div>
-      <div class="name">Call a Nanny</div>
-      <div class="sub">Professional Childcare</div>
-      <div class="sub">Marrakech, Morocco</div>
-    </div>
-    <div>
-      <div class="label">Billed To</div>
-      <div class="name">${inv.clientName || "N/A"}</div>
-      ${inv.clientEmail ? `<div class="sub">${inv.clientEmail}</div>` : ""}
-      ${inv.clientPhone ? `<div class="sub">${inv.clientPhone}</div>` : ""}
-      ${inv.hotel ? `<div class="sub">${inv.hotel}</div>` : ""}
+      <div style="margin-top:8px;">
+        <span class="status-badge" style="background:${inv.collectedAt ? "#dcfce7" : "#fef3c7"};color:${inv.collectedAt ? "#166534" : "#92400e"};">${inv.collectedAt ? "PAID" : "UNPAID"}</span>
+      </div>
     </div>
   </div>
 
-  <div class="table-section">
-    <div class="title">Service Details</div>
-    <div class="row"><span class="key">Caregiver</span><span class="val">${inv.nannyName || "Unassigned"}</span></div>
-    <div class="row"><span class="key">Clock In</span><span class="val">${formatClockTime(inv.clockIn)}</span></div>
-    <div class="row"><span class="key">Clock Out</span><span class="val">${formatClockTime(inv.clockOut)}</span></div>
-    <div class="row"><span class="key">Hours Worked</span><span class="val">${hours}h</span></div>
-    <div class="row"><span class="key">Children</span><span class="val">${inv.childrenCount || 1}${inv.childrenAges ? ` (${inv.childrenAges})` : ""}</span></div>
+  <div class="addresses">
+    <div class="addr">
+      <div class="addr-label">From</div>
+      <div class="addr-name">Call a Nanny</div>
+      <div class="addr-line">Professional Childcare</div>
+      <div class="addr-line">Marrakech, Morocco</div>
+      <div class="addr-line" style="color:#f97316;font-weight:600;margin-top:4px;">callanannycare.com</div>
+    </div>
+    <div class="addr">
+      <div class="addr-label">Billed To</div>
+      <div class="addr-name">${inv.clientName || "N/A"}</div>
+      ${inv.clientEmail ? `<div class="addr-line">${inv.clientEmail}</div>` : ""}
+      ${inv.clientPhone ? `<div class="addr-line">${inv.clientPhone}</div>` : ""}
+      ${inv.hotel ? `<div class="addr-line">${inv.hotel}</div>` : ""}
+    </div>
   </div>
 
-  <div class="table-section">
-    <div class="title">Price Breakdown</div>
-    <div class="row"><span class="key">${hours}h × ${SERVICE_RATE}€/hr</span><span class="val">${basePay}€</span></div>
-    ${hasTaxi ? `<div class="row taxi"><span class="key">Taxi fee (7 PM – 7 AM)</span><span class="val">+${TAXI_FEE}€</span></div>` : ""}
+  <div class="section-title">Service Details</div>
+  <table class="detail-table">
+    <thead><tr><th>Description</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>Caregiver</td><td>${inv.nannyName || "Unassigned"}</td></tr>
+      <tr><td>Clock In</td><td>${formatClockTime(inv.clockIn)}</td></tr>
+      <tr><td>Clock Out</td><td>${formatClockTime(inv.clockOut)}</td></tr>
+      <tr><td>Hours Worked</td><td>${hours}h</td></tr>
+      <tr><td>Children</td><td>${inv.childrenCount || 1}${inv.childrenAges ? ` (${inv.childrenAges})` : ""}</td></tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">Charges</div>
+  <table class="detail-table">
+    <thead><tr><th>Item</th><th>Amount</th></tr></thead>
+    <tbody>
+      <tr><td>Childcare service — ${hours}h × ${SERVICE_RATE}€/hr</td><td>${basePay}€</td></tr>
+      ${hasTaxi ? `<tr class="taxi"><td>Taxi fee (evening/night)</td><td>+${TAXI_FEE}€</td></tr>` : ""}
+    </tbody>
+  </table>
+
+  <div class="totals ${inv.collectedAt ? "paid" : ""}">
+    <div class="totals-box">
+      <div class="totals-row"><span>Subtotal</span><span class="val">${basePay}€</span></div>
+      ${hasTaxi ? `<div class="totals-row"><span>Taxi fee</span><span class="val">${TAXI_FEE}€</span></div>` : ""}
+      <div class="totals-row grand">
+        <span>${inv.collectedAt ? "Paid" : "Total Due"}</span>
+        <span>${total.toLocaleString()} €<span class="dh">(${totalDH.toLocaleString()} DH)</span></span>
+      </div>
+      ${inv.collectedAt ? `<div style="text-align:right;"><span class="paid-badge">PAID</span></div>` : ""}
+    </div>
   </div>
 
-  <div class="total-box" style="${inv.collectedAt ? "background: linear-gradient(135deg, #ecfdf5, #d1fae5);" : ""}">
-    <div class="label">${inv.collectedAt ? "Balance" : "Total Amount"}</div>
-    <div class="amount" style="${inv.collectedAt ? "color: #16a34a;" : ""}">${inv.collectedAt ? "0 €" : `${total.toLocaleString()} €`}</div>
-    <div class="sub">${inv.collectedAt ? "0 DH" : `${totalDH.toLocaleString()} DH`}</div>
-    ${inv.collectedAt ? `<div style="margin-top:10px;display:inline-block;background:#16a34a;color:white;padding:4px 16px;border-radius:20px;font-size:13px;font-weight:700;letter-spacing:1px;">PAID</div>` : ""}
+  ${inv.notes ? `<div class="notes-box"><div class="lbl">Notes</div><p>${inv.notes}</p></div>` : ""}
+
+  <div class="footer">
+    <div class="footer-brand">Call a Nanny</div>
+    <div class="footer-sub">Professional Childcare Services · Marrakech, Morocco</div>
+    <div class="footer-thanks">Thank you for choosing Call a Nanny!</div>
   </div>
-
-  ${inv.notes ? `<div class="notes"><div class="label">Notes</div><p>${inv.notes}</p></div>` : ""}
-
-  <div class="footer">Issued by Call a Nanny · callanannycare.com</div>
 </div>
 </body></html>`;
 
