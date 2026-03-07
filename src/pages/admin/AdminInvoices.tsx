@@ -319,7 +319,7 @@ export default function AdminInvoices() {
   .header-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; opacity: 0.85; }
   .header-num { font-size: 28px; font-weight: 800; margin: 2px 0 4px; }
   .header-date { font-size: 13px; opacity: 0.85; }
-  .paid-badge { display: inline-block; background: rgba(255,255,255,0.25); color: #fff; padding: 3px 12px; border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; margin-top: 6px; }
+  .paid-badge { display: inline-block; background: rgba(255,255,255,0.25); color: #fff; padding: 6px 18px; border-radius: 20px; font-size: 14px; font-weight: 700; letter-spacing: 2px; margin-top: 6px; }
   .body-content { padding: 16px 24px 20px; }
   .addresses { display: flex; gap: 20px; margin-bottom: 16px; }
   .addr { flex: 1; }
@@ -343,7 +343,7 @@ export default function AdminInvoices() {
   .total-amount { font-size: 36px; font-weight: 800; color: #fff; }
   .total-amount .currency { font-size: 22px; font-weight: 600; vertical-align: super; margin-left: 2px; opacity: 0.85; }
   .total-dh { font-size: 14px; color: rgba(255,255,255,0.75); margin-top: 2px; }
-  .total-paid-note { font-size: 11px; color: rgba(255,255,255,0.8); margin-top: 6px; font-weight: 600; letter-spacing: 1px; }
+  .total-paid-note { font-size: 15px; color: rgba(255,255,255,0.9); margin-top: 8px; font-weight: 800; letter-spacing: 2px; }
   @media print {
     body { background: #fff; padding: 0; margin: 0; }
     .page { max-width: 100%; margin: 0; }
