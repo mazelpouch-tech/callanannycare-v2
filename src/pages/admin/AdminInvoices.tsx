@@ -308,11 +308,7 @@ export default function AdminInvoices() {
 
     const invoiceNum = `INV-${String(inv.id).padStart(4, "0")}`;
 
-    const html = `<!DOCTYPE html>
-<html><head>
-<meta charset="utf-8"/>
-<title>${invoiceNum}</title>
-<style>
+    const html = `<style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; background: #fff; padding: 0; margin: 0; }
   .page { max-width: 750px; margin: 0 auto; padding: 0; }
@@ -383,7 +379,6 @@ export default function AdminInvoices() {
 
   @media print { @page { margin: 0; } }
 </style>
-</head><body>
 <div class="page">
 
   <!-- Header band with logo -->
@@ -489,8 +484,7 @@ export default function AdminInvoices() {
     <div class="footer-thanks">Thank you for choosing Call a Nanny!</div>
   </div>
 
-</div>
-</body></html>`;
+</div>`;
 
     downloadInvoicePdf(html, `Invoice_INV-${inv.id}.pdf`);
   };

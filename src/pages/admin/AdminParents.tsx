@@ -394,6 +394,7 @@ export default function AdminParents() {
   // Download a combined invoice PDF for all (non-cancelled) bookings of a parent
   const downloadParentInvoice = (p: ParentSummary) => {
     try {
+    alert("PDF generation started for " + p.name);
     const activeBookings = [...p.bookings]
       .filter((b) => b.status !== "cancelled")
       .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
@@ -418,11 +419,7 @@ export default function AdminParents() {
     const invoiceDate = format(new Date(), "dd MMMM yyyy");
     const allPaid = p.unpaidCount === 0 && p.paidCount > 0;
 
-    const html = `<!DOCTYPE html>
-<html><head>
-<meta charset="utf-8"/>
-<title>Invoice - ${p.name}</title>
-<style>
+    const html = `<style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; background: #fff; padding: 0; margin: 0; }
   .page { max-width: 750px; margin: 0 auto; padding: 0; }
@@ -491,7 +488,6 @@ export default function AdminParents() {
 
   @media print { @page { margin: 0; } }
 </style>
-</head><body>
 <div class="page">
 
   <!-- Header band with logo -->
@@ -589,8 +585,7 @@ export default function AdminParents() {
     <div class="footer-thanks">Thank you for choosing Call a Nanny!</div>
   </div>
 
-</div>
-</body></html>`;
+</div>`;
 
     const safeName = p.name.replace(/[^a-zA-Z0-9]/g, "_");
     downloadInvoicePdf(html, `Invoice_${safeName}.pdf`);
