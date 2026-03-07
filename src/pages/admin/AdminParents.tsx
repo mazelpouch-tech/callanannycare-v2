@@ -15,6 +15,8 @@ import {
   Filter,
   CalendarDays,
   Download,
+  TimerReset,
+  Loader2,
 } from "lucide-react";
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -50,6 +52,16 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
 const SERVICE_RATE = 10; // €/hr
 const TAXI_FEE = 10;
 
+// 24h time slots from 06:00 to 05:45 (business-day ordering, 15-min steps)
+const TIME_SLOTS: { value: string; label: string }[] = [];
+for (let i = 0; i < 96; i++) {
+  const h = (6 + Math.floor(i / 4)) % 24;
+  const m = (i % 4) * 15;
+  const hh = String(h).padStart(2, "0");
+  const mm = String(m).padStart(2, "0");
+  TIME_SLOTS.push({ value: `${h}:${mm}`, label: `${hh}h${mm}` });
+}
+
 function hoursForBooking(b: Booking): number {
   if (!b.startTime || !b.endTime) return 0;
   return calcTotalBookedHours(b.startTime, b.endTime, b.extraTimes, b.date, b.endDate);
@@ -65,7 +77,7 @@ function formatClockTime(iso: string | null): string {
 }
 
 export default function AdminParents() {
-  const { bookings, markAsCollected, adminProfile } = useData();
+  const { bookings, markAsCollected, updateBooking, adminProfile } = useData();
   const { toDH } = useExchangeRate();
 
   const [search, setSearch] = useState("");
@@ -84,12 +96,65 @@ export default function AdminParents() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
 
+  // Modify hours modal state
+  const [modifyingBooking, setModifyingBooking] = useState<Booking | null>(null);
+  const [modifyStart, setModifyStart] = useState("");
+  const [modifyEnd, setModifyEnd] = useState("");
+  const [modifySaving, setModifySaving] = useState(false);
+
   const closeModal = () => {
     setCollectingBooking(null);
     setCollectingParent(null);
     setPaymentMethod("cash");
     setCollectionNote("");
     setBulkProgress(0);
+  };
+
+  const closeModifyModal = () => {
+    setModifyingBooking(null);
+    setModifyStart("");
+    setModifyEnd("");
+    setModifySaving(false);
+  };
+
+  const openModifyModal = (b: Booking) => {
+    setModifyingBooking(b);
+    setModifyStart(b.startTime || "");
+    setModifyEnd(b.endTime || "");
+  };
+
+  const handleModifyHours = async () => {
+    if (!modifyingBooking || !modifyStart || !modifyEnd) return;
+    setModifySaving(true);
+    try {
+      // Calculate new price
+      const nanny = bookings.find(bk => bk.nannyId === modifyingBooking.nannyId);
+      const rate = SERVICE_RATE;
+      const startH = parseFloat(modifyStart.replace("h", ".").replace(/(\d{2})\.(\d{2})/, (_, h, m) => String(parseInt(h) + parseInt(m) / 60)));
+      const endH = parseFloat(modifyEnd.replace("h", ".").replace(/(\d{2})\.(\d{2})/, (_, h, m) => String(parseInt(h) + parseInt(m) / 60)));
+      const hours = endH > startH ? endH - startH : (24 - startH) + endH;
+      const days = modifyingBooking.endDate && modifyingBooking.endDate !== modifyingBooking.date
+        ? Math.max(1, Math.round((new Date(modifyingBooking.endDate).getTime() - new Date(modifyingBooking.date).getTime()) / 86400000) + 1)
+        : 1;
+      // Check evening hours for taxi fee
+      const sH = parseInt(modifyStart.split("h")[0]);
+      const eH = parseInt(modifyEnd.split("h")[0]);
+      const eM = parseInt(modifyEnd.split("h")[1] || "0");
+      const isOvernight = (eH + eM / 60) <= sH;
+      const isEvening = isOvernight || sH >= 19 || sH < 7 || eH > 19 || (eH === 19 && eM > 0);
+      const taxiFee = isEvening ? TAXI_FEE * days : 0;
+      const newPrice = Math.round(rate * hours * days) + taxiFee;
+
+      await updateBooking(modifyingBooking.id, {
+        startTime: modifyStart,
+        endTime: modifyEnd,
+        totalPrice: newPrice,
+      }, { skipConflictCheck: true });
+      closeModifyModal();
+    } catch (err) {
+      console.error("Modify hours failed:", err);
+      setModifySaving(false);
+    }
   };
 
   // Single booking collection
@@ -413,9 +478,20 @@ export default function AdminParents() {
             <span className="text-muted-foreground">{hours.toFixed(1)}h</span>
             <span className="text-foreground truncate">{b.nannyName || "Unassigned"}</span>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
             <span className="font-bold text-foreground">{(b.totalPrice || 0).toLocaleString()}&euro;</span>
             <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.cls}`}>{st.label}</span>
+            {!isCancelled && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openModifyModal(b);
+                }}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer"
+              >
+                <TimerReset className="w-3 h-3" /> Modify
+              </button>
+            )}
             {!isCancelled && (
               isPaid ? (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
@@ -941,6 +1017,140 @@ export default function AdminParents() {
           </div>
         );
       })()}
+
+      {/* Modify Hours Modal */}
+      {modifyingBooking && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm" onClick={() => !modifySaving && closeModifyModal()} />
+          <div className="relative bg-card rounded-t-3xl sm:rounded-2xl border border-border w-full sm:max-w-md mx-auto shadow-xl z-10 max-h-[90vh] overflow-y-auto">
+            <div className="px-6 pt-6 pb-3 flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <TimerReset className="w-5 h-5 text-primary" />
+                  Modify Hours
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {modifyingBooking.clientName} &middot; {modifyingBooking.date}
+                  {modifyingBooking.endDate && modifyingBooking.endDate !== modifyingBooking.date ? ` → ${modifyingBooking.endDate}` : ""}
+                </p>
+              </div>
+              <button onClick={() => !modifySaving && closeModifyModal()} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-6 pb-4 space-y-4">
+              {/* Current info */}
+              <div className="bg-muted/30 rounded-xl px-4 py-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Current</span>
+                  <span className="font-medium text-foreground">
+                    {modifyingBooking.startTime} – {modifyingBooking.endTime}
+                    <span className="text-xs text-muted-foreground ml-1">({hoursForBooking(modifyingBooking).toFixed(1)}h)</span>
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-muted-foreground">Price</span>
+                  <span className="font-bold text-foreground">{(modifyingBooking.totalPrice || 0).toLocaleString()}&euro;</span>
+                </div>
+              </div>
+
+              {/* Time selectors */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">Start Time</label>
+                  <select
+                    value={modifyStart}
+                    onChange={(e) => setModifyStart(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-xl bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  >
+                    <option value="">Select...</option>
+                    {TIME_SLOTS.map((slot) => (
+                      <option key={`ms-${slot.value}`} value={slot.label}>{slot.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-1.5 block">End Time</label>
+                  <select
+                    value={modifyEnd}
+                    onChange={(e) => setModifyEnd(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-border rounded-xl bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  >
+                    <option value="">Select...</option>
+                    {TIME_SLOTS.map((slot) => (
+                      <option key={`me-${slot.value}`} value={slot.label}>{slot.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Preview new price */}
+              {modifyStart && modifyEnd && (() => {
+                const sH = parseInt(modifyStart.split("h")[0]);
+                const sM = parseInt(modifyStart.split("h")[1] || "0");
+                const eH = parseInt(modifyEnd.split("h")[0]);
+                const eM = parseInt(modifyEnd.split("h")[1] || "0");
+                const startDec = sH + sM / 60;
+                const endDec = eH + eM / 60;
+                const hours = endDec > startDec ? endDec - startDec : (24 - startDec) + endDec;
+                const days = modifyingBooking.endDate && modifyingBooking.endDate !== modifyingBooking.date
+                  ? Math.max(1, Math.round((new Date(modifyingBooking.endDate).getTime() - new Date(modifyingBooking.date).getTime()) / 86400000) + 1)
+                  : 1;
+                const isOvernight = endDec <= startDec;
+                const isEvening = isOvernight || sH >= 19 || sH < 7 || eH > 19 || (eH === 19 && eM > 0);
+                const taxiFee = isEvening ? TAXI_FEE * days : 0;
+                const newPrice = Math.round(SERVICE_RATE * hours * days) + taxiFee;
+                const priceDiff = newPrice - (modifyingBooking.totalPrice || 0);
+
+                return (
+                  <div className="bg-primary/5 border border-primary/20 rounded-xl px-4 py-3 space-y-1.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">New hours</span>
+                      <span className="font-medium text-foreground">{(hours * days).toFixed(1)}h ({days > 1 ? `${days} days × ${hours.toFixed(1)}h` : `${hours.toFixed(1)}h`})</span>
+                    </div>
+                    {taxiFee > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Taxi fee</span>
+                        <span className="text-orange-600 font-medium">{taxiFee}&euro;</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-sm border-t border-primary/20 pt-1.5">
+                      <span className="font-medium text-foreground">New Price</span>
+                      <div className="text-right">
+                        <span className="text-lg font-bold text-foreground">{newPrice.toLocaleString()}&euro;</span>
+                        <span className="text-xs text-muted-foreground ml-1.5">({toDH(newPrice).toLocaleString()} DH)</span>
+                        {priceDiff !== 0 && (
+                          <p className={`text-xs font-medium ${priceDiff > 0 ? "text-primary" : "text-orange-600"}`}>
+                            {priceDiff > 0 ? "+" : ""}{priceDiff.toLocaleString()}&euro;
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="px-6 pb-6 pt-2 flex gap-3">
+              <button onClick={() => !modifySaving && closeModifyModal()} disabled={modifySaving} className="flex-1 py-3 border border-border rounded-xl text-sm font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50">
+                Cancel
+              </button>
+              <button
+                onClick={handleModifyHours}
+                disabled={modifySaving || !modifyStart || !modifyEnd}
+                className="flex-1 py-3 gradient-warm text-white font-semibold rounded-xl text-sm transition-opacity hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {modifySaving ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                ) : (
+                  <><TimerReset className="w-4 h-4" /> Save Changes</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
