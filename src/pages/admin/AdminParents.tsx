@@ -424,8 +424,8 @@ export default function AdminParents() {
 <title>Invoice - ${p.name}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: #2d3748; background: #faf5f0; padding: 0; margin: 0; }
-  .page { max-width: 480px; margin: 0 auto; background: #fff; min-height: 100vh; border-radius: 20px; overflow: hidden; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: #2d3748; background: #fff; padding: 20px 0; margin: 0; }
+  .page { max-width: 480px; margin: 0 auto; background: #fff; overflow: hidden; }
   .header { background: linear-gradient(135deg, #c2703a 0%, #e8956e 50%, #f0b08a 100%); padding: 32px 28px 28px; color: #fff; }
   .header-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; opacity: 0.85; }
   .header-num { font-size: 26px; font-weight: 800; margin: 4px 0 6px; }
@@ -455,10 +455,10 @@ export default function AdminParents() {
   .total-amount .currency { font-size: 22px; font-weight: 600; vertical-align: super; margin-left: 2px; opacity: 0.85; }
   .total-dh { font-size: 14px; color: rgba(255,255,255,0.75); margin-top: 2px; }
   @media print {
-    body { background: #fff; padding: 0; }
-    .page { border-radius: 0; box-shadow: none; max-width: 100%; }
-    @page { margin: 8mm; }
-    .header, .total-box { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    body { background: #fff; padding: 0; margin: 0; }
+    .page { max-width: 100%; }
+    @page { margin: 10mm; }
+    * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   }
 </style>
 </head><body>
