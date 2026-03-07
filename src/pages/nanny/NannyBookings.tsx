@@ -1367,8 +1367,8 @@ export default function NannyBookings() {
       {extendBooking && (
         <ExtendBookingModal
           booking={extendBooking}
-          onConfirm={async (newEndTime, newTotalPrice) => {
-            await updateBooking(extendBooking.id, { endTime: newEndTime, totalPrice: newTotalPrice });
+          onConfirm={async (newStartTime, newEndTime, newTotalPrice) => {
+            await updateBooking(extendBooking.id, { startTime: newStartTime, endTime: newEndTime, totalPrice: newTotalPrice });
             await fetchNannyBookings();
           }}
           onClose={() => setExtendBooking(null)}
