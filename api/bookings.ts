@@ -249,17 +249,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           nanny_id = null;
           unassigned = true;
         } else {
-        // Check blocked dates
-        const blockedRows = await sql`
-          SELECT DISTINCT nanny_id FROM nanny_blocked_dates WHERE date = ANY(${bookingDates})
-        ` as BlockedNannyRow[];
+        // Check blocked dates (one date at a time to avoid ANY() array issues with Neon driver)
+        let blockedRows: BlockedNannyRow[] = [];
+        for (const d of bookingDates) {
+          const rows = await sql`
+            SELECT DISTINCT nanny_id FROM nanny_blocked_dates WHERE date = ${d}
+          ` as BlockedNannyRow[];
+          blockedRows = blockedRows.concat(rows);
+        }
         const blockedIds = new Set(blockedRows.map(b => b.nanny_id));
 
         // Check existing bookings for overlap + same-hotel priority
-        const existing = await sql`
-          SELECT id, nanny_id, date, start_time, end_time, client_name, hotel FROM bookings
-          WHERE status != 'cancelled' AND date = ANY(${bookingDates})
-        ` as ExistingBookingRow[];
+        let existing: ExistingBookingRow[] = [];
+        for (const d of bookingDates) {
+          const rows = await sql`
+            SELECT id, nanny_id, date, start_time, end_time, client_name, hotel FROM bookings
+            WHERE status != 'cancelled' AND date = ${d}
+          ` as ExistingBookingRow[];
+          existing = existing.concat(rows);
+        }
 
         // Build list of conflict-free candidates
         const eligibleCandidates: { id: number; sameHotel: boolean }[] = [];
@@ -290,11 +298,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         }
       } else {
-        // Manual assign: check for conflicts with the chosen nanny
-        const conflicts = await sql`
-          SELECT id, date, start_time, end_time, client_name FROM bookings
-          WHERE nanny_id = ${nanny_id} AND status != 'cancelled' AND date = ANY(${bookingDates})
-        ` as ExistingBookingRow[];
+        // Manual assign: check for conflicts with the chosen nanny (one date at a time to avoid ANY() issues)
+        let conflicts: ExistingBookingRow[] = [];
+        for (const d of bookingDates) {
+          const rows = await sql`
+            SELECT id, date, start_time, end_time, client_name FROM bookings
+            WHERE nanny_id = ${nanny_id} AND status != 'cancelled' AND date = ${d}
+          ` as ExistingBookingRow[];
+          conflicts = conflicts.concat(rows);
+        }
 
         const overlapping = conflicts.filter(
           c => timesOverlap(start_time, effectiveEndTime, c.start_time, c.end_time || '23h59')
