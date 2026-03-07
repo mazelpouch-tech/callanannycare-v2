@@ -306,131 +306,95 @@ export default function AdminInvoices() {
     const total = inv.totalPrice || 0;
     const totalDH = toDH(total);
 
-    const invoiceNum = `INV-${String(inv.id).padStart(4, "0")}`;
+    const html = `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8"/>
+<title>Invoice #INV-${inv.id}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; padding: 40px; max-width: 700px; margin: 0 auto; }
+  .header { background: linear-gradient(135deg, #f97316, #ec4899); color: white; padding: 32px; border-radius: 16px 16px 0 0; display: flex; align-items: center; justify-content: space-between; }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .header-logo { width: 56px; height: 56px; border-radius: 12px; background: white; padding: 3px; }
+  .header h1 { font-size: 28px; font-weight: 700; }
+  .header .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.8; margin-bottom: 4px; }
+  .header .date { font-size: 12px; opacity: 0.7; margin-top: 6px; }
+  .content { border: 1px solid #e5e5e5; border-top: none; padding: 32px; border-radius: 0 0 16px 16px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .grid2 .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; font-weight: 600; margin-bottom: 6px; }
+  .grid2 .name { font-size: 14px; font-weight: 600; }
+  .grid2 .sub { font-size: 12px; color: #666; margin-top: 2px; }
+  .table-section { border: 1px solid #e5e5e5; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+  .table-section .title { background: #f9f9f9; padding: 10px 16px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #888; }
+  .table-section .row { display: flex; justify-content: space-between; padding: 10px 16px; border-top: 1px solid #e5e5e5; font-size: 13px; }
+  .table-section .row .key { color: #666; }
+  .table-section .row .val { font-weight: 500; }
+  .table-section .row.taxi { color: #b45309; }
+  .total-box { background: linear-gradient(135deg, #fff7ed, #fdf2f8); border-radius: 12px; padding: 28px; text-align: center; margin: 24px 0; }
+  .total-box .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 4px; }
+  .total-box .amount { font-size: 32px; font-weight: 700; }
+  .total-box .sub { font-size: 14px; color: #888; margin-top: 4px; }
+  .notes { background: #f9f9f9; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
+  .notes .label { font-size: 11px; font-weight: 600; color: #888; margin-bottom: 4px; }
+  .notes p { font-size: 13px; }
+  .footer { text-align: center; padding-top: 20px; border-top: 1px solid #e5e5e5; font-size: 10px; color: #aaa; }
+  @media print { body { padding: 20px; } @page { margin: 10mm; } }
+</style>
+</head><body>
+<div class="header" style="${inv.collectedAt ? "background: linear-gradient(135deg, #16a34a, #059669);" : ""}">
+  <div class="header-left">
+    <img class="header-logo" src="${INVOICE_LOGO_BASE64}" />
+    <div>
+      <div class="label">Invoice${inv.collectedAt ? " · Paid" : ""}</div>
+      <h1>#INV-${inv.id}</h1>
+      <div class="date">${dateStr}</div>
+    </div>
+  </div>
+</div>
+<div class="content">
+  <div class="grid2">
+    <div>
+      <div class="label">From</div>
+      <div class="name">Call a Nanny</div>
+      <div class="sub">Professional Childcare</div>
+      <div class="sub">Marrakech, Morocco</div>
+    </div>
+    <div>
+      <div class="label">Billed To</div>
+      <div class="name">${inv.clientName || "N/A"}</div>
+      ${inv.clientEmail ? `<div class="sub">${inv.clientEmail}</div>` : ""}
+      ${inv.clientPhone ? `<div class="sub">${inv.clientPhone}</div>` : ""}
+      ${inv.hotel ? `<div class="sub">${inv.hotel}</div>` : ""}
+    </div>
+  </div>
 
-    const isPaid = !!inv.collectedAt;
-    const statusColor = isPaid ? "#166534" : "#92400e";
-    const statusBg = isPaid ? "#dcfce7" : "#fef3c7";
-    const statusText = isPaid ? "PAID" : "UNPAID";
-    const grandColor = isPaid ? "#16a34a" : "#0f172a";
-    const grandBorder = isPaid ? "#16a34a" : "#f97316";
+  <div class="table-section">
+    <div class="title">Service Details</div>
+    <div class="row"><span class="key">Caregiver</span><span class="val">${inv.nannyName || "Unassigned"}</span></div>
+    <div class="row"><span class="key">Clock In</span><span class="val">${formatClockTime(inv.clockIn)}</span></div>
+    <div class="row"><span class="key">Clock Out</span><span class="val">${formatClockTime(inv.clockOut)}</span></div>
+    <div class="row"><span class="key">Hours Worked</span><span class="val">${hours}h</span></div>
+    <div class="row"><span class="key">Children</span><span class="val">${inv.childrenCount || 1}${inv.childrenAges ? ` (${inv.childrenAges})` : ""}</span></div>
+  </div>
 
-    const html = `<div style="max-width:750px;margin:0 auto;font-family:Helvetica,Arial,sans-serif;color:#1e293b;background:#fff;">
+  <div class="table-section">
+    <div class="title">Price Breakdown</div>
+    <div class="row"><span class="key">${hours}h × ${SERVICE_RATE}€/hr</span><span class="val">${basePay}€</span></div>
+    ${hasTaxi ? `<div class="row taxi"><span class="key">Taxi fee (7 PM – 7 AM)</span><span class="val">+${TAXI_FEE}€</span></div>` : ""}
+  </div>
 
-  <!-- Header -->
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f97316;padding:24px 32px;">
-    <tr>
-      <td style="vertical-align:middle;">
-        <table cellpadding="0" cellspacing="0"><tr>
-          <td style="vertical-align:middle;"><img src="${INVOICE_LOGO_BASE64}" width="60" height="60" style="border-radius:12px;background:#fff;padding:3px;" /></td>
-          <td style="vertical-align:middle;padding-left:14px;">
-            <div style="font-size:22px;font-weight:800;color:#fff;">Call a Nanny</div>
-            <div style="font-size:11px;color:#ffffffd9;margin-top:2px;">Professional Childcare Services</div>
-          </td>
-        </tr></table>
-      </td>
-      <td style="text-align:right;vertical-align:middle;">
-        <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:2px;">INVOICE</div>
-        <div style="font-size:12px;color:#ffffffd9;margin-top:4px;">${invoiceNum}</div>
-      </td>
-    </tr>
-  </table>
+  <div class="total-box" style="${inv.collectedAt ? "background: linear-gradient(135deg, #ecfdf5, #d1fae5);" : ""}">
+    <div class="label">${inv.collectedAt ? "Balance" : "Total Amount"}</div>
+    <div class="amount" style="${inv.collectedAt ? "color: #16a34a;" : ""}">${inv.collectedAt ? "0 €" : `${total.toLocaleString()} €`}</div>
+    <div class="sub">${inv.collectedAt ? "0 DH" : `${totalDH.toLocaleString()} DH`}</div>
+    ${inv.collectedAt ? `<div style="margin-top:10px;display:inline-block;background:#16a34a;color:white;padding:4px 16px;border-radius:20px;font-size:13px;font-weight:700;letter-spacing:1px;">PAID</div>` : ""}
+  </div>
 
-  <!-- Info strip -->
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;margin-top:24px;">
-    <tr>
-      <td style="padding:14px 20px;">
-        <div style="font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Invoice Date</div>
-        <div style="font-size:14px;font-weight:700;color:#0f172a;margin-top:4px;">${dateStr}</div>
-      </td>
-      <td style="padding:14px 20px;text-align:center;">
-        <div style="font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Invoice No.</div>
-        <div style="font-size:14px;font-weight:700;color:#0f172a;margin-top:4px;">${invoiceNum}</div>
-      </td>
-      <td style="padding:14px 20px;text-align:right;">
-        <div style="font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Status</div>
-        <div style="margin-top:4px;"><span style="display:inline-block;padding:4px 14px;background:${statusBg};color:${statusColor};font-size:11px;font-weight:700;border-radius:12px;">${statusText}</span></div>
-      </td>
-    </tr>
-  </table>
+  ${inv.notes ? `<div class="notes"><div class="label">Notes</div><p>${inv.notes}</p></div>` : ""}
 
-  <!-- From / Billed To -->
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;">
-    <tr>
-      <td width="48%" style="vertical-align:top;border:1px solid #e2e8f0;padding:16px 18px;">
-        <div style="font-size:9px;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">From</div>
-        <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:4px;">Call a Nanny</div>
-        <div style="font-size:12px;color:#64748b;line-height:1.7;">Professional Childcare</div>
-        <div style="font-size:12px;color:#64748b;line-height:1.7;">Marrakech, Morocco</div>
-        <div style="font-size:12px;color:#f97316;font-weight:600;margin-top:4px;">callanannycare.com</div>
-      </td>
-      <td width="4%"></td>
-      <td width="48%" style="vertical-align:top;border:1px solid #e2e8f0;padding:16px 18px;">
-        <div style="font-size:9px;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Billed To</div>
-        <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:4px;">${inv.clientName || "N/A"}</div>
-        ${inv.clientEmail ? `<div style="font-size:12px;color:#64748b;line-height:1.7;">${inv.clientEmail}</div>` : ""}
-        ${inv.clientPhone ? `<div style="font-size:12px;color:#64748b;line-height:1.7;">${inv.clientPhone}</div>` : ""}
-        ${inv.hotel ? `<div style="font-size:12px;color:#64748b;line-height:1.7;">${inv.hotel}</div>` : ""}
-      </td>
-    </tr>
-  </table>
-
-  <!-- Service Details -->
-  <div style="margin-top:28px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #f97316;display:inline-block;font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Service Details</div>
-  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:24px;">
-    <thead><tr>
-      <th style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#fff;font-weight:700;padding:10px 14px;background:#334155;text-align:left;">Description</th>
-      <th style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#fff;font-weight:700;padding:10px 14px;background:#334155;text-align:right;">Details</th>
-    </tr></thead>
-    <tbody>
-      <tr><td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#334155;">Caregiver</td><td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#0f172a;font-weight:600;text-align:right;">${inv.nannyName || "Unassigned"}</td></tr>
-      <tr style="background:#f8fafc;"><td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#334155;">Clock In</td><td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#0f172a;font-weight:600;text-align:right;">${formatClockTime(inv.clockIn)}</td></tr>
-      <tr><td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#334155;">Clock Out</td><td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#0f172a;font-weight:600;text-align:right;">${formatClockTime(inv.clockOut)}</td></tr>
-      <tr style="background:#f8fafc;"><td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#334155;">Hours Worked</td><td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#0f172a;font-weight:600;text-align:right;">${hours}h</td></tr>
-      <tr><td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#334155;">Children</td><td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#0f172a;font-weight:600;text-align:right;">${inv.childrenCount || 1}${inv.childrenAges ? ` (${inv.childrenAges})` : ""}</td></tr>
-    </tbody>
-  </table>
-
-  <!-- Charges -->
-  <div style="margin-top:4px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #f97316;display:inline-block;font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Charges</div>
-  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:24px;">
-    <thead><tr>
-      <th style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#fff;font-weight:700;padding:10px 14px;background:#334155;text-align:left;">Item</th>
-      <th style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#fff;font-weight:700;padding:10px 14px;background:#334155;text-align:right;">Amount</th>
-    </tr></thead>
-    <tbody>
-      <tr><td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#334155;">Childcare service — ${hours}h &times; ${SERVICE_RATE}&euro;/hr</td><td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#0f172a;font-weight:600;text-align:right;">${basePay}&euro;</td></tr>
-      ${hasTaxi ? `<tr style="background:#f8fafc;"><td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#b45309;font-style:italic;">Taxi fee (evening/night service)</td><td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#b45309;font-weight:600;text-align:right;font-style:italic;">+${TAXI_FEE}&euro;</td></tr>` : ""}
-    </tbody>
-  </table>
-
-  <!-- Totals -->
-  <table width="100%" cellpadding="0" cellspacing="0"><tr><td style="text-align:right;">
-    <table cellpadding="0" cellspacing="0" style="min-width:280px;background:#f8fafc;border:1px solid #e2e8f0;padding:16px 20px;display:inline-table;">
-      <tr><td style="font-size:13px;color:#64748b;padding:6px 0;">Subtotal</td><td style="font-size:13px;font-weight:600;color:#334155;padding:6px 0;text-align:right;">${basePay}&euro;</td></tr>
-      ${hasTaxi ? `<tr><td style="font-size:13px;color:#64748b;padding:6px 0;">Taxi fee</td><td style="font-size:13px;font-weight:600;color:#334155;padding:6px 0;text-align:right;">${TAXI_FEE}&euro;</td></tr>` : ""}
-      <tr><td colspan="2" style="border-top:2px solid ${grandBorder};padding-top:12px;margin-top:8px;"></td></tr>
-      <tr><td style="font-size:18px;font-weight:800;color:${grandColor};padding:4px 0;">${isPaid ? "Paid" : "Total Due"}</td><td style="font-size:18px;font-weight:800;color:${grandColor};padding:4px 0;text-align:right;">${total.toLocaleString()} &euro;</td></tr>
-      <tr><td></td><td style="font-size:12px;color:#94a3b8;text-align:right;">${totalDH.toLocaleString()} DH</td></tr>
-    </table>
-  </td></tr></table>
-
-  ${inv.notes ? `<div style="background:#fffbeb;border-left:4px solid #f97316;padding:14px 18px;margin:24px 0;">
-    <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#b45309;font-weight:700;margin-bottom:4px;">Notes</div>
-    <p style="font-size:12px;color:#78350f;line-height:1.6;margin:0;">${inv.notes}</p>
-  </div>` : ""}
-
-  <!-- Footer -->
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#1e293b;padding:20px 32px;text-align:center;">
-    <tr><td>
-      <div style="font-size:15px;font-weight:800;color:#fff;margin-bottom:4px;">Call a Nanny</div>
-      <div style="font-size:11px;color:#94a3b8;">Professional Childcare Services &middot; Marrakech, Morocco</div>
-      <div style="font-size:11px;color:#f97316;font-weight:600;margin-top:6px;">callanannycare.com</div>
-      <div style="font-size:13px;color:#f97316;font-weight:600;margin-top:8px;">Thank you for choosing Call a Nanny!</div>
-    </td></tr>
-  </table>
-
-</div>`;
+  <div class="footer">Issued by Call a Nanny · callanannycare.com</div>
+</div>
+</body></html>`;
 
     downloadInvoicePdf(html, `Invoice_INV-${inv.id}.pdf`);
   };

@@ -393,7 +393,6 @@ export default function AdminParents() {
 
   // Download a combined invoice PDF for all (non-cancelled) bookings of a parent
   const downloadParentInvoice = (p: ParentSummary) => {
-    try {
     const activeBookings = [...p.bookings]
       .filter((b) => b.status !== "cancelled")
       .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
@@ -404,98 +403,90 @@ export default function AdminParents() {
         ? `${formatClockTime(b.clockIn)} – ${formatClockTime(b.clockOut)}`
         : `${b.startTime || "—"} – ${b.endTime || "—"}`;
       const dateStr = b.date ? format(parseISO(b.date), "dd MMM yyyy") : "—";
-      return `<tr style="background:${activeBookings.indexOf(b) % 2 === 1 ? "#f8fafc" : "#fff"};">
-        <td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#334155;">${dateStr}</td>
-        <td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#334155;">${timeRange}</td>
-        <td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#334155;">${hours.toFixed(1)}h</td>
-        <td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#334155;">${b.nannyName || "—"}</td>
-        <td style="font-size:13px;padding:10px 14px;border-bottom:1px solid #f1f5f9;color:#0f172a;font-weight:600;text-align:right;">${(b.totalPrice || 0).toLocaleString()}&euro;</td>
+      return `<tr>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:12px;color:#666;">${dateStr}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:12px;">${timeRange}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:12px;">${hours.toFixed(1)}h</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:12px;">${b.nannyName || "—"}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:12px;font-weight:600;text-align:right;">${(b.totalPrice || 0).toLocaleString()}€</td>
       </tr>`;
     }).join("");
 
     const total = p.totalPrice;
     const totalDH = toDH(total);
     const invoiceDate = format(new Date(), "dd MMMM yyyy");
-    const allPaid = p.unpaidCount === 0 && p.paidCount > 0;
 
-    const statusColor = allPaid ? "#166534" : "#92400e";
-    const statusBg = allPaid ? "#dcfce7" : "#fef3c7";
-    const statusText = allPaid ? "PAID" : "UNPAID";
-    const grandColor = allPaid ? "#16a34a" : "#0f172a";
-    const grandBorder = allPaid ? "#16a34a" : "#f97316";
+    const html = `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8"/>
+<title>Invoice - ${p.name}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; padding: 40px; max-width: 750px; margin: 0 auto; }
+  .header { background: linear-gradient(135deg, #f97316, #ec4899); color: white; padding: 32px; border-radius: 16px 16px 0 0; display: flex; align-items: center; justify-content: space-between; }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .header-logo { width: 56px; height: 56px; border-radius: 12px; background: white; padding: 3px; }
+  .header h1 { font-size: 28px; font-weight: 700; }
+  .header .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.8; margin-bottom: 4px; }
+  .header .date { font-size: 12px; opacity: 0.7; margin-top: 6px; }
+  .content { border: 1px solid #e5e5e5; border-top: none; padding: 32px; border-radius: 0 0 16px 16px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
+  .grid2 .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; font-weight: 600; margin-bottom: 6px; }
+  .grid2 .name { font-size: 14px; font-weight: 600; }
+  .grid2 .sub { font-size: 12px; color: #666; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  thead th { background: #f9f9f9; padding: 10px 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #888; text-align: left; border-bottom: 2px solid #e5e5e5; }
+  thead th:last-child { text-align: right; }
+  .summary { display: flex; justify-content: flex-end; margin-bottom: 24px; }
+  .summary-box { border: 1px solid #e5e5e5; border-radius: 12px; padding: 8px 0; min-width: 220px; }
+  .summary-row { display: flex; justify-content: space-between; padding: 6px 16px; font-size: 13px; }
+  .summary-row .key { color: #666; }
+  .summary-row .val { font-weight: 500; }
+  .summary-row.total { border-top: 2px solid #e5e5e5; margin-top: 4px; padding-top: 10px; font-weight: 700; font-size: 15px; }
+  .total-box { background: linear-gradient(135deg, #fff7ed, #fdf2f8); border-radius: 12px; padding: 28px; text-align: center; margin: 24px 0; }
+  .total-box .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 4px; }
+  .total-box .amount { font-size: 32px; font-weight: 700; }
+  .total-box .sub { font-size: 14px; color: #888; margin-top: 4px; }
+  .footer { text-align: center; padding-top: 20px; border-top: 1px solid #e5e5e5; font-size: 10px; color: #aaa; }
+  .note { background: #f9f9f9; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 12px; color: #666; }
+  @media print { body { padding: 20px; } @page { margin: 10mm; } }
+</style>
+</head><body>
+<div class="header" style="${p.unpaidCount === 0 && p.paidCount > 0 ? "background: linear-gradient(135deg, #16a34a, #059669);" : ""}">
+  <div class="header-left">
+    <img class="header-logo" src="${INVOICE_LOGO_BASE64}" />
+    <div>
+      <div class="label">Invoice${p.unpaidCount === 0 && p.paidCount > 0 ? " · Paid" : ""}</div>
+      <h1>${p.name}</h1>
+      <div class="date">${invoiceDate} · ${activeBookings.length} booking${activeBookings.length !== 1 ? "s" : ""}</div>
+    </div>
+  </div>
+</div>
+<div class="content">
+  <div class="grid2">
+    <div>
+      <div class="label">From</div>
+      <div class="name">Call a Nanny</div>
+      <div class="sub">Professional Childcare</div>
+      <div class="sub">Marrakech, Morocco</div>
+    </div>
+    <div>
+      <div class="label">Billed To</div>
+      <div class="name">${p.name}</div>
+      ${p.email ? `<div class="sub">${p.email}</div>` : ""}
+      ${p.phone ? `<div class="sub">${p.phone}</div>` : ""}
+      ${p.hotel ? `<div class="sub">${p.hotel}</div>` : ""}
+    </div>
+  </div>
 
-    const html = `<div style="max-width:750px;margin:0 auto;font-family:Helvetica,Arial,sans-serif;color:#1e293b;background:#fff;">
-
-  <!-- Header -->
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f97316;padding:24px 32px;">
-    <tr>
-      <td style="vertical-align:middle;">
-        <table cellpadding="0" cellspacing="0"><tr>
-          <td style="vertical-align:middle;"><img src="${INVOICE_LOGO_BASE64}" width="60" height="60" style="border-radius:12px;background:#fff;padding:3px;" /></td>
-          <td style="vertical-align:middle;padding-left:14px;">
-            <div style="font-size:22px;font-weight:800;color:#fff;">Call a Nanny</div>
-            <div style="font-size:11px;color:#ffffffd9;margin-top:2px;">Professional Childcare Services</div>
-          </td>
-        </tr></table>
-      </td>
-      <td style="text-align:right;vertical-align:middle;">
-        <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:2px;">INVOICE</div>
-        <div style="font-size:12px;color:#ffffffd9;margin-top:4px;">${p.name}</div>
-      </td>
-    </tr>
-  </table>
-
-  <!-- Info strip -->
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;margin-top:24px;">
-    <tr>
-      <td style="padding:14px 20px;">
-        <div style="font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Invoice Date</div>
-        <div style="font-size:14px;font-weight:700;color:#0f172a;margin-top:4px;">${invoiceDate}</div>
-      </td>
-      <td style="padding:14px 20px;text-align:center;">
-        <div style="font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Bookings</div>
-        <div style="font-size:14px;font-weight:700;color:#0f172a;margin-top:4px;">${activeBookings.length}</div>
-      </td>
-      <td style="padding:14px 20px;text-align:right;">
-        <div style="font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Status</div>
-        <div style="margin-top:4px;"><span style="display:inline-block;padding:4px 14px;background:${statusBg};color:${statusColor};font-size:11px;font-weight:700;border-radius:12px;">${statusText}</span></div>
-      </td>
-    </tr>
-  </table>
-
-  <!-- From / Billed To -->
-  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;">
-    <tr>
-      <td width="48%" style="vertical-align:top;border:1px solid #e2e8f0;padding:16px 18px;">
-        <div style="font-size:9px;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">From</div>
-        <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:4px;">Call a Nanny</div>
-        <div style="font-size:12px;color:#64748b;line-height:1.7;">Professional Childcare</div>
-        <div style="font-size:12px;color:#64748b;line-height:1.7;">Marrakech, Morocco</div>
-        <div style="font-size:12px;color:#f97316;font-weight:600;margin-top:4px;">callanannycare.com</div>
-      </td>
-      <td width="4%"></td>
-      <td width="48%" style="vertical-align:top;border:1px solid #e2e8f0;padding:16px 18px;">
-        <div style="font-size:9px;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Billed To</div>
-        <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:4px;">${p.name}</div>
-        ${p.email ? `<div style="font-size:12px;color:#64748b;line-height:1.7;">${p.email}</div>` : ""}
-        ${p.phone ? `<div style="font-size:12px;color:#64748b;line-height:1.7;">${p.phone}</div>` : ""}
-        ${p.hotel ? `<div style="font-size:12px;color:#64748b;line-height:1.7;">${p.hotel}</div>` : ""}
-      </td>
-    </tr>
-  </table>
-
-  <!-- Section title -->
-  <div style="margin-top:28px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #f97316;display:inline-block;font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Booking Details</div>
-
-  <!-- Bookings table -->
-  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:24px;">
+  <table>
     <thead>
       <tr>
-        <th style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#fff;font-weight:700;padding:10px 14px;background:#334155;text-align:left;">Date</th>
-        <th style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#fff;font-weight:700;padding:10px 14px;background:#334155;text-align:left;">Time</th>
-        <th style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#fff;font-weight:700;padding:10px 14px;background:#334155;text-align:left;">Hours</th>
-        <th style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#fff;font-weight:700;padding:10px 14px;background:#334155;text-align:left;">Caregiver</th>
-        <th style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#fff;font-weight:700;padding:10px 14px;background:#334155;text-align:right;">Amount</th>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Hours</th>
+        <th>Caregiver</th>
+        <th style="text-align:right">Amount</th>
       </tr>
     </thead>
     <tbody>
@@ -503,40 +494,37 @@ export default function AdminParents() {
     </tbody>
   </table>
 
-  <!-- Totals -->
-  <table width="100%" cellpadding="0" cellspacing="0"><tr><td style="text-align:right;">
-    <table cellpadding="0" cellspacing="0" style="min-width:280px;background:#f8fafc;border:1px solid #e2e8f0;padding:16px 20px;display:inline-table;">
-      <tr><td style="font-size:13px;color:#64748b;padding:6px 0;">Bookings</td><td style="font-size:13px;font-weight:600;color:#334155;padding:6px 0;text-align:right;">${activeBookings.length}</td></tr>
-      <tr><td style="font-size:13px;color:#64748b;padding:6px 0;">Total Hours</td><td style="font-size:13px;font-weight:600;color:#334155;padding:6px 0;text-align:right;">${p.totalHours.toFixed(1)}h</td></tr>
-      <tr><td colspan="2" style="border-top:2px solid ${grandBorder};padding-top:12px;margin-top:8px;"></td></tr>
-      <tr><td style="font-size:18px;font-weight:800;color:${grandColor};padding:4px 0;">${allPaid ? "Paid" : "Total Due"}</td><td style="font-size:18px;font-weight:800;color:${grandColor};padding:4px 0;text-align:right;">${total.toLocaleString()} &euro;</td></tr>
-      <tr><td></td><td style="font-size:12px;color:#94a3b8;text-align:right;">${totalDH.toLocaleString()} DH</td></tr>
-    </table>
-  </td></tr></table>
-
-  <!-- Notes -->
-  <div style="background:#fffbeb;border-left:4px solid #f97316;padding:14px 18px;margin:24px 0;">
-    <p style="font-size:12px;color:#78350f;line-height:1.6;margin:0;">${allPaid ? "All payments have been received. Thank you for choosing Call a Nanny." : "Payment is due upon completion of service. Thank you for choosing Call a Nanny."}</p>
+  <div class="summary">
+    <div class="summary-box">
+      <div class="summary-row">
+        <span class="key">Bookings</span>
+        <span class="val">${activeBookings.length}</span>
+      </div>
+      <div class="summary-row">
+        <span class="key">Total Hours</span>
+        <span class="val">${p.totalHours.toFixed(1)}h</span>
+      </div>
+      <div class="summary-row total">
+        <span>Total</span>
+        <span>${total.toLocaleString()}€</span>
+      </div>
+    </div>
   </div>
 
-  <!-- Footer -->
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#1e293b;padding:20px 32px;text-align:center;">
-    <tr><td>
-      <div style="font-size:15px;font-weight:800;color:#fff;margin-bottom:4px;">Call a Nanny</div>
-      <div style="font-size:11px;color:#94a3b8;">Professional Childcare Services &middot; Marrakech, Morocco</div>
-      <div style="font-size:11px;color:#f97316;font-weight:600;margin-top:6px;">callanannycare.com</div>
-      <div style="font-size:13px;color:#f97316;font-weight:600;margin-top:8px;">Thank you for choosing Call a Nanny!</div>
-    </td></tr>
-  </table>
+  <div class="total-box" style="${p.unpaidCount === 0 && p.paidCount > 0 ? "background: linear-gradient(135deg, #ecfdf5, #d1fae5);" : ""}">
+    <div class="label">${p.unpaidCount === 0 && p.paidCount > 0 ? "Balance" : "Total Amount Due"}</div>
+    <div class="amount" style="${p.unpaidCount === 0 && p.paidCount > 0 ? "color: #16a34a;" : ""}">${p.unpaidCount === 0 && p.paidCount > 0 ? "0 €" : `${total.toLocaleString()} €`}</div>
+    <div class="sub">${p.unpaidCount === 0 && p.paidCount > 0 ? "0 DH" : `${totalDH.toLocaleString()} DH`}</div>
+    ${p.unpaidCount === 0 && p.paidCount > 0 ? `<div style="margin-top:10px;display:inline-block;background:#16a34a;color:white;padding:4px 16px;border-radius:20px;font-size:13px;font-weight:700;letter-spacing:1px;">PAID</div>` : ""}
+  </div>
 
-</div>`;
+  <div class="note">${p.unpaidCount === 0 && p.paidCount > 0 ? "All payments have been received. Thank you for choosing Call a Nanny." : "Payment is due upon completion of service. Thank you for choosing Call a Nanny."}</div>
 
-    const safeName = p.name.replace(/[^a-zA-Z0-9]/g, "_");
-    downloadInvoicePdf(html, `Invoice_${safeName}.pdf`);
-    } catch (err) {
-      console.error("Parent invoice error:", err);
-      alert("Failed to generate PDF. Check console for details.");
-    }
+  <div class="footer">Issued by Call a Nanny · callanannycare.com</div>
+</div>
+</body></html>`;
+
+    downloadInvoicePdf(html, `Invoice_${p.name}.pdf`);
   };
 
   // Render expanded booking history
