@@ -751,36 +751,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      // Resend invoice email on admin request — DISABLED (parent emails paused)
-      // if (resend_invoice && result[0] && result[0].client_email && result[0].status === 'completed' && result[0].clock_out) {
-      //   try {
-      //     const nannyRows2 = await sql`
-      //       SELECT name FROM nannies WHERE id = ${result[0].nanny_id}
-      //     ` as { name: string }[];
-      //     const nannyName2 = nannyRows2[0]?.name || 'Your Nanny';
-      //
-      //     const { sendInvoiceEmail: resendInvoiceFn } = await import('../_emailTemplates.js');
-      //     await resendInvoiceFn({
-      //       bookingId: result[0].id,
-      //       clientName: result[0].client_name,
-      //       clientEmail: result[0].client_email,
-      //       clientPhone: result[0].client_phone,
-      //       hotel: result[0].hotel,
-      //       date: result[0].date,
-      //       startTime: result[0].start_time,
-      //       endTime: result[0].end_time,
-      //       clockIn: result[0].clock_in || result[0].clock_out,
-      //       clockOut: result[0].clock_out,
-      //       childrenCount: result[0].children_count,
-      //       childrenAges: result[0].children_ages,
-      //       totalPrice: result[0].total_price,
-      //       nannyName: nannyName2,
-      //       locale: result[0].locale || 'en',
-      //     });
-      //   } catch (resendError: unknown) {
-      //     console.error('Resend invoice email failed:', resendError);
-      //   }
-      // }
+      // Resend invoice email on admin request
+      if (resend_invoice && result[0] && result[0].client_email && result[0].clock_out) {
+        try {
+          const nannyRows2 = await sql`
+            SELECT name FROM nannies WHERE id = ${result[0].nanny_id}
+          ` as { name: string }[];
+          const nannyName2 = nannyRows2[0]?.name || 'Your Nanny';
+
+          const { sendInvoiceEmail: resendInvoiceFn } = await import('../_emailTemplates.js');
+          await resendInvoiceFn({
+            bookingId: result[0].id,
+            clientName: result[0].client_name,
+            clientEmail: result[0].client_email,
+            clientPhone: result[0].client_phone,
+            hotel: result[0].hotel,
+            date: result[0].date,
+            startTime: result[0].start_time,
+            endTime: result[0].end_time,
+            clockIn: result[0].clock_in || result[0].clock_out,
+            clockOut: result[0].clock_out,
+            childrenCount: result[0].children_count,
+            childrenAges: result[0].children_ages,
+            totalPrice: result[0].total_price,
+            nannyName: nannyName2,
+            locale: result[0].locale || 'en',
+          });
+        } catch (resendError: unknown) {
+          console.error('Resend invoice email failed:', resendError);
+        }
+      }
 
       // Send reminder email to nanny for pending bookings
       if (send_reminder && result[0] && result[0].nanny_id && result[0].status === 'pending') {
