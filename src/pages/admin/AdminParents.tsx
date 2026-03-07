@@ -14,6 +14,7 @@ import {
   Wallet,
   Filter,
   CalendarDays,
+  Download,
 } from "lucide-react";
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -46,9 +47,21 @@ const statusConfig: Record<string, { label: string; cls: string }> = {
   cancelled: { label: "Cancelled", cls: "bg-red-50 text-red-700 border border-red-200" },
 };
 
+const SERVICE_RATE = 10; // €/hr
+const TAXI_FEE = 10;
+
 function hoursForBooking(b: Booking): number {
   if (!b.startTime || !b.endTime) return 0;
   return calcTotalBookedHours(b.startTime, b.endTime, b.extraTimes, b.date, b.endDate);
+}
+
+function fmtDateLong(dateStr: string): string {
+  try { return format(parseISO(dateStr), "EEEE do MMMM yyyy"); } catch { return dateStr || "N/A"; }
+}
+
+function formatClockTime(iso: string | null): string {
+  if (!iso) return "—";
+  try { return format(new Date(iso), "HH:mm"); } catch { return "—"; }
 }
 
 export default function AdminParents() {
@@ -248,6 +261,139 @@ export default function AdminParents() {
   const totalUnpaid = filteredParents.reduce((s, p) => s + p.unpaidAmount, 0);
 
   const toggle = (key: string) => setExpandedParent(expandedParent === key ? null : key);
+
+  // Download a combined invoice PDF for all (non-cancelled) bookings of a parent
+  const downloadParentInvoice = (p: ParentSummary) => {
+    const activeBookings = [...p.bookings]
+      .filter((b) => b.status !== "cancelled")
+      .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+
+    const bookingRows = activeBookings.map((b) => {
+      const hours = hoursForBooking(b);
+      const timeRange = b.clockIn && b.clockOut
+        ? `${formatClockTime(b.clockIn)} – ${formatClockTime(b.clockOut)}`
+        : `${b.startTime || "—"} – ${b.endTime || "—"}`;
+      const dateStr = b.date ? format(parseISO(b.date), "dd MMM yyyy") : "—";
+      return `<tr>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:12px;color:#666;">${dateStr}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:12px;">${timeRange}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:12px;">${hours.toFixed(1)}h</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:12px;">${b.nannyName || "—"}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #e5e5e5;font-size:12px;font-weight:600;text-align:right;">${(b.totalPrice || 0).toLocaleString()}€</td>
+      </tr>`;
+    }).join("");
+
+    const total = p.totalPrice;
+    const totalDH = toDH(total);
+    const invoiceDate = format(new Date(), "dd MMMM yyyy");
+
+    const html = `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8"/>
+<title>Invoice - ${p.name}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; padding: 40px; max-width: 750px; margin: 0 auto; }
+  .header { background: linear-gradient(135deg, #f97316, #ec4899); color: white; padding: 32px; border-radius: 16px 16px 0 0; }
+  .header h1 { font-size: 28px; font-weight: 700; }
+  .header .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.8; margin-bottom: 4px; }
+  .header .date { font-size: 12px; opacity: 0.7; margin-top: 6px; }
+  .content { border: 1px solid #e5e5e5; border-top: none; padding: 32px; border-radius: 0 0 16px 16px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
+  .grid2 .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; font-weight: 600; margin-bottom: 6px; }
+  .grid2 .name { font-size: 14px; font-weight: 600; }
+  .grid2 .sub { font-size: 12px; color: #666; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  thead th { background: #f9f9f9; padding: 10px 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #888; text-align: left; border-bottom: 2px solid #e5e5e5; }
+  thead th:last-child { text-align: right; }
+  .summary { display: flex; justify-content: flex-end; margin-bottom: 24px; }
+  .summary-box { border: 1px solid #e5e5e5; border-radius: 12px; padding: 8px 0; min-width: 220px; }
+  .summary-row { display: flex; justify-content: space-between; padding: 6px 16px; font-size: 13px; }
+  .summary-row .key { color: #666; }
+  .summary-row .val { font-weight: 500; }
+  .summary-row.total { border-top: 2px solid #e5e5e5; margin-top: 4px; padding-top: 10px; font-weight: 700; font-size: 15px; }
+  .total-box { background: linear-gradient(135deg, #fff7ed, #fdf2f8); border-radius: 12px; padding: 28px; text-align: center; margin: 24px 0; }
+  .total-box .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 4px; }
+  .total-box .amount { font-size: 32px; font-weight: 700; }
+  .total-box .sub { font-size: 14px; color: #888; margin-top: 4px; }
+  .footer { text-align: center; padding-top: 20px; border-top: 1px solid #e5e5e5; font-size: 10px; color: #aaa; }
+  .note { background: #f9f9f9; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 12px; color: #666; }
+  @media print { body { padding: 20px; } @page { margin: 10mm; } }
+</style>
+</head><body>
+<div class="header">
+  <div class="label">Invoice</div>
+  <h1>${p.name}</h1>
+  <div class="date">${invoiceDate} · ${activeBookings.length} booking${activeBookings.length !== 1 ? "s" : ""}</div>
+</div>
+<div class="content">
+  <div class="grid2">
+    <div>
+      <div class="label">From</div>
+      <div class="name">Call a Nanny</div>
+      <div class="sub">Professional Childcare</div>
+      <div class="sub">Marrakech, Morocco</div>
+    </div>
+    <div>
+      <div class="label">Billed To</div>
+      <div class="name">${p.name}</div>
+      ${p.email ? `<div class="sub">${p.email}</div>` : ""}
+      ${p.phone ? `<div class="sub">${p.phone}</div>` : ""}
+      ${p.hotel ? `<div class="sub">${p.hotel}</div>` : ""}
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Hours</th>
+        <th>Caregiver</th>
+        <th style="text-align:right">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${bookingRows}
+    </tbody>
+  </table>
+
+  <div class="summary">
+    <div class="summary-box">
+      <div class="summary-row">
+        <span class="key">Bookings</span>
+        <span class="val">${activeBookings.length}</span>
+      </div>
+      <div class="summary-row">
+        <span class="key">Total Hours</span>
+        <span class="val">${p.totalHours.toFixed(1)}h</span>
+      </div>
+      <div class="summary-row total">
+        <span>Total</span>
+        <span>${total.toLocaleString()}€</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="total-box">
+    <div class="label">Total Amount Due</div>
+    <div class="amount">${total.toLocaleString()} €</div>
+    <div class="sub">${totalDH.toLocaleString()} DH</div>
+  </div>
+
+  <div class="note">Payment is due upon completion of service. Thank you for choosing Call a Nanny.</div>
+
+  <div class="footer">Issued by Call a Nanny · callanannycare.com</div>
+</div>
+</body></html>`;
+
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 300);
+    }
+  };
 
   // Render expanded booking history
   const renderHistory = (p: ParentSummary) => {
@@ -523,10 +669,18 @@ export default function AdminParents() {
                       <p className="text-[10px] text-muted-foreground">{toDH(p.totalPrice).toLocaleString()} DH</p>
                     </td>
                     <td className="px-5 py-3">
-                      {paymentBadge(p, true)}
-                      {p.unpaidCount > 0 && p.paidCount > 0 && (
-                        <p className="text-[10px] text-muted-foreground mt-1">{p.paidCount} paid · {p.unpaidCount} unpaid</p>
-                      )}
+                      <div className="flex flex-col gap-1.5">
+                        {paymentBadge(p, true)}
+                        {p.unpaidCount > 0 && p.paidCount > 0 && (
+                          <p className="text-[10px] text-muted-foreground">{p.paidCount} paid · {p.unpaidCount} unpaid</p>
+                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); downloadParentInvoice(p); }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer w-fit"
+                        >
+                          <Download className="w-3 h-3" /> Invoice PDF
+                        </button>
+                      </div>
                     </td>
                     <td className="px-5 py-3 text-xs text-muted-foreground max-w-[140px] truncate">{p.nannyNames.join(", ") || "—"}</td>
                     <td className="px-5 py-3 text-sm text-muted-foreground whitespace-nowrap">
@@ -574,6 +728,12 @@ export default function AdminParents() {
                   <span>{p.totalBookings} bookings</span>
                   <span>{p.totalHours.toFixed(1)}h</span>
                   {paymentBadge(p, true)}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); downloadParentInvoice(p); }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer"
+                  >
+                    <Download className="w-3 h-3" /> Invoice PDF
+                  </button>
                   {expandedParent === p.key ? (
                     <ChevronUp className="w-4 h-4 ml-auto shrink-0" />
                   ) : (
