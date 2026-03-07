@@ -1915,6 +1915,18 @@ export default function AdminBookings() {
                                     Forward
                                   </button>
                                 )}
+                                {booking.extraTimes && booking.extraTimes.length > 0 && (
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm(`Remove extra time blocks (${booking.extraTimes!.map(et => `${et.startTime}-${et.endTime}`).join(", ")}) from this booking?`)) return;
+                                      await updateBooking(booking.id, { extraTimes: null } as Partial<Booking>);
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-700 text-xs font-medium hover:bg-red-100 transition-colors"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                    Remove Extra Times
+                                  </button>
+                                )}
                               </div>
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                 <div className="flex items-center gap-2">
@@ -2372,6 +2384,18 @@ export default function AdminBookings() {
                             >
                               <ArrowRightLeft className="w-3.5 h-3.5" />
                               Forward
+                            </button>
+                          )}
+                          {booking.extraTimes && booking.extraTimes.length > 0 && (
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`Remove extra time blocks (${booking.extraTimes!.map(et => `${et.startTime}-${et.endTime}`).join(", ")}) from this booking?`)) return;
+                                await updateBooking(booking.id, { extraTimes: null } as Partial<Booking>);
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-700 text-xs font-medium hover:bg-red-100 transition-colors"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              Remove Extra Times
                             </button>
                           )}
                         </div>

@@ -236,7 +236,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           payment_method = COALESCE(${_payment_method}, payment_method),
           admin_notes = COALESCE(${_admin_notes}, admin_notes),
           extra_dates = COALESCE(${_extra_dates}, extra_dates),
-          extra_times = COALESCE(${_extra_times}, extra_times),
+          extra_times = CASE WHEN ${extra_times !== undefined} THEN ${_extra_times} ELSE extra_times END,
           updated_at = NOW()
         WHERE id = ${id}
         RETURNING *
