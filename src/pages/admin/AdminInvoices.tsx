@@ -619,6 +619,11 @@ export default function AdminInvoices() {
                       <td className="px-5 py-4">
                         <div className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</div>
                         <div className="text-[10px] text-muted-foreground">{toDH(inv.totalPrice || 0).toLocaleString()} DH</div>
+                        {inv.collectedAt && (
+                          <span className="inline-flex items-center gap-0.5 mt-1 text-[11px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                            <DollarSign className="w-3 h-3" /> Paid
+                          </span>
+                        )}
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center justify-end gap-1">
@@ -671,6 +676,11 @@ export default function AdminInvoices() {
                     <div className="text-right">
                       <span className="text-sm font-bold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</span>
                       <div className="text-[10px] text-muted-foreground">{toDH(inv.totalPrice || 0).toLocaleString()} DH</div>
+                      {inv.collectedAt && (
+                        <span className="inline-flex items-center gap-0.5 mt-1 text-[11px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                          <DollarSign className="w-3 h-3" /> Paid
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
@@ -717,8 +727,8 @@ export default function AdminInvoices() {
         const outHour = inv.clockOut ? new Date(inv.clockOut).getHours() : 0;
         const hasTaxi = inHour >= 19 || inHour < 7 || outHour >= 19 || outHour < 7 || hoursNum > 12;
         return (
-          <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-[8vh] overflow-y-auto">
-            <div className="w-full max-w-lg bg-card rounded-2xl shadow-xl border border-border overflow-hidden">
+          <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-[8vh] overflow-y-auto" onClick={() => setViewInvoice(null)}>
+            <div className="w-full max-w-lg bg-card rounded-2xl shadow-xl border border-border overflow-hidden" onClick={(e) => e.stopPropagation()}>
               {/* Header */}
               <div className="gradient-warm px-6 py-5 text-white">
                 <div className="flex items-center justify-between">
@@ -731,6 +741,11 @@ export default function AdminInvoices() {
                   </button>
                 </div>
                 <p className="text-white/70 text-xs mt-1">{inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A"}</p>
+                {inv.collectedAt && (
+                  <div className="mt-2 inline-flex items-center gap-1.5 bg-green-500/90 text-white px-4 py-1.5 rounded-full text-sm font-bold tracking-wide shadow-lg">
+                    <DollarSign className="w-4 h-4" /> PAID
+                  </div>
+                )}
               </div>
 
               <div className="p-6 space-y-5">
@@ -800,10 +815,13 @@ export default function AdminInvoices() {
                 </div>
 
                 {/* Total */}
-                <div className="bg-gradient-to-r from-orange-50 to-pink-50 rounded-xl p-5 text-center">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total Amount</p>
+                <div className={`rounded-xl p-5 text-center ${inv.collectedAt ? "bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200" : "bg-gradient-to-r from-orange-50 to-pink-50"}`}>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{inv.collectedAt ? "Total Charged" : "Total Amount"}</p>
                   <p className="text-3xl font-bold text-foreground">{(inv.totalPrice || 0).toLocaleString()} <span className="text-lg text-muted-foreground">€</span></p>
                   <p className="text-sm text-muted-foreground mt-1">{toDH(inv.totalPrice || 0).toLocaleString()} DH</p>
+                  {inv.collectedAt && (
+                    <p className="text-base font-bold text-green-600 mt-2 tracking-widest">PAID</p>
+                  )}
                 </div>
 
                 {inv.notes && (
