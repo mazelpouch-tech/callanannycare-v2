@@ -413,10 +413,19 @@ export default function AdminInvoices() {
     </div>
 
     <div class="total-box${isPaid ? " paid" : ""}">
-      <div class="total-label">TOTAL AMOUNT</div>
+      <div class="total-label">${isPaid ? "TOTAL CHARGED" : "TOTAL AMOUNT"}</div>
       <div class="total-amount">${total}<span class="currency">&euro;</span></div>
       <div class="total-dh">${totalDH.toLocaleString()} DH</div>
-      ${isPaid ? `<div class="total-paid-note">&#10003; PAID</div>` : ""}
+      ${isPaid ? `
+      <div style="border-top:1px solid rgba(255,255,255,0.3);margin:10px 0 6px;"></div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:rgba(255,255,255,0.85);padding:4px 0;">
+        <span>Amount Paid</span><span style="font-weight:700;">${total}&euro;</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:15px;color:#fff;font-weight:800;padding:4px 0;">
+        <span>Balance Due</span><span>0&euro;</span>
+      </div>
+      <div class="total-paid-note">&#10003; PAID</div>
+      ` : ""}
     </div>
   </div>
 </div>

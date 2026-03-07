@@ -450,10 +450,13 @@ export default function AdminParents() {
   .detail-table td { font-size: 12px; padding: 10px 12px; border-bottom: 1px solid #f0ece6; color: #5a5a5a; }
   .detail-table td:last-child { text-align: right; font-weight: 700; color: #1a202c; }
   .total-box { background: linear-gradient(135deg, #c2703a 0%, #e8956e 50%, #f0b08a 100%); border-radius: 14px; padding: 24px; text-align: center; margin-top: 8px; }
+  .total-box.paid { background: linear-gradient(135deg, #16a34a 0%, #22c55e 50%, #4ade80 100%); }
   .total-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.8); margin-bottom: 6px; }
   .total-amount { font-size: 42px; font-weight: 800; color: #fff; }
   .total-amount .currency { font-size: 22px; font-weight: 600; vertical-align: super; margin-left: 2px; opacity: 0.85; }
   .total-dh { font-size: 14px; color: rgba(255,255,255,0.75); margin-top: 2px; }
+  .total-paid-note { font-size: 11px; color: rgba(255,255,255,0.8); margin-top: 6px; font-weight: 600; letter-spacing: 1px; }
+  .paid-badge { display: inline-block; background: rgba(255,255,255,0.25); color: #fff; padding: 4px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; margin-top: 8px; }
   @media print {
     body { background: #fff; padding: 0; margin: 0; }
     .page { max-width: 100%; }
@@ -467,6 +470,7 @@ export default function AdminParents() {
     <div class="header-label">INVOICE</div>
     <div class="header-num">${p.name}</div>
     <div class="header-date">${invoiceDate} &middot; ${activeBookings.length} booking${activeBookings.length !== 1 ? "s" : ""}</div>
+    ${isPaid ? `<div class="paid-badge">&#10003; PAID</div>` : ""}
   </div>
 
   <div class="body-content">
@@ -515,10 +519,20 @@ export default function AdminParents() {
       </div>
     </div>
 
-    <div class="total-box">
-      <div class="total-label">TOTAL AMOUNT</div>
+    <div class="total-box${isPaid ? " paid" : ""}">
+      <div class="total-label">${isPaid ? "TOTAL CHARGED" : "TOTAL AMOUNT"}</div>
       <div class="total-amount">${total}<span class="currency">&euro;</span></div>
       <div class="total-dh">${totalDH.toLocaleString()} DH</div>
+      ${isPaid ? `
+      <div style="border-top:1px solid rgba(255,255,255,0.3);margin:10px 0 6px;"></div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:rgba(255,255,255,0.85);padding:4px 0;">
+        <span>Amount Paid</span><span style="font-weight:700;">${total}&euro;</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:15px;color:#fff;font-weight:800;padding:4px 0;">
+        <span>Balance Due</span><span>0&euro;</span>
+      </div>
+      <div class="total-paid-note">&#10003; PAID</div>
+      ` : ""}
     </div>
   </div>
 </div>
