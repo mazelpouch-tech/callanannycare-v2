@@ -424,44 +424,46 @@ export default function AdminParents() {
 <title>Invoice - ${p.name}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: #2d3748; background: #fff; padding: 20px 0; margin: 0; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: #2d3748; background: #fff; padding: 0; margin: 0; }
   .page { max-width: 480px; margin: 0 auto; background: #fff; overflow: hidden; }
-  .header { background: linear-gradient(135deg, #c2703a 0%, #e8956e 50%, #f0b08a 100%); padding: 32px 28px 28px; color: #fff; }
+  .header { background: linear-gradient(135deg, #c2703a 0%, #e8956e 50%, #f0b08a 100%); padding: 24px 28px 20px; color: #fff; }
   .header-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; opacity: 0.85; }
-  .header-num { font-size: 26px; font-weight: 800; margin: 4px 0 6px; }
+  .header-num { font-size: 24px; font-weight: 800; margin: 2px 0 4px; }
   .header-date { font-size: 13px; opacity: 0.85; }
-  .body-content { padding: 24px 24px 32px; }
-  .addresses { display: flex; gap: 20px; margin-bottom: 24px; }
+  .body-content { padding: 16px 24px 20px; }
+  .addresses { display: flex; gap: 20px; margin-bottom: 16px; }
   .addr { flex: 1; }
-  .addr-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #a0937e; margin-bottom: 8px; }
+  .addr-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #a0937e; margin-bottom: 6px; }
   .addr-name { font-size: 15px; font-weight: 700; color: #1a202c; margin-bottom: 4px; }
   .addr-line { font-size: 12px; color: #718096; line-height: 1.7; display: flex; align-items: center; gap: 6px; }
   .addr-line .icon { font-size: 12px; color: #a0937e; flex-shrink: 0; }
-  .card { background: #faf8f5; border: 1px solid #f0ece6; border-radius: 14px; padding: 20px; margin-bottom: 16px; }
-  .card-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #8a7e6e; margin-bottom: 14px; }
-  .card-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0ece6; }
+  .card { background: #faf8f5; border: 1px solid #f0ece6; border-radius: 14px; padding: 14px 18px; margin-bottom: 12px; }
+  .card-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #8a7e6e; margin-bottom: 10px; }
+  .card-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid #f0ece6; }
   .card-row:last-child { border-bottom: none; }
   .card-row-label { font-size: 13px; color: #5a5a5a; display: flex; align-items: center; gap: 8px; }
   .card-row-label .icon { font-size: 14px; color: #a0937e; }
   .card-row-value { font-size: 14px; font-weight: 700; color: #1a202c; }
   .detail-table { width: 100%; border-collapse: collapse; }
-  .detail-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #8a7e6e; font-weight: 600; padding: 10px 12px; text-align: left; border-bottom: 1px solid #f0ece6; }
+  .detail-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #8a7e6e; font-weight: 600; padding: 7px 10px; text-align: left; border-bottom: 1px solid #f0ece6; }
   .detail-table th:last-child { text-align: right; }
-  .detail-table td { font-size: 12px; padding: 10px 12px; border-bottom: 1px solid #f0ece6; color: #5a5a5a; }
+  .detail-table td { font-size: 11px; padding: 7px 10px; border-bottom: 1px solid #f0ece6; color: #5a5a5a; }
   .detail-table td:last-child { text-align: right; font-weight: 700; color: #1a202c; }
-  .total-box { background: linear-gradient(135deg, #c2703a 0%, #e8956e 50%, #f0b08a 100%); border-radius: 14px; padding: 24px; text-align: center; margin-top: 8px; }
+  .total-box { background: linear-gradient(135deg, #c2703a 0%, #e8956e 50%, #f0b08a 100%); border-radius: 14px; padding: 18px; text-align: center; margin-top: 6px; }
   .total-box.paid { background: linear-gradient(135deg, #16a34a 0%, #22c55e 50%, #4ade80 100%); }
   .total-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.8); margin-bottom: 6px; }
-  .total-amount { font-size: 42px; font-weight: 800; color: #fff; }
+  .total-amount { font-size: 36px; font-weight: 800; color: #fff; }
   .total-amount .currency { font-size: 22px; font-weight: 600; vertical-align: super; margin-left: 2px; opacity: 0.85; }
   .total-dh { font-size: 14px; color: rgba(255,255,255,0.75); margin-top: 2px; }
   .total-paid-note { font-size: 11px; color: rgba(255,255,255,0.8); margin-top: 6px; font-weight: 600; letter-spacing: 1px; }
-  .paid-badge { display: inline-block; background: rgba(255,255,255,0.25); color: #fff; padding: 4px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; margin-top: 8px; }
+  .paid-badge { display: inline-block; background: rgba(255,255,255,0.25); color: #fff; padding: 3px 12px; border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; margin-top: 6px; }
   @media print {
     body { background: #fff; padding: 0; margin: 0; }
-    .page { max-width: 100%; }
-    @page { margin: 10mm; }
+    .page { max-width: 100%; margin: 0; }
+    @page { margin: 6mm; size: A4; }
     * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .header { break-after: avoid; }
+    .body-content { break-before: avoid; }
   }
 </style>
 </head><body>
