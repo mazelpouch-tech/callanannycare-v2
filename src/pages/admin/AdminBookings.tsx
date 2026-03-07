@@ -492,7 +492,7 @@ export default function AdminBookings() {
         totalPrice: editBookingPrice,
         status: editBookingData.status as BookingStatus,
         extraTimes: extraTimesForApi,
-      });
+      }, { skipConflictCheck: true });
       setShowEditBooking(false);
       setEditBookingData(null);
       setEditExtraTimeBlocks([]);
@@ -3571,7 +3571,7 @@ export default function AdminBookings() {
                 }, { skipMinHours: true });
               }
             } else {
-              await updateBooking(extendBooking.id, { startTime: newStartTime, endTime: newEndTime, totalPrice: newTotalPrice });
+              await updateBooking(extendBooking.id, { startTime: newStartTime, endTime: newEndTime, totalPrice: newTotalPrice }, { skipConflictCheck: true });
             }
             await fetchBookings();
           }}

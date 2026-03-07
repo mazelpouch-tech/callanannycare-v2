@@ -519,7 +519,7 @@ export function DataProvider({ children }: DataProviderProps) {
     }
   }, [fetchBookings]);
 
-  const updateBooking = useCallback(async (id: number | string, updates: Partial<Booking>): Promise<void> => {
+  const updateBooking = useCallback(async (id: number | string, updates: Partial<Booking>, options?: { skipConflictCheck?: boolean }): Promise<void> => {
     // Map camelCase to snake_case for API
     const apiBody: Record<string, unknown> = {};
     if (updates.nannyId !== undefined) apiBody.nanny_id = updates.nannyId;
@@ -541,6 +541,7 @@ export function DataProvider({ children }: DataProviderProps) {
     if (updates.status !== undefined) apiBody.status = updates.status;
     if (updates.clockIn !== undefined) apiBody.clock_in = updates.clockIn;
     if (updates.clockOut !== undefined) apiBody.clock_out = updates.clockOut;
+    if (options?.skipConflictCheck) apiBody.skip_conflict_check = true;
     // Optimistic local update
     setBookings((prev) => {
       const updated = prev.map((b) => b.id === id ? { ...b, ...updates } : b);
