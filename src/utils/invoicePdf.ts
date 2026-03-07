@@ -6,24 +6,15 @@ export const INVOICE_LOGO_BASE64 =
 
 /**
  * Generate a PDF from an invoice HTML string and trigger download.
- * The HTML should be a complete page body (no <html>/<head> wrapping needed —
- * we render just the content div inside a container).
  */
 export function downloadInvoicePdf(
   invoiceBodyHtml: string,
   filename: string,
 ) {
-  // Create a temporary container to render the invoice
-  const container = document.createElement("div");
-  container.innerHTML = invoiceBodyHtml;
-  container.style.position = "fixed";
-  container.style.left = "-9999px";
-  container.style.top = "0";
-  container.style.width = "750px";
-  document.body.appendChild(container);
+  const wrapper = `<div style="width:750px;font-family:Helvetica,Arial,sans-serif;">${invoiceBodyHtml}</div>`;
 
   const opt = {
-    margin: 0,
+    margin: [0, 0, 0, 0],
     filename,
     image: { type: "jpeg", quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, logging: false },
@@ -32,13 +23,9 @@ export function downloadInvoicePdf(
 
   html2pdf()
     .set(opt)
-    .from(container)
+    .from(wrapper, "string")
     .save()
-    .then(() => {
-      document.body.removeChild(container);
-    })
     .catch((err: unknown) => {
       console.error("Invoice PDF generation failed:", err);
-      document.body.removeChild(container);
     });
 }
