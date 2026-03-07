@@ -231,8 +231,9 @@ export default function NannyBookings() {
       });
       await fetchNannyBookings();
       setEditBooking(null);
-    } catch {
-      // error handled by context
+    } catch (err) {
+      console.error("Edit booking failed:", err);
+      alert("Failed to save booking changes. Please try again.");
     } finally {
       setEditLoading(false);
     }
