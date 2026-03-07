@@ -159,10 +159,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           if (effNannyId) {
             const bookingDates = getDateRange(effDate, effEndDate || null);
-            const conflicts = await sql`
-              SELECT id, date, start_time, end_time, client_name FROM bookings
-              WHERE nanny_id = ${effNannyId} AND id != ${id} AND status != 'cancelled' AND date = ANY(${bookingDates})
-            ` as { id: number; date: string; start_time: string; end_time: string; client_name: string }[];
+            // Fetch conflicts one date at a time to avoid ANY() array compatibility issues with Neon driver
+            let conflicts: { id: number; date: string; start_time: string; end_time: string; client_name: string }[] = [];
+            for (const d of bookingDates) {
+              const rows = await sql`
+                SELECT id, date, start_time, end_time, client_name FROM bookings
+                WHERE nanny_id = ${effNannyId} AND id != ${id} AND status != 'cancelled' AND date = ${d}
+              ` as { id: number; date: string; start_time: string; end_time: string; client_name: string }[];
+              conflicts = conflicts.concat(rows);
+            }
 
             const overlapping = conflicts.filter(
               c => timesOverlap(effStartTime, effEndTime, c.start_time, c.end_time || '23h59')

@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Clock, X, ArrowRight, Loader2, CheckCircle, Pencil, Check } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { Clock, X, ArrowRight, Loader2, CheckCircle, Pencil, Check, Plus, Minus } from "lucide-react";
 import type { Booking } from "@/types";
 import { calcBookedHours, parseTimeToHours, TIME_SLOTS } from "@/utils/shiftHelpers";
 
@@ -161,6 +161,26 @@ export default function ExtendBookingModal({
     return `${String(h).padStart(2, "0")}h${m === 0 ? "00" : String(m).padStart(2, "0")}`;
   };
 
+  /** Convert decimal hours to nearest TIME_SLOTS label, clamping to valid range */
+  const hoursToLabel = useCallback((decimalHours: number): string => {
+    const h = Math.floor(((decimalHours % 24) + 24) % 24);
+    const m = Math.round((decimalHours - Math.floor(decimalHours)) * 60);
+    const rounded = m < 15 ? 0 : m < 30 ? 15 : m < 45 ? 30 : 45;
+    return `${String(h).padStart(2, "0")}h${String(rounded).padStart(2, "0")}`;
+  }, []);
+
+  /** Quick adjust: shift end time by delta hours (positive = add, negative = reduce) */
+  const adjustHours = useCallback((delta: number) => {
+    const currentEnd = parseTimeToHours(newEndTime || booking.endTime);
+    if (currentEnd === null) return;
+    const adjusted = currentEnd + delta;
+    if (adjusted <= 0 || adjusted > 24) return;
+    const label = hoursToLabel(adjusted);
+    // Verify it's a valid TIME_SLOT
+    const match = TIME_SLOTS.find(s => s.label === label);
+    if (match) setNewEndTime(match.label);
+  }, [newEndTime, booking.endTime, hoursToLabel]);
+
   if (success) {
     return (
       <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -217,6 +237,37 @@ export default function ExtendBookingModal({
               <span className="text-sm font-semibold text-foreground">
                 {booking.totalPrice?.toLocaleString()}€
               </span>
+            </div>
+          </div>
+
+          {/* Quick +/- hours buttons */}
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Quick Adjust End Time
+            </label>
+            <div className="flex items-center gap-2 flex-wrap">
+              {[-2, -1, -0.5].map((delta) => (
+                <button
+                  key={delta}
+                  type="button"
+                  onClick={() => adjustHours(delta)}
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 transition-colors"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                  {Math.abs(delta)}h
+                </button>
+              ))}
+              {[0.5, 1, 2].map((delta) => (
+                <button
+                  key={delta}
+                  type="button"
+                  onClick={() => adjustHours(delta)}
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-700 text-sm font-medium hover:bg-green-100 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {delta}h
+                </button>
+              ))}
             </div>
           </div>
 
