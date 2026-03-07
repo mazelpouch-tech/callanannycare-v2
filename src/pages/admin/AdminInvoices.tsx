@@ -305,6 +305,7 @@ export default function AdminInvoices() {
     const dateStr = inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A";
     const total = inv.totalPrice || 0;
     const totalDH = toDH(total);
+    const isPaid = !!inv.collectedAt;
 
     const html = `<!DOCTYPE html>
 <html><head>
@@ -318,6 +319,7 @@ export default function AdminInvoices() {
   .header-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; opacity: 0.85; }
   .header-num { font-size: 32px; font-weight: 800; margin: 4px 0 6px; }
   .header-date { font-size: 13px; opacity: 0.85; }
+  .paid-badge { display: inline-block; background: rgba(255,255,255,0.25); color: #fff; padding: 4px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; margin-top: 8px; }
   .body-content { padding: 24px 24px 32px; }
   .addresses { display: flex; gap: 20px; margin-bottom: 24px; }
   .addr { flex: 1; }
@@ -335,11 +337,15 @@ export default function AdminInvoices() {
   .taxi-row .card-row-label { color: #c2703a; }
   .taxi-row .card-row-label .icon { color: #c2703a; }
   .taxi-row .card-row-value { color: #c2703a; }
+  .paid-row .card-row-label { color: #16a34a; }
+  .paid-row .card-row-value { color: #16a34a; }
   .total-box { background: linear-gradient(135deg, #c2703a 0%, #e8956e 50%, #f0b08a 100%); border-radius: 14px; padding: 24px; text-align: center; margin-top: 8px; }
+  .total-box.paid { background: linear-gradient(135deg, #16a34a 0%, #22c55e 50%, #4ade80 100%); }
   .total-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.8); margin-bottom: 6px; }
   .total-amount { font-size: 42px; font-weight: 800; color: #fff; }
   .total-amount .currency { font-size: 22px; font-weight: 600; vertical-align: super; margin-left: 2px; opacity: 0.85; }
   .total-dh { font-size: 14px; color: rgba(255,255,255,0.75); margin-top: 2px; }
+  .total-paid-note { font-size: 11px; color: rgba(255,255,255,0.8); margin-top: 6px; font-weight: 600; letter-spacing: 1px; }
   @media print {
     body { background: #fff; padding: 0; }
     .page { border-radius: 0; box-shadow: none; max-width: 100%; }
@@ -353,6 +359,7 @@ export default function AdminInvoices() {
     <div class="header-label">INVOICE</div>
     <div class="header-num">#INV-${inv.id}</div>
     <div class="header-date">${dateStr}</div>
+    ${isPaid ? `<div class="paid-badge">&#10003; PAID</div>` : ""}
   </div>
 
   <div class="body-content">
@@ -405,12 +412,17 @@ export default function AdminInvoices() {
         <span class="card-row-label"><span class="icon">&#128663;</span> Taxi fee (7 PM &ndash; 7 AM)</span>
         <span class="card-row-value">+${TAXI_FEE}&euro;</span>
       </div>` : ""}
+      ${isPaid ? `<div class="card-row paid-row">
+        <span class="card-row-label"><span class="icon">&#10003;</span> Payment received</span>
+        <span class="card-row-value">-${total}&euro;</span>
+      </div>` : ""}
     </div>
 
-    <div class="total-box">
-      <div class="total-label">TOTAL AMOUNT</div>
-      <div class="total-amount">${total}<span class="currency">&euro;</span></div>
-      <div class="total-dh">${totalDH.toLocaleString()} DH</div>
+    <div class="total-box${isPaid ? " paid" : ""}">
+      <div class="total-label">${isPaid ? "BALANCE DUE" : "TOTAL AMOUNT"}</div>
+      <div class="total-amount">${isPaid ? 0 : total}<span class="currency">&euro;</span></div>
+      <div class="total-dh">${isPaid ? "0" : totalDH.toLocaleString()} DH</div>
+      ${isPaid ? `<div class="total-paid-note">FULLY PAID &mdash; ${total}&euro; (${totalDH.toLocaleString()} DH)</div>` : ""}
     </div>
   </div>
 </div>
