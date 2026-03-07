@@ -10,10 +10,23 @@ export function downloadInvoicePdf(
   invoiceFullHtml: string,
   _filename: string,
 ) {
-  const printWindow = window.open("", "_blank", "toolbar=no,location=no,menubar=no,scrollbars=yes,width=820,height=1100");
+  // Use a Blob URL for better cross-browser/mobile support
+  const blob = new Blob([invoiceFullHtml], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const printWindow = window.open(url, "_blank");
   if (printWindow) {
-    printWindow.document.write(invoiceFullHtml);
-    printWindow.document.close();
-    setTimeout(() => printWindow.print(), 400);
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print();
+        URL.revokeObjectURL(url);
+      }, 600);
+    };
+  } else {
+    // Fallback: direct download as HTML file
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = _filename.replace(".pdf", ".html");
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 }
