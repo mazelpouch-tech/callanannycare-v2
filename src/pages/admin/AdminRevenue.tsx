@@ -14,7 +14,7 @@ import {
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import type { Booking } from "@/types";
-import { calcShiftPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE } from "@/utils/shiftHelpers";
+import { calcShiftPayBreakdown, estimateNannyPayBreakdown, calcTotalBookedHours, HOURLY_RATE } from "@/utils/shiftHelpers";
 import PaymentPanel from "../../components/PaymentPanel";
 
 type ViewTab = "to-collect" | "collected" | "by-nanny";
@@ -110,6 +110,26 @@ export default function AdminRevenue() {
 
   const filteredExpenseEUR = rate > 0 ? Math.round(filteredExpenseDH / rate) : 0;
   const filteredNetIncomeEUR = filteredRevenue - filteredExpenseEUR;
+
+  // Hours for financial summary cards
+  const filteredClientHours = useMemo(
+    () => Math.round(filteredFinancialBookings.reduce((sum, b) => {
+      if (!b.startTime || !b.endTime) return sum;
+      return sum + calcTotalBookedHours(b.startTime, b.endTime, b.extraTimes, b.date, b.endDate);
+    }, 0) * 10) / 10,
+    [filteredFinancialBookings]
+  );
+  const filteredNannyHours = useMemo(
+    () => Math.round(filteredFinancialBookings.reduce((sum, b) => {
+      if (b.clockIn && b.clockOut) {
+        const ms = new Date(b.clockOut).getTime() - new Date(b.clockIn).getTime();
+        return sum + ms / 3600000;
+      }
+      if (!b.startTime || !b.endTime) return sum;
+      return sum + calcTotalBookedHours(b.startTime, b.endTime, b.extraTimes, b.date, b.endDate);
+    }, 0) * 10) / 10,
+    [filteredFinancialBookings]
+  );
 
   // ── Collection lists ──
   const toCollect = useMemo(() => {
@@ -476,7 +496,7 @@ export default function AdminRevenue() {
                 </div>
                 <div>
                   <p className="text-xs font-medium text-green-800">Revenue</p>
-                  <p className="text-[10px] text-green-600/70">From clients</p>
+                  <p className="text-[10px] text-green-600/70">From clients · {filteredClientHours}h</p>
                 </div>
               </div>
               <div className="text-right">
@@ -492,7 +512,7 @@ export default function AdminRevenue() {
                 </div>
                 <div>
                   <p className="text-xs font-medium text-orange-800">Expense</p>
-                  <p className="text-[10px] text-orange-600/70">Nanny pay ({HOURLY_RATE} DH/hr)</p>
+                  <p className="text-[10px] text-orange-600/70">Nanny pay · {filteredNannyHours}h worked</p>
                 </div>
               </div>
               <div className="text-right">
@@ -508,7 +528,7 @@ export default function AdminRevenue() {
                 </div>
                 <div>
                   <p className={`text-xs font-medium ${filteredNetIncomeEUR >= 0 ? "text-blue-800" : "text-red-800"}`}>Net Income</p>
-                  <p className={`text-[10px] ${filteredNetIncomeEUR >= 0 ? "text-blue-600/70" : "text-red-600/70"}`}>Revenue − Expenses</p>
+                  <p className={`text-[10px] ${filteredNetIncomeEUR >= 0 ? "text-blue-600/70" : "text-red-600/70"}`}>{filteredNannyHours}h worked</p>
                 </div>
               </div>
               <div className="text-right">
