@@ -180,35 +180,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       // ────────────────────────────────────────────────────────────
 
+      // Normalize all values: convert undefined → null so Neon driver doesn't choke
+      const _nanny_id = nanny_id !== undefined ? nanny_id : null;
+      const _status = status ?? null;
+      const _client_name = client_name ?? null;
+      const _client_email = client_email ?? null;
+      const _client_phone = client_phone ?? null;
+      const _hotel = hotel ?? null;
+      const _date = date ?? null;
+      const _end_date = end_date !== undefined ? end_date : null;
+      const _start_time = start_time ?? null;
+      const _end_time = end_time ?? null;
+      const _plan = plan ?? null;
+      const _children_count = children_count ?? null;
+      const _children_ages = children_ages ?? null;
+      const _notes = notes ?? null;
+      const _total_price = total_price ?? null;
+      const _clock_in = clock_in || null;
+      const _clock_out = clock_out || null;
+      const _cancellation_reason = cancellation_reason || '';
+      const _cancelled_by = cancelled_by || '';
+      const _collected_by = collected_by || null;
+      const _collected_at = collected_at || null;
+      const _collection_note = collection_note || null;
+      const _payment_method = payment_method || null;
+      const _admin_notes = admin_notes !== undefined ? admin_notes : null;
+      const _extra_dates = extra_dates !== undefined ? extra_dates : null;
+      const _extra_times = extra_times !== undefined ? extra_times : null;
+
       const result = await sql`
         UPDATE bookings SET
-          nanny_id = COALESCE(${nanny_id !== undefined ? nanny_id : null}, nanny_id),
-          status = COALESCE(${status}, status),
-          client_name = COALESCE(${client_name}, client_name),
-          client_email = COALESCE(${client_email}, client_email),
-          client_phone = COALESCE(${client_phone}, client_phone),
-          hotel = COALESCE(${hotel}, hotel),
-          date = COALESCE(${date}, date),
-          end_date = COALESCE(${end_date !== undefined ? end_date : null}, end_date),
-          start_time = COALESCE(${start_time}, start_time),
-          end_time = COALESCE(${end_time}, end_time),
-          plan = COALESCE(${plan}, plan),
-          children_count = COALESCE(${children_count}, children_count),
-          children_ages = COALESCE(${children_ages}, children_ages),
-          notes = COALESCE(${notes}, notes),
-          total_price = COALESCE(${total_price}, total_price),
-          clock_in = COALESCE(${clock_in ? clock_in : null}, clock_in),
-          clock_out = COALESCE(${clock_out ? clock_out : null}, clock_out),
-          cancelled_at = CASE WHEN ${status} = 'cancelled' AND cancelled_at IS NULL THEN NOW() ELSE cancelled_at END,
-          cancellation_reason = CASE WHEN ${status} = 'cancelled' THEN COALESCE(${cancellation_reason || ''}, cancellation_reason) ELSE cancellation_reason END,
-          cancelled_by = CASE WHEN ${status} = 'cancelled' THEN COALESCE(${cancelled_by || ''}, cancelled_by) ELSE cancelled_by END,
-          collected_by = COALESCE(${collected_by || null}, collected_by),
-          collected_at = COALESCE(${collected_at ? collected_at : null}, collected_at),
-          collection_note = COALESCE(${collection_note || null}, collection_note),
-          payment_method = COALESCE(${payment_method || null}, payment_method),
-          admin_notes = COALESCE(${admin_notes !== undefined ? admin_notes : null}, admin_notes),
-          extra_dates = COALESCE(${extra_dates !== undefined ? extra_dates : null}, extra_dates),
-          extra_times = COALESCE(${extra_times !== undefined ? extra_times : null}, extra_times),
+          nanny_id = COALESCE(${_nanny_id}, nanny_id),
+          status = COALESCE(${_status}, status),
+          client_name = COALESCE(${_client_name}, client_name),
+          client_email = COALESCE(${_client_email}, client_email),
+          client_phone = COALESCE(${_client_phone}, client_phone),
+          hotel = COALESCE(${_hotel}, hotel),
+          date = COALESCE(${_date}, date),
+          end_date = COALESCE(${_end_date}, end_date),
+          start_time = COALESCE(${_start_time}, start_time),
+          end_time = COALESCE(${_end_time}, end_time),
+          plan = COALESCE(${_plan}, plan),
+          children_count = COALESCE(${_children_count}, children_count),
+          children_ages = COALESCE(${_children_ages}, children_ages),
+          notes = COALESCE(${_notes}, notes),
+          total_price = COALESCE(${_total_price}, total_price),
+          clock_in = COALESCE(${_clock_in}, clock_in),
+          clock_out = COALESCE(${_clock_out}, clock_out),
+          cancelled_at = CASE WHEN ${_status} = 'cancelled' AND cancelled_at IS NULL THEN NOW() ELSE cancelled_at END,
+          cancellation_reason = CASE WHEN ${_status} = 'cancelled' THEN COALESCE(${_cancellation_reason}, cancellation_reason) ELSE cancellation_reason END,
+          cancelled_by = CASE WHEN ${_status} = 'cancelled' THEN COALESCE(${_cancelled_by}, cancelled_by) ELSE cancelled_by END,
+          collected_by = COALESCE(${_collected_by}, collected_by),
+          collected_at = COALESCE(${_collected_at}, collected_at),
+          collection_note = COALESCE(${_collection_note}, collection_note),
+          payment_method = COALESCE(${_payment_method}, payment_method),
+          admin_notes = COALESCE(${_admin_notes}, admin_notes),
+          extra_dates = COALESCE(${_extra_dates}, extra_dates),
+          extra_times = COALESCE(${_extra_times}, extra_times),
           updated_at = NOW()
         WHERE id = ${id}
         RETURNING *
@@ -782,7 +810,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Booking API error:', message);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Booking API error:', message, error);
+    return res.status(500).json({ error: message });
   }
 }
