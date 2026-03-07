@@ -498,7 +498,8 @@ export default function AdminBookings() {
       setEditExtraTimeBlocks([]);
     } catch (err) {
       console.error("Edit booking failed:", err);
-      alert("Failed to save booking changes. Please try again.");
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      alert(`Failed to save booking: ${msg}`);
     } finally {
       setEditBookingLoading(false);
     }
