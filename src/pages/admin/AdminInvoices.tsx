@@ -318,7 +318,7 @@ export default function AdminInvoices() {
   .page { max-width: 750px; margin: 0 auto; padding: 0; }
 
   /* ── Header band ── */
-  .header-band { background: linear-gradient(135deg, #f97316, #ea580c); padding: 32px 40px; display: flex; justify-content: space-between; align-items: center; }
+  .header-band { background: #f97316; padding: 32px 40px; display: flex; justify-content: space-between; align-items: center; }
   .header-left { display: flex; align-items: center; gap: 16px; }
   .header-left img { width: 72px; height: 72px; border-radius: 16px; object-fit: contain; background: #fff; padding: 4px; }
   .header-brand { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
