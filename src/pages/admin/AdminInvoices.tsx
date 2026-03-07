@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import {
   Search, Trash2, ChevronDown,
   Plus, X, Loader2,
-  FileText, Pencil, Send, Download, DollarSign, CheckCircle, AlertCircle,
+  FileText, Pencil, Download, DollarSign, AlertCircle,
   Clock, User, Phone, Mail, Hotel, Baby, Calculator, Car,
 } from "lucide-react";
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, subMonths } from "date-fns";
@@ -72,7 +72,7 @@ const emptyForm: InvoiceForm = {
 // ─── Main Component ─────────────────────────────────────────
 
 export default function AdminInvoices() {
-  const { bookings, nannies, addBooking, updateBooking, deleteBooking, resendInvoice, adminProfile } = useData();
+  const { bookings, nannies, addBooking, updateBooking, deleteBooking, adminProfile } = useData();
   const { toDH } = useExchangeRate();
 
   // Filters
@@ -89,8 +89,6 @@ export default function AdminInvoices() {
 
   // Actions
   const [deleteConfirm, setDeleteConfirm] = useState<number | string | null>(null);
-  const [resendingId, setResendingId] = useState<number | string | null>(null);
-  const [resendSuccess, setResendSuccess] = useState<number | string | null>(null);
 
   // View invoice
   const [viewInvoice, setViewInvoice] = useState<Booking | null>(null);
@@ -296,16 +294,105 @@ export default function AdminInvoices() {
     setDeleteConfirm(null);
   };
 
-  const handleResend = async (id: number | string) => {
-    setResendingId(id);
-    try {
-      await resendInvoice(id);
-      setResendSuccess(id);
-      setTimeout(() => setResendSuccess(null), 3000);
-    } catch {
-      // silent fail
+  const downloadPDF = (inv: Booking) => {
+    const hours = calcWorkedHours(inv.clockIn, inv.clockOut);
+    const hoursNum = inv.clockIn && inv.clockOut ? (new Date(inv.clockOut).getTime() - new Date(inv.clockIn).getTime()) / 3600000 : 0;
+    const basePay = Math.round(hoursNum * SERVICE_RATE);
+    const inHour = inv.clockIn ? new Date(inv.clockIn).getHours() : 0;
+    const outHour = inv.clockOut ? new Date(inv.clockOut).getHours() : 0;
+    const hasTaxi = inHour >= 19 || inHour < 7 || outHour >= 19 || outHour < 7 || hoursNum > 12;
+    const dateStr = inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A";
+    const total = inv.totalPrice || 0;
+    const totalDH = toDH(total);
+
+    const html = `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8"/>
+<title>Invoice #INV-${inv.id}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; padding: 40px; max-width: 700px; margin: 0 auto; }
+  .header { background: linear-gradient(135deg, #f97316, #ec4899); color: white; padding: 32px; border-radius: 16px 16px 0 0; }
+  .header h1 { font-size: 28px; font-weight: 700; }
+  .header .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.8; margin-bottom: 4px; }
+  .header .date { font-size: 12px; opacity: 0.7; margin-top: 6px; }
+  .content { border: 1px solid #e5e5e5; border-top: none; padding: 32px; border-radius: 0 0 16px 16px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .grid2 .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; font-weight: 600; margin-bottom: 6px; }
+  .grid2 .name { font-size: 14px; font-weight: 600; }
+  .grid2 .sub { font-size: 12px; color: #666; margin-top: 2px; }
+  .table-section { border: 1px solid #e5e5e5; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+  .table-section .title { background: #f9f9f9; padding: 10px 16px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #888; }
+  .table-section .row { display: flex; justify-content: space-between; padding: 10px 16px; border-top: 1px solid #e5e5e5; font-size: 13px; }
+  .table-section .row .key { color: #666; }
+  .table-section .row .val { font-weight: 500; }
+  .table-section .row.taxi { color: #b45309; }
+  .total-box { background: linear-gradient(135deg, #fff7ed, #fdf2f8); border-radius: 12px; padding: 28px; text-align: center; margin: 24px 0; }
+  .total-box .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 4px; }
+  .total-box .amount { font-size: 32px; font-weight: 700; }
+  .total-box .sub { font-size: 14px; color: #888; margin-top: 4px; }
+  .notes { background: #f9f9f9; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
+  .notes .label { font-size: 11px; font-weight: 600; color: #888; margin-bottom: 4px; }
+  .notes p { font-size: 13px; }
+  .footer { text-align: center; padding-top: 20px; border-top: 1px solid #e5e5e5; font-size: 10px; color: #aaa; }
+  @media print { body { padding: 20px; } @page { margin: 10mm; } }
+</style>
+</head><body>
+<div class="header">
+  <div class="label">Invoice</div>
+  <h1>#INV-${inv.id}</h1>
+  <div class="date">${dateStr}</div>
+</div>
+<div class="content">
+  <div class="grid2">
+    <div>
+      <div class="label">From</div>
+      <div class="name">Call a Nanny</div>
+      <div class="sub">Professional Childcare</div>
+      <div class="sub">Marrakech, Morocco</div>
+    </div>
+    <div>
+      <div class="label">Billed To</div>
+      <div class="name">${inv.clientName || "N/A"}</div>
+      ${inv.clientEmail ? `<div class="sub">${inv.clientEmail}</div>` : ""}
+      ${inv.clientPhone ? `<div class="sub">${inv.clientPhone}</div>` : ""}
+      ${inv.hotel ? `<div class="sub">${inv.hotel}</div>` : ""}
+    </div>
+  </div>
+
+  <div class="table-section">
+    <div class="title">Service Details</div>
+    <div class="row"><span class="key">Caregiver</span><span class="val">${inv.nannyName || "Unassigned"}</span></div>
+    <div class="row"><span class="key">Clock In</span><span class="val">${formatClockTime(inv.clockIn)}</span></div>
+    <div class="row"><span class="key">Clock Out</span><span class="val">${formatClockTime(inv.clockOut)}</span></div>
+    <div class="row"><span class="key">Hours Worked</span><span class="val">${hours}h</span></div>
+    <div class="row"><span class="key">Children</span><span class="val">${inv.childrenCount || 1}${inv.childrenAges ? ` (${inv.childrenAges})` : ""}</span></div>
+  </div>
+
+  <div class="table-section">
+    <div class="title">Price Breakdown</div>
+    <div class="row"><span class="key">${hours}h × ${SERVICE_RATE}€/hr</span><span class="val">${basePay}€</span></div>
+    ${hasTaxi ? `<div class="row taxi"><span class="key">Taxi fee (7 PM – 7 AM)</span><span class="val">+${TAXI_FEE}€</span></div>` : ""}
+  </div>
+
+  <div class="total-box">
+    <div class="label">Total Amount</div>
+    <div class="amount">${total.toLocaleString()} €</div>
+    <div class="sub">${totalDH.toLocaleString()} DH</div>
+  </div>
+
+  ${inv.notes ? `<div class="notes"><div class="label">Notes</div><p>${inv.notes}</p></div>` : ""}
+
+  <div class="footer">Issued by Call a Nanny · callanannycare.com</div>
+</div>
+</body></html>`;
+
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 300);
     }
-    setResendingId(null);
   };
 
   const exportCSV = () => {
@@ -464,7 +551,6 @@ export default function AdminInvoices() {
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Clock In/Out</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hours</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</th>
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
                     <th className="text-right px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
@@ -494,27 +580,17 @@ export default function AdminInvoices() {
                         <div className="text-[10px] text-muted-foreground">{toDH(inv.totalPrice || 0).toLocaleString()} DH</div>
                       </td>
                       <td className="px-5 py-4">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                          <CheckCircle className="w-3 h-3" />
-                          Sent
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
                         <div className="flex items-center justify-end gap-1">
                           <button onClick={() => openEdit(inv)} className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors" title="Edit">
                             <Pencil className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleResend(inv.id)}
-                            disabled={resendingId === inv.id}
-                            className="p-1.5 rounded-lg text-muted-foreground hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-50"
-                            title="Resend Invoice"
+                            onClick={() => downloadPDF(inv)}
+                            className="p-1.5 rounded-lg text-muted-foreground hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                            title="Download PDF"
                           >
-                            {resendingId === inv.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                            <Download className="w-4 h-4" />
                           </button>
-                          {resendSuccess === inv.id && (
-                            <span className="text-[10px] text-green-600 font-semibold">Sent!</span>
-                          )}
                           {deleteConfirm === inv.id ? (
                             <div className="flex items-center gap-1">
                               <button onClick={() => handleDelete(inv.id)} className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded-lg hover:bg-red-100">Yes</button>
@@ -544,10 +620,6 @@ export default function AdminInvoices() {
                     >
                       #INV-{inv.id}
                     </button>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
-                      <CheckCircle className="w-2.5 h-2.5" />
-                      Sent
-                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
@@ -570,12 +642,11 @@ export default function AdminInvoices() {
                       <Pencil className="w-3 h-3" /> Edit
                     </button>
                     <button
-                      onClick={() => handleResend(inv.id)}
-                      disabled={resendingId === inv.id}
-                      className="flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+                      onClick={() => downloadPDF(inv)}
+                      className="flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors"
                     >
-                      {resendingId === inv.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
-                      {resendSuccess === inv.id ? "Sent!" : "Resend"}
+                      <Download className="w-3 h-3" />
+                      Download PDF
                     </button>
                     {deleteConfirm === inv.id ? (
                       <div className="flex items-center gap-1 ml-auto">
@@ -710,12 +781,11 @@ export default function AdminInvoices() {
                     <Pencil className="w-4 h-4" /> Edit
                   </button>
                   <button
-                    onClick={() => { handleResend(inv.id); }}
-                    disabled={resendingId === inv.id}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium text-white gradient-warm rounded-xl hover:opacity-90 transition-opacity shadow-warm disabled:opacity-50"
+                    onClick={() => downloadPDF(inv)}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium text-white gradient-warm rounded-xl hover:opacity-90 transition-opacity shadow-warm"
                   >
-                    {resendingId === inv.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    {resendSuccess === inv.id ? "Sent!" : "Resend Invoice"}
+                    <Download className="w-4 h-4" />
+                    Download PDF
                   </button>
                 </div>
               </div>
