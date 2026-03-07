@@ -322,10 +322,10 @@ export default function AdminInvoices() {
   .header-left { display: flex; align-items: center; gap: 16px; }
   .header-left img { width: 72px; height: 72px; border-radius: 16px; object-fit: contain; background: #fff; padding: 4px; }
   .header-brand { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
-  .header-tagline { font-size: 11px; color: rgba(255,255,255,0.85); font-weight: 500; letter-spacing: 0.5px; margin-top: 2px; }
+  .header-tagline { font-size: 11px; color: #ffffffd9; font-weight: 500; letter-spacing: 0.5px; margin-top: 2px; }
   .header-right { text-align: right; }
   .header-right .inv-title { font-size: 32px; font-weight: 900; color: #fff; letter-spacing: 2px; text-transform: uppercase; }
-  .header-right .inv-num { font-size: 13px; color: rgba(255,255,255,0.85); margin-top: 4px; font-weight: 500; }
+  .header-right .inv-num { font-size: 13px; color: #ffffffd9; margin-top: 4px; font-weight: 500; }
 
   /* ── Content area ── */
   .content { padding: 36px 40px 28px; }
@@ -339,8 +339,8 @@ export default function AdminInvoices() {
   .status-paid { background: #dcfce7; color: #166534; }
 
   /* ── Address cards ── */
-  .addr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 32px; }
-  .addr-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; }
+  .addr-grid { display: flex; gap: 20px; margin-bottom: 32px; }
+  .addr-card { flex: 1; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; }
   .addr-card .addr-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #f97316; font-weight: 700; margin-bottom: 10px; }
   .addr-card .addr-name { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 6px; }
   .addr-card .addr-line { font-size: 12px; color: #64748b; line-height: 1.7; }

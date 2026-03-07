@@ -37,7 +37,8 @@ export function downloadInvoicePdf(
     .then(() => {
       document.body.removeChild(container);
     })
-    .catch(() => {
+    .catch((err: unknown) => {
+      console.error("Invoice PDF generation failed:", err);
       document.body.removeChild(container);
     });
 }
