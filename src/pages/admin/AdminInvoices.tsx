@@ -337,8 +337,6 @@ export default function AdminInvoices() {
   .taxi-row .card-row-label { color: #c2703a; }
   .taxi-row .card-row-label .icon { color: #c2703a; }
   .taxi-row .card-row-value { color: #c2703a; }
-  .paid-row .card-row-label { color: #16a34a; }
-  .paid-row .card-row-value { color: #16a34a; }
   .total-box { background: linear-gradient(135deg, #c2703a 0%, #e8956e 50%, #f0b08a 100%); border-radius: 14px; padding: 24px; text-align: center; margin-top: 8px; }
   .total-box.paid { background: linear-gradient(135deg, #16a34a 0%, #22c55e 50%, #4ade80 100%); }
   .total-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.8); margin-bottom: 6px; }
@@ -412,17 +410,13 @@ export default function AdminInvoices() {
         <span class="card-row-label"><span class="icon">&#128663;</span> Taxi fee (7 PM &ndash; 7 AM)</span>
         <span class="card-row-value">+${TAXI_FEE}&euro;</span>
       </div>` : ""}
-      ${isPaid ? `<div class="card-row paid-row">
-        <span class="card-row-label"><span class="icon">&#10003;</span> Payment received</span>
-        <span class="card-row-value">-${total}&euro;</span>
-      </div>` : ""}
     </div>
 
     <div class="total-box${isPaid ? " paid" : ""}">
-      <div class="total-label">${isPaid ? "BALANCE DUE" : "TOTAL AMOUNT"}</div>
-      <div class="total-amount">${isPaid ? 0 : total}<span class="currency">&euro;</span></div>
-      <div class="total-dh">${isPaid ? "0" : totalDH.toLocaleString()} DH</div>
-      ${isPaid ? `<div class="total-paid-note">FULLY PAID &mdash; ${total}&euro; (${totalDH.toLocaleString()} DH)</div>` : ""}
+      <div class="total-label">TOTAL AMOUNT</div>
+      <div class="total-amount">${total}<span class="currency">&euro;</span></div>
+      <div class="total-dh">${totalDH.toLocaleString()} DH</div>
+      ${isPaid ? `<div class="total-paid-note">&#10003; PAID</div>` : ""}
     </div>
   </div>
 </div>
