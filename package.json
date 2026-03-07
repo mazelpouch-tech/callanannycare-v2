@@ -21,6 +21,7 @@
     "@neondatabase/serverless": "^1.0.2",
     "capacitor-native-biometric": "^4.2.2",
     "date-fns": "^4.1.0",
+    "html2pdf.js": "^0.14.0",
     "lucide-react": "^0.575.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
