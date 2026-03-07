@@ -449,8 +449,8 @@ export default function AdminParents() {
   @media print { body { padding: 20px; } @page { margin: 10mm; } }
 </style>
 </head><body>
-<div class="header">
-  <div class="label">Invoice</div>
+<div class="header" style="${p.unpaidCount === 0 && p.paidCount > 0 ? "background: linear-gradient(135deg, #16a34a, #059669);" : ""}">
+  <div class="label">Invoice${p.unpaidCount === 0 && p.paidCount > 0 ? " · Paid" : ""}</div>
   <h1>${p.name}</h1>
   <div class="date">${invoiceDate} · ${activeBookings.length} booking${activeBookings.length !== 1 ? "s" : ""}</div>
 </div>
@@ -503,13 +503,14 @@ export default function AdminParents() {
     </div>
   </div>
 
-  <div class="total-box">
-    <div class="label">Total Amount Due</div>
-    <div class="amount">${total.toLocaleString()} €</div>
-    <div class="sub">${totalDH.toLocaleString()} DH</div>
+  <div class="total-box" style="${p.unpaidCount === 0 && p.paidCount > 0 ? "background: linear-gradient(135deg, #ecfdf5, #d1fae5);" : ""}">
+    <div class="label">${p.unpaidCount === 0 && p.paidCount > 0 ? "Balance" : "Total Amount Due"}</div>
+    <div class="amount" style="${p.unpaidCount === 0 && p.paidCount > 0 ? "color: #16a34a;" : ""}">${p.unpaidCount === 0 && p.paidCount > 0 ? "0 €" : `${total.toLocaleString()} €`}</div>
+    <div class="sub">${p.unpaidCount === 0 && p.paidCount > 0 ? "0 DH" : `${totalDH.toLocaleString()} DH`}</div>
+    ${p.unpaidCount === 0 && p.paidCount > 0 ? `<div style="margin-top:10px;display:inline-block;background:#16a34a;color:white;padding:4px 16px;border-radius:20px;font-size:13px;font-weight:700;letter-spacing:1px;">PAID</div>` : ""}
   </div>
 
-  <div class="note">Payment is due upon completion of service. Thank you for choosing Call a Nanny.</div>
+  <div class="note">${p.unpaidCount === 0 && p.paidCount > 0 ? "All payments have been received. Thank you for choosing Call a Nanny." : "Payment is due upon completion of service. Thank you for choosing Call a Nanny."}</div>
 
   <div class="footer">Issued by Call a Nanny · callanannycare.com</div>
 </div>
