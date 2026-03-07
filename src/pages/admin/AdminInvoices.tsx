@@ -128,7 +128,7 @@ export default function AdminInvoices() {
 
   const invoices = useMemo(() => {
     return bookings
-      .filter((b) => b.status === "completed" && b.clockOut)
+      .filter((b) => (b.status === "completed" && b.clockOut) || b.collectedAt)
       .sort((a, b) => {
         const da = new Date(a.clockOut!).getTime();
         const db = new Date(b.clockOut!).getTime();
