@@ -338,8 +338,8 @@ export default function AdminInvoices() {
   @media print { body { padding: 20px; } @page { margin: 10mm; } }
 </style>
 </head><body>
-<div class="header">
-  <div class="label">Invoice</div>
+<div class="header" style="${inv.collectedAt ? "background: linear-gradient(135deg, #16a34a, #059669);" : ""}">
+  <div class="label">Invoice${inv.collectedAt ? " · Paid" : ""}</div>
   <h1>#INV-${inv.id}</h1>
   <div class="date">${dateStr}</div>
 </div>
@@ -375,10 +375,11 @@ export default function AdminInvoices() {
     ${hasTaxi ? `<div class="row taxi"><span class="key">Taxi fee (7 PM – 7 AM)</span><span class="val">+${TAXI_FEE}€</span></div>` : ""}
   </div>
 
-  <div class="total-box">
-    <div class="label">Total Amount</div>
-    <div class="amount">${total.toLocaleString()} €</div>
-    <div class="sub">${totalDH.toLocaleString()} DH</div>
+  <div class="total-box" style="${inv.collectedAt ? "background: linear-gradient(135deg, #ecfdf5, #d1fae5);" : ""}">
+    <div class="label">${inv.collectedAt ? "Balance" : "Total Amount"}</div>
+    <div class="amount" style="${inv.collectedAt ? "color: #16a34a;" : ""}">${inv.collectedAt ? "0 €" : `${total.toLocaleString()} €`}</div>
+    <div class="sub">${inv.collectedAt ? "0 DH" : `${totalDH.toLocaleString()} DH`}</div>
+    ${inv.collectedAt ? `<div style="margin-top:10px;display:inline-block;background:#16a34a;color:white;padding:4px 16px;border-radius:20px;font-size:13px;font-weight:700;letter-spacing:1px;">PAID</div>` : ""}
   </div>
 
   ${inv.notes ? `<div class="notes"><div class="label">Notes</div><p>${inv.notes}</p></div>` : ""}
