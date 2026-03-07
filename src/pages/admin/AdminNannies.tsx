@@ -153,11 +153,13 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
       nannyMap[nannyId].taxiFee += bd.taxiFee;
       nannyMap[nannyId].totalPay += bd.total;
 
-      // Track actual clock in/out hours for comparison
+      // Track actual hours: use clock data when available, otherwise assume booked hours
       if (b.clockIn && b.clockOut) {
         nannyMap[nannyId].actualHours += calcActualHoursWorked(b.clockIn, b.clockOut);
-        nannyMap[nannyId].clockedShifts += 1;
+      } else {
+        nannyMap[nannyId].actualHours += hours;
       }
+      nannyMap[nannyId].clockedShifts += 1;
     });
 
     return Object.values(nannyMap)
@@ -167,7 +169,6 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
 
   const totalAllHours = nannyHours.reduce((s, n) => s + n.totalHours, 0);
   const totalAllActual = nannyHours.reduce((s, n) => s + n.actualHours, 0);
-  const totalAllClocked = nannyHours.reduce((s, n) => s + n.clockedShifts, 0);
   const totalAllBasePay = nannyHours.reduce((s, n) => s + n.basePay, 0);
   const totalAllTaxi = nannyHours.reduce((s, n) => s + n.taxiFee, 0);
   const totalAllPay = nannyHours.reduce((s, n) => s + n.totalPay, 0);
@@ -445,17 +446,15 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{nanny.shifts}</td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">{nanny.totalHours}h</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {nanny.clockedShifts > 0 ? `${nanny.actualHours}h` : <span className="text-muted-foreground/50">—</span>}
-                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{nanny.actualHours}h</td>
                       <td className="px-4 py-3 text-sm">
-                        {nanny.clockedShifts > 0 ? (() => {
+                        {(() => {
                           const diff = Math.round((nanny.actualHours - nanny.totalHours) * 10) / 10;
                           if (Math.abs(diff) < 0.2) return <span className="text-green-600">0h</span>;
                           return diff > 0
                             ? <span className="text-red-600 font-medium">+{diff}h</span>
                             : <span className="text-blue-600 font-medium">{diff}h</span>;
-                        })() : <span className="text-muted-foreground/50">—</span>}
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground text-right">
                         {nanny.basePay.toLocaleString()} DH
@@ -491,17 +490,15 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                   <td className="px-4 py-3 text-sm font-bold text-foreground">Total</td>
                   <td className="px-4 py-3 text-sm font-bold text-foreground">{totalAllShifts}</td>
                   <td className="px-4 py-3 text-sm font-bold text-foreground">{totalAllHours.toFixed(1)}h</td>
-                  <td className="px-4 py-3 text-sm font-bold text-foreground">
-                    {totalAllClocked > 0 ? `${Math.round(totalAllActual * 10) / 10}h` : "—"}
-                  </td>
+                  <td className="px-4 py-3 text-sm font-bold text-foreground">{Math.round(totalAllActual * 10) / 10}h</td>
                   <td className="px-4 py-3 text-sm font-bold">
-                    {totalAllClocked > 0 ? (() => {
+                    {(() => {
                       const diff = Math.round((totalAllActual - totalAllHours) * 10) / 10;
                       if (Math.abs(diff) < 0.2) return <span className="text-green-600">0h</span>;
                       return diff > 0
                         ? <span className="text-red-600">+{diff}h</span>
                         : <span className="text-blue-600">{diff}h</span>;
-                    })() : "—"}
+                    })()}
                   </td>
                   <td className="px-4 py-3 text-sm font-bold text-foreground text-right">{totalAllBasePay.toLocaleString()} DH</td>
                   <td className="px-4 py-3 text-sm font-bold text-orange-600 text-right">
@@ -546,10 +543,8 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                   <div className="flex items-center gap-3 text-xs text-muted-foreground pl-6">
                     <span>{nanny.shifts} shifts</span>
                     <span>Booked: {nanny.totalHours}h</span>
-                    {nanny.clockedShifts > 0 && (
-                      <span>Actual: {nanny.actualHours}h</span>
-                    )}
-                    {nanny.clockedShifts > 0 && (() => {
+                    <span>Actual: {nanny.actualHours}h</span>
+                    {(() => {
                       const diff = Math.round((nanny.actualHours - nanny.totalHours) * 10) / 10;
                       if (Math.abs(diff) < 0.2) return null;
                       return diff > 0
