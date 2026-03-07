@@ -473,30 +473,35 @@ export default function AdminBookings() {
         }))
       : null;
 
-    await updateBooking(editBookingData.id, {
-      nannyId: Number(editBookingData.nannyId),
-      nannyName: editSelectedNanny?.name || "",
-      clientName: editBookingData.clientName,
-      clientEmail: editBookingData.clientEmail,
-      clientPhone: editBookingData.clientPhone,
-      hotel: editBookingData.hotel,
-      date: editBookingData.date,
-      endDate: editBookingData.endDate || null,
-      startTime: startLabel,
-      endTime: endLabel,
-      plan: editBookingData.plan as BookingPlan,
-      childrenCount: Number(editBookingData.numChildren),
-      childrenAges: editBookingData.childrenAges,
-      notes: editBookingData.notes,
-      totalPrice: editBookingPrice,
-      status: editBookingData.status as BookingStatus,
-      extraTimes: extraTimesForApi,
-    });
-
-    setEditBookingLoading(false);
-    setShowEditBooking(false);
-    setEditBookingData(null);
-    setEditExtraTimeBlocks([]);
+    try {
+      await updateBooking(editBookingData.id, {
+        nannyId: Number(editBookingData.nannyId),
+        nannyName: editSelectedNanny?.name || "",
+        clientName: editBookingData.clientName,
+        clientEmail: editBookingData.clientEmail,
+        clientPhone: editBookingData.clientPhone,
+        hotel: editBookingData.hotel,
+        date: editBookingData.date,
+        endDate: editBookingData.endDate || null,
+        startTime: startLabel,
+        endTime: endLabel,
+        plan: editBookingData.plan as BookingPlan,
+        childrenCount: Number(editBookingData.numChildren),
+        childrenAges: editBookingData.childrenAges,
+        notes: editBookingData.notes,
+        totalPrice: editBookingPrice,
+        status: editBookingData.status as BookingStatus,
+        extraTimes: extraTimesForApi,
+      });
+      setShowEditBooking(false);
+      setEditBookingData(null);
+      setEditExtraTimeBlocks([]);
+    } catch (err) {
+      console.error("Edit booking failed:", err);
+      alert("Failed to save booking changes. Please try again.");
+    } finally {
+      setEditBookingLoading(false);
+    }
   };
 
   const availableNannies = useMemo(

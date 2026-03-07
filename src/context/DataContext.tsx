@@ -554,8 +554,10 @@ export function DataProvider({ children }: DataProviderProps) {
         body: JSON.stringify(apiBody),
       });
       await fetchBookings();
-    } catch {
-      console.warn("API update failed, local state updated");
+    } catch (err) {
+      // Rollback optimistic update by refetching server data
+      await fetchBookings().catch(() => {});
+      throw err;
     }
   }, [fetchBookings]);
 

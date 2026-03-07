@@ -143,6 +143,12 @@ export default function ExtendBookingModal({
             ? err.message
             : "Modifying this booking would create a scheduling conflict."
         );
+      } else {
+        setConflictError(
+          err instanceof Error
+            ? err.message
+            : "Failed to save changes. Please try again."
+        );
       }
     }
   };
