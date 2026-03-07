@@ -344,9 +344,14 @@ export default function AdminInvoices() {
   .total-amount .currency { font-size: 22px; font-weight: 600; vertical-align: super; margin-left: 2px; opacity: 0.85; }
   .total-dh { font-size: 14px; color: rgba(255,255,255,0.75); margin-top: 2px; }
   .total-paid-note { font-size: 15px; color: rgba(255,255,255,0.9); margin-top: 8px; font-weight: 800; letter-spacing: 2px; }
+  .back-bar { max-width: 480px; margin: 0 auto; padding: 12px 16px; display: flex; gap: 8px; }
+  .back-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px 20px; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .back-btn.close { background: linear-gradient(135deg, #c2703a 0%, #e8956e 100%); color: #fff; }
+  .back-btn.print { background: #f0ece6; color: #5a5a5a; }
   @media print {
     body { background: #fff; padding: 0; margin: 0; }
     .page { max-width: 100%; margin: 0; }
+    .back-bar { display: none !important; }
     @page { margin: 6mm; size: A4; }
     * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     .header { break-after: avoid; }
@@ -354,6 +359,10 @@ export default function AdminInvoices() {
   }
 </style>
 </head><body>
+<div class="back-bar">
+  <button class="back-btn close" onclick="window.close(); setTimeout(function(){ history.back(); }, 300);">&#8592; Back to App</button>
+  <button class="back-btn print" onclick="window.print();">&#128424; Print / Save PDF</button>
+</div>
 <div class="page">
   <div class="header">
     <div class="header-label">INVOICE</div>

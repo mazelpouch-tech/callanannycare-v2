@@ -15,11 +15,10 @@ export function downloadInvoicePdf(
   const url = URL.createObjectURL(blob);
   const printWindow = window.open(url, "_blank");
   if (printWindow) {
+    // Don't auto-print — the invoice page has its own Print button
+    // and a Back to App button so the user can navigate back
     printWindow.onload = () => {
-      setTimeout(() => {
-        printWindow.print();
-        URL.revokeObjectURL(url);
-      }, 600);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
     };
   } else {
     // Fallback: direct download as HTML file
