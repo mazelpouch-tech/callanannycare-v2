@@ -146,7 +146,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json(restored[0]);
       }
 
-      // ─── Conflict check when nanny/date/time changes ────────────
+      // ─── Conflict check when nanny/date/time actually changes ────
       if (nanny_id !== undefined || date || end_date !== undefined || start_time || end_time) {
         const currentRows = await sql`SELECT * FROM bookings WHERE id = ${id}` as DbBookingWithNanny[];
         if (currentRows.length > 0) {
@@ -157,7 +157,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const effStartTime = start_time || cur.start_time;
           const effEndTime = end_time || cur.end_time || '23h59';
 
-          if (effNannyId) {
+          // Only run conflict check if the schedule actually changed
+          const scheduleChanged =
+            (nanny_id !== undefined && nanny_id !== cur.nanny_id) ||
+            (date && date !== cur.date) ||
+            (end_date !== undefined && end_date !== (cur.end_date || null)) ||
+            (start_time && start_time !== cur.start_time) ||
+            (end_time && end_time !== cur.end_time);
+
+          if (effNannyId && scheduleChanged) {
             const bookingDates = getDateRange(effDate, effEndDate || null);
             // Fetch conflicts one date at a time to avoid ANY() array compatibility issues with Neon driver
             let conflicts: { id: number; date: string; start_time: string; end_time: string; client_name: string }[] = [];
