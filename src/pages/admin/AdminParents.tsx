@@ -96,11 +96,18 @@ export default function AdminParents() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
 
-  // Modify hours modal state
+  // Modify hours modal state (single booking)
   const [modifyingBooking, setModifyingBooking] = useState<Booking | null>(null);
   const [modifyStart, setModifyStart] = useState("");
   const [modifyEnd, setModifyEnd] = useState("");
   const [modifySaving, setModifySaving] = useState(false);
+
+  // Bulk modify hours modal state (all bookings for a parent)
+  const [bulkModifyParent, setBulkModifyParent] = useState<ParentSummary | null>(null);
+  const [bulkModifyStart, setBulkModifyStart] = useState("");
+  const [bulkModifyEnd, setBulkModifyEnd] = useState("");
+  const [bulkModifySaving, setBulkModifySaving] = useState(false);
+  const [bulkModifyProgress, setBulkModifyProgress] = useState(0);
 
   const closeModal = () => {
     setCollectingBooking(null);
@@ -121,6 +128,62 @@ export default function AdminParents() {
     setModifyingBooking(b);
     setModifyStart(b.startTime || "");
     setModifyEnd(b.endTime || "");
+  };
+
+  const closeBulkModifyModal = () => {
+    setBulkModifyParent(null);
+    setBulkModifyStart("");
+    setBulkModifyEnd("");
+    setBulkModifySaving(false);
+    setBulkModifyProgress(0);
+  };
+
+  const openBulkModifyModal = (p: ParentSummary) => {
+    const active = p.bookings.filter((b) => b.status !== "cancelled");
+    if (active.length === 0) return;
+    setBulkModifyParent(p);
+    // Pre-fill with the most common start/end from active bookings
+    setBulkModifyStart(active[0]?.startTime || "");
+    setBulkModifyEnd(active[0]?.endTime || "");
+  };
+
+  const handleBulkModifyHours = async () => {
+    if (!bulkModifyParent || !bulkModifyStart || !bulkModifyEnd) return;
+    const active = bulkModifyParent.bookings.filter((b) => b.status !== "cancelled");
+    if (active.length === 0) return;
+    setBulkModifySaving(true);
+    setBulkModifyProgress(0);
+    try {
+      for (let i = 0; i < active.length; i++) {
+        const b = active[i];
+        // Calculate new price for this booking
+        const sH = parseInt(bulkModifyStart.split("h")[0]);
+        const sM = parseInt(bulkModifyStart.split("h")[1] || "0");
+        const eH = parseInt(bulkModifyEnd.split("h")[0]);
+        const eM = parseInt(bulkModifyEnd.split("h")[1] || "0");
+        const startDec = sH + sM / 60;
+        const endDec = eH + eM / 60;
+        const hours = endDec > startDec ? endDec - startDec : (24 - startDec) + endDec;
+        const days = b.endDate && b.endDate !== b.date
+          ? Math.max(1, Math.round((new Date(b.endDate).getTime() - new Date(b.date).getTime()) / 86400000) + 1)
+          : 1;
+        const isOvernight = endDec <= startDec;
+        const isEvening = isOvernight || sH >= 19 || sH < 7 || eH > 19 || (eH === 19 && eM > 0);
+        const taxiFee = isEvening ? TAXI_FEE * days : 0;
+        const newPrice = Math.round(SERVICE_RATE * hours * days) + taxiFee;
+
+        await updateBooking(b.id, {
+          startTime: bulkModifyStart,
+          endTime: bulkModifyEnd,
+          totalPrice: newPrice,
+        }, { skipConflictCheck: true });
+        setBulkModifyProgress(i + 1);
+      }
+      closeBulkModifyModal();
+    } catch (err) {
+      console.error("Bulk modify hours failed:", err);
+      setBulkModifySaving(false);
+    }
   };
 
   const handleModifyHours = async () => {
@@ -751,6 +814,12 @@ export default function AdminParents() {
                           <p className="text-[10px] text-muted-foreground">{p.paidCount} paid · {p.unpaidCount} unpaid</p>
                         )}
                         <button
+                          onClick={(e) => { e.stopPropagation(); openBulkModifyModal(p); }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer w-fit"
+                        >
+                          <TimerReset className="w-3 h-3" /> Modify All
+                        </button>
+                        <button
                           onClick={(e) => { e.stopPropagation(); downloadParentInvoice(p); }}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer w-fit"
                         >
@@ -804,6 +873,12 @@ export default function AdminParents() {
                   <span>{p.totalBookings} bookings</span>
                   <span>{p.totalHours.toFixed(1)}h</span>
                   {paymentBadge(p, true)}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openBulkModifyModal(p); }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer"
+                  >
+                    <TimerReset className="w-3 h-3" /> Modify All
+                  </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); downloadParentInvoice(p); }}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer"
@@ -1010,6 +1085,162 @@ export default function AdminParents() {
                     <><span className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full" /> {bulkProgress}/{unpaid.length}</>
                   ) : (
                     <><CheckCircle className="w-4 h-4" /> Collect All ({unpaid.length})</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Bulk Modify Hours Modal */}
+      {bulkModifyParent && (() => {
+        const active = bulkModifyParent.bookings.filter((b) => b.status !== "cancelled");
+
+        // Price preview calculation
+        let previewTotal = 0;
+        let previewTaxiTotal = 0;
+        if (bulkModifyStart && bulkModifyEnd) {
+          const sH = parseInt(bulkModifyStart.split("h")[0]);
+          const sM = parseInt(bulkModifyStart.split("h")[1] || "0");
+          const eH = parseInt(bulkModifyEnd.split("h")[0]);
+          const eM = parseInt(bulkModifyEnd.split("h")[1] || "0");
+          const startDec = sH + sM / 60;
+          const endDec = eH + eM / 60;
+          const hours = endDec > startDec ? endDec - startDec : (24 - startDec) + endDec;
+          const isOvernight = endDec <= startDec;
+          const isEvening = isOvernight || sH >= 19 || sH < 7 || eH > 19 || (eH === 19 && eM > 0);
+          active.forEach((b) => {
+            const days = b.endDate && b.endDate !== b.date
+              ? Math.max(1, Math.round((new Date(b.endDate).getTime() - new Date(b.date).getTime()) / 86400000) + 1)
+              : 1;
+            const taxiFee = isEvening ? TAXI_FEE * days : 0;
+            previewTaxiTotal += taxiFee;
+            previewTotal += Math.round(SERVICE_RATE * hours * days) + taxiFee;
+          });
+        }
+        const currentTotal = active.reduce((s, b) => s + (b.totalPrice || 0), 0);
+        const priceDiff = previewTotal - currentTotal;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+            <div className="fixed inset-0 bg-foreground/40 backdrop-blur-sm" onClick={() => !bulkModifySaving && closeBulkModifyModal()} />
+            <div className="relative bg-card rounded-t-3xl sm:rounded-2xl border border-border w-full sm:max-w-md mx-auto shadow-xl z-10 max-h-[90vh] overflow-y-auto">
+
+              <div className="px-6 pt-6 pb-3 flex items-start justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                    <TimerReset className="w-5 h-5 text-primary" />
+                    Modify All Hours
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {bulkModifyParent.name} &middot; {active.length} booking{active.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <button onClick={() => !bulkModifySaving && closeBulkModifyModal()} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="px-6 pb-4 space-y-4">
+                {/* List of bookings that will be modified */}
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Bookings to modify</label>
+                  <div className="bg-muted/30 rounded-xl overflow-hidden divide-y divide-border/50 max-h-40 overflow-y-auto">
+                    {active.map((b, idx) => (
+                      <div key={b.id} className="flex items-center justify-between gap-3 px-4 py-2 text-xs">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {bulkModifySaving && bulkModifyProgress > idx ? (
+                            <CheckCircle className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                          ) : bulkModifySaving && bulkModifyProgress === idx ? (
+                            <span className="animate-spin w-3.5 h-3.5 border-2 border-blue-300 border-t-blue-600 rounded-full shrink-0" />
+                          ) : (
+                            <CircleDashed className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+                          )}
+                          <span className="text-muted-foreground whitespace-nowrap">
+                            {b.date ? format(parseISO(b.date), "dd MMM yy") : "—"}
+                          </span>
+                          <span className="text-foreground whitespace-nowrap">{b.startTime}–{b.endTime}</span>
+                          <span className="text-foreground truncate">{b.nannyName || "—"}</span>
+                        </div>
+                        <span className="font-bold text-foreground shrink-0">{(b.totalPrice || 0).toLocaleString()}&euro;</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Time selectors */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-1.5 block">New Start Time</label>
+                    <select
+                      value={bulkModifyStart}
+                      onChange={(e) => setBulkModifyStart(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-border rounded-xl bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                    >
+                      <option value="">Select...</option>
+                      {TIME_SLOTS.map((slot) => (
+                        <option key={`bms-${slot.value}`} value={slot.label}>{slot.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-1.5 block">New End Time</label>
+                    <select
+                      value={bulkModifyEnd}
+                      onChange={(e) => setBulkModifyEnd(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-border rounded-xl bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                    >
+                      <option value="">Select...</option>
+                      {TIME_SLOTS.map((slot) => (
+                        <option key={`bme-${slot.value}`} value={slot.label}>{slot.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Preview new total price */}
+                {bulkModifyStart && bulkModifyEnd && (
+                  <div className="bg-primary/5 border border-primary/20 rounded-xl px-4 py-3 space-y-1.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Current total</span>
+                      <span className="font-medium text-foreground">{currentTotal.toLocaleString()}&euro;</span>
+                    </div>
+                    {previewTaxiTotal > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Taxi fees included</span>
+                        <span className="text-orange-600 font-medium">{previewTaxiTotal}&euro;</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-sm border-t border-primary/20 pt-1.5">
+                      <span className="font-medium text-foreground">New Total</span>
+                      <div className="text-right">
+                        <span className="text-lg font-bold text-foreground">{previewTotal.toLocaleString()}&euro;</span>
+                        <span className="text-xs text-muted-foreground ml-1.5">({toDH(previewTotal).toLocaleString()} DH)</span>
+                        {priceDiff !== 0 && (
+                          <p className={`text-xs font-medium ${priceDiff > 0 ? "text-primary" : "text-orange-600"}`}>
+                            {priceDiff > 0 ? "+" : ""}{priceDiff.toLocaleString()}&euro;
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="px-6 pb-6 pt-2 flex gap-3">
+                <button onClick={() => !bulkModifySaving && closeBulkModifyModal()} disabled={bulkModifySaving} className="flex-1 py-3 border border-border rounded-xl text-sm font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBulkModifyHours}
+                  disabled={bulkModifySaving || !bulkModifyStart || !bulkModifyEnd}
+                  className="flex-1 py-3 gradient-warm text-white font-semibold rounded-xl text-sm transition-opacity hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {bulkModifySaving ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> {bulkModifyProgress}/{active.length}</>
+                  ) : (
+                    <><TimerReset className="w-4 h-4" /> Modify All ({active.length})</>
                   )}
                 </button>
               </div>
