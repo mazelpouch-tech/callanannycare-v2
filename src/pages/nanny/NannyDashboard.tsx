@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Clock,
   CheckCircle,
@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
+  PlusCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -310,6 +311,7 @@ export default function NannyDashboard() {
     updateBookingStatus,
   } = useData();
   const { t, locale } = useLanguage();
+  const navigate = useNavigate();
   const [extendBooking, setExtendBooking] = useState<Booking | null>(null);
   const [completeLoading, setCompleteLoading] = useState<number | string | null>(null);
 
@@ -391,11 +393,24 @@ export default function NannyDashboard() {
       );
   }, [nannyBookings, periodStart, periodEnd]);
 
+  const bookedTodayCount = useMemo(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    return nannyBookings.filter((b) => b.createdAt && b.createdAt.slice(0, 10) === todayStr).length;
+  }, [nannyBookings]);
+
   const isLoading = !nannyStats && nannyBookings.length === 0;
 
   if (isLoading) return <DashboardSkeleton />;
 
   const statCards = [
+    {
+      label: t("nanny.dashboard.bookedToday"),
+      value: bookedTodayCount,
+      icon: PlusCircle,
+      bg: "bg-emerald-50",
+      color: "text-emerald-600",
+      link: "/nanny/bookings",
+    },
     {
       label: t("nanny.dashboard.hoursWorked"),
       value: parseFloat(totalActualHours.toFixed(1)),
@@ -494,14 +509,11 @@ export default function NannyDashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {statCards.map((stat) => {
           const Icon = stat.icon;
-          return (
-            <div
-              key={stat.label}
-              className="bg-card rounded-xl border border-border p-4 sm:p-5"
-            >
+          const cardContent = (
+            <>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm text-muted-foreground">
                   {stat.label}
@@ -520,6 +532,22 @@ export default function NannyDashboard() {
                   </span>
                 )}
               </p>
+            </>
+          );
+          return stat.link ? (
+            <div
+              key={stat.label}
+              onClick={() => navigate(stat.link!)}
+              className="bg-card rounded-xl border border-border p-4 sm:p-5 cursor-pointer hover:shadow-soft hover:border-primary/30 transition-all"
+            >
+              {cardContent}
+            </div>
+          ) : (
+            <div
+              key={stat.label}
+              className="bg-card rounded-xl border border-border p-4 sm:p-5"
+            >
+              {cardContent}
             </div>
           );
         })}
