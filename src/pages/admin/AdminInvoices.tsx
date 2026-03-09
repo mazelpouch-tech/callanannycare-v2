@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import {
   Search, Trash2, ChevronDown,
-  Plus, X, Loader2,
+  Plus, X, Loader2, CheckCircle,
   FileText, Pencil, Download, DollarSign, AlertCircle,
   Clock, User, Phone, Mail, Hotel, Baby, Calculator, Car,
   Share2, MessageCircle, Send,
@@ -75,7 +75,7 @@ const emptyForm: InvoiceForm = {
 // ─── Main Component ─────────────────────────────────────────
 
 export default function AdminInvoices() {
-  const { bookings, nannies, addBooking, updateBooking, deleteBooking, adminProfile, resendInvoice } = useData();
+  const { bookings, nannies, addBooking, updateBooking, deleteBooking, adminProfile, resendInvoice, markAsCollected } = useData();
   const { toDH } = useExchangeRate();
 
   // Filters
@@ -92,6 +92,7 @@ export default function AdminInvoices() {
 
   // Actions
   const [deleteConfirm, setDeleteConfirm] = useState<number | string | null>(null);
+  const [markingPaid, setMarkingPaid] = useState<number | string | null>(null);
 
   // View invoice
   const [viewInvoice, setViewInvoice] = useState<Booking | null>(null);
@@ -309,6 +310,17 @@ export default function AdminInvoices() {
     setIsEditing(true);
     setFormError("");
     setShowModal(true);
+  };
+
+  const handleMarkPaid = async (inv: Booking) => {
+    setMarkingPaid(inv.id);
+    try {
+      await markAsCollected(inv.id, {
+        collectedBy: adminProfile?.name || "Admin",
+        paymentMethod: "cash",
+      });
+    } catch { /* best-effort */ }
+    setMarkingPaid(null);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -764,6 +776,16 @@ export default function AdminInvoices() {
                               </div>
                             )}
                           </div>
+                          {!inv.collectedAt && (
+                            <button
+                              onClick={() => handleMarkPaid(inv)}
+                              disabled={markingPaid === inv.id}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-green-600 hover:bg-green-50 transition-colors"
+                              title="Mark as Paid"
+                            >
+                              {markingPaid === inv.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                            </button>
+                          )}
                           {deleteConfirm === inv.id ? (
                             <div className="flex items-center gap-1">
                               <button onClick={() => handleDelete(inv.id)} className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded-lg hover:bg-red-100">Yes</button>
@@ -841,6 +863,16 @@ export default function AdminInvoices() {
                       <MessageCircle className="w-3 h-3" />
                       WhatsApp
                     </button>
+                    {!inv.collectedAt && (
+                      <button
+                        onClick={() => handleMarkPaid(inv)}
+                        disabled={markingPaid === inv.id}
+                        className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-3 py-1.5 rounded-lg hover:bg-green-100 transition-colors"
+                      >
+                        {markingPaid === inv.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                        Mark Paid
+                      </button>
+                    )}
                     {deleteConfirm === inv.id ? (
                       <div className="flex items-center gap-1 ml-auto">
                         <button onClick={() => handleDelete(inv.id)} className="text-xs font-semibold text-red-600 bg-red-50 px-2.5 py-1.5 rounded-lg">Delete</button>

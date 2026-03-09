@@ -1332,3 +1332,100 @@ export async function sendNannyDeletionNotificationEmail(data: NannyDeletionNoti
     return false;
   }
 }
+
+// ============================================================
+// Nanny Weekly Earnings Summary Email
+// ============================================================
+
+export interface WeeklySummaryEmailData {
+  nannyName: string;
+  nannyEmail: string;
+  periodLabel: string;
+  bookings: Array<{
+    id: number;
+    date: string;
+    clientName: string;
+    startTime: string;
+    endTime: string;
+    hours: number;
+    pay: number;
+  }>;
+  totalHours: number;
+  totalPay: number;
+}
+
+export async function sendWeeklySummaryEmail(data: WeeklySummaryEmailData): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log('RESEND_API_KEY not configured. Weekly summary email skipped.');
+    return false;
+  }
+
+  const resend = new Resend(apiKey);
+  const fromAddress = process.env.RESEND_FROM_EMAIL || 'Call a Nanny <onboarding@resend.dev>';
+  const baseUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
+
+  const bookingRows = data.bookings.map(b =>
+    `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#1a1a1a;">#${b.id}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#1a1a1a;">${b.date}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#666;">${b.clientName}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#666;">${b.startTime} - ${b.endTime}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#1a1a1a;text-align:right;">${b.hours.toFixed(1)}h</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#1a1a1a;font-weight:600;text-align:right;">${b.pay} DH</td>
+    </tr>`
+  ).join('');
+
+  const content = `
+    <div style="text-align:center;margin-bottom:24px;">
+      <h2 style="margin:0 0 6px;color:#1a1a1a;font-size:22px;font-family:Georgia,'Times New Roman',serif;">Weekly Earnings Summary</h2>
+      <p style="margin:0;color:#666;font-size:15px;">Hi ${data.nannyName}, here's your earnings recap for this pay period.</p>
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden;margin-bottom:24px;">
+      ${row('Period', data.periodLabel)}
+      ${row('Total Shifts', `${data.bookings.length}`)}
+      ${row('Total Hours', `${data.totalHours.toFixed(1)}h`)}
+      ${row('Total Pay', `${data.totalPay.toLocaleString()} DH`)}
+    </table>
+
+    ${data.bookings.length > 0 ? `
+    ${sectionTitle('Shift Breakdown')}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden;margin-bottom:24px;">
+      <tr style="background:#fafafa;">
+        <th style="padding:8px 12px;text-align:left;font-size:11px;color:#666;text-transform:uppercase;">Ref</th>
+        <th style="padding:8px 12px;text-align:left;font-size:11px;color:#666;text-transform:uppercase;">Date</th>
+        <th style="padding:8px 12px;text-align:left;font-size:11px;color:#666;text-transform:uppercase;">Client</th>
+        <th style="padding:8px 12px;text-align:left;font-size:11px;color:#666;text-transform:uppercase;">Time</th>
+        <th style="padding:8px 12px;text-align:right;font-size:11px;color:#666;text-transform:uppercase;">Hours</th>
+        <th style="padding:8px 12px;text-align:right;font-size:11px;color:#666;text-transform:uppercase;">Pay</th>
+      </tr>
+      ${bookingRows}
+      <tr style="background:#f9fafb;font-weight:700;">
+        <td colspan="4" style="padding:10px 12px;font-size:14px;color:#1a1a1a;">Total</td>
+        <td style="padding:10px 12px;font-size:14px;color:#1a1a1a;text-align:right;">${data.totalHours.toFixed(1)}h</td>
+        <td style="padding:10px 12px;font-size:14px;color:#1a1a1a;text-align:right;">${data.totalPay.toLocaleString()} DH</td>
+      </tr>
+    </table>
+    ` : '<p style="color:#666;font-size:14px;text-align:center;margin:16px 0;">No completed shifts this period.</p>'}
+
+    <div style="text-align:center;margin:32px 0;">
+      <a href="${baseUrl}/nanny" style="display:inline-block;background:linear-gradient(135deg,#ef4444,#f97316);color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;padding:14px 32px;border-radius:50px;box-shadow:0 4px 14px rgba(239,68,68,0.3);">View Nanny Portal</a>
+    </div>
+
+    <p style="margin:0;color:#999;font-size:13px;text-align:center;">Call a Nanny &mdash; <a href="mailto:info@callanannycare.com" style="color:#f97316;">info@callanannycare.com</a></p>
+  `;
+
+  try {
+    await resend.emails.send({
+      from: fromAddress,
+      to: data.nannyEmail,
+      subject: `Your Weekly Earnings Summary — ${data.periodLabel}`,
+      html: emailWrapper(content),
+    });
+    return true;
+  } catch (err) {
+    console.error('Failed to send weekly summary email:', err);
+    return false;
+  }
+}
