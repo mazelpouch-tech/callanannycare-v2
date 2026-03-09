@@ -22,6 +22,7 @@ import {
   MessageCircle,
   FileText,
   ArrowLeft,
+  Car,
 } from "lucide-react";
 import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -687,6 +688,18 @@ export default function AdminParents() {
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
             <span className="font-bold text-foreground">{(b.totalPrice || 0).toLocaleString()}&euro;</span>
+            {!isCancelled && (
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await updateBooking(b.id, { totalPrice: (b.totalPrice || 0) + TAXI_FEE });
+                }}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 transition-colors cursor-pointer"
+                title="Add 10€ taxi fee"
+              >
+                <Car className="w-3 h-3" /> +{TAXI_FEE}&euro;
+              </button>
+            )}
             <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.cls}`}>{st.label}</span>
             {!isCancelled && (
               <button
