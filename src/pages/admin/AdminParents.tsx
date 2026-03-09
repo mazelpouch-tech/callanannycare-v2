@@ -700,6 +700,18 @@ export default function AdminParents() {
                 <Car className="w-3 h-3" /> +{TAXI_FEE}&euro;
               </button>
             )}
+            {!isCancelled && (b.totalPrice || 0) > TAXI_FEE && (
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await updateBooking(b.id, { totalPrice: (b.totalPrice || 0) - TAXI_FEE });
+                }}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors cursor-pointer"
+                title="Remove 10€ taxi fee"
+              >
+                <Car className="w-3 h-3" /> -{TAXI_FEE}&euro;
+              </button>
+            )}
             <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${st.cls}`}>{st.label}</span>
             {!isCancelled && (
               <button
