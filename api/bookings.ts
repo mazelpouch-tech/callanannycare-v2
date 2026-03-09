@@ -214,7 +214,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      // ─── Cron: Weekly earnings summary email to nannies ──
+      // ─── Cron: Weekly earnings summary email to admins ──
       if (req.query.cron === 'weekly-summary') {
         // Previous pay period: last Sunday 00:00 → this Sunday 00:00 (Sat 23:59 cutoff)
         const now = new Date();
@@ -236,24 +236,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
         const periodLabel = `${fmtShort(satStart)} 23:59 — ${fmtShort(satEnd)} 23:59`;
 
+        // Get admin emails
+        const admins = await sql`
+          SELECT email FROM admin_users WHERE role = 'super_admin' AND is_active = true
+        ` as { email: string }[];
+        const adminEmails = admins.map(a => a.email).filter(Boolean);
+        if (adminEmails.length === 0) {
+          return res.status(200).json({ success: true, skipped: 'no admin emails' });
+        }
+
         // Get all completed bookings in the period with nanny info
         const completed = await sql`
           SELECT b.id, b.date, b.start_time, b.end_time, b.client_name, b.total_price,
-                 b.nanny_id, n.name as nanny_name, n.email as nanny_email
+                 b.nanny_id, n.name as nanny_name
           FROM bookings b
           LEFT JOIN nannies n ON b.nanny_id = n.id
           WHERE b.status = 'completed'
             AND b.date >= ${startStr}
             AND b.date < ${endStr}
             AND b.nanny_id IS NOT NULL
-            AND n.email IS NOT NULL
-        ` as Array<{ id: number; date: string; start_time: string; end_time: string; client_name: string; total_price: number; nanny_id: number; nanny_name: string; nanny_email: string }>;
+        ` as Array<{ id: number; date: string; start_time: string; end_time: string; client_name: string; total_price: number; nanny_id: number; nanny_name: string }>;
 
         // Group by nanny
-        const byNanny = new Map<number, { name: string; email: string; bookings: typeof completed }>();
+        const byNanny = new Map<number, { name: string; bookings: typeof completed }>();
         for (const b of completed) {
           if (!byNanny.has(b.nanny_id)) {
-            byNanny.set(b.nanny_id, { name: b.nanny_name, email: b.nanny_email, bookings: [] });
+            byNanny.set(b.nanny_id, { name: b.nanny_name, bookings: [] });
           }
           byNanny.get(b.nanny_id)!.bookings.push(b);
         }
@@ -267,46 +275,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return 0;
         };
         const RATE = 31.25;
-        let emailsSent = 0;
 
+        // Build per-nanny summaries
+        const nannySummaries: Array<{ nannyName: string; bookings: Array<{ id: number; date: string; clientName: string; startTime: string; endTime: string; hours: number; pay: number }>; totalHours: number; totalPay: number }> = [];
         for (const [, nanny] of byNanny) {
           const bookingData = nanny.bookings.map(b => {
             const s = parseT(b.start_time);
             const e = parseT(b.end_time || '');
             const hours = e > s ? e - s : e > 0 ? (24 - s) + e : 0;
             const pay = Math.ceil(hours * RATE);
-            return {
-              id: b.id,
-              date: b.date,
-              clientName: b.client_name,
-              startTime: b.start_time,
-              endTime: b.end_time || '',
-              hours,
-              pay,
-            };
+            return { id: b.id, date: b.date, clientName: b.client_name, startTime: b.start_time, endTime: b.end_time || '', hours, pay };
           });
-          const totalHours = bookingData.reduce((sum, b) => sum + b.hours, 0);
-          const totalPay = bookingData.reduce((sum, b) => sum + b.pay, 0);
-
-          try {
-            const { sendWeeklySummaryEmail } = await import('./_emailTemplates.js');
-            await sendWeeklySummaryEmail({
-              nannyName: nanny.name,
-              nannyEmail: nanny.email,
-              periodLabel,
-              bookings: bookingData,
-              totalHours,
-              totalPay,
-            });
-            emailsSent++;
-          } catch (e) { console.error(`Weekly summary for ${nanny.name} failed:`, e); }
+          nannySummaries.push({
+            nannyName: nanny.name,
+            bookings: bookingData,
+            totalHours: bookingData.reduce((sum, b) => sum + b.hours, 0),
+            totalPay: bookingData.reduce((sum, b) => sum + b.pay, 0),
+          });
         }
+
+        let emailSent = false;
+        try {
+          const { sendWeeklySummaryEmail } = await import('./_emailTemplates.js');
+          await sendWeeklySummaryEmail({
+            adminEmails,
+            periodLabel,
+            nannySummaries,
+            grandTotalHours: nannySummaries.reduce((s, n) => s + n.totalHours, 0),
+            grandTotalPay: nannySummaries.reduce((s, n) => s + n.totalPay, 0),
+          });
+          emailSent = true;
+        } catch (e) { console.error('Weekly summary email failed:', e); }
 
         return res.status(200).json({
           success: true,
           period: periodLabel,
           nanniesWithBookings: byNanny.size,
-          emailsSent,
+          emailSent,
         });
       }
       // ────────────────────────────────────────────────────────────
