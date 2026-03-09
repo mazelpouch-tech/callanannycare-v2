@@ -27,6 +27,7 @@ interface CreateBookingBody {
   extra_times?: string | null; // JSON array of extra time blocks [{"start_time":"18h00","end_time":"21h00"}]
   skip_min_hours?: boolean;
   skip_conflict_check?: boolean;
+  skip_parent_notifications?: boolean; // Skip parent email/WhatsApp (for multi-day batching)
 }
 
 interface AvailableNannyRow {
@@ -212,7 +213,120 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
-      const { nanny_id: provided_nanny_id, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, locale, status: reqStatus, clock_in, clock_out, created_by, created_by_name, extra_dates, extra_times, skip_min_hours, skip_conflict_check } = req.body as CreateBookingBody;
+      // ─── Multi-day consolidated notification action ─────────
+      if (req.body?.action === 'send-multi-day-confirmation') {
+        const { client_name: mName, client_email: mEmail, client_phone: mPhone, hotel: mHotel, locale: mLocale, booking_ids, days } = req.body as {
+          action: string; client_name: string; client_email: string; client_phone?: string; hotel?: string; locale?: string;
+          booking_ids: number[];
+          days: { date: string; startTime: string; endTime: string; price: number }[];
+        };
+        const grandTotal = days.reduce((sum: number, d: { price: number }) => sum + d.price, 0);
+
+        // Send one consolidated parent email
+        if (mEmail) {
+          try {
+            const { sendMultiDayConfirmationEmail } = await import('./_emailTemplates.js');
+            await sendMultiDayConfirmationEmail({
+              bookingIds: booking_ids,
+              clientName: mName,
+              clientEmail: mEmail,
+              clientPhone: mPhone || '',
+              hotel: mHotel || '',
+              days,
+              grandTotal,
+              locale: mLocale || 'en',
+            });
+          } catch (emailErr) { console.error('Multi-day confirmation email failed:', emailErr); }
+        }
+
+        // Send one consolidated WhatsApp to parent
+        const WA_TOKEN = process.env.WHATSAPP_TOKEN;
+        const WA_PHONE_ID = process.env.WHATSAPP_PHONE_ID;
+        if (WA_TOKEN && WA_PHONE_ID && mPhone) {
+          try {
+            let parentPhone = mPhone.replace(/[\s\-\(\)]/g, '');
+            if (parentPhone.startsWith('0')) parentPhone = '212' + parentPhone.slice(1);
+            if (!parentPhone.startsWith('+') && !parentPhone.match(/^\d{10,}/)) parentPhone = '+' + parentPhone;
+            parentPhone = parentPhone.replace('+', '');
+
+            const siteUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
+            const daysText = days.map((d: { date: string; startTime: string; endTime: string; price: number }) =>
+              `  📅 ${d.date}  🕐 ${d.startTime} - ${d.endTime}  💰 ${d.price}€`
+            ).join('\n');
+            const waParentMsg = [
+              '✅ *Réservation Confirmée — Call a Nanny*',
+              '✅ *Booking Confirmed — Call a Nanny*',
+              '',
+              `Bonjour ${mName},`,
+              'Merci pour votre réservation ! Voici les détails :',
+              '',
+              `Hi ${mName},`,
+              'Thank you for your booking! Here are the details:',
+              '',
+              `📋 *Réservations / Bookings:* ${booking_ids.map(id => `#${id}`).join(', ')}`,
+              '',
+              daysText,
+              '',
+              `🏨 *Lieu / Location :* ${mHotel || 'N/A'}`,
+              `💰 *Total :* ${grandTotal}€`,
+              '',
+              '📌 *Prochaine étape :* Une nounou qualifiée vous sera assignée sous peu.',
+              '📌 *Next step:* A qualified nanny will be assigned to your booking shortly.',
+              '',
+              '💳 *Paiement :* Le paiement sera collecté par un membre de notre équipe avant la fin de votre séjour — et non par votre hôtel.',
+              '💳 *Payment:* Payment will be collected by a member of our staff by the end of your stay — not by your hotel.',
+              '',
+              `📍 *Suivre / Track :* ${siteUrl}/booking/${booking_ids[0]}`,
+              '',
+              '_Merci de votre confiance ! / Thank you for choosing us!_',
+              '💕 Call a Nanny — Marrakech',
+            ].join('\n');
+
+            await fetch(`https://graph.facebook.com/v18.0/${WA_PHONE_ID}/messages`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ messaging_product: 'whatsapp', to: parentPhone, type: 'text', text: { body: waParentMsg } }),
+            });
+          } catch (waErr) { console.error('Multi-day WhatsApp to parent failed:', waErr); }
+        }
+
+        // Send one consolidated WhatsApp to business
+        const WHATSAPP_BUSINESS_NUMBER = process.env.WHATSAPP_BUSINESS_NUMBER;
+        if (WA_TOKEN && WA_PHONE_ID && WHATSAPP_BUSINESS_NUMBER) {
+          try {
+            const siteUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
+            const daysText = days.map((d: { date: string; startTime: string; endTime: string; price: number }) =>
+              `  📅 ${d.date}  🕐 ${d.startTime} - ${d.endTime}  💰 ${d.price}€`
+            ).join('\n');
+            const waBusinessMsg = [
+              '🔔 *Nouvelle Réservation Multi-Jours ! / New Multi-Day Booking!*',
+              '',
+              `👤 *Client :* ${mName}`,
+              `📱 *Téléphone / Phone :* ${mPhone || 'N/A'}`,
+              `🏨 *Hôtel / Hotel :* ${mHotel || 'N/A'}`,
+              '',
+              daysText,
+              '',
+              `💰 *Grand Total :* ${grandTotal}€`,
+              '',
+              `📍 *Gérer / Manage :* ${siteUrl}/admin/bookings?booking=${booking_ids[0]}`,
+              '',
+              '_Envoyé automatiquement par Call a Nanny_',
+            ].join('\n');
+
+            await fetch(`https://graph.facebook.com/v18.0/${WA_PHONE_ID}/messages`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ messaging_product: 'whatsapp', to: WHATSAPP_BUSINESS_NUMBER, type: 'text', text: { body: waBusinessMsg } }),
+            });
+          } catch (waErr) { console.error('Multi-day WhatsApp to business failed:', waErr); }
+        }
+
+        return res.status(200).json({ success: true, message: 'Multi-day confirmation sent' });
+      }
+      // ────────────────────────────────────────────────────────────
+
+      const { nanny_id: provided_nanny_id, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, locale, status: reqStatus, clock_in, clock_out, created_by, created_by_name, extra_dates, extra_times, skip_min_hours, skip_conflict_check, skip_parent_notifications } = req.body as CreateBookingBody;
 
       // ─── Minimum 3-hour duration check (admin can override) ───
       if (start_time && end_time && !clock_in && !(skip_min_hours && created_by === 'admin')) {
@@ -399,11 +513,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // Send WhatsApp Business notification (best-effort, non-blocking)
+      // Skip when batching multi-day bookings (consolidated notification sent separately)
       const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
       const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID;
       const WHATSAPP_BUSINESS_NUMBER = process.env.WHATSAPP_BUSINESS_NUMBER;
 
-      if (WHATSAPP_TOKEN && WHATSAPP_PHONE_ID && WHATSAPP_BUSINESS_NUMBER) {
+      if (WHATSAPP_TOKEN && WHATSAPP_PHONE_ID && WHATSAPP_BUSINESS_NUMBER && !skip_parent_notifications) {
         try {
           const siteUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
           const waLines = unassigned
@@ -464,7 +579,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // Send WhatsApp booking confirmation to parent (automatic)
-      if (WHATSAPP_TOKEN && WHATSAPP_PHONE_ID && client_phone) {
+      // Skip when batching multi-day bookings (consolidated notification sent separately)
+      if (WHATSAPP_TOKEN && WHATSAPP_PHONE_ID && client_phone && !skip_parent_notifications) {
         try {
           let parentPhone = client_phone.replace(/[\s\-\(\)]/g, '');
           if (parentPhone.startsWith('0')) parentPhone = '212' + parentPhone.slice(1);
@@ -513,7 +629,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // Send confirmation email to parent (best-effort)
-      if (result[0] && client_email) {
+      // Skip when batching multi-day bookings (consolidated email sent separately)
+      if (result[0] && client_email && !skip_parent_notifications) {
         try {
           const { sendConfirmationEmail } = await import('./_emailTemplates.js');
           await sendConfirmationEmail({

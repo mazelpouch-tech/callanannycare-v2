@@ -74,6 +74,14 @@ const strings = {
     cancellationFeeNote: 'A cancellation fee may apply as the cancellation was made within 24 hours of your scheduled service.',
     cancellationNoFee: 'No cancellation fee applies — your booking was cancelled more than 24 hours before the scheduled service.',
     cancelledByLabel: 'Cancelled by',
+    // Multi-day booking
+    multiDaySubject: 'Booking Confirmation - Call a Nanny',
+    multiDayThankYou: 'Thank you for your multi-day booking!',
+    multiDaySchedule: 'Your Schedule',
+    date: 'Date',
+    time: 'Time',
+    price: 'Price',
+    grandTotal: 'Grand Total',
   },
   fr: {
     confirmSubject: 'Confirmation de Réservation - Call a Nanny',
@@ -144,6 +152,14 @@ const strings = {
     cancellationFeeNote: 'Des frais d\'annulation peuvent s\'appliquer car l\'annulation a été effectuée moins de 24h avant le service.',
     cancellationNoFee: 'Aucun frais d\'annulation — votre réservation a été annulée plus de 24h avant le service.',
     cancelledByLabel: 'Annulé par',
+    // Multi-day booking
+    multiDaySubject: 'Confirmation de Réservation - Call a Nanny',
+    multiDayThankYou: 'Merci pour votre réservation multi-jours !',
+    multiDaySchedule: 'Votre Programme',
+    date: 'Date',
+    time: 'Horaire',
+    price: 'Prix',
+    grandTotal: 'Total Général',
   },
 };
 
@@ -289,6 +305,106 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData): Promis
     to: data.clientEmail,
     cc: ['info@callanannycare.com'],
     subject: s.confirmSubject,
+    html: emailWrapper(content),
+  });
+}
+
+// ============================================================
+// Multi-Day Confirmation Email (consolidated)
+// ============================================================
+
+export interface MultiDayConfirmationEmailData {
+  bookingIds: number[];
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  hotel: string;
+  days: { date: string; startTime: string; endTime: string; price: number }[];
+  grandTotal: number;
+  locale: string;
+}
+
+export async function sendMultiDayConfirmationEmail(data: MultiDayConfirmationEmailData): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log('RESEND_API_KEY not configured. Multi-day confirmation email skipped.');
+    return;
+  }
+
+  const resend = new Resend(apiKey);
+  const locale: Locale = data.locale === 'fr' ? 'fr' : 'en';
+  const s = t(locale);
+  const baseUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
+
+  // Build per-day rows for the schedule table
+  const dayRows = data.days.map((d, i) =>
+    `<tr>
+      <td style="padding:10px 12px;color:#1a1a1a;font-size:14px;border-bottom:1px solid #f0f0f0;">${d.date}</td>
+      <td style="padding:10px 12px;color:#1a1a1a;font-size:14px;border-bottom:1px solid #f0f0f0;">${d.startTime} - ${d.endTime}</td>
+      <td style="padding:10px 12px;color:#1a1a1a;font-size:14px;border-bottom:1px solid #f0f0f0;text-align:right;">${d.price}€</td>
+    </tr>`
+  ).join('');
+
+  const content = `
+    <h2 style="margin:0 0 8px;color:#1a1a1a;font-size:22px;font-family:Georgia,'Times New Roman',serif;">${s.greeting} ${data.clientName},</h2>
+    <p style="margin:0 0 24px;color:#666;font-size:16px;line-height:1.5;">${s.multiDayThankYou}</p>
+
+    ${sectionTitle(s.bookingDetails)}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden;">
+      ${row(s.bookingRef, data.bookingIds.map(id => `#${id}`).join(', '))}
+      ${row(s.accommodation, data.hotel || 'N/A')}
+    </table>
+
+    ${sectionTitle(s.multiDaySchedule)}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden;">
+      <tr style="background-color:#fafafa;">
+        <th style="padding:10px 12px;color:#666;font-size:13px;text-align:left;border-bottom:1px solid #e0e0e0;font-weight:600;">${s.date}</th>
+        <th style="padding:10px 12px;color:#666;font-size:13px;text-align:left;border-bottom:1px solid #e0e0e0;font-weight:600;">${s.time}</th>
+        <th style="padding:10px 12px;color:#666;font-size:13px;text-align:right;border-bottom:1px solid #e0e0e0;font-weight:600;">${s.price}</th>
+      </tr>
+      ${dayRows}
+      <tr style="background-color:#fff7ed;">
+        <td colspan="2" style="padding:12px;color:#1a1a1a;font-size:15px;font-weight:700;">${s.grandTotal}</td>
+        <td style="padding:12px;color:#f97316;font-size:18px;font-weight:700;text-align:right;">${data.grandTotal}€</td>
+      </tr>
+    </table>
+
+    <!-- What happens next -->
+    <div style="margin:28px 0;padding:20px;background-color:#fff7ed;border-radius:12px;border-left:4px solid #f97316;">
+      <h3 style="margin:0 0 8px;color:#1a1a1a;font-size:15px;font-weight:600;">${s.whatNext}</h3>
+      <p style="margin:0;color:#666;font-size:14px;line-height:1.5;">${s.whatNextText}</p>
+    </div>
+
+    <!-- Payment Notice -->
+    <div style="margin:28px 0;padding:20px;background-color:#eff6ff;border-radius:12px;border-left:4px solid #3b82f6;">
+      <h3 style="margin:0 0 8px;color:#1a1a1a;font-size:15px;font-weight:600;">💳 ${s.paymentCollectedBy}</h3>
+      <p style="margin:0;color:#666;font-size:14px;line-height:1.5;">${s.paymentCollectedByText}</p>
+    </div>
+
+    <!-- Track Booking CTA -->
+    <div style="margin:28px 0;padding:20px;background:linear-gradient(135deg,#fff7ed,#fdf2f8);border-radius:12px;text-align:center;border:1px solid #fed7aa;">
+      <h3 style="margin:0 0 6px;color:#1a1a1a;font-size:15px;font-weight:600;">${s.trackBooking}</h3>
+      <p style="margin:0 0 16px;color:#666;font-size:13px;line-height:1.5;">${s.trackBookingText}</p>
+      <a href="${baseUrl}/booking/${data.bookingIds[0]}" style="display:inline-block;background:linear-gradient(135deg,#f97316,#ec4899);color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:50px;box-shadow:0 2px 8px rgba(249,115,22,0.3);">${s.trackBookingBtn}</a>
+    </div>
+
+    <!-- Book Again CTA -->
+    <div style="margin:28px 0;padding:20px;background-color:#fdf2f8;border-radius:12px;text-align:center;">
+      <h3 style="margin:0 0 6px;color:#1a1a1a;font-size:15px;font-weight:600;">${s.rebookTitle}</h3>
+      <p style="margin:0 0 16px;color:#666;font-size:13px;line-height:1.5;">${s.rebookText}</p>
+      <a href="${baseUrl}/rebook/${data.bookingIds[0]}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:50px;box-shadow:0 2px 8px rgba(236,72,153,0.3);">${s.rebookBtn}</a>
+    </div>
+
+    <p style="margin:0;color:#999;font-size:13px;text-align:center;">${s.contactUs} <a href="mailto:info@callanannycare.com" style="color:#f97316;">info@callanannycare.com</a></p>
+  `;
+
+  const fromAddress = process.env.RESEND_FROM_EMAIL || 'Call a Nanny <onboarding@resend.dev>';
+
+  await resend.emails.send({
+    from: fromAddress,
+    to: data.clientEmail,
+    cc: ['info@callanannycare.com'],
+    subject: s.multiDaySubject,
     html: emailWrapper(content),
   });
 }

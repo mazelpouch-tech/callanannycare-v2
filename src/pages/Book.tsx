@@ -41,6 +41,7 @@ import {
 import { useData } from "../context/DataContext";
 import { useLanguage } from "../context/LanguageContext";
 import PhoneInput from "../components/PhoneInput";
+import { NATIVE_API_BASE } from "../utils/native";
 import type { BookingPlan } from "@/types";
 
 // ---- Interfaces ----
@@ -1439,9 +1440,15 @@ export default function Book() {
         endDate: null,
       };
 
+      // For multi-day bookings, skip individual parent notifications and send one consolidated email after
+      const isMultiDay = selectedDates.length > 1;
+      const createdBookingIds: (number | string)[] = [];
+      const createdDays: { date: string; startTime: string; endTime: string; price: number }[] = [];
+
       for (let i = 0; i < selectedDates.length; i++) {
         const d = selectedDates[i];
         const override = dayTimeOverrides[i];
+        let result;
         if (override) {
           const [osh, osm = 0] = override.startTime.split(":").map(Number);
           const [oeh, oem = 0] = override.endTime.split(":").map(Number);
@@ -1451,15 +1458,42 @@ export default function Book() {
           const oIsOvernight = (oeh + oem / 60) <= (osh + osm / 60);
           const oIsEvening = oIsOvernight || osh >= 19 || osh < 7 || oeh > 19 || (oeh === 19 && oem > 0);
           const scaledPrice = Math.round(RATE * oHours) + (oIsEvening ? TAXI_FEE : 0);
-          await addBooking({
+          const dayStartTime = TIME_SLOTS.find((s) => s.value === override.startTime)?.label || override.startTime;
+          const dayEndTime = TIME_SLOTS.find((s) => s.value === override.endTime)?.label || override.endTime;
+          result = await addBooking({
             ...basePayload,
             date: format(d, "yyyy-MM-dd"),
-            startTime: TIME_SLOTS.find((s) => s.value === override.startTime)?.label || override.startTime,
-            endTime: TIME_SLOTS.find((s) => s.value === override.endTime)?.label || override.endTime,
+            startTime: dayStartTime,
+            endTime: dayEndTime,
             totalPrice: scaledPrice,
-          }, { locale });
+          }, { locale, skipParentNotifications: isMultiDay });
+          createdDays.push({ date: format(d, "yyyy-MM-dd"), startTime: dayStartTime, endTime: dayEndTime, price: scaledPrice });
         } else {
-          await addBooking({ ...basePayload, date: format(d, "yyyy-MM-dd") }, { locale });
+          result = await addBooking({ ...basePayload, date: format(d, "yyyy-MM-dd") }, { locale, skipParentNotifications: isMultiDay });
+          createdDays.push({ date: format(d, "yyyy-MM-dd"), startTime: startLabel, endTime: endLabel, price: defaultDailyPrice });
+        }
+        createdBookingIds.push(result.id);
+      }
+
+      // Send one consolidated email + WhatsApp for multi-day bookings
+      if (isMultiDay && createdBookingIds.length > 0) {
+        try {
+          await fetch(`${NATIVE_API_BASE}/api/bookings`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "send-multi-day-confirmation",
+              client_name: details.fullName,
+              client_email: details.email,
+              client_phone: details.phone,
+              hotel: details.accommodation,
+              locale,
+              booking_ids: createdBookingIds,
+              days: createdDays,
+            }),
+          });
+        } catch {
+          console.warn("Multi-day consolidated notification failed, bookings still saved.");
         }
       }
 

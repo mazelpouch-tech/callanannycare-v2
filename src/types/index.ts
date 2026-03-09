@@ -409,7 +409,7 @@ export interface DataContextValue {
 
   bookings: Booking[];
   fetchBookings: () => Promise<void>;
-  addBooking: (booking: Partial<Booking>, meta?: { locale?: string }) => Promise<Booking>;
+  addBooking: (booking: Partial<Booking>, meta?: { locale?: string; skipMinHours?: boolean; skipConflictCheck?: boolean; skipParentNotifications?: boolean }) => Promise<Booking>;
   updateBooking: (id: number | string, updates: Partial<Booking>) => Promise<void>;
   updateBookingStatus: (id: number | string, status: BookingStatus, meta?: { reason?: string; cancelledBy?: string }) => Promise<void>;
   clockInBooking: (id: number | string) => Promise<void>;
