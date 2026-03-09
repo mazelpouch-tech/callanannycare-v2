@@ -1447,11 +1447,10 @@ export default function Book() {
           const [oeh, oem = 0] = override.endTime.split(":").map(Number);
           let oHours = (oeh + oem / 60) - (osh + osm / 60);
           if (oHours <= 0) oHours += 24;
-          const [dsh, dsm = 0] = startTime.split(":").map(Number);
-          const [deh, dem = 0] = endTime.split(":").map(Number);
-          let defHours = (deh + dem / 60) - (dsh + dsm / 60);
-          if (defHours <= 0) defHours += 24;
-          const scaledPrice = defHours > 0 ? Math.round(defaultDailyPrice * oHours / defHours) : defaultDailyPrice;
+          // Recalculate price for this day including taxi fee if evening
+          const oIsOvernight = (oeh + oem / 60) <= (osh + osm / 60);
+          const oIsEvening = oIsOvernight || osh >= 19 || osh < 7 || oeh > 19 || (oeh === 19 && oem > 0);
+          const scaledPrice = Math.round(RATE * oHours) + (oIsEvening ? TAXI_FEE : 0);
           await addBooking({
             ...basePayload,
             date: format(d, "yyyy-MM-dd"),

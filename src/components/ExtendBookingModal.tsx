@@ -41,11 +41,24 @@ function formatShortDate(dateStr: string): string {
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
+const TAXI_FEE = 10; // EUR flat fee for evening/night bookings (7 PM – 7 AM)
+
 function calcHours(startTime: string, endTime: string): number {
   const s = parseTimeToHours(startTime);
   const e = parseTimeToHours(endTime);
   if (s === null || e === null) return 0;
   return e > s ? e - s : (24 - s) + e;
+}
+
+function isEveningShift(startTime: string, endTime: string): boolean {
+  const s = parseTimeToHours(startTime);
+  const e = parseTimeToHours(endTime);
+  if (s === null || e === null) return false;
+  const sH = Math.floor(s);
+  const eH = Math.floor(e);
+  const eM = Math.round((e - eH) * 60);
+  const isOvernight = e <= s;
+  return isOvernight || sH >= 19 || sH < 7 || eH > 19 || (eH === 19 && eM > 0);
 }
 
 export default function ExtendBookingModal({
@@ -91,7 +104,8 @@ export default function ExtendBookingModal({
       const dayStart = override?.startTime || baseStart;
       const dayEnd = override?.endTime || baseEnd;
       const hours = calcHours(dayStart, dayEnd);
-      return { date, startTime: dayStart, endTime: dayEnd, price: Math.round(rate * hours) };
+      const taxiFee = isEveningShift(dayStart, dayEnd) ? TAXI_FEE : 0;
+      return { date, startTime: dayStart, endTime: dayEnd, price: Math.round(rate * hours) + taxiFee };
     });
   }, [dates, newStartTime, newEndTime, perDayMode, dayOverrides, booking, rate]);
 
