@@ -23,11 +23,13 @@ import {
   FileText,
   ArrowLeft,
   Car,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
+import { format, parseISO, startOfMonth, endOfMonth, subDays } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
-import { calcTotalBookedHours } from "@/utils/shiftHelpers";
+import { calcTotalBookedHours, getSaturdayPeriod, formatPeriodLabel, toDateStr } from "@/utils/shiftHelpers";
 import type { Booking } from "@/types";
 import { downloadInvoicePdf } from "@/utils/invoicePdf";
 
@@ -95,7 +97,8 @@ export default function AdminParents() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"spent" | "bookings" | "recent" | "hours">("spent");
   const [paymentFilter, setPaymentFilter] = useState<"all" | "unpaid" | "paid">("all");
-  const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month" | "custom">("all");
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month" | "custom">("week");
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = previous, etc.
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [expandedParent, setExpandedParent] = useState<string | null>(null);
@@ -274,6 +277,15 @@ export default function AdminParents() {
     }
   };
 
+  // Saturday-to-Saturday period for the week filter
+  const satPeriod = useMemo(() => {
+    const ref = new Date();
+    ref.setDate(ref.getDate() + weekOffset * 7);
+    return getSaturdayPeriod(ref);
+  }, [weekOffset]);
+
+  const satPeriodLabel = useMemo(() => formatPeriodLabel(satPeriod.start, satPeriod.end), [satPeriod]);
+
   // Compute date range from filter
   const dateRange = useMemo(() => {
     const today = new Date();
@@ -281,7 +293,7 @@ export default function AdminParents() {
       case "today":
         return { from: format(today, "yyyy-MM-dd"), to: format(today, "yyyy-MM-dd") };
       case "week":
-        return { from: format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd"), to: format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd") };
+        return { from: toDateStr(satPeriod.start), to: toDateStr(new Date(satPeriod.end.getTime() - 1)) };
       case "month":
         return { from: format(startOfMonth(today), "yyyy-MM-dd"), to: format(endOfMonth(today), "yyyy-MM-dd") };
       case "custom":
@@ -289,7 +301,7 @@ export default function AdminParents() {
       default:
         return null;
     }
-  }, [dateFilter, dateFrom, dateTo]);
+  }, [dateFilter, dateFrom, dateTo, satPeriod]);
 
   // Filter bookings by date range first
   const dateFilteredBookings = useMemo(() => {
@@ -902,13 +914,13 @@ export default function AdminParents() {
             {([
               { value: "all", label: "All Time" },
               { value: "today", label: "Today" },
-              { value: "week", label: "This Week" },
+              { value: "week", label: "Week" },
               { value: "month", label: "This Month" },
               { value: "custom", label: "Custom" },
             ] as const).map((f) => (
               <button
                 key={f.value}
-                onClick={() => setDateFilter(f.value)}
+                onClick={() => { setDateFilter(f.value); if (f.value === "week") setWeekOffset(0); }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
                   dateFilter === f.value
                     ? "bg-card text-foreground shadow-sm"
@@ -920,6 +932,33 @@ export default function AdminParents() {
               </button>
             ))}
           </div>
+
+          {/* Saturday-period week navigation */}
+          {dateFilter === "week" && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setWeekOffset((o) => o - 1)}
+                className="p-1.5 rounded-lg bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">{satPeriodLabel}</span>
+              <button
+                onClick={() => setWeekOffset((o) => o + 1)}
+                className="p-1.5 rounded-lg bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              {weekOffset !== 0 && (
+                <button
+                  onClick={() => setWeekOffset(0)}
+                  className="px-2 py-1 rounded-lg text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                >
+                  Current
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Custom date inputs */}
           {dateFilter === "custom" && (
@@ -941,12 +980,12 @@ export default function AdminParents() {
           )}
 
           {/* Active filter count + reset */}
-          {(paymentFilter !== "all" || dateFilter !== "all") && (
+          {(paymentFilter !== "all" || dateFilter !== "week" || weekOffset !== 0) && (
             <button
-              onClick={() => { setPaymentFilter("all"); setDateFilter("all"); setDateFrom(""); setDateTo(""); }}
+              onClick={() => { setPaymentFilter("all"); setDateFilter("week"); setWeekOffset(0); setDateFrom(""); setDateTo(""); }}
               className="px-3 py-1.5 rounded-xl text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
             >
-              Clear filters
+              Reset filters
             </button>
           )}
         </div>
