@@ -164,7 +164,7 @@ function UrgencyBadge({ booking }: { booking: Booking }) {
   );
 }
 
-const statusFilters = ["all", "pending", "confirmed", "completed", "cancelled"];
+const statusFilters = ["all", "attention", "pending", "confirmed", "completed", "cancelled"];
 
 export default function AdminBookings() {
   const { bookings, fetchBookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking, fetchDeletedBookings, restoreBooking, sendBookingReminder, adminProfile } = useData();
@@ -898,7 +898,15 @@ export default function AdminBookings() {
     }
 
     // Status filter
-    if (statusFilter !== "all") {
+    if (statusFilter === "attention") {
+      const oneHourAgo = Date.now() - 3600000;
+      result = result.filter((b) => {
+        if (b.status !== "pending") return false;
+        const noNanny = !b.nannyId;
+        const stale = b.createdAt ? new Date(b.createdAt).getTime() < oneHourAgo : false;
+        return noNanny || stale;
+      });
+    } else if (statusFilter !== "all") {
       result = result.filter((b) => b.status === statusFilter);
     }
 
@@ -1495,7 +1503,7 @@ export default function AdminBookings() {
             >
               {statusFilters.map((s) => (
                 <option key={s} value={s}>
-                  {s === "all" ? "All Status" : s.charAt(0).toUpperCase() + s.slice(1)}
+                  {s === "all" ? "All Status" : s === "attention" ? "Needs Attention" : s.charAt(0).toUpperCase() + s.slice(1)}
                 </option>
               ))}
             </select>

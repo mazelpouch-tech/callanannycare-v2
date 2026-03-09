@@ -96,6 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let nannyReminders = 0;
         let parentReminders = 0;
         let whatsappReminders = 0;
+        let nannyPushReminders = 0;
 
         for (const b of upcoming) {
           // 1. Send nanny reminder email
@@ -117,6 +118,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               });
               nannyReminders++;
             } catch (e) { console.error('Nanny reminder failed:', e); }
+          }
+
+          // 1b. Create in-app notification + push for nanny
+          if (b.nanny_id) {
+            const timeSlot = `${b.start_time}${b.end_time ? ' - ' + b.end_time : ''}`;
+            const reminderMsg = `Reminder: You have a booking tomorrow with ${b.client_name} at ${b.hotel || 'N/A'} (${timeSlot}).`;
+            try {
+              await sql`
+                INSERT INTO nanny_notifications (nanny_id, type, title, message, booking_id)
+                VALUES (${b.nanny_id}, 'new_booking', 'Shift Tomorrow', ${reminderMsg}, ${b.id})
+              `;
+            } catch (e) { console.error('Nanny in-app notification failed:', e); }
+            try {
+              const { sendPushToUser } = await import('./_pushUtils.js');
+              const siteUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
+              await sendPushToUser('nanny', b.nanny_id, {
+                title: 'Shift Tomorrow',
+                body: reminderMsg,
+                url: `${siteUrl}/nanny/bookings`,
+                tag: `reminder-${b.id}`,
+              });
+              nannyPushReminders++;
+            } catch (e) { console.error('Nanny push reminder failed:', e); }
           }
 
           // 2. Send parent reminder email — DISABLED (parent emails paused)
@@ -184,6 +208,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           date: tomorrowStr,
           totalBookings: upcoming.length,
           nannyReminders,
+          nannyPushReminders,
           parentReminders,
           whatsappReminders,
         });

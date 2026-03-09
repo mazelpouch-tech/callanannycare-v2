@@ -81,7 +81,7 @@ export default function AdminInvoices() {
   // Filters
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
-  const [dateFilter, setDateFilter] = useState<"all" | "this-month" | "last-month">("all");
+  const [dateFilter, setDateFilter] = useState<"all" | "this-month" | "last-month" | "uncollected">("all");
 
   // Modal
   const [showModal, setShowModal] = useState(false);
@@ -223,7 +223,9 @@ export default function AdminInvoices() {
       );
     }
     const now = new Date();
-    if (dateFilter === "this-month") {
+    if (dateFilter === "uncollected") {
+      result = result.filter((b) => !b.collectedAt);
+    } else if (dateFilter === "this-month") {
       const s = startOfMonth(now), e = endOfMonth(now);
       result = result.filter((b) => {
         try {
@@ -267,18 +269,28 @@ export default function AdminInvoices() {
     setShowModal(true);
   };
 
+  /** Convert booking time strings like "18h00" or "9:30" to "HH:mm" form value */
+  const bookingTimeToHHmm = (t?: string | null): string => {
+    if (!t) return "";
+    const h = parseTimeToHours(t);
+    if (h === null) return "";
+    const hh = String(Math.floor(h)).padStart(2, "0");
+    const mm = String(Math.round((h - Math.floor(h)) * 60)).padStart(2, "0");
+    return `${hh}:${mm}`;
+  };
+
   const openEdit = (inv: Booking) => {
     // Extract date from clockIn or fall back to inv.date
     const editDate = inv.clockIn
       ? new Date(inv.clockIn).toISOString().slice(0, 10)
       : inv.date || "";
-    // Extract time-only (HH:mm) from clockIn/clockOut
+    // Extract time-only (HH:mm) from clockIn/clockOut, falling back to booked times
     const editClockIn = inv.clockIn
       ? new Date(inv.clockIn).toTimeString().slice(0, 5)
-      : "";
+      : bookingTimeToHHmm(inv.startTime);
     const editClockOut = inv.clockOut
       ? new Date(inv.clockOut).toTimeString().slice(0, 5)
-      : "";
+      : bookingTimeToHHmm(inv.endTime);
     setFormData({
       id: inv.id,
       nannyId: String(inv.nannyId || ""),
@@ -637,6 +649,7 @@ export default function AdminInvoices() {
             className="appearance-none pl-3 pr-8 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 text-foreground cursor-pointer"
           >
             <option value="all">All Time</option>
+            <option value="uncollected">Uncollected</option>
             <option value="this-month">This Month</option>
             <option value="last-month">Last Month</option>
           </select>
