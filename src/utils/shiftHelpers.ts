@@ -2,6 +2,7 @@ import type { Booking, BookingStatus } from '../types';
 import { format } from 'date-fns';
 
 export const HOURLY_RATE = 31.25; // DH/hr
+export const GRACE_PERIOD_MINUTES = 10; // Clock-in/out tolerance before flagging mismatch
 
 export const statusColors: Record<BookingStatus, string> = {
   pending: 'bg-yellow-100 text-yellow-700',
@@ -193,6 +194,13 @@ export function estimateNannyPayBreakdown(
 export function calcActualHoursWorked(clockIn: string, clockOut: string): number {
   const ms = new Date(clockOut).getTime() - new Date(clockIn).getTime();
   return Math.max(0, ms / 3600000);
+}
+
+/** Check if the difference between booked and actual hours falls within the grace period.
+ *  Returns true if the discrepancy is minor (within GRACE_PERIOD_MINUTES on each end). */
+export function isWithinGracePeriod(bookedHours: number, actualHours: number): boolean {
+  const diffMinutes = Math.abs(actualHours - bookedHours) * 60;
+  return diffMinutes <= GRACE_PERIOD_MINUTES * 2; // up to 10 min early + 10 min late = 20 min total
 }
 
 export function formatDate(dateStr: string): string {

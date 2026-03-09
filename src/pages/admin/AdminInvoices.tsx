@@ -12,6 +12,7 @@ import { useExchangeRate } from "@/hooks/useExchangeRate";
 import PhoneInput from "../../components/PhoneInput";
 import type { Booking } from "@/types";
 import { downloadInvoicePdf } from "@/utils/invoicePdf";
+import { calcTotalBookedHours, parseTimeToHours } from "@/utils/shiftHelpers";
 
 const SERVICE_RATE = 10; // €/hr — client rate (same as booking page)
 const TAXI_FEE = 10;
@@ -113,7 +114,11 @@ export default function AdminInvoices() {
   }, [shareMenuId]);
 
   const buildWhatsAppLink = (inv: Booking) => {
-    const hours = calcWorkedHours(inv.clockIn, inv.clockOut);
+    // Use booked hours for parent-facing invoice
+    const bookedH = inv.startTime && inv.endTime
+      ? calcTotalBookedHours(inv.startTime, inv.endTime, inv.extraTimes, inv.date, inv.endDate)
+      : 0;
+    const hours = bookedH > 0 ? bookedH.toFixed(1) : calcWorkedHours(inv.clockIn, inv.clockOut);
     const total = inv.totalPrice || 0;
     const totalDH = toDH(total);
     const dateStr = inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A";
@@ -124,9 +129,8 @@ export default function AdminInvoices() {
       ``,
       `*Service Details*`,
       `Caregiver: ${inv.nannyName || "Unassigned"}`,
-      `Clock In: ${formatClockTime(inv.clockIn)}`,
-      `Clock Out: ${formatClockTime(inv.clockOut)}`,
-      `Hours Worked: ${hours}h`,
+      `Time Slot: ${inv.startTime || formatClockTime(inv.clockIn)} – ${inv.endTime || formatClockTime(inv.clockOut)}`,
+      `Service Hours: ${hours}h`,
       `Children: ${inv.childrenCount || 1}${inv.childrenAges ? ` (${inv.childrenAges})` : ""}`,
       ``,
       `*Total: ${total}€ (${totalDH.toLocaleString()} DH)*`,
@@ -366,11 +370,18 @@ export default function AdminInvoices() {
   };
 
   const downloadPDF = (inv: Booking) => {
-    const hours = calcWorkedHours(inv.clockIn, inv.clockOut);
-    const hoursNum = inv.clockIn && inv.clockOut ? (new Date(inv.clockOut).getTime() - new Date(inv.clockIn).getTime()) / 3600000 : 0;
+    // Use booked hours for billing — clock times are recorded for transparency only
+    const bookedHoursNum = inv.startTime && inv.endTime
+      ? calcTotalBookedHours(inv.startTime, inv.endTime, inv.extraTimes, inv.date, inv.endDate)
+      : 0;
+    const hours = bookedHoursNum > 0 ? bookedHoursNum.toFixed(1) : calcWorkedHours(inv.clockIn, inv.clockOut);
+    const hoursNum = bookedHoursNum > 0 ? bookedHoursNum : (inv.clockIn && inv.clockOut ? (new Date(inv.clockOut).getTime() - new Date(inv.clockIn).getTime()) / 3600000 : 0);
     const basePay = Math.round(hoursNum * SERVICE_RATE);
-    const inHour = inv.clockIn ? new Date(inv.clockIn).getHours() : 0;
-    const outHour = inv.clockOut ? new Date(inv.clockOut).getHours() : 0;
+    // Detect evening shift from booked times when available, otherwise from clock times
+    const startH = inv.startTime ? parseTimeToHours(inv.startTime) : (inv.clockIn ? new Date(inv.clockIn).getHours() : 0);
+    const endH = inv.endTime ? parseTimeToHours(inv.endTime) : (inv.clockOut ? new Date(inv.clockOut).getHours() : 0);
+    const inHour = startH ?? 0;
+    const outHour = endH ?? 0;
     const hasTaxi = inHour >= 19 || inHour < 7 || outHour >= 19 || outHour < 7 || hoursNum > 12;
     const dateStr = inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A";
     const total = inv.totalPrice || 0;
@@ -464,15 +475,11 @@ export default function AdminInvoices() {
         <span class="card-row-value">${inv.nannyName || "Unassigned"}</span>
       </div>
       <div class="card-row">
-        <span class="card-row-label"><span class="icon">&#9201;</span> Clock In</span>
-        <span class="card-row-value">${formatClockTime(inv.clockIn)}</span>
+        <span class="card-row-label"><span class="icon">&#9201;</span> Time Slot</span>
+        <span class="card-row-value">${inv.startTime || formatClockTime(inv.clockIn)} – ${inv.endTime || formatClockTime(inv.clockOut)}</span>
       </div>
       <div class="card-row">
-        <span class="card-row-label"><span class="icon">&#9201;</span> Clock Out</span>
-        <span class="card-row-value">${formatClockTime(inv.clockOut)}</span>
-      </div>
-      <div class="card-row">
-        <span class="card-row-label">Hours Worked</span>
+        <span class="card-row-label">Service Hours</span>
         <span class="card-row-value">${hours}h</span>
       </div>
       <div class="card-row">
@@ -842,11 +849,17 @@ export default function AdminInvoices() {
       {/* ── View Invoice Modal ── */}
       {viewInvoice && (() => {
         const inv = viewInvoice;
-        const hours = calcWorkedHours(inv.clockIn, inv.clockOut);
-        const hoursNum = inv.clockIn && inv.clockOut ? (new Date(inv.clockOut).getTime() - new Date(inv.clockIn).getTime()) / 3600000 : 0;
+        // Use booked hours for billing
+        const viewBookedH = inv.startTime && inv.endTime
+          ? calcTotalBookedHours(inv.startTime, inv.endTime, inv.extraTimes, inv.date, inv.endDate)
+          : 0;
+        const hours = viewBookedH > 0 ? viewBookedH.toFixed(1) : calcWorkedHours(inv.clockIn, inv.clockOut);
+        const hoursNum = viewBookedH > 0 ? viewBookedH : (inv.clockIn && inv.clockOut ? (new Date(inv.clockOut).getTime() - new Date(inv.clockIn).getTime()) / 3600000 : 0);
         const basePay = Math.round(hoursNum * SERVICE_RATE);
-        const inHour = inv.clockIn ? new Date(inv.clockIn).getHours() : 0;
-        const outHour = inv.clockOut ? new Date(inv.clockOut).getHours() : 0;
+        const vStartH = inv.startTime ? parseTimeToHours(inv.startTime) : (inv.clockIn ? new Date(inv.clockIn).getHours() : 0);
+        const vEndH = inv.endTime ? parseTimeToHours(inv.endTime) : (inv.clockOut ? new Date(inv.clockOut).getHours() : 0);
+        const inHour = vStartH ?? 0;
+        const outHour = vEndH ?? 0;
         const hasTaxi = inHour >= 19 || inHour < 7 || outHour >= 19 || outHour < 7 || hoursNum > 12;
         return (
           <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-[8vh] overflow-y-auto" onClick={() => setViewInvoice(null)}>
@@ -898,16 +911,18 @@ export default function AdminInvoices() {
                       <span className="text-sm text-muted-foreground flex items-center gap-1.5"><User className="w-3.5 h-3.5" />Caregiver</span>
                       <span className="text-sm font-medium text-foreground">{inv.nannyName || "Unassigned"}</span>
                     </div>
+                    {inv.startTime && inv.endTime && (
+                      <div className="flex justify-between px-4 py-2.5">
+                        <span className="text-sm text-muted-foreground flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />Booked Time</span>
+                        <span className="text-sm font-medium text-foreground">{inv.startTime} – {inv.endTime}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between px-4 py-2.5">
-                      <span className="text-sm text-muted-foreground flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />Clock In</span>
-                      <span className="text-sm font-medium text-foreground">{formatClockTime(inv.clockIn)}</span>
+                      <span className="text-sm text-muted-foreground flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />Clock In / Out</span>
+                      <span className="text-sm font-medium text-foreground">{formatClockTime(inv.clockIn)} – {formatClockTime(inv.clockOut)}</span>
                     </div>
                     <div className="flex justify-between px-4 py-2.5">
-                      <span className="text-sm text-muted-foreground flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />Clock Out</span>
-                      <span className="text-sm font-medium text-foreground">{formatClockTime(inv.clockOut)}</span>
-                    </div>
-                    <div className="flex justify-between px-4 py-2.5">
-                      <span className="text-sm text-muted-foreground">Hours Worked</span>
+                      <span className="text-sm text-muted-foreground">Service Hours</span>
                       <span className="text-sm font-medium text-foreground">{hours}h</span>
                     </div>
                     <div className="flex justify-between px-4 py-2.5">

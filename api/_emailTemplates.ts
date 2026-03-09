@@ -705,6 +705,25 @@ function calculateHours(clockIn: string, clockOut: string): string {
   }
 }
 
+/** Parse time string ("09h00", "9:00", "14h30") to decimal hours */
+function parseTimeToDecimal(t: string): number | null {
+  if (!t) return null;
+  const hFmt = t.match(/^(\d{1,2})h(\d{2})$/i);
+  if (hFmt) return parseInt(hFmt[1]) + parseInt(hFmt[2]) / 60;
+  const cFmt = t.match(/^(\d{1,2}):(\d{2})/);
+  if (cFmt) return parseInt(cFmt[1]) + parseInt(cFmt[2]) / 60;
+  return null;
+}
+
+/** Calculate booked hours from start/end time strings */
+function calcBookedHoursServer(startTime: string, endTime: string): string {
+  const s = parseTimeToDecimal(startTime);
+  const e = parseTimeToDecimal(endTime);
+  if (s === null || e === null) return '0';
+  const hours = e > s ? e - s : (24 - s) + e;
+  return hours > 0 ? hours.toFixed(1) : '0';
+}
+
 export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -716,9 +735,10 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
   const locale: Locale = data.locale === 'fr' ? 'fr' : 'en';
   const s = t(locale);
 
-  const actualHours = calculateHours(data.clockIn, data.clockOut);
-  const clockInFormatted = formatClockTime(data.clockIn);
-  const clockOutFormatted = formatClockTime(data.clockOut);
+  // Use booked hours for parent-facing invoice; fall back to clock hours if no booked times
+  const bookedHours = data.startTime && data.endTime
+    ? calcBookedHoursServer(data.startTime, data.endTime)
+    : calculateHours(data.clockIn, data.clockOut);
 
   const invoiceDate = new Date().toLocaleDateString(locale === 'fr' ? 'fr-FR' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const baseUrl = process.env.SITE_URL || 'https://callanannycare.vercel.app';
@@ -763,8 +783,7 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
       ${row(s.dateOfService, data.date)}
       ${row(s.caregiver, data.nannyName)}
       ${row(s.scheduledTime, data.startTime && data.endTime ? `${data.startTime} - ${data.endTime}` : data.startTime)}
-      ${row(s.actualTime, `${clockInFormatted} - ${clockOutFormatted}`)}
-      ${row(s.hoursWorked, `${actualHours} ${s.hours}`)}
+      ${row(s.hoursWorked, `${bookedHours} ${s.hours}`)}
       ${row(s.children, `${data.childrenCount}`)}
       ${row(s.accommodation, data.hotel || 'N/A')}
     </table>

@@ -47,7 +47,9 @@ import {
   estimateNannyPayBreakdown,
   calcBookedHours,
   calcActualHoursWorked,
+  isWithinGracePeriod,
   HOURLY_RATE,
+  GRACE_PERIOD_MINUTES,
   getSaturdayPeriod,
   isDateInRange,
   toDateStr,
@@ -178,7 +180,8 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
       const booked = Math.round(calcBookedHours(b.startTime, b.endTime, b.date, b.endDate) * 10) / 10;
       const actual = Math.round(calcActualHoursWorked(b.clockIn!, b.clockOut!) * 10) / 10;
       const diff = Math.round((actual - booked) * 10) / 10;
-      if (Math.abs(diff) >= 0.1) {
+      // Only flag bookings outside the grace period (10 min each end)
+      if (!isWithinGracePeriod(booked, actual)) {
         if (!result[nannyId]) result[nannyId] = [];
         result[nannyId].push({
           id: b.id,
@@ -441,14 +444,14 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
           {(() => {
             const mismatches = nannyHours
               .map((n) => ({ ...n, diff: Math.round((n.actualHours - n.totalHours) * 10) / 10 }))
-              .filter((n) => Math.abs(n.diff) >= 0.2);
+              .filter((n) => !isWithinGracePeriod(n.totalHours, n.actualHours));
             if (mismatches.length === 0) return null;
             return (
               <div className="px-5 py-3 bg-red-50 border-b border-red-100 space-y-1.5">
                 <div className="flex items-center gap-1.5">
                   <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
                   <span className="text-xs font-semibold text-red-800">
-                    Hours mismatch — {mismatches.length} nanny{mismatches.length > 1 ? "s" : ""}
+                    Hours mismatch (beyond {GRACE_PERIOD_MINUTES}min grace) — {mismatches.length} nanny{mismatches.length > 1 ? "s" : ""}
                   </span>
                 </div>
                 <div className="space-y-1 pl-5">
