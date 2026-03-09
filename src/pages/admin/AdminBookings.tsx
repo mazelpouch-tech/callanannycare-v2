@@ -642,7 +642,7 @@ export default function AdminBookings() {
           dates.push(d.toISOString().slice(0, 10));
         }
         for (const date of dates) {
-          await addBooking({ ...baseBookingData, date, totalPrice: dailyPrice }, { skipMinHours: overrideMinHours, skipConflictCheck: overrideConflict });
+          await addBooking({ ...baseBookingData, date, totalPrice: dailyPrice }, { skipMinHours: overrideMinHours, skipConflictCheck: true });
         }
       } else {
         // Generate N consecutive daily bookings from start date, respecting per-day time overrides
@@ -662,7 +662,7 @@ export default function AdminBookings() {
             startTime: dayStartLabel,
             endTime: dayEndLabel,
             totalPrice: dayPrice,
-          }, { skipMinHours: overrideMinHours, skipConflictCheck: overrideConflict });
+          }, { skipMinHours: overrideMinHours, skipConflictCheck: true });
         }
       }
       setShowNewBooking(false);
@@ -3245,7 +3245,7 @@ export default function AdminBookings() {
                 </button>
                 <button
                   type="submit"
-                  disabled={newBookingLoading || (!newBooking.nannyId && !bestAutoNanny) || !newBooking.date || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime || (newBookingHours > 0 && newBookingHours < 3 && !overrideMinHours) || (conflicts.length > 0 && !overrideConflict)}
+                  disabled={newBookingLoading || (!newBooking.nannyId && !bestAutoNanny) || !newBooking.date || !newBooking.clientName || !newBooking.startTime || !newBooking.endTime || (newBookingHours > 0 && newBookingHours < 3 && !overrideMinHours)}
                   className="flex-1 gradient-warm text-white rounded-xl px-4 py-3 font-semibold hover:opacity-90 transition-opacity shadow-warm flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {newBookingLoading ? (
