@@ -8,13 +8,13 @@ import {
 } from "lucide-react";
 import {
   format, parseISO, isWithinInterval,
-  startOfMonth, endOfMonth, startOfWeek, endOfWeek,
+  startOfMonth, endOfMonth,
   startOfYear, endOfYear,
 } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import type { Booking } from "@/types";
-import { calcShiftPayBreakdown, estimateNannyPayBreakdown, calcTotalBookedHours, HOURLY_RATE } from "@/utils/shiftHelpers";
+import { calcShiftPayBreakdown, estimateNannyPayBreakdown, calcTotalBookedHours, HOURLY_RATE, getSaturdayPeriod } from "@/utils/shiftHelpers";
 import PaymentPanel from "../../components/PaymentPanel";
 
 type ViewTab = "to-collect" | "collected" | "by-nanny";
@@ -71,8 +71,9 @@ export default function AdminRevenue() {
     let start: Date;
     let end: Date;
     if (financialPeriod === "week") {
-      start = startOfWeek(now, { weekStartsOn: 6 });
-      end = endOfWeek(now, { weekStartsOn: 6 });
+      const wp = getSaturdayPeriod(now);
+      start = wp.start;
+      end = new Date(wp.end.getTime() - 1); // exclusive → inclusive for isWithinInterval
     } else if (financialPeriod === "month") {
       start = startOfMonth(now);
       end = endOfMonth(now);

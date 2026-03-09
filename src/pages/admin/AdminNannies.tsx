@@ -47,9 +47,10 @@ import {
   calcBookedHours,
   calcActualHoursWorked,
   HOURLY_RATE,
-  getFridayPeriod,
+  getSaturdayPeriod,
   isDateInRange,
   toDateStr,
+  formatPeriodLabel,
 } from "@/utils/shiftHelpers";
 
 // ─── Nanny Hours Report with Mark-as-Paid ─────────────────────────
@@ -66,7 +67,7 @@ interface NannyPaymentRecord {
 
 function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
   const { adminProfile } = useData();
-  const currentPeriod = getFridayPeriod();
+  const currentPeriod = getSaturdayPeriod();
   const [periodStart, setPeriodStart] = useState<Date>(currentPeriod.start);
   const [periodEnd, setPeriodEnd] = useState<Date>(currentPeriod.end);
   const [showCustom, setShowCustom] = useState(false);
@@ -116,7 +117,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
   };
 
   const resetToCurrentWeek = () => {
-    const p = getFridayPeriod();
+    const p = getSaturdayPeriod();
     setPeriodStart(p.start);
     setPeriodEnd(p.end);
     setShowCustom(false);
@@ -124,11 +125,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
 
   const isCurrentWeek = periodStart.getTime() === currentPeriod.start.getTime() && periodEnd.getTime() === currentPeriod.end.getTime();
 
-  const periodLabel = (() => {
-    const endDisplay = new Date(periodEnd);
-    endDisplay.setDate(endDisplay.getDate() - 1);
-    return `${format(periodStart, "MMM d")} — ${format(endDisplay, "MMM d, yyyy")}`;
-  })();
+  const periodLabel = formatPeriodLabel(periodStart, periodEnd);
 
   const nannyHours = useMemo(() => {
     const completedBookings = bookings.filter(
@@ -282,7 +279,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
           <button onClick={() => goToPeriod(-1)} className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Previous week">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <span className="text-sm font-medium text-foreground min-w-[180px] text-center">{periodLabel}</span>
+          <span className="text-sm font-medium text-foreground min-w-[280px] text-center">{periodLabel}</span>
           <button onClick={() => goToPeriod(1)} className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Next week">
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -318,7 +315,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
         )}
 
         <p className="text-[10px] text-muted-foreground">
-          Pay period: Friday midnight → Friday midnight
+          Pay period: Saturday midnight → Saturday midnight
         </p>
       </div>
 

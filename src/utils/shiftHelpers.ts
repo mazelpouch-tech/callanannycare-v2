@@ -211,22 +211,38 @@ export function formatTime(timeStr: string): string {
 }
 
 /**
- * Get the Friday-to-Friday pay period boundaries.
- * Period runs from Friday 00:00:00 to the next Friday 00:00:00.
+ * Get the Saturday-to-Saturday pay period boundaries.
+ * Period runs from Sunday 00:00:00 to the next Sunday 00:00:00
+ * (i.e. Saturday 23:59:59 is the last moment of the period).
  * @param refDate - reference date (defaults to today)
  * @returns { start: Date, end: Date } — start is inclusive, end is exclusive
  */
-export function getFridayPeriod(refDate?: Date): { start: Date; end: Date } {
+export function getSaturdayPeriod(refDate?: Date): { start: Date; end: Date } {
   const d = refDate ? new Date(refDate) : new Date();
   d.setHours(0, 0, 0, 0);
-  const day = d.getDay(); // 0=Sun, 5=Fri
-  // Days since last Friday (if today is Friday, daysSinceFri = 0)
-  const daysSinceFri = (day + 2) % 7; // Fri=0, Sat=1, Sun=2, Mon=3, …
+  const day = d.getDay(); // 0=Sun, 1=Mon, …, 6=Sat
+  const daysSinceSun = day; // Sun=0, Mon=1, …, Sat=6
   const start = new Date(d);
-  start.setDate(d.getDate() - daysSinceFri);
+  start.setDate(d.getDate() - daysSinceSun);
   const end = new Date(start);
   end.setDate(start.getDate() + 7);
   return { start, end };
+}
+
+/** @deprecated Use getSaturdayPeriod instead */
+export const getFridayPeriod = getSaturdayPeriod;
+
+/**
+ * Format a Saturday-cutoff period label.
+ * Given internal boundaries (Sunday 00:00 → next Sunday 00:00),
+ * displays as "Sat, Mar 7 23:59 — Sat, Mar 14 23:59".
+ */
+export function formatPeriodLabel(start: Date, end: Date): string {
+  const satStart = new Date(start);
+  satStart.setDate(satStart.getDate() - 1); // Sunday → preceding Saturday
+  const satEnd = new Date(end);
+  satEnd.setDate(satEnd.getDate() - 1); // next Sunday → next Saturday
+  return `${format(satStart, "EEE, MMM d")} 23:59 — ${format(satEnd, "EEE, MMM d")} 23:59`;
 }
 
 /** Format a date as YYYY-MM-DD (local timezone) */

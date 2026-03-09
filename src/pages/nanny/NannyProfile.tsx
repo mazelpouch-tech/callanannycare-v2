@@ -27,7 +27,7 @@ import { format } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
 import ImageUpload from "../../components/ImageUpload";
-import { calcBookedHoursForBooking, calcNannyPayBreakdown, getFridayPeriod, isDateInRange, toDateStr } from "@/utils/shiftHelpers";
+import { calcBookedHoursForBooking, calcNannyPayBreakdown, getSaturdayPeriod, isDateInRange, toDateStr, formatPeriodLabel } from "@/utils/shiftHelpers";
 import type { NannyProfile as NannyProfileType } from "@/types";
 
 export default function NannyProfile() {
@@ -58,8 +58,8 @@ export default function NannyProfile() {
     fetchNannyBookings();
   }, [fetchNannyBookings]);
 
-  // ── Friday-to-Friday period state ──
-  const currentPeriod = useMemo(() => getFridayPeriod(), []);
+  // ── Saturday-to-Saturday cutoff period state ──
+  const currentPeriod = useMemo(() => getSaturdayPeriod(), []);
   const [periodStart, setPeriodStart] = useState<Date>(currentPeriod.start);
   const [periodEnd, setPeriodEnd] = useState<Date>(currentPeriod.end);
   const [showCustom, setShowCustom] = useState(false);
@@ -86,7 +86,7 @@ export default function NannyProfile() {
   };
 
   const resetToCurrentWeek = () => {
-    const p = getFridayPeriod();
+    const p = getSaturdayPeriod();
     setPeriodStart(p.start);
     setPeriodEnd(p.end);
     setShowCustom(false);
@@ -94,11 +94,7 @@ export default function NannyProfile() {
 
   const isCurrentWeek = periodStart.getTime() === currentPeriod.start.getTime() && periodEnd.getTime() === currentPeriod.end.getTime();
 
-  const periodLabel = (() => {
-    const endDisplay = new Date(periodEnd);
-    endDisplay.setDate(endDisplay.getDate() - 1);
-    return `${format(periodStart, "MMM d")} — ${format(endDisplay, "MMM d")}`;
-  })();
+  const periodLabel = formatPeriodLabel(periodStart, periodEnd);
 
   // Calculate total hours from completed bookings within the period
   const totalHoursWorked = useMemo(() =>
@@ -297,7 +293,7 @@ export default function NannyProfile() {
                 <button onClick={() => goToPeriod(-1)} className="p-1 rounded hover:bg-muted transition-colors">
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
-                <span className="text-xs font-medium text-foreground min-w-[140px] text-center">{periodLabel}</span>
+                <span className="text-xs font-medium text-foreground min-w-[260px] text-center">{periodLabel}</span>
                 <button onClick={() => goToPeriod(1)} className="p-1 rounded hover:bg-muted transition-colors">
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>

@@ -27,11 +27,12 @@ import {
   calcNannyPayBreakdown,
   calcBookedHoursForBooking,
   HOURLY_RATE,
-  getFridayPeriod,
+  getSaturdayPeriod,
   isDateInRange,
   toDateStr,
   estimateNannyPayBreakdown,
   calcBookedHours,
+  formatPeriodLabel,
 } from "@/utils/shiftHelpers";
 import ExtendBookingModal from "../../components/ExtendBookingModal";
 
@@ -332,8 +333,8 @@ export default function NannyDashboard() {
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
     .slice(0, 5);
 
-  // ── Friday-to-Friday period state ──
-  const currentPeriod = useMemo(() => getFridayPeriod(), []);
+  // ── Saturday-to-Saturday cutoff period state ──
+  const currentPeriod = useMemo(() => getSaturdayPeriod(), []);
   const [periodStart, setPeriodStart] = useState<Date>(currentPeriod.start);
   const [periodEnd, setPeriodEnd] = useState<Date>(currentPeriod.end);
   const [showCustom, setShowCustom] = useState(false);
@@ -360,7 +361,7 @@ export default function NannyDashboard() {
   };
 
   const resetToCurrentWeek = () => {
-    const p = getFridayPeriod();
+    const p = getSaturdayPeriod();
     setPeriodStart(p.start);
     setPeriodEnd(p.end);
     setShowCustom(false);
@@ -368,11 +369,7 @@ export default function NannyDashboard() {
 
   const isCurrentWeek = periodStart.getTime() === currentPeriod.start.getTime() && periodEnd.getTime() === currentPeriod.end.getTime();
 
-  const periodLabel = (() => {
-    const endDisplay = new Date(periodEnd);
-    endDisplay.setDate(endDisplay.getDate() - 1);
-    return `${format(periodStart, "MMM d")} — ${format(endDisplay, "MMM d")}`;
-  })();
+  const periodLabel = formatPeriodLabel(periodStart, periodEnd);
 
   // Calculate hours & pay from booked time for COMPLETED bookings within the period
   const totalActualHours = useMemo(() => {
@@ -469,7 +466,7 @@ export default function NannyDashboard() {
           <button onClick={() => goToPeriod(-1)} className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Previous week">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <span className="text-sm font-medium text-foreground min-w-[160px] text-center">{periodLabel}</span>
+          <span className="text-sm font-medium text-foreground min-w-[260px] text-center">{periodLabel}</span>
           <button onClick={() => goToPeriod(1)} className="p-1.5 rounded-lg hover:bg-muted transition-colors" title="Next week">
             <ChevronRight className="w-4 h-4" />
           </button>
