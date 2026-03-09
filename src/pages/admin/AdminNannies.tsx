@@ -31,6 +31,7 @@ import {
   CheckSquare,
   Square,
   AlertTriangle,
+  ChevronDown,
 } from "lucide-react";
 import ImageUpload from "../../components/ImageUpload";
 import { useData } from "../../context/DataContext";
@@ -79,6 +80,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError] = useState("");
+  const [expandedMismatch, setExpandedMismatch] = useState<number | null>(null);
 
   const periodKey = `${toDateStr(periodStart)}|${toDateStr(periodEnd)}`;
 
@@ -162,6 +164,37 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
     return Object.values(nannyMap)
       .map((n) => ({ ...n, totalHours: Math.round(n.totalHours * 10) / 10, actualHours: Math.round(n.actualHours * 10) / 10 }))
       .sort((a, b) => b.totalHours - a.totalHours);
+  }, [bookings, periodStart, periodEnd]);
+
+  // Per-booking mismatch details: find which specific bookings cause hours discrepancies
+  const bookingMismatches = useMemo(() => {
+    const completedBookings = bookings.filter(
+      (b) => b.status === "completed" && b.startTime && b.endTime && b.clockIn && b.clockOut && isDateInRange(b.date, periodStart, periodEnd)
+    );
+    const result: Record<number, Array<{ id: number; date: string; clientName: string; startTime: string; endTime: string; booked: number; actual: number; diff: number; clockIn: string; clockOut: string }>> = {};
+    completedBookings.forEach((b) => {
+      const nannyId = b.nannyId;
+      if (nannyId == null) return;
+      const booked = Math.round(calcBookedHours(b.startTime, b.endTime, b.date, b.endDate) * 10) / 10;
+      const actual = Math.round(calcActualHoursWorked(b.clockIn!, b.clockOut!) * 10) / 10;
+      const diff = Math.round((actual - booked) * 10) / 10;
+      if (Math.abs(diff) >= 0.1) {
+        if (!result[nannyId]) result[nannyId] = [];
+        result[nannyId].push({
+          id: b.id,
+          date: b.date,
+          clientName: b.clientName || "Unknown",
+          startTime: b.startTime,
+          endTime: b.endTime,
+          booked,
+          actual,
+          diff,
+          clockIn: b.clockIn!,
+          clockOut: b.clockOut!,
+        });
+      }
+    });
+    return result;
   }, [bookings, periodStart, periodEnd]);
 
   const totalAllHours = nannyHours.reduce((s, n) => s + n.totalHours, 0);
@@ -420,15 +453,58 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                 </div>
                 <div className="space-y-1 pl-5">
                   {mismatches.map((n) => (
-                    <div key={n.nannyId} className="flex items-center justify-between text-xs">
-                      <span className="text-red-800 font-medium">{n.name}</span>
-                      <span className="flex items-center gap-2">
-                        <span className="text-red-700/70">Booked {n.totalHours}h</span>
-                        <span className="text-red-700/70">Actual {n.actualHours}h</span>
-                        <span className={`font-semibold ${n.diff > 0 ? "text-red-700" : "text-blue-700"}`}>
-                          {n.diff > 0 ? `+${n.diff}h` : `${n.diff}h`}
+                    <div key={n.nannyId} className="space-y-1">
+                      <button
+                        onClick={() => setExpandedMismatch(expandedMismatch === n.nannyId ? null : n.nannyId)}
+                        className="flex items-center justify-between text-xs w-full hover:bg-red-100/50 rounded px-1 py-0.5 transition-colors"
+                      >
+                        <span className="flex items-center gap-1 text-red-800 font-medium">
+                          <ChevronDown className={`w-3 h-3 transition-transform ${expandedMismatch === n.nannyId ? "rotate-180" : ""}`} />
+                          {n.name}
                         </span>
-                      </span>
+                        <span className="flex items-center gap-2">
+                          <span className="text-red-700/70">Booked {n.totalHours}h</span>
+                          <span className="text-red-700/70">Actual {n.actualHours}h</span>
+                          <span className={`font-semibold ${n.diff > 0 ? "text-red-700" : "text-blue-700"}`}>
+                            {n.diff > 0 ? `+${n.diff}h` : `${n.diff}h`}
+                          </span>
+                        </span>
+                      </button>
+                      {expandedMismatch === n.nannyId && bookingMismatches[n.nannyId] && (
+                        <div className="ml-4 space-y-1 border-l-2 border-red-200 pl-3 py-1">
+                          <div className="text-[10px] font-semibold text-red-700/60 uppercase tracking-wider mb-1">
+                            Bookings with discrepancies
+                          </div>
+                          {bookingMismatches[n.nannyId].map((bm) => (
+                            <div key={bm.id} className="flex items-center justify-between text-[11px] bg-white/60 rounded px-2 py-1.5">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-red-900 font-medium">
+                                  #{bm.id} — {bm.clientName}
+                                </span>
+                                <span className="text-red-700/60">
+                                  {bm.date ? format(new Date(bm.date + "T00:00:00"), "EEE, dd MMM") : "—"} · {bm.startTime}–{bm.endTime}
+                                </span>
+                                <span className="text-red-700/50 text-[10px]">
+                                  Clocked: {format(new Date(bm.clockIn), "HH:mm")} → {format(new Date(bm.clockOut), "HH:mm")}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-right">
+                                <span className="text-red-700/70">{bm.booked}h</span>
+                                <span className="text-red-700/70">→</span>
+                                <span className="text-red-700/70">{bm.actual}h</span>
+                                <span className={`font-bold ${bm.diff > 0 ? "text-red-700" : "text-blue-700"}`}>
+                                  {bm.diff > 0 ? `+${bm.diff}h` : `${bm.diff}h`}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                          {!bookingMismatches[n.nannyId]?.length && (
+                            <div className="text-[11px] text-red-700/50 italic">
+                              Small rounding differences across multiple bookings
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
