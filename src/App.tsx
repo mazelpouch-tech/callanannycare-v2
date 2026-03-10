@@ -11,6 +11,7 @@ import RebookBooking from './pages/RebookBooking'
 import BookingStatus from './pages/BookingStatus'
 import ReviewNannyPublic from './pages/ReviewNannyPublic'
 import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsConditions from './pages/TermsConditions'
 import PartnerDemo from './pages/PartnerDemo'
 import NotFound from './pages/NotFound'
 import AdminLogin from './pages/admin/AdminLogin'
@@ -95,6 +96,7 @@ export default function App() {
       <Route path="/booking/:id" element={<BookingStatus />} />
       <Route path="/review/nanny/:id" element={<ReviewNannyPublic />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsConditions />} />
 
       {/* Admin routes */}
       <Route path="/admin/login" element={<AdminLogin />} />

@@ -897,7 +897,11 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
               className="w-4 h-4 rounded border-border text-primary focus:ring-primary mt-0.5"
             />
             <span className="text-sm text-foreground">
-              {t("book.agreeTerms")} <span className="text-destructive">*</span>
+              {t("book.agreeTerms")}{" "}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
+                {t("book.viewTerms")}
+              </a>
+              <span className="text-destructive"> *</span>
             </span>
           </label>
           <label className="flex items-start gap-3 cursor-pointer">
