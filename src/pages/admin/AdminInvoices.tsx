@@ -453,6 +453,7 @@ export default function AdminInvoices() {
   .back-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px 20px; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .back-btn.close { background: linear-gradient(135deg, #c2703a 0%, #e8956e 100%); color: #fff; }
   .back-btn.print { background: #f0ece6; color: #5a5a5a; }
+  .back-btn.share { background: #e8f4e8; color: #16a34a; }
   @media print {
     body { background: #fff; padding: 0; margin: 0; }
     .page { max-width: 100%; margin: 0; }
@@ -467,6 +468,7 @@ export default function AdminInvoices() {
 <div class="back-bar">
   <button class="back-btn close" onclick="window.close(); setTimeout(function(){ history.back(); }, 300);">&#8592; Back to App</button>
   <button class="back-btn print" onclick="window.print();">&#128424; Print / Save PDF</button>
+  <button class="back-btn share" onclick="if(navigator.share){navigator.share({title:'Invoice',text:document.title,url:location.href}).catch(function(){});}else{window.print();}">&#8599; Share</button>
 </div>
 <div class="page">
   <div class="header">
