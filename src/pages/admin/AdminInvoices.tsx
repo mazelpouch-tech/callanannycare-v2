@@ -449,7 +449,7 @@ export default function AdminInvoices() {
   .total-amount .currency { font-size: 22px; font-weight: 600; vertical-align: super; margin-left: 2px; opacity: 0.85; }
   .total-dh { font-size: 14px; color: rgba(255,255,255,0.75); margin-top: 2px; }
   .total-paid-note { font-size: 15px; color: rgba(255,255,255,0.9); margin-top: 8px; font-weight: 800; letter-spacing: 2px; }
-  .back-bar { max-width: 480px; margin: 0 auto; padding: 12px 16px; display: flex; gap: 8px; }
+  .back-bar { max-width: 480px; margin: 0 auto; padding: 12px 16px; display: flex; gap: 8px; position: sticky; top: 0; z-index: 100; background: #fff; }
   .back-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px 20px; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .back-btn.close { background: linear-gradient(135deg, #c2703a 0%, #e8956e 100%); color: #fff; }
   .back-btn.print { background: #f0ece6; color: #5a5a5a; }
@@ -465,10 +465,24 @@ export default function AdminInvoices() {
   }
 </style>
 </head><body>
+<script>
+function goBack(){try{window.close()}catch(e){}setTimeout(function(){if(!window.closed){history.length>1?history.back():location.href='/'}},400)}
+function sharePdf(){
+  var title=document.title||'Invoice';
+  var html='<!DOCTYPE html>'+document.documentElement.outerHTML;
+  var blob=new Blob([html],{type:'text/html'});
+  var file=new File([blob],title.replace(/[^a-zA-Z0-9-_#]/g,'_')+'.html',{type:'text/html'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    navigator.share({title:title,files:[file]}).catch(function(){window.print()});
+  }else if(navigator.share){
+    navigator.share({title:title,text:title+' - Call a Nanny'}).catch(function(){window.print()});
+  }else{window.print()}
+}
+</script>
 <div class="back-bar">
-  <button class="back-btn close" onclick="window.close(); setTimeout(function(){ history.back(); }, 300);">&#8592; Back to App</button>
-  <button class="back-btn print" onclick="window.print();">&#128424; Print / Save PDF</button>
-  <button class="back-btn share" onclick="if(navigator.share){navigator.share({title:'Invoice',text:document.title,url:location.href}).catch(function(){});}else{window.print();}">&#8599; Share</button>
+  <button class="back-btn close" onclick="goBack()">&#8592; Back</button>
+  <button class="back-btn print" onclick="window.print()">&#128424; Save PDF</button>
+  <button class="back-btn share" onclick="sharePdf()">&#8599; Share</button>
 </div>
 <div class="page">
   <div class="header">
