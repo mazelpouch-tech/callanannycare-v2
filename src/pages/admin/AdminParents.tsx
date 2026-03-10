@@ -29,7 +29,7 @@ import {
 import { format, parseISO, startOfMonth, endOfMonth, subDays } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
-import { calcTotalBookedHours, getSaturdayPeriod, formatPeriodLabel, toDateStr } from "@/utils/shiftHelpers";
+import { calcTotalBookedHours, getSaturdayPeriod, formatPeriodLabel, toDateStr, parseTimeToHours } from "@/utils/shiftHelpers";
 import type { Booking } from "@/types";
 import { downloadInvoicePdf } from "@/utils/invoicePdf";
 
@@ -74,6 +74,33 @@ for (let i = 0; i < 96; i++) {
 function hoursForBooking(b: Booking): number {
   if (!b.startTime || !b.endTime) return 0;
   return calcTotalBookedHours(b.startTime, b.endTime, b.extraTimes, b.date, b.endDate);
+}
+
+/** Detect if a booking has a taxi fee (touches 7 PM – 7 AM window) */
+function bookingHasTaxi(b: Booking): boolean {
+  const startH = b.startTime ? parseTimeToHours(b.startTime) : null;
+  const endH = b.endTime ? parseTimeToHours(b.endTime) : null;
+  if (startH == null || endH == null) return false;
+  const hours = hoursForBooking(b);
+  return startH >= 19 || startH < 7 || endH >= 19 || endH < 7 || hours > 12;
+}
+
+/** Number of days a booking spans (for multi-day taxi fees) */
+function bookingDayCount(b: Booking): number {
+  if (b.endDate && b.endDate !== b.date) {
+    return Math.max(1, Math.round((new Date(b.endDate).getTime() - new Date(b.date!).getTime()) / 86400000) + 1);
+  }
+  return 1;
+}
+
+/** Calculate the taxi fee for a booking */
+function taxiFeeForBooking(b: Booking): number {
+  return bookingHasTaxi(b) ? TAXI_FEE * bookingDayCount(b) : 0;
+}
+
+/** Calculate the base service charge (total - taxi) */
+function basePriceForBooking(b: Booking): number {
+  return (b.totalPrice || 0) - taxiFeeForBooking(b);
 }
 
 function fmtDateLong(dateStr: string): string {
@@ -536,22 +563,33 @@ export default function AdminParents() {
 
     const bookingRows = activeBookings.map((b) => {
       const hours = hoursForBooking(b);
+      const taxi = taxiFeeForBooking(b);
+      const base = basePriceForBooking(b);
       const timeRange = b.clockIn && b.clockOut
         ? `${formatClockTime(b.clockIn)} – ${formatClockTime(b.clockOut)}`
         : `${b.startTime || "—"} – ${b.endTime || "—"}`;
       const dateStr = b.date ? format(parseISO(b.date), "dd MMM yyyy") : "—";
-      return `<tr>
+      let row = `<tr>
         <td>${dateStr}</td>
         <td>${timeRange}</td>
         <td>${hours.toFixed(1)}h</td>
         <td>${b.nannyName || "—"}</td>
-        <td>${(b.totalPrice || 0).toLocaleString()}€</td>
+        <td>${base}€</td>
       </tr>`;
+      if (taxi > 0) {
+        row += `<tr class="taxi-row">
+          <td colspan="4" style="text-align:right;color:#c2703a;font-size:10px;">&#128663; Taxi fee (evening)</td>
+          <td style="color:#c2703a;font-weight:700;">+${taxi}€</td>
+        </tr>`;
+      }
+      return row;
     }).join("");
 
     const total = p.totalPrice;
     const totalDH = toDH(total);
     const invoiceDate = format(new Date(), "dd MMMM yyyy");
+    const pdfTotalTaxi = activeBookings.reduce((sum, b) => sum + taxiFeeForBooking(b), 0);
+    const pdfTotalService = total - pdfTotalTaxi;
 
     const isPaid = p.unpaidCount === 0 && p.paidCount > 0;
 
@@ -581,6 +619,9 @@ export default function AdminParents() {
   .card-row-label { font-size: 13px; color: #5a5a5a; display: flex; align-items: center; gap: 8px; }
   .card-row-label .icon { font-size: 14px; color: #a0937e; }
   .card-row-value { font-size: 14px; font-weight: 700; color: #1a202c; }
+  .taxi-row .card-row-label { color: #c2703a; }
+  .taxi-row .card-row-label .icon { color: #c2703a; }
+  .taxi-row .card-row-value { color: #c2703a; }
   .detail-table { width: 100%; border-collapse: collapse; }
   .detail-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #8a7e6e; font-weight: 600; padding: 7px 10px; text-align: left; border-bottom: 1px solid #f0ece6; }
   .detail-table th:last-child { text-align: right; }
@@ -656,6 +697,14 @@ export default function AdminParents() {
         <span class="card-row-label">Total Hours</span>
         <span class="card-row-value">${p.totalHours.toFixed(1)}h</span>
       </div>
+      <div class="card-row">
+        <span class="card-row-label">${p.totalHours.toFixed(1)}h &times; ${SERVICE_RATE}&euro;/hr</span>
+        <span class="card-row-value">${pdfTotalService}&euro;</span>
+      </div>
+      ${pdfTotalTaxi > 0 ? `<div class="card-row taxi-row">
+        <span class="card-row-label"><span class="icon">&#128663;</span> Taxi fees</span>
+        <span class="card-row-value">+${pdfTotalTaxi}&euro;</span>
+      </div>` : ""}
     </div>
 
     <div class="total-box${isPaid ? " paid" : ""}">
@@ -1629,6 +1678,8 @@ export default function AdminParents() {
         const total = p.totalPrice;
         const totalDH = toDH(total);
         const isPaid = p.unpaidCount === 0 && p.paidCount > 0;
+        const totalTaxi = activeBookings.reduce((sum, b) => sum + taxiFeeForBooking(b), 0);
+        const totalService = total - totalTaxi;
         return (
           <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-[8vh] overflow-y-auto" onClick={() => setViewParentInvoice(null)}>
             <div className="w-full max-w-lg bg-card rounded-2xl shadow-xl border border-border overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -1677,14 +1728,24 @@ export default function AdminParents() {
                   <div className="divide-y divide-border max-h-48 overflow-y-auto">
                     {activeBookings.map((b) => {
                       const hours = hoursForBooking(b);
+                      const taxi = taxiFeeForBooking(b);
+                      const base = basePriceForBooking(b);
                       return (
-                        <div key={b.id} className="flex justify-between px-4 py-2 text-xs">
-                          <div className="flex items-center gap-3">
-                            <span className="text-muted-foreground">{b.date ? format(parseISO(b.date), "dd MMM") : "—"}</span>
-                            <span className="text-foreground">{b.startTime || "—"} – {b.endTime || "—"}</span>
-                            <span className="text-muted-foreground">{hours.toFixed(1)}h</span>
+                        <div key={b.id} className="px-4 py-2 text-xs">
+                          <div className="flex justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="text-muted-foreground">{b.date ? format(parseISO(b.date), "dd MMM") : "—"}</span>
+                              <span className="text-foreground">{b.startTime || "—"} – {b.endTime || "—"}</span>
+                              <span className="text-muted-foreground">{hours.toFixed(1)}h</span>
+                            </div>
+                            <span className="font-bold text-foreground">{base}€</span>
                           </div>
-                          <span className="font-bold text-foreground">{(b.totalPrice || 0)}€</span>
+                          {taxi > 0 && (
+                            <div className="flex justify-between mt-1 text-amber-700">
+                              <span className="flex items-center gap-1 pl-[calc(3rem+12px)]"><Car className="w-3 h-3" /> Taxi fee (evening)</span>
+                              <span className="font-bold">+{taxi}€</span>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -1705,6 +1766,16 @@ export default function AdminParents() {
                       <span className="text-sm text-muted-foreground">Total Hours</span>
                       <span className="text-sm font-medium text-foreground">{p.totalHours.toFixed(1)}h</span>
                     </div>
+                    <div className="flex justify-between px-4 py-2.5">
+                      <span className="text-sm text-muted-foreground">{p.totalHours.toFixed(1)}h × {SERVICE_RATE}€/hr</span>
+                      <span className="text-sm font-medium text-foreground">{totalService}€</span>
+                    </div>
+                    {totalTaxi > 0 && (
+                      <div className="flex justify-between px-4 py-2.5">
+                        <span className="text-sm text-amber-700 flex items-center gap-1.5"><Car className="w-3.5 h-3.5" /> Taxi fees</span>
+                        <span className="text-sm font-medium text-amber-700">+{totalTaxi}€</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
