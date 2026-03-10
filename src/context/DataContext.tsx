@@ -1102,14 +1102,15 @@ export function DataProvider({ children }: DataProviderProps) {
         body: JSON.stringify({ email, password }),
       });
       if (result.success) {
+        // API returns camelCase keys (lastLogin, loginCount) not snake_case
         const a = result.admin;
         const profile: AdminProfile = {
           id: a.id,
           name: a.name,
           email: a.email,
           role: a.role,
-          lastLogin: a.last_login,
-          loginCount: a.login_count,
+          lastLogin: a.lastLogin,
+          loginCount: a.loginCount,
         };
         setIsAdmin(true);
         setAdminProfile(profile);
@@ -1165,6 +1166,12 @@ export function DataProvider({ children }: DataProviderProps) {
     setIsAdmin(false);
     setAdminProfile(null);
     setAdminUsers([]);
+    // Also clear any linked nanny session (dual-role users)
+    setIsNanny(false);
+    setNannyProfile(null);
+    setIsImpersonating(false);
+    localStorage.removeItem(STORAGE_KEYS.nannyProfile);
+    localStorage.removeItem(STORAGE_KEYS.impersonating);
   }, []);
 
   const fetchAdminUsers = useCallback(async (): Promise<AdminUser[]> => {

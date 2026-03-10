@@ -386,7 +386,16 @@ export interface LinkedNannyInfo {
 }
 
 export interface NannyLoginResponse { nanny: DbNanny; linkedAdmin?: LinkedAdminInfo }
-export interface AdminLoginResponse { admin: DbAdminUser; token?: string; linkedNanny?: LinkedNannyInfo }
+/** API returns camelCase admin fields, not the DB snake_case shape */
+export interface AdminLoginResponseAdmin {
+  id: number;
+  name: string;
+  email: string;
+  role: AdminRole;
+  lastLogin: string | null;
+  loginCount: number;
+}
+export interface AdminLoginResponse { admin: AdminLoginResponseAdmin; token?: string; linkedNanny?: LinkedNannyInfo }
 export interface InviteResponse { inviteLink: string; emailSent: boolean; nanny: { id: number; name: string; email: string } }
 export interface ResendInviteResponse { inviteLink: string; emailSent: boolean }
 export interface ProfileUpdateResponse { nanny: DbNanny }
