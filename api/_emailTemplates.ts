@@ -82,6 +82,16 @@ const strings = {
     time: 'Time',
     price: 'Price',
     grandTotal: 'Grand Total',
+    // Terms & Conditions
+    termsTitle: 'General Terms & Conditions',
+    termsIntro: 'By confirming this booking, you acknowledge that you have read and accepted our General Terms & Conditions. Here are the key points:',
+    termsMinBooking: 'Minimum booking of 3 hours required',
+    termsPayment: 'Payment due at end of stay (€10/hr per nanny, payable in EUR or MAD)',
+    termsTaxi: 'Services starting after 7:00 PM include a €10 taxi fee',
+    termsCancellation: 'Free cancellation up to 24 hours before service; cancellations within 24 hours will be charged',
+    termsParental: 'Parents remain fully responsible for their children at all times',
+    termsOvertime: 'Time exceeding booked hours is charged at the applicable rate',
+    termsViewFull: 'View Full Terms & Conditions',
   },
   fr: {
     confirmSubject: 'Confirmation de Réservation - Call a Nanny',
@@ -160,6 +170,16 @@ const strings = {
     time: 'Horaire',
     price: 'Prix',
     grandTotal: 'Total Général',
+    // Terms & Conditions
+    termsTitle: 'Conditions Générales',
+    termsIntro: 'En confirmant cette réservation, vous reconnaissez avoir lu et accepté nos Conditions Générales. Voici les points essentiels :',
+    termsMinBooking: 'Réservation minimum de 3 heures requise',
+    termsPayment: 'Paiement dû en fin de séjour (10€/h par nounou, payable en EUR ou MAD)',
+    termsTaxi: 'Les services commençant après 19h00 incluent des frais de taxi de 10€',
+    termsCancellation: 'Annulation gratuite jusqu\'à 24h avant le service ; annulation dans les 24h facturée',
+    termsParental: 'Les parents restent entièrement responsables de leurs enfants à tout moment',
+    termsOvertime: 'Le temps dépassant les heures réservées est facturé au tarif applicable',
+    termsViewFull: 'Voir les Conditions Générales Complètes',
   },
 };
 
@@ -203,6 +223,27 @@ function emailWrapper(content: string): string {
 </table>
 </body>
 </html>`;
+}
+
+function termsBlock(s: ReturnType<typeof t>, baseUrl: string): string {
+  return `
+    <!-- Terms & Conditions -->
+    <div style="margin:28px 0;padding:20px;background-color:#fefce8;border-radius:12px;border-left:4px solid #eab308;">
+      <h3 style="margin:0 0 12px;color:#1a1a1a;font-size:15px;font-weight:600;">📋 ${s.termsTitle}</h3>
+      <p style="margin:0 0 12px;color:#666;font-size:13px;line-height:1.5;">${s.termsIntro}</p>
+      <ul style="margin:0 0 16px;padding-left:20px;color:#555;font-size:13px;line-height:1.8;">
+        <li>${s.termsMinBooking}</li>
+        <li>${s.termsPayment}</li>
+        <li>${s.termsTaxi}</li>
+        <li>${s.termsCancellation}</li>
+        <li>${s.termsParental}</li>
+        <li>${s.termsOvertime}</li>
+      </ul>
+      <div style="text-align:center;">
+        <a href="${baseUrl}/terms" style="display:inline-block;background:#eab308;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;padding:10px 24px;border-radius:50px;">${s.termsViewFull}</a>
+      </div>
+    </div>
+  `;
 }
 
 function row(label: string, value: string): string {
@@ -294,6 +335,8 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData): Promis
       <p style="margin:0 0 16px;color:#666;font-size:13px;line-height:1.5;">${s.rebookText}</p>
       <a href="${baseUrl}/rebook/${data.bookingId}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:50px;box-shadow:0 2px 8px rgba(236,72,153,0.3);">${s.rebookBtn}</a>
     </div>
+
+    ${termsBlock(s, baseUrl)}
 
     <p style="margin:0;color:#999;font-size:13px;text-align:center;">${s.contactUs} <a href="mailto:info@callanannycare.com" style="color:#f97316;">info@callanannycare.com</a></p>
   `;
@@ -394,6 +437,8 @@ export async function sendMultiDayConfirmationEmail(data: MultiDayConfirmationEm
       <p style="margin:0 0 16px;color:#666;font-size:13px;line-height:1.5;">${s.rebookText}</p>
       <a href="${baseUrl}/rebook/${data.bookingIds[0]}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:50px;box-shadow:0 2px 8px rgba(236,72,153,0.3);">${s.rebookBtn}</a>
     </div>
+
+    ${termsBlock(s, baseUrl)}
 
     <p style="margin:0;color:#999;font-size:13px;text-align:center;">${s.contactUs} <a href="mailto:info@callanannycare.com" style="color:#f97316;">info@callanannycare.com</a></p>
   `;
