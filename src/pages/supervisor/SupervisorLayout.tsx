@@ -27,6 +27,7 @@ const sidebarLinks: SidebarLink[] = [
   { to: "/supervisor/bookings", label: "Bookings", icon: CalendarDays },
   { to: "/supervisor/assignments", label: "Nanny Schedule", icon: Users },
   { to: "/supervisor/revenue", label: "Collections", icon: DollarSign },
+  { to: "/supervisor/parents", label: "Parents", icon: Users },
 ];
 
 export default function SupervisorLayout() {

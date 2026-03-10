@@ -788,7 +788,7 @@ export default function AdminParents() {
             {!isCancelled && (
               isPaid ? (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200">
-                  <CheckCircle className="w-3 h-3" /> Paid
+                  <CheckCircle className="w-3 h-3" /> Paid by {b.collectedBy || "Admin"}
                 </span>
               ) : (
                 <button
