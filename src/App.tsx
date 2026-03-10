@@ -132,6 +132,7 @@ export default function App() {
         <Route path="notifications" element={<NannyNotifications />} />
         <Route path="messages" element={<NannyMessages />} />
         <Route path="profile" element={<NannyProfile />} />
+        <Route path="parents" element={<SupervisorParents />} />
       </Route>
     </Routes>
   )

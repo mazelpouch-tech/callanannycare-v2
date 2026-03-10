@@ -11,6 +11,7 @@ import {
   Menu,
   Globe,
   User,
+  Users,
   ShieldCheck,
   ArrowLeftRight,
   Eye,
@@ -149,6 +150,24 @@ export default function NannyLayout() {
               </NavLink>
             );
           })}
+
+          {/* Parents tab — only for supervisor/admin users (e.g. Doha) */}
+          {isAdmin && (
+            <NavLink
+              to="/nanny/parents"
+              onClick={() => setSidebarOpen(false)}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  isActive
+                    ? "bg-violet-100 text-violet-700 shadow-sm"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                }`
+              }
+            >
+              <Users className="w-5 h-5 shrink-0" />
+              <span>Parents</span>
+            </NavLink>
+          )}
         </nav>
 
         {/* Role switcher — only shown for Doha */}
