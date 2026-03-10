@@ -12,11 +12,8 @@ import {
   ChevronUp,
   Shield,
   User,
-  UtensilsCrossed,
-  Pill,
-  TreePine,
-  Brain,
   ClipboardList,
+  Camera,
 } from "lucide-react";
 import PhoneInput from "../components/PhoneInput";
 
@@ -30,7 +27,6 @@ const T = {
     parentInfo: "Informations du Parent / Tuteur",
     childInfo: "Informations de l'Enfant",
     allergies: "Allergies",
-    specialNeeds: "Besoins Speciaux & Comportement",
     consent: "Consentement & Autorisation",
     // Parent fields
     parentName: "Nom complet du parent / tuteur",
@@ -40,36 +36,19 @@ const T = {
     // Child fields
     childFirstName: "Prenom de l'enfant",
     childLastName: "Nom de l'enfant",
-    childDob: "Date de naissance",
     childAge: "Age",
     childGender: "Sexe",
     genderBoy: "Garcon",
     genderGirl: "Fille",
     // Allergies
-    foodAllergies: "Allergies alimentaires",
-    foodAllergiesPlaceholder: "Ex: arachides, lait, gluten, fruits de mer...",
-    medicineAllergies: "Allergies medicamenteuses",
-    medicineAllergiesPlaceholder: "Ex: penicilline, ibuprofene...",
-    environmentAllergies: "Allergies environnementales",
-    environmentAllergiesPlaceholder: "Ex: pollen, acariens, animaux...",
+    allergiesField: "Allergies (alimentaires, medicamenteuses, etc.)",
+    allergiesPlaceholder: "Ex: arachides, lait, penicilline, pollen...",
     noAllergies: "Aucune allergie connue",
-    allergyReaction: "Reactions allergiques connues et traitement",
-    allergyReactionPlaceholder: "Decrivez les reactions et le traitement a administrer...",
-    // Special needs
-    specialNeedsDesc: "Besoins speciaux ou handicap",
-    specialNeedsPlaceholder: "Decrivez tout besoin particulier...",
-    behaviorNotes: "Notes sur le comportement",
-    behaviorNotesPlaceholder: "Ex: peurs, routines, habitudes de sommeil, methodes de reconfort...",
-    dietaryRestrictions: "Restrictions alimentaires ou regime",
-    dietaryRestrictionsPlaceholder: "Ex: vegetarien, halal, sans sucre...",
-    favoriteActivities: "Activites preferees",
-    favoriteActivitiesPlaceholder: "Ex: dessin, lecture, jeux de construction...",
-    napSchedule: "Horaire de sieste / sommeil",
-    napSchedulePlaceholder: "Ex: sieste de 13h a 15h, coucher a 20h...",
     // Consent
     consentText:
-      "J'autorise call a nanny a prendre soin de mon enfant selon les informations fournies ci-dessus. Je certifie que toutes les informations sont exactes et completes.",
+      "J'autorise Call a Nanny a prendre soin de mon enfant selon les informations fournies ci-dessus. Je certifie que toutes les informations sont exactes et completes.",
     agreeTerms: "J'accepte les conditions generales de service",
+    allowPhotos: "J'autorise la nounou a prendre des photos et videos de mon enfant",
     // Actions
     submit: "Soumettre le Formulaire",
     submitting: "Envoi en cours...",
@@ -91,7 +70,6 @@ const T = {
     parentInfo: "Parent / Guardian Information",
     childInfo: "Child Information",
     allergies: "Allergies",
-    specialNeeds: "Special Needs & Behavior",
     consent: "Consent & Authorization",
     // Parent fields
     parentName: "Parent / Guardian full name",
@@ -101,36 +79,19 @@ const T = {
     // Child fields
     childFirstName: "Child's first name",
     childLastName: "Child's last name",
-    childDob: "Date of birth",
     childAge: "Age",
     childGender: "Gender",
     genderBoy: "Boy",
     genderGirl: "Girl",
     // Allergies
-    foodAllergies: "Food allergies",
-    foodAllergiesPlaceholder: "e.g. peanuts, milk, gluten, seafood...",
-    medicineAllergies: "Medicine allergies",
-    medicineAllergiesPlaceholder: "e.g. penicillin, ibuprofen...",
-    environmentAllergies: "Environmental allergies",
-    environmentAllergiesPlaceholder: "e.g. pollen, dust mites, animals...",
+    allergiesField: "Allergies (food, medicine, environmental, etc.)",
+    allergiesPlaceholder: "e.g. peanuts, milk, penicillin, pollen...",
     noAllergies: "No known allergies",
-    allergyReaction: "Known allergic reactions and treatment",
-    allergyReactionPlaceholder: "Describe reactions and treatment to administer...",
-    // Special needs
-    specialNeedsDesc: "Special needs or disabilities",
-    specialNeedsPlaceholder: "Describe any special requirements...",
-    behaviorNotes: "Behavior notes",
-    behaviorNotesPlaceholder: "e.g. fears, routines, sleep habits, comfort methods...",
-    dietaryRestrictions: "Dietary restrictions or diet",
-    dietaryRestrictionsPlaceholder: "e.g. vegetarian, halal, sugar-free...",
-    favoriteActivities: "Favorite activities",
-    favoriteActivitiesPlaceholder: "e.g. drawing, reading, building blocks...",
-    napSchedule: "Nap / sleep schedule",
-    napSchedulePlaceholder: "e.g. nap 1-3 PM, bedtime at 8 PM...",
     // Consent
     consentText:
-      "I authorize call a nanny to care for my child according to the information provided above. I certify that all information is accurate and complete.",
+      "I authorize Call a Nanny to care for my child according to the information provided above. I certify that all information is accurate and complete.",
     agreeTerms: "I agree to the general terms of service",
+    allowPhotos: "I allow the nanny to take photos and videos of my child",
     // Actions
     submit: "Submit Form",
     submitting: "Submitting...",
@@ -215,20 +176,12 @@ export default function ParentForm() {
     hotel: "",
     childFirstName: "",
     childLastName: "",
-    childDob: "",
     childAge: "",
     childGender: "",
-    foodAllergies: "",
-    medicineAllergies: "",
-    environmentAllergies: "",
+    allergies: "",
     noAllergies: false,
-    allergyReaction: "",
-    specialNeeds: "",
-    behaviorNotes: "",
-    dietaryRestrictions: "",
-    favoriteActivities: "",
-    napSchedule: "",
     agreeTerms: false,
+    allowPhotos: false,
   });
 
   const set = useCallback((field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -246,25 +199,19 @@ export default function ParentForm() {
     lines.push(`Hotel: ${form.hotel}`);
     lines.push(``);
     lines.push(`Child: ${form.childFirstName} ${form.childLastName}`);
-    if (form.childDob) lines.push(`DOB: ${form.childDob}`);
     if (form.childAge) lines.push(`Age: ${form.childAge}`);
     if (form.childGender) lines.push(`Gender: ${form.childGender}`);
     lines.push(``);
 
     if (form.noAllergies) {
       lines.push(`Allergies: None`);
+    } else if (form.allergies) {
+      lines.push(`Allergies: ${form.allergies}`);
     } else {
-      if (form.foodAllergies) lines.push(`Food allergies: ${form.foodAllergies}`);
-      if (form.medicineAllergies) lines.push(`Medicine allergies: ${form.medicineAllergies}`);
-      if (form.environmentAllergies) lines.push(`Environment allergies: ${form.environmentAllergies}`);
-      if (form.allergyReaction) lines.push(`Allergy reactions: ${form.allergyReaction}`);
+      lines.push(`Allergies: Not specified`);
     }
 
-    if (form.specialNeeds) lines.push(`Special needs: ${form.specialNeeds}`);
-    if (form.behaviorNotes) lines.push(`Behavior: ${form.behaviorNotes}`);
-    if (form.dietaryRestrictions) lines.push(`Diet: ${form.dietaryRestrictions}`);
-    if (form.favoriteActivities) lines.push(`Activities: ${form.favoriteActivities}`);
-    if (form.napSchedule) lines.push(`Nap/sleep: ${form.napSchedule}`);
+    lines.push(`Photos/Videos: ${form.allowPhotos ? "Allowed" : "Not allowed"}`);
 
     lines.push(``);
     lines.push(`--- call a nanny ---`);
@@ -289,18 +236,10 @@ export default function ParentForm() {
           "Parent Email": form.parentEmail || "N/A",
           "Hotel / Address": form.hotel,
           "Child Name": `${form.childFirstName} ${form.childLastName || ""}`,
-          "Child DOB": form.childDob || "N/A",
           "Child Age": form.childAge || "N/A",
           "Child Gender": form.childGender || "N/A",
-          "Food Allergies": form.noAllergies ? "None" : (form.foodAllergies || "N/A"),
-          "Medicine Allergies": form.noAllergies ? "None" : (form.medicineAllergies || "N/A"),
-          "Environment Allergies": form.noAllergies ? "None" : (form.environmentAllergies || "N/A"),
-          "Allergy Reactions": form.noAllergies ? "None" : (form.allergyReaction || "N/A"),
-          "Special Needs": form.specialNeeds || "None",
-          "Behavior Notes": form.behaviorNotes || "N/A",
-          "Dietary Restrictions": form.dietaryRestrictions || "None",
-          "Favorite Activities": form.favoriteActivities || "N/A",
-          "Nap Schedule": form.napSchedule || "N/A",
+          "Allergies": form.noAllergies ? "None" : (form.allergies || "N/A"),
+          "Photos/Videos Allowed": form.allowPhotos ? "Yes" : "No",
         }),
       });
       const data = await res.json();
@@ -335,20 +274,12 @@ export default function ParentForm() {
       hotel: "",
       childFirstName: "",
       childLastName: "",
-      childDob: "",
       childAge: "",
       childGender: "",
-      foodAllergies: "",
-      medicineAllergies: "",
-      environmentAllergies: "",
+      allergies: "",
       noAllergies: false,
-      allergyReaction: "",
-      specialNeeds: "",
-      behaviorNotes: "",
-      dietaryRestrictions: "",
-      favoriteActivities: "",
-      napSchedule: "",
       agreeTerms: false,
+      allowPhotos: false,
     });
     setSubmitted(false);
     setCopied(false);
@@ -510,15 +441,7 @@ export default function ParentForm() {
                 />
               </Field>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Field label={t.childDob}>
-                <input
-                  type="date"
-                  value={form.childDob}
-                  onChange={set("childDob")}
-                  className={inputClass}
-                />
-              </Field>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label={t.childAge}>
                 <input
                   type="text"
@@ -539,7 +462,7 @@ export default function ParentForm() {
           </Section>
 
           {/* Allergies */}
-          <Section icon={AlertTriangle} title={t.allergies} defaultOpen={true}>
+          <Section icon={AlertTriangle} title={t.allergies}>
             <label className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 cursor-pointer">
               <input
                 type="checkbox"
@@ -550,94 +473,16 @@ export default function ParentForm() {
               <span className="text-sm font-medium text-foreground">{t.noAllergies}</span>
             </label>
             {!form.noAllergies && (
-              <>
-                <Field label={<span className="flex items-center gap-1.5"><UtensilsCrossed className="w-3.5 h-3.5 text-primary" />{t.foodAllergies}</span>}>
-                  <input
-                    type="text"
-                    value={form.foodAllergies}
-                    onChange={set("foodAllergies")}
-                    placeholder={t.foodAllergiesPlaceholder}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label={<span className="flex items-center gap-1.5"><Pill className="w-3.5 h-3.5 text-primary" />{t.medicineAllergies}</span>}>
-                  <input
-                    type="text"
-                    value={form.medicineAllergies}
-                    onChange={set("medicineAllergies")}
-                    placeholder={t.medicineAllergiesPlaceholder}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label={<span className="flex items-center gap-1.5"><TreePine className="w-3.5 h-3.5 text-primary" />{t.environmentAllergies}</span>}>
-                  <input
-                    type="text"
-                    value={form.environmentAllergies}
-                    onChange={set("environmentAllergies")}
-                    placeholder={t.environmentAllergiesPlaceholder}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label={t.allergyReaction}>
-                  <textarea
-                    value={form.allergyReaction}
-                    onChange={set("allergyReaction")}
-                    placeholder={t.allergyReactionPlaceholder}
-                    rows={3}
-                    className={textareaClass}
-                  />
-                </Field>
-              </>
+              <Field label={t.allergiesField}>
+                <textarea
+                  value={form.allergies}
+                  onChange={set("allergies")}
+                  placeholder={t.allergiesPlaceholder}
+                  rows={3}
+                  className={textareaClass}
+                />
+              </Field>
             )}
-          </Section>
-
-          {/* Special Needs */}
-          <Section icon={Brain} title={t.specialNeeds} defaultOpen={false}>
-            <Field label={t.specialNeedsDesc}>
-              <textarea
-                value={form.specialNeeds}
-                onChange={set("specialNeeds")}
-                placeholder={t.specialNeedsPlaceholder}
-                rows={3}
-                className={textareaClass}
-              />
-            </Field>
-            <Field label={t.behaviorNotes}>
-              <textarea
-                value={form.behaviorNotes}
-                onChange={set("behaviorNotes")}
-                placeholder={t.behaviorNotesPlaceholder}
-                rows={3}
-                className={textareaClass}
-              />
-            </Field>
-            <Field label={t.dietaryRestrictions}>
-              <input
-                type="text"
-                value={form.dietaryRestrictions}
-                onChange={set("dietaryRestrictions")}
-                placeholder={t.dietaryRestrictionsPlaceholder}
-                className={inputClass}
-              />
-            </Field>
-            <Field label={t.favoriteActivities}>
-              <input
-                type="text"
-                value={form.favoriteActivities}
-                onChange={set("favoriteActivities")}
-                placeholder={t.favoriteActivitiesPlaceholder}
-                className={inputClass}
-              />
-            </Field>
-            <Field label={t.napSchedule}>
-              <input
-                type="text"
-                value={form.napSchedule}
-                onChange={set("napSchedule")}
-                placeholder={t.napSchedulePlaceholder}
-                className={inputClass}
-              />
-            </Field>
           </Section>
 
           {/* Consent */}
@@ -645,18 +490,32 @@ export default function ParentForm() {
             <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground leading-relaxed mb-4">
               {t.consentText}
             </div>
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.agreeTerms}
-                onChange={set("agreeTerms")}
-                className="w-4 h-4 rounded border-border text-primary focus:ring-primary mt-0.5"
-                required
-              />
-              <span className="text-sm text-foreground">
-                {t.agreeTerms} <span className="text-destructive">*</span>
-              </span>
-            </label>
+            <div className="space-y-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.agreeTerms}
+                  onChange={set("agreeTerms")}
+                  className="w-4 h-4 rounded border-border text-primary focus:ring-primary mt-0.5"
+                  required
+                />
+                <span className="text-sm text-foreground">
+                  {t.agreeTerms} <span className="text-destructive">*</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.allowPhotos}
+                  onChange={set("allowPhotos")}
+                  className="w-4 h-4 rounded border-border text-primary focus:ring-primary mt-0.5"
+                />
+                <span className="text-sm text-foreground flex items-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5 text-primary" />
+                  {t.allowPhotos}
+                </span>
+              </label>
+            </div>
           </Section>
 
           {/* Submit */}
