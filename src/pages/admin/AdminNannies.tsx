@@ -116,8 +116,12 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
     const from = new Date(customFrom + "T00:00:00");
     const to = new Date(customTo + "T00:00:00");
     if (from >= to) return;
+    // Add 1 day to end so the selected end date is inclusive
+    // (isDateInRange uses exclusive end: d < end)
+    const toInclusive = new Date(to);
+    toInclusive.setDate(toInclusive.getDate() + 1);
     setPeriodStart(from);
-    setPeriodEnd(to);
+    setPeriodEnd(toInclusive);
     setShowCustom(false);
   };
 
