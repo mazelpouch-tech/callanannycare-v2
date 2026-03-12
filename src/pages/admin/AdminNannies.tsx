@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -83,6 +83,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError] = useState("");
   const [expandedMismatch, setExpandedMismatch] = useState<number | null>(null);
+  const [expandedHours, setExpandedHours] = useState<number | null>(null);
 
   const periodKey = `${toDateStr(periodStart)}|${toDateStr(periodEnd)}`;
 
@@ -137,13 +138,14 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
     );
     if (completedBookings.length === 0) return [];
 
-    const nannyMap: Record<number, { nannyId: number; name: string; shifts: number; totalHours: number; actualHours: number; clockedShifts: number; basePay: number; taxiFee: number; totalPay: number }> = {};
+    interface ShiftDetail { date: string; clientName: string; startTime: string; endTime: string; bookedHours: number; actualHours: number; clockIn: string | null; clockOut: string | null; }
+    const nannyMap: Record<number, { nannyId: number; name: string; shifts: number; totalHours: number; actualHours: number; clockedShifts: number; basePay: number; taxiFee: number; totalPay: number; shiftDetails: ShiftDetail[] }> = {};
     completedBookings.forEach((b) => {
       const nannyId = b.nannyId;
       if (nannyId == null) return;
       const nannyName = b.nannyName || "Unknown";
       if (!nannyMap[nannyId]) {
-        nannyMap[nannyId] = { nannyId, name: nannyName, shifts: 0, totalHours: 0, actualHours: 0, clockedShifts: 0, basePay: 0, taxiFee: 0, totalPay: 0 };
+        nannyMap[nannyId] = { nannyId, name: nannyName, shifts: 0, totalHours: 0, actualHours: 0, clockedShifts: 0, basePay: 0, taxiFee: 0, totalPay: 0, shiftDetails: [] };
       }
       const hours = calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
       const bd = estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate);
@@ -154,13 +156,20 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
       nannyMap[nannyId].taxiFee += bd.taxiFee;
       nannyMap[nannyId].totalPay += bd.total;
 
-      // Track actual hours: use clock data when available, otherwise assume booked hours
-      if (b.clockIn && b.clockOut) {
-        nannyMap[nannyId].actualHours += calcActualHoursWorked(b.clockIn, b.clockOut);
-      } else {
-        nannyMap[nannyId].actualHours += hours;
-      }
+      const actualH = (b.clockIn && b.clockOut) ? calcActualHoursWorked(b.clockIn, b.clockOut) : hours;
+      nannyMap[nannyId].actualHours += actualH;
       nannyMap[nannyId].clockedShifts += 1;
+
+      nannyMap[nannyId].shiftDetails.push({
+        date: b.date,
+        clientName: b.clientName || "Unknown",
+        startTime: b.startTime,
+        endTime: b.endTime,
+        bookedHours: Math.round(hours * 10) / 10,
+        actualHours: Math.round(actualH * 10) / 10,
+        clockIn: b.clockIn || null,
+        clockOut: b.clockOut || null,
+      });
     });
 
     return Object.values(nannyMap)
@@ -537,7 +546,8 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                   const isPaid = paidNannyIds.has(nanny.nannyId);
                   const isSelected = selectedIds.has(nanny.nannyId);
                   return (
-                    <tr key={nanny.nannyId} className={`transition-colors ${isPaid ? "bg-green-50/50" : "hover:bg-muted/50"}`}>
+                    <Fragment key={nanny.nannyId}>
+                    <tr className={`transition-colors ${isPaid ? "bg-green-50/50" : "hover:bg-muted/50"}`}>
                       <td className="px-6 py-3">
                         {isPaid ? (
                           <button onClick={() => undoPaid(nanny.nannyId)} title="Undo paid" className="text-green-600 hover:text-red-500 transition-colors">
@@ -552,9 +562,21 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                       <td className="px-4 py-3">
                         <p className="text-sm font-medium text-foreground">{nanny.name}</p>
                       </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{nanny.shifts}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{nanny.totalHours}h</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{nanny.actualHours}h</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                        <button onClick={() => setExpandedHours(expandedHours === nanny.nannyId ? null : nanny.nannyId)} className="underline decoration-dotted underline-offset-2 hover:text-foreground transition-colors">
+                          {nanny.shifts}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                        <button onClick={() => setExpandedHours(expandedHours === nanny.nannyId ? null : nanny.nannyId)} className="underline decoration-dotted underline-offset-2 hover:text-foreground transition-colors">
+                          {nanny.totalHours}h
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                        <button onClick={() => setExpandedHours(expandedHours === nanny.nannyId ? null : nanny.nannyId)} className="underline decoration-dotted underline-offset-2 hover:text-foreground transition-colors">
+                          {nanny.actualHours}h
+                        </button>
+                      </td>
                       <td className="px-4 py-3 text-sm">
                         {(() => {
                           const diff = Math.round((nanny.actualHours - nanny.totalHours) * 10) / 10;
@@ -589,6 +611,32 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                         )}
                       </td>
                     </tr>
+                    {expandedHours === nanny.nannyId && (
+                      <tr>
+                        <td colSpan={10} className="px-6 py-3 bg-muted/20">
+                          <div className="space-y-1">
+                            <p className="text-xs font-semibold text-muted-foreground mb-2">Shift Details for {nanny.name}</p>
+                            {nanny.shiftDetails
+                              .sort((a, b) => a.date.localeCompare(b.date))
+                              .map((s, i) => (
+                              <div key={i} className="flex items-center gap-4 text-xs text-muted-foreground bg-background rounded px-3 py-1.5">
+                                <span className="font-medium text-foreground w-28">{new Date(s.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
+                                <span className="w-32 truncate">{s.clientName}</span>
+                                <span className="w-24">{s.startTime} – {s.endTime}</span>
+                                <span className="w-16">Booked: {s.bookedHours}h</span>
+                                <span className="w-16">Actual: {s.actualHours}h</span>
+                                {Math.abs(s.actualHours - s.bookedHours) >= 0.2 && (
+                                  <span className={`font-medium ${s.actualHours > s.bookedHours ? "text-red-600" : "text-blue-600"}`}>
+                                    {s.actualHours > s.bookedHours ? "+" : ""}{Math.round((s.actualHours - s.bookedHours) * 10) / 10}h
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                   );
                 })}
               </tbody>
@@ -648,10 +696,13 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground pl-6">
+                  <button
+                    onClick={() => setExpandedHours(expandedHours === nanny.nannyId ? null : nanny.nannyId)}
+                    className="flex items-center gap-3 text-xs text-muted-foreground pl-6 w-full text-left hover:text-foreground transition-colors"
+                  >
                     <span>{nanny.shifts} shifts</span>
-                    <span>Booked: {nanny.totalHours}h</span>
-                    <span>Actual: {nanny.actualHours}h</span>
+                    <span className="underline decoration-dotted underline-offset-2">Booked: {nanny.totalHours}h</span>
+                    <span className="underline decoration-dotted underline-offset-2">Actual: {nanny.actualHours}h</span>
                     {(() => {
                       const diff = Math.round((nanny.actualHours - nanny.totalHours) * 10) / 10;
                       if (Math.abs(diff) < 0.2) return null;
@@ -659,7 +710,31 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                         ? <span className="text-red-600 font-medium">+{diff}h over</span>
                         : <span className="text-blue-600 font-medium">{diff}h under</span>;
                     })()}
-                  </div>
+                    <ChevronDown className={`w-3 h-3 ml-auto transition-transform ${expandedHours === nanny.nannyId ? "rotate-180" : ""}`} />
+                  </button>
+                  {expandedHours === nanny.nannyId && (
+                    <div className="pl-6 pr-2 pt-2 pb-1 space-y-1.5">
+                      {nanny.shiftDetails
+                        .sort((a, b) => a.date.localeCompare(b.date))
+                        .map((s, i) => (
+                        <div key={i} className="flex items-center justify-between text-[11px] text-muted-foreground bg-muted/40 rounded px-2.5 py-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-foreground">{new Date(s.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
+                            <span className="text-muted-foreground">{s.clientName}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span>{s.startTime}–{s.endTime}</span>
+                            <span className="font-medium">{s.bookedHours}h</span>
+                            {s.clockIn && s.clockOut && Math.abs(s.actualHours - s.bookedHours) >= 0.2 && (
+                              <span className={s.actualHours > s.bookedHours ? "text-red-600" : "text-blue-600"}>
+                                ({s.actualHours}h actual)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div className="flex items-center gap-3 text-xs text-muted-foreground pl-6">
                     <span>Hourly: {nanny.basePay} DH</span>
                     {nanny.taxiFee > 0 && (
