@@ -84,6 +84,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
   const [payError, setPayError] = useState("");
   const [expandedMismatch, setExpandedMismatch] = useState<number | null>(null);
   const [expandedHours, setExpandedHours] = useState<number | null>(null);
+  const [isCustomPeriod, setIsCustomPeriod] = useState(false);
 
   const periodKey = `${toDateStr(periodStart)}|${toDateStr(periodEnd)}`;
 
@@ -109,6 +110,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
     newEnd.setDate(newStart.getDate() + 7);
     setPeriodStart(newStart);
     setPeriodEnd(newEnd);
+    setIsCustomPeriod(false);
     setShowCustom(false);
   };
 
@@ -122,6 +124,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
     toInclusive.setDate(toInclusive.getDate() + 1);
     setPeriodStart(from);
     setPeriodEnd(toInclusive);
+    setIsCustomPeriod(true);
     setShowCustom(false);
   };
 
@@ -129,12 +132,19 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
     const p = getSaturdayPeriod();
     setPeriodStart(p.start);
     setPeriodEnd(p.end);
+    setIsCustomPeriod(false);
     setShowCustom(false);
   };
 
   const isCurrentWeek = periodStart.getTime() === currentPeriod.start.getTime() && periodEnd.getTime() === currentPeriod.end.getTime();
 
-  const periodLabel = formatPeriodLabel(periodStart, periodEnd);
+  const periodLabel = isCustomPeriod
+    ? (() => {
+        const endDisplay = new Date(periodEnd);
+        endDisplay.setDate(endDisplay.getDate() - 1); // exclusive end → last included date
+        return `${fmtDate(periodStart, "EEE, MMM d")} — ${fmtDate(endDisplay, "EEE, MMM d")}`;
+      })()
+    : formatPeriodLabel(periodStart, periodEnd);
 
   const nannyHours = useMemo(() => {
     const completedBookings = bookings.filter(
@@ -364,7 +374,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
         )}
 
         <p className="text-[10px] text-muted-foreground">
-          Pay period: Saturday midnight → Saturday midnight
+          {isCustomPeriod ? "Custom date range" : "Pay period: Saturday midnight → Saturday midnight"}
         </p>
       </div>
 
