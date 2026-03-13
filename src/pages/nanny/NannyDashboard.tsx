@@ -378,12 +378,33 @@ export default function NannyDashboard() {
       .reduce((sum, b) => sum + calcBookedHoursForBooking(b), 0);
   }, [nannyBookings, periodStart, periodEnd]);
 
+  // Calculate upcoming (confirmed/pending) hours within the period
+  const upcomingHours = useMemo(() => {
+    return nannyBookings
+      .filter((b) => (b.status === "confirmed" || b.status === "pending") && isDateInRange(b.date, periodStart, periodEnd))
+      .reduce((sum, b) => sum + calcBookedHoursForBooking(b), 0);
+  }, [nannyBookings, periodStart, periodEnd]);
+
+  const totalCombinedHours = Math.round((totalActualHours + upcomingHours) * 10) / 10;
+
   const payBreakdown = useMemo(() => {
     return nannyBookings
       .filter((b) => b.status === "completed" && isDateInRange(b.date, periodStart, periodEnd))
       .reduce(
         (acc, b) => {
           const bd = calcNannyPayBreakdown(b);
+          return { basePay: acc.basePay + bd.basePay, taxiFee: acc.taxiFee + bd.taxiFee, total: acc.total + bd.total };
+        },
+        { basePay: 0, taxiFee: 0, total: 0 }
+      );
+  }, [nannyBookings, periodStart, periodEnd]);
+
+  const upcomingPayBreakdown = useMemo(() => {
+    return nannyBookings
+      .filter((b) => (b.status === "confirmed" || b.status === "pending") && isDateInRange(b.date, periodStart, periodEnd))
+      .reduce(
+        (acc, b) => {
+          const bd = estimateNannyPayBreakdown(b.startTime || "", b.endTime || "", b.date, b.endDate);
           return { basePay: acc.basePay + bd.basePay, taxiFee: acc.taxiFee + bd.taxiFee, total: acc.total + bd.total };
         },
         { basePay: 0, taxiFee: 0, total: 0 }
@@ -410,11 +431,12 @@ export default function NannyDashboard() {
     },
     {
       label: t("nanny.dashboard.hoursWorked"),
-      value: parseFloat(totalActualHours.toFixed(1)),
+      value: totalCombinedHours,
       suffix: t("nanny.dashboard.hrs"),
       icon: Clock,
       bg: "bg-primary/10",
       color: "text-primary",
+      subtitle: upcomingHours > 0 ? `${parseFloat(totalActualHours.toFixed(1))} done + ${parseFloat(upcomingHours.toFixed(1))} upcoming` : undefined,
     },
     {
       label: t("nanny.dashboard.completedLabel"),
@@ -432,11 +454,12 @@ export default function NannyDashboard() {
     },
     {
       label: t("nanny.dashboard.myPay"),
-      value: payBreakdown.total,
+      value: payBreakdown.total + upcomingPayBreakdown.total,
       suffix: "DH",
       icon: DollarSign,
       bg: "bg-orange-50",
       color: "text-orange-600",
+      subtitle: upcomingPayBreakdown.total > 0 ? `${payBreakdown.total} earned + ${upcomingPayBreakdown.total} upcoming` : undefined,
     },
   ];
 
@@ -529,6 +552,9 @@ export default function NannyDashboard() {
                   </span>
                 )}
               </p>
+              {stat.subtitle && (
+                <p className="text-[10px] text-blue-600 mt-1">{stat.subtitle}</p>
+              )}
             </>
           );
           return stat.link ? (
@@ -551,16 +577,33 @@ export default function NannyDashboard() {
       </div>
 
       {/* Pay Breakdown */}
-      {payBreakdown.total > 0 && (
-        <div className="bg-orange-50/50 border border-orange-200/60 rounded-xl px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
-          <span className="font-medium text-foreground">{t("nanny.dashboard.payBreakdown")}:</span>
-          <span className="text-muted-foreground">
-            {t("nanny.dashboard.hourlyPay")}: <span className="font-semibold text-foreground">{payBreakdown.basePay} DH</span>
-          </span>
-          {payBreakdown.taxiFee > 0 && (
-            <span className="text-muted-foreground">
-              {t("nanny.dashboard.taxiFee")}: <span className="font-semibold text-orange-600">+{payBreakdown.taxiFee} DH</span>
-            </span>
+      {(payBreakdown.total > 0 || upcomingPayBreakdown.total > 0) && (
+        <div className="space-y-2">
+          {payBreakdown.total > 0 && (
+            <div className="bg-orange-50/50 border border-orange-200/60 rounded-xl px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+              <span className="font-medium text-foreground">{t("nanny.dashboard.payBreakdown")} ({parseFloat(totalActualHours.toFixed(1))}h completed):</span>
+              <span className="text-muted-foreground">
+                {t("nanny.dashboard.hourlyPay")}: <span className="font-semibold text-foreground">{payBreakdown.basePay} DH</span>
+              </span>
+              {payBreakdown.taxiFee > 0 && (
+                <span className="text-muted-foreground">
+                  {t("nanny.dashboard.taxiFee")}: <span className="font-semibold text-orange-600">+{payBreakdown.taxiFee} DH</span>
+                </span>
+              )}
+            </div>
+          )}
+          {upcomingPayBreakdown.total > 0 && (
+            <div className="bg-blue-50/50 border border-blue-200/60 rounded-xl px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+              <span className="font-medium text-blue-800">Upcoming ({parseFloat(upcomingHours.toFixed(1))}h scheduled):</span>
+              <span className="text-blue-700">
+                {t("nanny.dashboard.hourlyPay")}: <span className="font-semibold">{upcomingPayBreakdown.basePay} DH</span>
+              </span>
+              {upcomingPayBreakdown.taxiFee > 0 && (
+                <span className="text-blue-700">
+                  {t("nanny.dashboard.taxiFee")}: <span className="font-semibold text-orange-600">+{upcomingPayBreakdown.taxiFee} DH</span>
+                </span>
+              )}
+            </div>
           )}
         </div>
       )}

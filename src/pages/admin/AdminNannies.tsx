@@ -150,17 +150,25 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
     const completedBookings = bookings.filter(
       (b) => b.status === "completed" && b.startTime && b.endTime && isDateInRange(b.date, periodStart, periodEnd)
     );
-    if (completedBookings.length === 0) return [];
+    // Also include confirmed/pending bookings in the period (upcoming hours)
+    const upcomingBookings = bookings.filter(
+      (b) => (b.status === "confirmed" || b.status === "pending") && b.startTime && b.endTime && isDateInRange(b.date, periodStart, periodEnd)
+    );
+    if (completedBookings.length === 0 && upcomingBookings.length === 0) return [];
 
-    interface ShiftDetail { date: string; clientName: string; startTime: string; endTime: string; bookedHours: number; actualHours: number; clockIn: string | null; clockOut: string | null; }
-    const nannyMap: Record<number, { nannyId: number; name: string; shifts: number; totalHours: number; actualHours: number; clockedShifts: number; basePay: number; taxiFee: number; totalPay: number; shiftDetails: ShiftDetail[] }> = {};
+    interface ShiftDetail { date: string; clientName: string; startTime: string; endTime: string; bookedHours: number; actualHours: number; clockIn: string | null; clockOut: string | null; isUpcoming?: boolean; }
+    const nannyMap: Record<number, { nannyId: number; name: string; shifts: number; totalHours: number; actualHours: number; clockedShifts: number; basePay: number; taxiFee: number; totalPay: number; shiftDetails: ShiftDetail[]; upcomingShifts: number; upcomingHours: number; upcomingPay: number }> = {};
+
+    const ensureNanny = (nannyId: number, nannyName: string) => {
+      if (!nannyMap[nannyId]) {
+        nannyMap[nannyId] = { nannyId, name: nannyName, shifts: 0, totalHours: 0, actualHours: 0, clockedShifts: 0, basePay: 0, taxiFee: 0, totalPay: 0, shiftDetails: [], upcomingShifts: 0, upcomingHours: 0, upcomingPay: 0 };
+      }
+    };
+
     completedBookings.forEach((b) => {
       const nannyId = b.nannyId;
       if (nannyId == null) return;
-      const nannyName = b.nannyName || "Unknown";
-      if (!nannyMap[nannyId]) {
-        nannyMap[nannyId] = { nannyId, name: nannyName, shifts: 0, totalHours: 0, actualHours: 0, clockedShifts: 0, basePay: 0, taxiFee: 0, totalPay: 0, shiftDetails: [] };
-      }
+      ensureNanny(nannyId, b.nannyName || "Unknown");
       const hours = calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
       const bd = estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate);
 
@@ -183,12 +191,37 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
         actualHours: Math.round(actualH * 10) / 10,
         clockIn: b.clockIn || null,
         clockOut: b.clockOut || null,
+        isUpcoming: false,
+      });
+    });
+
+    upcomingBookings.forEach((b) => {
+      const nannyId = b.nannyId;
+      if (nannyId == null) return;
+      ensureNanny(nannyId, b.nannyName || "Unknown");
+      const hours = calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
+      const bd = estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate);
+
+      nannyMap[nannyId].upcomingShifts += 1;
+      nannyMap[nannyId].upcomingHours += hours;
+      nannyMap[nannyId].upcomingPay += bd.total;
+
+      nannyMap[nannyId].shiftDetails.push({
+        date: b.date,
+        clientName: b.clientName || "Unknown",
+        startTime: b.startTime,
+        endTime: b.endTime,
+        bookedHours: Math.round(hours * 10) / 10,
+        actualHours: 0,
+        clockIn: null,
+        clockOut: null,
+        isUpcoming: true,
       });
     });
 
     return Object.values(nannyMap)
-      .map((n) => ({ ...n, totalHours: Math.round(n.totalHours * 10) / 10, actualHours: Math.round(n.actualHours * 10) / 10 }))
-      .sort((a, b) => b.totalHours - a.totalHours);
+      .map((n) => ({ ...n, totalHours: Math.round(n.totalHours * 10) / 10, actualHours: Math.round(n.actualHours * 10) / 10, upcomingHours: Math.round(n.upcomingHours * 10) / 10 }))
+      .sort((a, b) => (b.totalHours + b.upcomingHours) - (a.totalHours + a.upcomingHours));
   }, [bookings, periodStart, periodEnd]);
 
   // Per-booking mismatch details: find which specific bookings cause hours discrepancies
@@ -229,6 +262,10 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
   const totalAllTaxi = nannyHours.reduce((s, n) => s + n.taxiFee, 0);
   const totalAllPay = nannyHours.reduce((s, n) => s + n.totalPay, 0);
   const totalAllShifts = nannyHours.reduce((s, n) => s + n.shifts, 0);
+  const totalUpcomingHours = nannyHours.reduce((s, n) => s + n.upcomingHours, 0);
+  const totalUpcomingShifts = nannyHours.reduce((s, n) => s + n.upcomingShifts, 0);
+  const totalUpcomingPay = nannyHours.reduce((s, n) => s + n.upcomingPay, 0);
+  const totalCombinedHours = Math.round((totalAllHours + totalUpcomingHours) * 10) / 10;
 
   // Unpaid nannies (have hours but not paid)
   const unpaidNannies = nannyHours.filter((n) => !paidNannyIds.has(n.nannyId));
@@ -325,9 +362,12 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
           </h2>
           {nannyHours.length > 0 && (
             <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground">
-              <span>{totalAllShifts} shifts</span>
-              <span>{totalAllHours.toFixed(1)} hrs</span>
-              <span className="font-semibold text-foreground">{totalAllPay.toLocaleString()} DH</span>
+              <span>{totalAllShifts + totalUpcomingShifts} shifts</span>
+              <span>{totalCombinedHours.toFixed(1)} hrs total</span>
+              {totalUpcomingHours > 0 && (
+                <span className="text-blue-600">({totalAllHours.toFixed(1)} done + {totalUpcomingHours.toFixed(1)} upcoming)</span>
+              )}
+              <span className="font-semibold text-foreground">{(totalAllPay + totalUpcomingPay).toLocaleString()} DH</span>
               {allPaid && <span className="text-green-600 font-semibold flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />All Paid</span>}
             </div>
           )}
@@ -381,9 +421,9 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
       {nannyHours.length === 0 && (
         <div className="px-6 py-10 text-center">
           <Timer className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-muted-foreground font-medium">No completed bookings for this period</p>
+          <p className="text-muted-foreground font-medium">No bookings for this period</p>
           <p className="text-sm text-muted-foreground/70 mt-1">
-            Hours will appear here once bookings are marked as completed.
+            Hours will appear here once bookings are confirmed or completed.
           </p>
         </div>
       )}
@@ -546,8 +586,9 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                   <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-8"></th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nanny</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Shifts</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Booked</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actual</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Completed</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Upcoming</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Hrs</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Diff</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hourly Pay</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Taxi Fee</th>
@@ -586,10 +627,17 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                           {nanny.totalHours}h
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        <button onClick={() => setExpandedHours(expandedHours === nanny.nannyId ? null : nanny.nannyId)} className="underline decoration-dotted underline-offset-2 hover:text-foreground transition-colors">
-                          {nanny.actualHours}h
-                        </button>
+                      <td className="px-4 py-3 text-sm">
+                        {nanny.upcomingHours > 0 ? (
+                          <button onClick={() => setExpandedHours(expandedHours === nanny.nannyId ? null : nanny.nannyId)} className="text-blue-600 underline decoration-dotted underline-offset-2 hover:text-blue-800 transition-colors">
+                            {nanny.upcomingHours}h
+                          </button>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-foreground">
+                        {Math.round((nanny.totalHours + nanny.upcomingHours) * 10) / 10}h
                       </td>
                       <td className="px-4 py-3 text-sm">
                         {(() => {
@@ -627,22 +675,28 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                     </tr>
                     {expandedHours === nanny.nannyId && (
                       <tr>
-                        <td colSpan={10} className="px-6 py-3 bg-muted/20">
+                        <td colSpan={11} className="px-6 py-3 bg-muted/20">
                           <div className="space-y-1">
                             <p className="text-xs font-semibold text-muted-foreground mb-2">Shift Details for {nanny.name}</p>
                             {nanny.shiftDetails
                               .sort((a, b) => a.date.localeCompare(b.date))
                               .map((s, i) => (
-                              <div key={i} className="flex items-center gap-4 text-xs text-muted-foreground bg-background rounded px-3 py-1.5">
+                              <div key={i} className={`flex items-center gap-4 text-xs text-muted-foreground rounded px-3 py-1.5 ${s.isUpcoming ? "bg-blue-50 border border-blue-100" : "bg-background"}`}>
                                 <span className="font-medium text-foreground w-28">{new Date(s.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
                                 <span className="w-32 truncate">{s.clientName}</span>
                                 <span className="w-24">{s.startTime} – {s.endTime}</span>
-                                <span className="w-16">Booked: {s.bookedHours}h</span>
-                                <span className="w-16">Actual: {s.actualHours}h</span>
-                                {Math.abs(s.actualHours - s.bookedHours) >= 0.2 && (
-                                  <span className={`font-medium ${s.actualHours > s.bookedHours ? "text-red-600" : "text-blue-600"}`}>
-                                    {s.actualHours > s.bookedHours ? "+" : ""}{Math.round((s.actualHours - s.bookedHours) * 10) / 10}h
-                                  </span>
+                                {s.isUpcoming ? (
+                                  <span className="text-blue-600 font-medium">{s.bookedHours}h (upcoming)</span>
+                                ) : (
+                                  <>
+                                    <span className="w-16">Booked: {s.bookedHours}h</span>
+                                    <span className="w-16">Actual: {s.actualHours}h</span>
+                                    {Math.abs(s.actualHours - s.bookedHours) >= 0.2 && (
+                                      <span className={`font-medium ${s.actualHours > s.bookedHours ? "text-red-600" : "text-blue-600"}`}>
+                                        {s.actualHours > s.bookedHours ? "+" : ""}{Math.round((s.actualHours - s.bookedHours) * 10) / 10}h
+                                      </span>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             ))}
@@ -658,9 +712,10 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                 <tr className="border-t-2 border-border bg-muted/30">
                   <td className="px-6 py-3"></td>
                   <td className="px-4 py-3 text-sm font-bold text-foreground">Total</td>
-                  <td className="px-4 py-3 text-sm font-bold text-foreground">{totalAllShifts}</td>
+                  <td className="px-4 py-3 text-sm font-bold text-foreground">{totalAllShifts + totalUpcomingShifts}</td>
                   <td className="px-4 py-3 text-sm font-bold text-foreground">{totalAllHours.toFixed(1)}h</td>
-                  <td className="px-4 py-3 text-sm font-bold text-foreground">{Math.round(totalAllActual * 10) / 10}h</td>
+                  <td className="px-4 py-3 text-sm font-bold text-blue-600">{totalUpcomingHours > 0 ? `${totalUpcomingHours.toFixed(1)}h` : "—"}</td>
+                  <td className="px-4 py-3 text-sm font-bold text-foreground">{totalCombinedHours.toFixed(1)}h</td>
                   <td className="px-4 py-3 text-sm font-bold">
                     {(() => {
                       const diff = Math.round((totalAllActual - totalAllHours) * 10) / 10;
@@ -674,7 +729,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                   <td className="px-4 py-3 text-sm font-bold text-orange-600 text-right">
                     {totalAllTaxi > 0 ? `+${totalAllTaxi.toLocaleString()} DH` : "—"}
                   </td>
-                  <td className="px-4 py-3 text-sm font-bold text-foreground text-right">{totalAllPay.toLocaleString()} DH</td>
+                  <td className="px-4 py-3 text-sm font-bold text-foreground text-right">{(totalAllPay + totalUpcomingPay).toLocaleString()} DH</td>
                   <td className="px-4 py-3"></td>
                 </tr>
               </tfoot>
@@ -714,16 +769,12 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                     onClick={() => setExpandedHours(expandedHours === nanny.nannyId ? null : nanny.nannyId)}
                     className="flex items-center gap-3 text-xs text-muted-foreground pl-6 w-full text-left hover:text-foreground transition-colors"
                   >
-                    <span>{nanny.shifts} shifts</span>
-                    <span className="underline decoration-dotted underline-offset-2">Booked: {nanny.totalHours}h</span>
-                    <span className="underline decoration-dotted underline-offset-2">Actual: {nanny.actualHours}h</span>
-                    {(() => {
-                      const diff = Math.round((nanny.actualHours - nanny.totalHours) * 10) / 10;
-                      if (Math.abs(diff) < 0.2) return null;
-                      return diff > 0
-                        ? <span className="text-red-600 font-medium">+{diff}h over</span>
-                        : <span className="text-blue-600 font-medium">{diff}h under</span>;
-                    })()}
+                    <span>{nanny.shifts + nanny.upcomingShifts} shifts</span>
+                    <span className="underline decoration-dotted underline-offset-2">Done: {nanny.totalHours}h</span>
+                    {nanny.upcomingHours > 0 && (
+                      <span className="text-blue-600 underline decoration-dotted underline-offset-2">Upcoming: {nanny.upcomingHours}h</span>
+                    )}
+                    <span className="font-medium">Total: {Math.round((nanny.totalHours + nanny.upcomingHours) * 10) / 10}h</span>
                     <ChevronDown className={`w-3 h-3 ml-auto transition-transform ${expandedHours === nanny.nannyId ? "rotate-180" : ""}`} />
                   </button>
                   {expandedHours === nanny.nannyId && (
@@ -731,7 +782,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                       {nanny.shiftDetails
                         .sort((a, b) => a.date.localeCompare(b.date))
                         .map((s, i) => (
-                        <div key={i} className="flex items-center justify-between text-[11px] text-muted-foreground bg-muted/40 rounded px-2.5 py-1.5">
+                        <div key={i} className={`flex items-center justify-between text-[11px] text-muted-foreground rounded px-2.5 py-1.5 ${s.isUpcoming ? "bg-blue-50 border border-blue-100" : "bg-muted/40"}`}>
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-foreground">{new Date(s.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</span>
                             <span className="text-muted-foreground">{s.clientName}</span>
@@ -739,10 +790,14 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                           <div className="flex items-center gap-2">
                             <span>{s.startTime}–{s.endTime}</span>
                             <span className="font-medium">{s.bookedHours}h</span>
-                            {s.clockIn && s.clockOut && Math.abs(s.actualHours - s.bookedHours) >= 0.2 && (
-                              <span className={s.actualHours > s.bookedHours ? "text-red-600" : "text-blue-600"}>
-                                ({s.actualHours}h actual)
-                              </span>
+                            {s.isUpcoming ? (
+                              <span className="text-blue-600 font-medium text-[10px]">upcoming</span>
+                            ) : (
+                              s.clockIn && s.clockOut && Math.abs(s.actualHours - s.bookedHours) >= 0.2 && (
+                                <span className={s.actualHours > s.bookedHours ? "text-red-600" : "text-blue-600"}>
+                                  ({s.actualHours}h actual)
+                                </span>
+                              )
                             )}
                           </div>
                         </div>
@@ -762,12 +817,14 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
             <div className="px-5 py-3 bg-muted/30 border-t border-border">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-foreground">Period Total</span>
-                <span className="text-sm font-bold text-foreground">{totalAllPay.toLocaleString()} DH</span>
+                <span className="text-sm font-bold text-foreground">{(totalAllPay + totalUpcomingPay).toLocaleString()} DH</span>
               </div>
-              <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                <span>{totalAllShifts} shifts</span>
-                <span>{totalAllHours.toFixed(1)}h</span>
-                <span>Hourly: {totalAllBasePay.toLocaleString()} DH</span>
+              <div className="flex items-center gap-3 text-[11px] text-muted-foreground flex-wrap">
+                <span>{totalAllShifts + totalUpcomingShifts} shifts</span>
+                <span className="font-medium">{totalCombinedHours.toFixed(1)}h total</span>
+                {totalUpcomingHours > 0 && (
+                  <span className="text-blue-600">({totalAllHours.toFixed(1)} done + {totalUpcomingHours.toFixed(1)} upcoming)</span>
+                )}
                 {totalAllTaxi > 0 && (
                   <span className="text-orange-600">Taxi: +{totalAllTaxi.toLocaleString()} DH</span>
                 )}
