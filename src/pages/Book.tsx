@@ -68,6 +68,7 @@ interface BookingDetails {
   email: string;
   phone: string;
   accommodation: string;
+  roomNumber: string;
   numChildren: string;
   notes: string;
 }
@@ -565,7 +566,8 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
     details.fullName.trim() &&
     details.email.trim() &&
     details.phone.trim() &&
-    details.accommodation.trim();
+    details.accommodation.trim() &&
+    details.roomNumber.trim();
 
   return (
     <div>
@@ -633,6 +635,22 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
             value={details.accommodation}
             onChange={handleChange("accommodation")}
             placeholder={t("book.hotelPlaceholder")}
+            className="w-full rounded-lg border border-border p-3 bg-card text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+        </div>
+
+        {/* Room Number */}
+        <div>
+          <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-1.5">
+            <Hotel className="w-4 h-4 text-primary" />
+            {t("book.roomNumber")} <span className="text-destructive">*</span>
+          </label>
+          <input
+            type="text"
+            required
+            value={details.roomNumber}
+            onChange={handleChange("roomNumber")}
+            placeholder={t("book.roomNumberPlaceholder")}
             className="w-full rounded-lg border border-border p-3 bg-card text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
         </div>
@@ -1055,6 +1073,10 @@ function StepReview({
               {details.accommodation}
             </p>
             <p>
+              <span className="text-foreground font-medium">{t("book.roomNumber")}:</span>{" "}
+              {details.roomNumber}
+            </p>
+            <p>
               <span className="text-foreground font-medium">{t("book.children")}:</span>{" "}
               {details.numChildren}
             </p>
@@ -1279,12 +1301,13 @@ function loadSavedParent(): BookingDetails {
         email: parsed.email || "",
         phone: parsed.phone || "",
         accommodation: parsed.accommodation || "",
+        roomNumber: parsed.roomNumber || "",
         numChildren,
         notes: "",
       };
     }
   } catch { /* ignore */ }
-  return { fullName: "", email: "", phone: "", accommodation: "", numChildren: "1", notes: "" };
+  return { fullName: "", email: "", phone: "", accommodation: "", roomNumber: "", numChildren: "1", notes: "" };
 }
 
 function saveParentDetails(details: BookingDetails) {
@@ -1294,6 +1317,7 @@ function saveParentDetails(details: BookingDetails) {
       email: details.email,
       phone: details.phone,
       accommodation: details.accommodation,
+      roomNumber: details.roomNumber,
       numChildren: details.numChildren,
     }));
   } catch { /* ignore */ }
@@ -1433,7 +1457,7 @@ export default function Book() {
         clientName: details.fullName,
         clientEmail: details.email,
         clientPhone: details.phone,
-        hotel: details.accommodation,
+        hotel: `${details.accommodation} - Room ${details.roomNumber}`,
         childrenCount: Number(details.numChildren),
         childrenAges: childrenInfo.map((c) => c.childAge).filter(Boolean).join(", "),
         notes: enrichedNotes,
@@ -1490,7 +1514,7 @@ export default function Book() {
               client_name: details.fullName,
               client_email: details.email,
               client_phone: details.phone,
-              hotel: details.accommodation,
+              hotel: `${details.accommodation} - Room ${details.roomNumber}`,
               locale,
               booking_ids: createdBookingIds,
               days: createdDays,
@@ -1525,6 +1549,7 @@ export default function Book() {
               "Parent Phone": details.phone,
               "Parent Email": details.email,
               "Hotel / Address": details.accommodation,
+              "Room Number": details.roomNumber,
               "Booking Dates": selectedDates.map((d) => format(d, "yyyy-MM-dd")).join(", "),
               "Booking Time": `${startLabel} - ${endLabel}`,
               "Total Price": `${totalPrice}€`,
@@ -1547,6 +1572,7 @@ export default function Book() {
         email: details.email,
         phone: details.phone,
         accommodation: details.accommodation,
+        roomNumber: details.roomNumber,
         numChildren: details.numChildren,
         notes: details.notes,
         status: "pending",
