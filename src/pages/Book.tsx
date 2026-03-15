@@ -1518,10 +1518,10 @@ export default function Book() {
             startTime: dayStartTime,
             endTime: dayEndTime,
             totalPrice: scaledPrice,
-          }, { locale, skipParentNotifications: isMultiDay });
+          }, { locale, skipParentNotifications: isMultiDay, skipNannyPush: isMultiDay });
           createdDays.push({ date: format(d, "yyyy-MM-dd"), startTime: dayStartTime, endTime: dayEndTime, price: scaledPrice });
         } else {
-          result = await addBooking({ ...basePayload, date: format(d, "yyyy-MM-dd") }, { locale, skipParentNotifications: isMultiDay });
+          result = await addBooking({ ...basePayload, date: format(d, "yyyy-MM-dd") }, { locale, skipParentNotifications: isMultiDay, skipNannyPush: isMultiDay });
           createdDays.push({ date: format(d, "yyyy-MM-dd"), startTime: startLabel, endTime: endLabel, price: defaultDailyPrice });
         }
         createdBookingIds.push(result.id);
@@ -1542,6 +1542,12 @@ export default function Book() {
               locale,
               booking_ids: createdBookingIds,
               days: createdDays,
+              total_hours: Math.round(createdDays.reduce((sum, day) => {
+                const parseT = (t: string) => { const [h, m = 0] = t.replace(/[hH]/, ':').split(':').map(Number); return h + m / 60; };
+                let h = parseT(day.endTime) - parseT(day.startTime);
+                if (h <= 0) h += 24;
+                return sum + h;
+              }, 0)),
             }),
           });
         } catch {

@@ -28,6 +28,7 @@ interface CreateBookingBody {
   skip_min_hours?: boolean;
   skip_conflict_check?: boolean;
   skip_parent_notifications?: boolean; // Skip parent email/WhatsApp (for multi-day batching)
+  skip_nanny_push?: boolean; // Skip nanny in-app + push notifications (for multi-day batching)
 }
 
 interface AvailableNannyRow {
@@ -341,10 +342,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'POST') {
       // ─── Multi-day consolidated notification action ─────────
       if (req.body?.action === 'send-multi-day-confirmation') {
-        const { client_name: mName, client_email: mEmail, client_phone: mPhone, hotel: mHotel, locale: mLocale, booking_ids, days } = req.body as {
+        const { client_name: mName, client_email: mEmail, client_phone: mPhone, hotel: mHotel, locale: mLocale, booking_ids, days, total_hours: mTotalHours } = req.body as {
           action: string; client_name: string; client_email: string; client_phone?: string; hotel?: string; locale?: string;
           booking_ids: number[];
           days: { date: string; startTime: string; endTime: string; price: number }[];
+          total_hours?: number;
         };
         const grandTotal = days.reduce((sum: number, d: { price: number }) => sum + d.price, 0);
 
@@ -448,11 +450,65 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           } catch (waErr) { console.error('Multi-day WhatsApp to business failed:', waErr); }
         }
 
+        // ─── Consolidated nanny in-app notification + push for multi-day ───
+        const totalDays = days.length;
+        const totalHours = mTotalHours || 0;
+        const hoursText = totalHours ? ` (${totalHours}h total)` : '';
+        const firstBookingId = booking_ids[0];
+
+        // Look up which nanny is assigned to the first booking
+        try {
+          const bookingRows = await sql`SELECT nanny_id FROM bookings WHERE id = ${firstBookingId}` as { nanny_id: number | null }[];
+          const assignedNannyId = bookingRows[0]?.nanny_id;
+
+          if (assignedNannyId) {
+            // One consolidated in-app notification
+            await sql`
+              INSERT INTO nanny_notifications (nanny_id, type, title, message, booking_id)
+              VALUES (${assignedNannyId}, 'new_booking', 'New Multi-Day Booking',
+              ${`You have a new booking from ${mName} — ${totalDays} day${totalDays > 1 ? 's' : ''}${hoursText}.`}, ${firstBookingId})
+            `;
+
+            // One consolidated push to nanny
+            const { sendPushToUser, sendPushToAllAdmins } = await import('./_pushUtils.js');
+            await sendPushToUser('nanny', assignedNannyId, {
+              title: 'New Multi-Day Booking',
+              body: `${mName} — ${totalDays} day${totalDays > 1 ? 's' : ''}${hoursText}`,
+              url: `/nanny/bookings?booking=${firstBookingId}`,
+              tag: `booking-multiday-${firstBookingId}`,
+            });
+
+            // One consolidated push to admins
+            let nannyName = '';
+            try {
+              const nr = await sql`SELECT name FROM nannies WHERE id = ${assignedNannyId}` as { name: string }[];
+              nannyName = nr[0]?.name || '';
+            } catch { /* ignore */ }
+            await sendPushToAllAdmins({
+              title: 'New Multi-Day Booking',
+              body: `${mName} — ${totalDays} day${totalDays > 1 ? 's' : ''}${hoursText}${nannyName ? ' — ' + nannyName : ''}`,
+              url: `/admin/bookings?booking=${firstBookingId}`,
+              tag: `admin-booking-multiday-${firstBookingId}`,
+            });
+          } else {
+            // Unassigned multi-day: urgent push to admins only
+            const { sendPushToAllAdmins } = await import('./_pushUtils.js');
+            await sendPushToAllAdmins({
+              title: 'URGENT: No Nanny Assigned!',
+              body: `${mName} — ${totalDays} day${totalDays > 1 ? 's' : ''}${hoursText} but NO nanny assigned!`,
+              url: `/admin/bookings?booking=${firstBookingId}`,
+              tag: `admin-booking-urgent-multiday-${firstBookingId}`,
+            });
+          }
+        } catch (multiNotifErr) {
+          console.error('Multi-day consolidated notification failed:', multiNotifErr);
+        }
+
         return res.status(200).json({ success: true, message: 'Multi-day confirmation sent' });
       }
       // ────────────────────────────────────────────────────────────
 
-      const { nanny_id: provided_nanny_id, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, locale, status: reqStatus, clock_in, clock_out, created_by, created_by_name, extra_dates, extra_times, skip_min_hours, skip_conflict_check, skip_parent_notifications } = req.body as CreateBookingBody;
+      const { nanny_id: provided_nanny_id, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, locale, status: reqStatus, clock_in, clock_out, created_by, created_by_name, extra_dates, extra_times, skip_min_hours, skip_conflict_check, skip_parent_notifications, skip_nanny_push } = req.body as CreateBookingBody;
 
       // ─── Minimum 3-hour duration check (admin can override) ───
       if (start_time && end_time && !clock_in && !(skip_min_hours && created_by === 'admin')) {
@@ -567,8 +623,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         VALUES (${nanny_id}, ${client_name}, ${client_email}, ${client_phone || ''}, ${hotel || ''}, ${date}, ${end_date || null}, ${start_time}, ${end_time || ''}, ${plan || 'hourly'}, ${children_count || 1}, ${children_ages || ''}, ${notes || ''}, ${total_price || 0}, ${reqStatus || 'pending'}, ${locale || 'en'}, ${clock_in || null}, ${clock_out || null}, true, ${created_by || 'parent'}, ${created_by_name || ''}, ${extra_dates || null}, ${extra_times || null})
         RETURNING *
       ` as DbBooking[];
-      // Create notification for nanny
-      if (result[0] && nanny_id) {
+      // Create notification for nanny + push (skip when batching multi-day bookings)
+      if (result[0] && nanny_id && !skip_nanny_push) {
         try {
           await sql`
             INSERT INTO nanny_notifications (nanny_id, type, title, message, booking_id)
@@ -603,7 +659,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      // Send push notifications (best-effort, non-blocking)
+      // Send push notifications (best-effort, non-blocking) — skip when batching multi-day
+      if (!skip_nanny_push) {
       try {
         const { sendPushToUser, sendPushToAllAdmins } = await import('./_pushUtils.js');
         let pushNannyName = '';
@@ -647,6 +704,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       } catch (pushError: unknown) {
         console.error('Push notification failed:', pushError);
+      }
       }
 
       // Send WhatsApp Business notification (best-effort, non-blocking)
