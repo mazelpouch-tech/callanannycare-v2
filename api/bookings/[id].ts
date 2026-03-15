@@ -614,9 +614,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Push notification to newly assigned nanny
         try {
           const { sendPushToUser } = await import('../_pushUtils.js');
+          const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+          const dateObj = new Date(result[0].date + 'T12:00:00');
+          const dayName = days[dateObj.getDay()];
+          const dayNum = dateObj.getDate();
+          const suffix = dayNum === 1 || dayNum === 21 || dayNum === 31 ? 'st' : dayNum === 2 || dayNum === 22 ? 'nd' : dayNum === 3 || dayNum === 23 ? 'rd' : 'th';
+          const monthName = months[dateObj.getMonth()];
+          const fmtDate = `${dayName} ${String(dayNum).padStart(2, '0')}${suffix} ${monthName}`;
           await sendPushToUser('nanny', nanny_id, {
             title: 'New Booking Assigned',
-            body: `You've been assigned a booking with ${result[0].client_name} on ${result[0].date}`,
+            body: `${result[0].client_name} - ${fmtDate}`,
             url: `/nanny/bookings?booking=${result[0].id}`,
             tag: `booking-assigned-${result[0].id}`,
           });

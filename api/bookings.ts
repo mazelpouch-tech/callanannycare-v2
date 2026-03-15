@@ -607,6 +607,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try {
         const { sendPushToUser, sendPushToAllAdmins } = await import('./_pushUtils.js');
         let pushNannyName = '';
+
+        // Format date as "Sat 08th March"
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const dateObj = new Date(date + 'T12:00:00');
+        const dayName = days[dateObj.getDay()];
+        const dayNum = dateObj.getDate();
+        const suffix = dayNum === 1 || dayNum === 21 || dayNum === 31 ? 'st' : dayNum === 2 || dayNum === 22 ? 'nd' : dayNum === 3 || dayNum === 23 ? 'rd' : 'th';
+        const monthName = months[dateObj.getMonth()];
+        const formattedDate = `${dayName} ${String(dayNum).padStart(2, '0')}${suffix} ${monthName}`;
+
         if (nanny_id) {
           try {
             const nr = await sql`SELECT name FROM nannies WHERE id = ${nanny_id}` as { name: string }[];
@@ -614,7 +625,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           } catch { /* ignore */ }
           await sendPushToUser('nanny', nanny_id, {
             title: 'New Booking Request',
-            body: `New booking from ${client_name} on ${date}`,
+            body: `New booking from ${client_name} on ${formattedDate}`,
             url: `/nanny/bookings?booking=${result[0].id}`,
             tag: `booking-new-${result[0].id}`,
           });
@@ -622,14 +633,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (unassigned) {
           await sendPushToAllAdmins({
             title: '🚨 URGENT: No Nanny Assigned!',
-            body: `${client_name} booked for ${date} (${start_time}${end_time ? '-' + end_time : ''}) but NO nanny is available. Please assign one ASAP!`,
+            body: `${client_name} booked for ${formattedDate} (${start_time}${end_time ? '-' + end_time : ''}) but NO nanny is available. Please assign one ASAP!`,
             url: `/admin/bookings?booking=${result[0].id}`,
             tag: `admin-booking-urgent-${result[0].id}`,
           });
         } else {
           await sendPushToAllAdmins({
             title: 'New Booking',
-            body: pushNannyName ? `${client_name} booked for ${date} — ${pushNannyName}` : `${client_name} booked for ${date}`,
+            body: pushNannyName ? `${client_name} - ${formattedDate} - ${pushNannyName}` : `${client_name} - ${formattedDate}`,
             url: `/admin/bookings?booking=${result[0].id}`,
             tag: `admin-booking-new-${result[0].id}`,
           });
