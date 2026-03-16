@@ -18,6 +18,7 @@ import {
   User,
   TrendingUp,
   BarChart2,
+  Calculator,
 } from "lucide-react";
 import { useData } from "../../context/DataContext";
 import AdminToast, { type AdminToastItem } from "../../components/AdminToast";
@@ -41,6 +42,7 @@ const sidebarLinks: SidebarLink[] = [
   { to: "/admin/calendar", label: "Calendar", icon: CalendarRange },
   { to: "/admin/nannies", label: "Nannies", icon: Users },
   { to: "/admin/parents", label: "Parents", icon: UserCheck },
+  { to: "/admin/quotes", label: "Quick Quote", icon: Calculator },
   { to: "/admin/users", label: "Admin Users", icon: ShieldCheck },
   { to: "/admin/qr-codes", label: "QR Codes", icon: QrCode },
   { to: "/admin/login-logs", label: "Login Logs", icon: ScrollText },
