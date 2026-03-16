@@ -485,7 +485,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               nannyName = nr[0]?.name || '';
             } catch { /* ignore */ }
             await sendPushToAllAdmins({
-              title: 'New Multi-Day Booking',
+              title: '✅ New Multi-Day Booking',
               body: `${mName} — ${totalDays} day${totalDays > 1 ? 's' : ''}${hoursText}${nannyName ? ' — ' + nannyName : ''}`,
               url: `/admin/bookings?booking=${firstBookingId}`,
               tag: `admin-booking-multiday-${firstBookingId}`,
@@ -675,6 +675,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const monthName = months[dateObj.getMonth()];
         const formattedDate = `${dayName} ${String(dayNum).padStart(2, '0')}${suffix} ${monthName}`;
 
+        // Calculate total hours for admin notification
+        let singleHoursText = '';
+        if (start_time && end_time) {
+          const pT = (t: string) => { const [h, m] = t.replace('h', ':').split(':').map(Number); return h + (m || 0) / 60; };
+          const sH = pT(start_time), eH = pT(end_time);
+          const dur = eH <= sH ? (24 - sH) + eH : eH - sH;
+          singleHoursText = ` (${Math.round(dur * 10) / 10}h)`;
+        }
+
         if (nanny_id) {
           try {
             const nr = await sql`SELECT name FROM nannies WHERE id = ${nanny_id}` as { name: string }[];
@@ -690,14 +699,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (unassigned) {
           await sendPushToAllAdmins({
             title: '🚨 URGENT: No Nanny Assigned!',
-            body: `${client_name} booked for ${formattedDate} (${start_time}${end_time ? '-' + end_time : ''}) but NO nanny is available. Please assign one ASAP!`,
+            body: `${client_name} booked for ${formattedDate} (${start_time}${end_time ? '-' + end_time : ''})${singleHoursText} but NO nanny is available. Please assign one ASAP!`,
             url: `/admin/bookings?booking=${result[0].id}`,
             tag: `admin-booking-urgent-${result[0].id}`,
           });
         } else {
           await sendPushToAllAdmins({
-            title: 'New Booking',
-            body: pushNannyName ? `${client_name} - ${formattedDate} - ${pushNannyName}` : `${client_name} - ${formattedDate}`,
+            title: '✅ New Booking',
+            body: pushNannyName ? `${client_name} - ${formattedDate}${singleHoursText} - ${pushNannyName}` : `${client_name} - ${formattedDate}${singleHoursText}`,
             url: `/admin/bookings?booking=${result[0].id}`,
             tag: `admin-booking-new-${result[0].id}`,
           });
