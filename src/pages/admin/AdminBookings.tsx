@@ -2249,6 +2249,29 @@ export default function AdminBookings() {
 
           {/* Mobile Cards */}
           <div className="lg:hidden space-y-3">
+            {/* Mobile Select-All Bar */}
+            {filteredBookings.length > 0 && (
+              <div className="flex items-center justify-between px-3 py-2.5 bg-card rounded-xl border border-border shadow-soft">
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="rounded border-border accent-primary cursor-pointer w-4 h-4"
+                    checked={filteredBookings.length > 0 && selectedIds.size === filteredBookings.length}
+                    onChange={toggleSelectAll}
+                  />
+                  <span className="text-sm font-medium text-foreground">Select All</span>
+                  <span className="text-xs text-muted-foreground">({filteredBookings.length})</span>
+                </label>
+                {selectedIds.size > 0 && (
+                  <button
+                    onClick={clearSelection}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted"
+                  >
+                    Clear ({selectedIds.size})
+                  </button>
+                )}
+              </div>
+            )}
             {allGroups.map((group) => group.items.length > 0 && (
               <Fragment key={`m-${group.key}`}>
                 <div
@@ -2323,22 +2346,31 @@ export default function AdminBookings() {
                   onClick={() => { if (swipedBookingId === booking.id) { setSwipedBookingId(null); return; } }}
                 >
                   {/* Card Header */}
-                  <div className="p-4 space-y-3">
+                  <div className={`p-4 space-y-3 ${selectedIds.has(booking.id) ? "bg-primary/5" : ""}`}>
                     <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-medium text-foreground text-sm">
-                          {booking.clientName || "N/A"}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          {booking.clockIn && !booking.clockOut && (
-                            <span className="relative flex h-2 w-2 shrink-0">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-                            </span>
-                          )}
-                          <p className="text-xs text-muted-foreground">
-                            {booking.nannyName || "Unassigned"}
+                      <div className="flex items-start gap-2.5">
+                        <input
+                          type="checkbox"
+                          className="rounded border-border accent-primary cursor-pointer w-4 h-4 mt-0.5 shrink-0"
+                          checked={selectedIds.has(booking.id)}
+                          onChange={(e) => { e.stopPropagation(); toggleSelect(booking.id); }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div>
+                          <p className="font-medium text-foreground text-sm">
+                            {booking.clientName || "N/A"}
                           </p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {booking.clockIn && !booking.clockOut && (
+                              <span className="relative flex h-2 w-2 shrink-0">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                              </span>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              {booking.nannyName || "Unassigned"}
+                            </p>
+                          </div>
                         </div>
                       </div>
                       <UrgencyBadge booking={booking} />
@@ -4230,65 +4262,67 @@ export default function AdminBookings() {
 
       {/* ── Bulk Action Floating Bar ── */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 bg-card border border-border rounded-2xl shadow-xl backdrop-blur-sm animate-in slide-in-from-bottom-4 duration-200">
-          <span className="text-sm font-semibold text-foreground pr-2 border-r border-border">
-            {selectedIds.size} selected
-          </span>
-          <button
-            onClick={() => handleBulkAction("confirmed")}
-            disabled={!!bulkLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-green-500 text-white hover:bg-green-600 transition-colors disabled:opacity-50"
-          >
-            {bulkLoading === "confirmed" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-            Confirm All
-          </button>
-          <button
-            onClick={() => handleBulkAction("completed")}
-            disabled={!!bulkLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-500 text-white hover:bg-blue-600 transition-colors disabled:opacity-50"
-          >
-            {bulkLoading === "completed" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-            Complete All
-          </button>
-          <button
-            onClick={() => handleBulkAction("cancelled")}
-            disabled={!!bulkLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50"
-          >
-            {bulkLoading === "cancelled" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
-            Cancel All
-          </button>
-          <button
-            onClick={() => { setBulkForwardModal(true); setBulkForwardError(null); setBulkForwardNannyId(null); setBulkForwardSuccess(false); }}
-            disabled={!!bulkLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-colors disabled:opacity-50"
-          >
-            <ArrowRightLeft className="w-3.5 h-3.5" />
-            Forward All
-          </button>
-          <button
-            onClick={() => { setBulkModifyModal(true); setBulkModifyStart(""); setBulkModifyEnd(""); setBulkModifyProgress(0); }}
-            disabled={!!bulkLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-500 text-white hover:bg-blue-600 transition-colors disabled:opacity-50"
-          >
-            <TimerReset className="w-3.5 h-3.5" />
-            Modify Hours
-          </button>
-          <button
-            onClick={handleBulkDelete}
-            disabled={!!bulkLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-700 text-white hover:bg-red-800 transition-colors disabled:opacity-50"
-          >
-            {bulkLoading === "delete" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-            Delete
-          </button>
-          <button
-            onClick={clearSelection}
-            className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Clear selection"
-          >
-            <X className="w-4 h-4" />
-          </button>
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-fit bg-card border border-border rounded-2xl shadow-xl backdrop-blur-sm animate-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-2 px-4 py-2.5 overflow-x-auto scrollbar-none">
+            <span className="text-sm font-semibold text-foreground pr-2 border-r border-border whitespace-nowrap shrink-0">
+              {selectedIds.size} selected
+            </span>
+            <button
+              onClick={() => handleBulkAction("confirmed")}
+              disabled={!!bulkLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-green-500 text-white hover:bg-green-600 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
+            >
+              {bulkLoading === "confirmed" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              Confirm
+            </button>
+            <button
+              onClick={() => handleBulkAction("completed")}
+              disabled={!!bulkLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-500 text-white hover:bg-blue-600 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
+            >
+              {bulkLoading === "completed" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              Complete
+            </button>
+            <button
+              onClick={() => handleBulkAction("cancelled")}
+              disabled={!!bulkLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
+            >
+              {bulkLoading === "cancelled" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+              Cancel
+            </button>
+            <button
+              onClick={() => { setBulkForwardModal(true); setBulkForwardError(null); setBulkForwardNannyId(null); setBulkForwardSuccess(false); }}
+              disabled={!!bulkLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+              Forward
+            </button>
+            <button
+              onClick={() => { setBulkModifyModal(true); setBulkModifyStart(""); setBulkModifyEnd(""); setBulkModifyProgress(0); }}
+              disabled={!!bulkLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-500 text-white hover:bg-blue-600 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
+            >
+              <TimerReset className="w-3.5 h-3.5" />
+              Hours
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={!!bulkLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-700 text-white hover:bg-red-800 transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
+            >
+              {bulkLoading === "delete" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              Delete
+            </button>
+            <button
+              onClick={clearSelection}
+              className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+              title="Clear selection"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
