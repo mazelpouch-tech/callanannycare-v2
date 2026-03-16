@@ -52,6 +52,7 @@ import ForwardBookingModal from "../../components/ForwardBookingModal";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
 import { calcBookedHours, calcTotalBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE, isTomorrow as isTomorrowDate, timesOverlap } from "@/utils/shiftHelpers";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { downloadQuotePdf, generateQuoteRef } from "@/utils/quotePdf";
 
 interface EditBookingForm {
   id: number | string;
@@ -168,7 +169,7 @@ const statusFilters = ["all", "attention", "pending", "confirmed", "completed", 
 
 export default function AdminBookings() {
   const { bookings, fetchBookings, nannies, addBooking, updateBooking, updateBookingStatus, deleteBooking, fetchDeletedBookings, restoreBooking, sendBookingReminder, adminProfile } = useData();
-  const { toDH } = useExchangeRate();
+  const { toDH, rate: exchangeRate } = useExchangeRate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [search, setSearch] = useState("");
@@ -1983,6 +1984,35 @@ export default function AdminBookings() {
                                     Forward
                                   </button>
                                 )}
+                                <button
+                                  onClick={() => {
+                                    const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate)
+                                      + (booking.extraTimes ? booking.extraTimes.reduce((s, et) => s + calcBookedHours(et.startTime, et.endTime), 0) : 0);
+                                    const startH = booking.startTime ? parseInt(booking.startTime) : 0;
+                                    const endH = booking.endTime ? parseInt(booking.endTime) : 0;
+                                    const isEve = startH >= 19 || startH < 7 || endH >= 19 || endH < 7 || hours > 12;
+                                    const days = booking.endDate && booking.date
+                                      ? Math.max(1, Math.round((new Date(booking.endDate).getTime() - new Date(booking.date).getTime()) / 86400000) + 1)
+                                      : 1;
+                                    const hoursPerDay = days > 0 ? Math.round((hours / days) * 10) / 10 : hours;
+                                    downloadQuotePdf({
+                                      parentName: booking.clientName || undefined,
+                                      hotel: booking.hotel || undefined,
+                                      days,
+                                      hoursPerDay,
+                                      isEvening: isEve,
+                                      rate: 10,
+                                      taxiFee: 10,
+                                      notes: booking.notes || undefined,
+                                      quoteRef: generateQuoteRef(),
+                                      exchangeRate,
+                                    });
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-medium hover:bg-amber-100 transition-colors"
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                  Quote PDF
+                                </button>
                                 {booking.extraTimes && booking.extraTimes.length > 0 && (
                                   <button
                                     onClick={async () => {
