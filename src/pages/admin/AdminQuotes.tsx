@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Calculator, Copy, Check, Moon, Sun, Plus, Minus, FileDown } from "lucide-react";
-import { downloadQuotePdf, generateQuoteRef } from "@/utils/quotePdf";
+import { Calculator, Copy, Check, Moon, Sun, Plus, Minus, FileDown, Share2, Loader2 } from "lucide-react";
+import { downloadQuotePdf, shareQuotePdf, generateQuoteRef } from "@/utils/quotePdf";
+import type { QuotePdfData } from "@/utils/quotePdf";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 
 const RATE = 10; // EUR per hour
@@ -15,6 +16,8 @@ export default function AdminQuotes() {
   const [hotel, setHotel] = useState("");
   const [notes, setNotes] = useState("");
   const [copied, setCopied] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [shareLoading, setShareLoading] = useState(false);
   const { toDH, rate: exchangeRate } = useExchangeRate();
 
   const totalHours = hoursPerDay * days;
@@ -47,20 +50,28 @@ export default function AdminQuotes() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const generatePdf = () => {
-    downloadQuotePdf({
-      parentName: parentName || undefined,
-      childName: childName || undefined,
-      hotel: hotel || undefined,
-      days,
-      hoursPerDay,
-      isEvening,
-      rate: RATE,
-      taxiFee: TAXI_FEE,
-      notes: notes || undefined,
-      quoteRef: generateQuoteRef(),
-      exchangeRate,
-    });
+  const getQuoteData = (): QuotePdfData => ({
+    parentName: parentName || undefined,
+    childName: childName || undefined,
+    hotel: hotel || undefined,
+    days,
+    hoursPerDay,
+    isEvening,
+    rate: RATE,
+    taxiFee: TAXI_FEE,
+    notes: notes || undefined,
+    quoteRef: generateQuoteRef(),
+    exchangeRate,
+  });
+
+  const generatePdf = async () => {
+    setPdfLoading(true);
+    try { await downloadQuotePdf(getQuoteData()); } finally { setPdfLoading(false); }
+  };
+
+  const handleShare = async () => {
+    setShareLoading(true);
+    try { await shareQuotePdf(getQuoteData()); } finally { setShareLoading(false); }
   };
 
   return (
@@ -218,28 +229,39 @@ export default function AdminQuotes() {
         <div className="flex gap-2 mt-2">
           <button
             onClick={generatePdf}
-            className="flex-1 flex items-center justify-center gap-2 bg-primary text-white py-2.5 rounded-lg hover:bg-primary/90 transition-colors font-medium"
+            disabled={pdfLoading}
+            className="flex-1 flex items-center justify-center gap-2 bg-primary text-white py-2.5 rounded-lg hover:bg-primary/90 transition-colors font-medium disabled:opacity-60"
           >
-            <FileDown className="h-4 w-4" /> Generate PDF
+            {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            {pdfLoading ? "Generating…" : "Save PDF"}
           </button>
           <button
-            onClick={handleCopy}
-            className="flex-1 flex items-center justify-center gap-2 bg-white border border-primary/30 text-primary py-2.5 rounded-lg hover:bg-primary/5 transition-colors font-medium"
+            onClick={handleShare}
+            disabled={shareLoading}
+            className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white py-2.5 rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-60"
           >
-            {copied ? (
-              <>
-                <Check className="h-4 w-4" /> Copied!
-              </>
-            ) : (
-              <>
-                <Copy className="h-4 w-4" /> Copy Text
-              </>
-            )}
+            {shareLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+            {shareLoading ? "Preparing…" : "Share PDF"}
           </button>
         </div>
 
+        <button
+          onClick={handleCopy}
+          className="w-full flex items-center justify-center gap-2 bg-white border border-primary/30 text-primary py-2 rounded-lg hover:bg-primary/5 transition-colors font-medium text-sm"
+        >
+          {copied ? (
+            <>
+              <Check className="h-4 w-4" /> Copied!
+            </>
+          ) : (
+            <>
+              <Copy className="h-4 w-4" /> Copy Text for WhatsApp
+            </>
+          )}
+        </button>
+
         <p className="text-xs text-gray-500 text-center">
-          Generate a PDF quote to share, or copy text for WhatsApp
+          Save or share a real PDF quote with the parent
         </p>
       </div>
     </div>
