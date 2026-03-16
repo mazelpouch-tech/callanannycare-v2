@@ -52,7 +52,8 @@ import ForwardBookingModal from "../../components/ForwardBookingModal";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
 import { calcBookedHours, calcTotalBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE, isTomorrow as isTomorrowDate, timesOverlap } from "@/utils/shiftHelpers";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
-import { downloadQuotePdf, generateQuoteRef } from "@/utils/quotePdf";
+import { downloadQuotePdf, shareQuotePdf, generateQuoteRef } from "@/utils/quotePdf";
+import type { QuotePdfData } from "@/utils/quotePdf";
 
 interface EditBookingForm {
   id: number | string;
@@ -1984,35 +1985,45 @@ export default function AdminBookings() {
                                     Forward
                                   </button>
                                 )}
-                                <button
-                                  onClick={() => {
-                                    const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate)
+                                {(() => {
+                                  const buildQuoteData = (): QuotePdfData => {
+                                    const hrs = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate)
                                       + (booking.extraTimes ? booking.extraTimes.reduce((s, et) => s + calcBookedHours(et.startTime, et.endTime), 0) : 0);
-                                    const startH = booking.startTime ? parseInt(booking.startTime) : 0;
-                                    const endH = booking.endTime ? parseInt(booking.endTime) : 0;
-                                    const isEve = startH >= 19 || startH < 7 || endH >= 19 || endH < 7 || hours > 12;
-                                    const days = booking.endDate && booking.date
+                                    const sH = booking.startTime ? parseInt(booking.startTime) : 0;
+                                    const eH = booking.endTime ? parseInt(booking.endTime) : 0;
+                                    const isEve = sH >= 19 || sH < 7 || eH >= 19 || eH < 7 || hrs > 12;
+                                    const d = booking.endDate && booking.date
                                       ? Math.max(1, Math.round((new Date(booking.endDate).getTime() - new Date(booking.date).getTime()) / 86400000) + 1)
                                       : 1;
-                                    const hoursPerDay = days > 0 ? Math.round((hours / days) * 10) / 10 : hours;
-                                    downloadQuotePdf({
+                                    const hpd = d > 0 ? Math.round((hrs / d) * 10) / 10 : hrs;
+                                    return {
                                       parentName: booking.clientName || undefined,
                                       hotel: booking.hotel || undefined,
-                                      days,
-                                      hoursPerDay,
-                                      isEvening: isEve,
-                                      rate: 10,
-                                      taxiFee: 10,
+                                      days: d, hoursPerDay: hpd, isEvening: isEve,
+                                      rate: 10, taxiFee: 10,
                                       notes: booking.notes || undefined,
-                                      quoteRef: generateQuoteRef(),
-                                      exchangeRate,
-                                    });
-                                  }}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-medium hover:bg-amber-100 transition-colors"
-                                >
-                                  <FileText className="w-3.5 h-3.5" />
-                                  Quote PDF
-                                </button>
+                                      quoteRef: generateQuoteRef(), exchangeRate,
+                                    };
+                                  };
+                                  return (
+                                    <>
+                                      <button
+                                        onClick={() => downloadQuotePdf(buildQuoteData())}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-medium hover:bg-amber-100 transition-colors"
+                                      >
+                                        <FileText className="w-3.5 h-3.5" />
+                                        Quote PDF
+                                      </button>
+                                      <button
+                                        onClick={() => shareQuotePdf(buildQuoteData())}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
+                                      >
+                                        <Mail className="w-3.5 h-3.5" />
+                                        Share Quote
+                                      </button>
+                                    </>
+                                  );
+                                })()}
                                 {booking.extraTimes && booking.extraTimes.length > 0 && (
                                   <button
                                     onClick={async () => {
