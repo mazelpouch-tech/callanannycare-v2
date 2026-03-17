@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calculator, Copy, Check, Moon, Sun, Plus, Minus, FileDown, Share2, Loader2, CheckCircle, RotateCcw } from "lucide-react";
+import { Calculator, Copy, Check, Moon, Sun, Plus, Minus, FileDown, Share2, CheckCircle, RotateCcw } from "lucide-react";
 import { downloadQuotePdf, shareQuotePdf, generateQuoteRef } from "@/utils/quotePdf";
 import type { QuotePdfData } from "@/utils/quotePdf";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
@@ -16,8 +16,6 @@ export default function AdminQuotes() {
   const [hotel, setHotel] = useState("");
   const [notes, setNotes] = useState("");
   const [copied, setCopied] = useState(false);
-  const [pdfLoading, setPdfLoading] = useState(false);
-  const [shareLoading, setShareLoading] = useState(false);
   const [pdfDone, setPdfDone] = useState(false);
   const { toDH, rate: exchangeRate } = useExchangeRate();
 
@@ -65,14 +63,14 @@ export default function AdminQuotes() {
     exchangeRate,
   });
 
-  const generatePdf = async () => {
-    setPdfLoading(true);
-    try { await downloadQuotePdf(getQuoteData()); setPdfDone(true); } finally { setPdfLoading(false); }
+  const generatePdf = () => {
+    downloadQuotePdf(getQuoteData());
+    setPdfDone(true);
   };
 
-  const handleShare = async () => {
-    setShareLoading(true);
-    try { await shareQuotePdf(getQuoteData()); setPdfDone(true); } finally { setShareLoading(false); }
+  const handleShare = () => {
+    shareQuotePdf(getQuoteData());
+    setPdfDone(true);
   };
 
   const resetForm = () => {
@@ -236,19 +234,17 @@ export default function AdminQuotes() {
         <div className="flex gap-2 mt-2">
           <button
             onClick={generatePdf}
-            disabled={pdfLoading}
-            className="flex-1 flex items-center justify-center gap-2 bg-primary text-white py-2.5 rounded-lg hover:bg-primary/90 transition-colors font-medium disabled:opacity-60"
+            className="flex-1 flex items-center justify-center gap-2 bg-primary text-white py-2.5 rounded-lg hover:bg-primary/90 transition-colors font-medium"
           >
-            {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-            {pdfLoading ? "Generating…" : "Save PDF"}
+            <FileDown className="h-4 w-4" />
+            Save PDF
           </button>
           <button
             onClick={handleShare}
-            disabled={shareLoading}
-            className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white py-2.5 rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-60"
+            className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white py-2.5 rounded-lg hover:bg-green-700 transition-colors font-medium"
           >
-            {shareLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
-            {shareLoading ? "Preparing…" : "Share PDF"}
+            <Share2 className="h-4 w-4" />
+            Share PDF
           </button>
         </div>
 
