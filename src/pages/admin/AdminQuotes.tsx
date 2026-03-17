@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calculator, Copy, Check, Moon, Sun, Plus, Minus, FileDown, Share2, Loader2 } from "lucide-react";
+import { Calculator, Copy, Check, Moon, Sun, Plus, Minus, FileDown, Share2, Loader2, CheckCircle, RotateCcw } from "lucide-react";
 import { downloadQuotePdf, shareQuotePdf, generateQuoteRef } from "@/utils/quotePdf";
 import type { QuotePdfData } from "@/utils/quotePdf";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
@@ -18,6 +18,7 @@ export default function AdminQuotes() {
   const [copied, setCopied] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [shareLoading, setShareLoading] = useState(false);
+  const [pdfDone, setPdfDone] = useState(false);
   const { toDH, rate: exchangeRate } = useExchangeRate();
 
   const totalHours = hoursPerDay * days;
@@ -66,12 +67,18 @@ export default function AdminQuotes() {
 
   const generatePdf = async () => {
     setPdfLoading(true);
-    try { await downloadQuotePdf(getQuoteData()); } finally { setPdfLoading(false); }
+    try { await downloadQuotePdf(getQuoteData()); setPdfDone(true); } finally { setPdfLoading(false); }
   };
 
   const handleShare = async () => {
     setShareLoading(true);
-    try { await shareQuotePdf(getQuoteData()); } finally { setShareLoading(false); }
+    try { await shareQuotePdf(getQuoteData()); setPdfDone(true); } finally { setShareLoading(false); }
+  };
+
+  const resetForm = () => {
+    setDays(1); setHoursPerDay(3); setIsEvening(false);
+    setParentName(""); setChildName(""); setHotel(""); setNotes("");
+    setPdfDone(false);
   };
 
   return (
@@ -259,6 +266,22 @@ export default function AdminQuotes() {
             </>
           )}
         </button>
+
+        {pdfDone && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-green-700 text-sm font-medium">
+              <CheckCircle className="h-4 w-4" />
+              PDF ready!
+            </div>
+            <button
+              onClick={resetForm}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-green-200 text-green-700 text-xs font-medium hover:bg-green-50 transition-colors"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              New Quote
+            </button>
+          </div>
+        )}
 
         <p className="text-xs text-gray-500 text-center">
           Save or share a real PDF quote with the parent
