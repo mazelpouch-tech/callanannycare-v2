@@ -24,6 +24,7 @@ import type { Booking } from "@/types";
 import {
   statusColors,
   isToday,
+  isBookingOnDate,
   calcNannyPayBreakdown,
   calcBookedHoursForBooking,
   HOURLY_RATE,
@@ -163,16 +164,21 @@ function DashboardSkeleton() {
 function TodayBookingsSection({ bookings, updateBookingStatus, fetchNannyBookings, t }: TodayBookingsSectionProps) {
   const [completeLoading, setCompleteLoading] = useState<number | string | null>(null);
 
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
+
   // Today's bookings (confirmed, not yet completed)
   const todayConfirmed = useMemo(
-    () => bookings.filter((b) => b.status === "confirmed" && isToday(b.date)),
-    [bookings]
+    () => bookings.filter((b) => b.status === "confirmed" && isBookingOnDate(b, todayStr)),
+    [bookings, todayStr]
   );
 
   // Today's completed bookings
   const todayCompleted = useMemo(
-    () => bookings.filter((b) => b.status === "completed" && isToday(b.date)),
-    [bookings]
+    () => bookings.filter((b) => b.status === "completed" && isBookingOnDate(b, todayStr)),
+    [bookings, todayStr]
   );
 
   const handleComplete = async (id: number | string) => {

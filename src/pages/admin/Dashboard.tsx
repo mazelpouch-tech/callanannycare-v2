@@ -10,6 +10,7 @@ import {
 } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { isBookingOnDate } from "@/utils/shiftHelpers";
 import type { Booking, BookingStatus } from "@/types";
 
 // ─── Urgency Badge ───────────────────────────────────────────────
@@ -55,7 +56,8 @@ export default function Dashboard() {
   const { bookings, stats, adminProfile, updateBookingStatus } = useData();
   const { toDH } = useExchangeRate();
 
-  const todaysBookings = bookings.filter((b) => { try { return isToday(parseISO(b.date)); } catch { return false; } });
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const todaysBookings = bookings.filter((b) => isBookingOnDate(b, todayStr));
   const todaysBookingsCount = todaysBookings.length;
 
   // Bookings SCHEDULED for today, sorted by start time
@@ -94,7 +96,7 @@ export default function Dashboard() {
       const day = addDays(agendaStart, i);
       const dateStr = format(day, "yyyy-MM-dd");
       const dayBookings = bookings
-        .filter((b) => b.date === dateStr && b.status !== "cancelled")
+        .filter((b) => isBookingOnDate(b, dateStr) && b.status !== "cancelled")
         .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
       return { day, dateStr, bookings: dayBookings, isToday: dateStr === todayStr };
     });

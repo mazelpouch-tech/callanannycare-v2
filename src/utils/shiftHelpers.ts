@@ -18,6 +18,18 @@ export function isToday(dateStr: string): boolean {
   return dateStr === todayStr;
 }
 
+/** Check if a booking falls on a given date, accounting for endDate range and extraDates */
+export function isBookingOnDate(b: Booking, dateStr: string): boolean {
+  if (!b.date) return false;
+  // Direct match
+  if (b.date === dateStr) return true;
+  // Contiguous date range (date → endDate)
+  if (b.endDate && b.date <= dateStr && dateStr <= b.endDate) return true;
+  // Non-contiguous extra dates
+  if (b.extraDates && b.extraDates.includes(dateStr)) return true;
+  return false;
+}
+
 export function isTomorrow(dateStr: string): boolean {
   if (!dateStr) return false;
   const tomorrow = new Date();
