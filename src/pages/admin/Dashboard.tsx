@@ -240,6 +240,12 @@ export default function Dashboard() {
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${agendaStatusDot(b.status)}`} />
                         <span className="font-semibold truncate">{b.startTime}–{b.endTime}</span>
                       </div>
+                      {b.extraTimes && b.extraTimes.length > 0 && b.extraTimes.map((et, i) => (
+                        <div key={i} className="flex items-center gap-1 mb-0.5 opacity-80">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${agendaStatusDot(b.status)}`} />
+                          <span className="font-semibold truncate">{et.startTime}–{et.endTime}</span>
+                        </div>
+                      ))}
                       <div className="truncate font-medium">{b.clientName}</div>
                       <div className="truncate text-[9px] opacity-70">{b.nannyName || "Unassigned"}</div>
                       {b.totalPrice ? <div className="font-semibold mt-0.5">{b.totalPrice}€</div> : null}
@@ -351,6 +357,12 @@ export default function Dashboard() {
                             <Clock className="w-3.5 h-3.5 text-muted-foreground" />
                             {booking.startTime || "—"}{booking.endTime ? `–${booking.endTime}` : ""}
                           </div>
+                          {booking.extraTimes && booking.extraTimes.length > 0 && booking.extraTimes.map((et, i) => (
+                            <div key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                              <Clock className="w-3 h-3" />
+                              {et.startTime}–{et.endTime}
+                            </div>
+                          ))}
                           {booking.hotel && <div className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[140px]">📍 {booking.hotel}</div>}
                         </td>
                         <td className="px-6 py-4">
@@ -414,6 +426,9 @@ export default function Dashboard() {
                       <span className="flex items-center gap-0.5">
                         <Clock className="w-3 h-3" />
                         {booking.startTime || "—"}{booking.endTime ? `–${booking.endTime}` : ""}
+                        {booking.extraTimes && booking.extraTimes.length > 0 && (
+                          <span className="text-muted-foreground"> + {booking.extraTimes.map(et => `${et.startTime}–${et.endTime}`).join(", ")}</span>
+                        )}
                       </span>
                       <span>·</span>
                       <span className="font-semibold text-foreground">{(booking.totalPrice || 0).toLocaleString()}€</span>

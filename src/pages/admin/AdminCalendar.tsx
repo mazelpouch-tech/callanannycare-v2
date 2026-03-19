@@ -247,6 +247,12 @@ export default function AdminCalendar() {
                           {booking.startTime}
                           {booking.endTime ? ` - ${booking.endTime}` : ""} · {booking.plan}
                         </div>
+                        {booking.extraTimes && booking.extraTimes.length > 0 && booking.extraTimes.map((et, i) => (
+                          <div key={i} className="flex items-center gap-1.5">
+                            <Clock className="w-3 h-3" />
+                            {et.startTime} - {et.endTime} · evening
+                          </div>
+                        ))}
                         {booking.hotel && (
                           <div className="flex items-center gap-1.5">
                             <MapPin className="w-3 h-3" />

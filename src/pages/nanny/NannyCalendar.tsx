@@ -414,6 +414,15 @@ export default function NannyCalendar() {
                         {booking.plan}
                       </span>
                     </div>
+                    {booking.extraTimes && booking.extraTimes.length > 0 && booking.extraTimes.map((et, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Clock className="w-3.5 h-3.5" />
+                        {et.startTime} - {et.endTime}
+                        <span className="ml-2 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">
+                          evening
+                        </span>
+                      </div>
+                    ))}
 
                     {booking.hotel && (
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
