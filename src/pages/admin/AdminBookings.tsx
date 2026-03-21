@@ -839,6 +839,15 @@ export default function AdminBookings() {
         return { nanny: n, totalActive, sameHotel };
       })
       .sort((a, b) => {
+        // Priority nannies: Doha, Oumaima, Nouhaila — assign them first
+        const PRIORITY_NANNIES = ['doha', 'oumaima', 'nouhaila'];
+        const getPri = (name: string) => {
+          const idx = PRIORITY_NANNIES.indexOf(name.toLowerCase().trim());
+          return idx >= 0 ? idx : PRIORITY_NANNIES.length;
+        };
+        const pa = getPri(a.nanny.name);
+        const pb = getPri(b.nanny.name);
+        if (pa !== pb) return pa - pb;
         if (a.sameHotel && !b.sameHotel) return -1;
         if (!a.sameHotel && b.sameHotel) return 1;
         return a.totalActive - b.totalActive;

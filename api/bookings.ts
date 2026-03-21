@@ -566,7 +566,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Build list of conflict-free candidates
-        const eligibleCandidates: { id: number; sameHotel: boolean }[] = [];
+        const eligibleCandidates: { id: number; name: string; sameHotel: boolean }[] = [];
         for (const candidate of available) {
           if (blockedIds.has(candidate.id)) continue;
           const hasConflict = existing.some(
@@ -579,7 +579,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               eb => eb.nanny_id === candidate.id &&
                 eb.hotel && eb.hotel.toLowerCase().trim() === hotel.toLowerCase().trim()
             ));
-            eligibleCandidates.push({ id: candidate.id, sameHotel });
+            eligibleCandidates.push({ id: candidate.id, name: candidate.name, sameHotel });
           }
         }
 
@@ -588,9 +588,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           nanny_id = null;
           unassigned = true;
         } else {
-        // Prefer nanny already at the same hotel (saves transportation)
-        const sameHotelMatch = eligibleCandidates.find(c => c.sameHotel);
-        nanny_id = sameHotelMatch ? sameHotelMatch.id : eligibleCandidates[0].id;
+        // Priority nannies: Doha, Oumaima, Nouhaila — assign them first before others
+        const PRIORITY_NANNIES = ['doha', 'oumaima', 'nouhaila'];
+        const getPriority = (name: string) => {
+          const idx = PRIORITY_NANNIES.indexOf(name.toLowerCase().trim());
+          return idx >= 0 ? idx : PRIORITY_NANNIES.length;
+        };
+
+        // Sort: priority nannies first (in order), then same-hotel, then least busy
+        eligibleCandidates.sort((a, b) => {
+          const pa = getPriority(a.name);
+          const pb = getPriority(b.name);
+          if (pa !== pb) return pa - pb;
+          if (a.sameHotel && !b.sameHotel) return -1;
+          if (!a.sameHotel && b.sameHotel) return 1;
+          return 0;
+        });
+        nanny_id = eligibleCandidates[0].id;
         }
         }
       } else {
