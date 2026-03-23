@@ -13,6 +13,7 @@ import ReviewNannyPublic from './pages/ReviewNannyPublic'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsConditions from './pages/TermsConditions'
 import PartnerDemo from './pages/PartnerDemo'
+import BookingConfirmed from './pages/BookingConfirmed'
 import NotFound from './pages/NotFound'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminLayout from './pages/admin/AdminLayout'
@@ -89,6 +90,7 @@ export default function App() {
 
       {/* Partner demo page */}
       <Route path="/partner" element={<PartnerDemo />} />
+      <Route path="/booking-confirmed" element={<BookingConfirmed />} />
 
       {/* Public standalone pages (no navbar/footer) */}
       <Route path="/parent-form" element={<ParentForm />} />
