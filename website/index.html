@@ -3,10 +3,120 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Call a Nanny — Trusted Childcare in Marrakech</title>
-  <meta name="description" content="Professional, verified nanny services in Marrakech. Book trusted childcare for your hotel stay, event, or home in minutes.">
+  <title>Call a Nanny — Trusted Babysitter & Nanny in Marrakech | From &euro;10/hr</title>
+  <meta name="description" content="Book a verified, background-checked nanny in Marrakech. Hotel babysitting, event childcare & hourly care from &euro;10/hr. 50+ nannies speaking English, French & Arabic. Same-day booking available.">
+  <meta name="keywords" content="nanny Marrakech, babysitter Marrakech, hotel babysitting Marrakech, childcare Marrakech, garde enfant Marrakech, babysitting Marrakech, nanny service Morocco, trusted nanny Marrakech, hotel childcare Morocco">
   <meta name="theme-color" content="#f97316">
-  <link rel="icon" href="https://callanannycare.vercel.app/favicon.ico">
+  <link rel="canonical" href="https://callanannycare.com/">
+  <link rel="icon" href="/favicon.ico">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://callanannycare.com/">
+  <meta property="og:title" content="Call a Nanny — Trusted Childcare in Marrakech">
+  <meta property="og:description" content="Book a verified nanny in Marrakech from &euro;10/hr. Hotel babysitting, event childcare & hourly care. 50+ background-checked nannies. Same-day booking.">
+  <meta property="og:image" content="https://callanannycare.com/logo.png">
+  <meta property="og:site_name" content="Call a Nanny">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Call a Nanny — Trusted Childcare in Marrakech">
+  <meta name="twitter:description" content="Book a verified nanny in Marrakech from &euro;10/hr. 50+ background-checked nannies. Same-day booking available.">
+  <meta name="twitter:image" content="https://callanannycare.com/logo.png">
+
+  <!-- Schema.org Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "name": "Call a Nanny",
+    "description": "Professional, verified nanny and babysitting services in Marrakech, Morocco. Hotel babysitting, event childcare, and hourly care.",
+    "url": "https://callanannycare.com",
+    "logo": "https://callanannycare.com/logo.png",
+    "image": "https://callanannycare.com/logo.png",
+    "telephone": "+212656643375",
+    "email": "info@callanannycare.com",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "Marrakech",
+      "addressCountry": "MA"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": 31.6295,
+      "longitude": -7.9811
+    },
+    "areaServed": {
+      "@type": "City",
+      "name": "Marrakech"
+    },
+    "priceRange": "From &euro;10/hour",
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.9",
+      "reviewCount": "1000",
+      "bestRating": "5"
+    },
+    "openingHoursSpecification": {
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+      "opens": "07:00",
+      "closes": "23:00"
+    },
+    "sameAs": [
+      "https://wa.me/212656643375"
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How are your nannies verified?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Every nanny undergoes thorough background checks, in-person interviews, and reference verification. They hold certifications in childcare and first aid."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How much does a nanny cost in Marrakech?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Our nanny services start from just &euro;10 per hour. Evening sessions (7 PM - 7 AM) include a small taxi supplement of &euro;10 per date."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I book a nanny the same day?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes, same-day bookings are available subject to nanny availability. We recommend booking in advance during peak season for the best selection."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What languages do your nannies speak?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Our nannies speak Arabic, French, English, and some speak Spanish as well. We match families with nannies who speak their preferred language."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What is your cancellation policy?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Free cancellation up to 24 hours before the session. Cancellations within 24 hours may incur a fee."
+        }
+      }
+    ]
+  }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -414,6 +524,109 @@
       margin-bottom: 12px;
     }
 
+    /* ---- TESTIMONIALS ---- */
+    .testimonials { background: var(--white); }
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .testimonial-card {
+      padding: 32px 28px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      position: relative;
+    }
+    .testimonial-card .stars {
+      color: var(--primary);
+      font-size: 1.1rem;
+      margin-bottom: 14px;
+      letter-spacing: 2px;
+    }
+    .testimonial-card blockquote {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+      font-style: italic;
+      margin-bottom: 16px;
+    }
+    .testimonial-author {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+    .testimonial-author span {
+      font-weight: 400;
+      color: var(--text-muted);
+    }
+
+    /* ---- PRICE BANNER ---- */
+    .price-banner {
+      background: linear-gradient(135deg, var(--primary), #fb923c);
+      color: var(--white);
+      text-align: center;
+      padding: 32px 24px;
+    }
+    .price-banner p {
+      font-family: var(--font-serif);
+      font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+      font-weight: 600;
+    }
+    .price-banner p span {
+      font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+      font-weight: 700;
+    }
+
+    /* ---- FAQ ---- */
+    .faq-list {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    .faq-item {
+      border-bottom: 1px solid var(--border);
+    }
+    .faq-question {
+      width: 100%;
+      background: none;
+      border: none;
+      padding: 20px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      font-family: var(--font-serif);
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text);
+      text-align: left;
+      gap: 16px;
+    }
+    .faq-question:hover { color: var(--primary); }
+    .faq-question .chevron {
+      font-size: 1.2rem;
+      transition: transform 0.3s;
+      flex-shrink: 0;
+      color: var(--text-muted);
+    }
+    .faq-item.open .chevron { transform: rotate(180deg); }
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease, padding 0.3s ease;
+    }
+    .faq-item.open .faq-answer {
+      max-height: 200px;
+      padding-bottom: 20px;
+    }
+    .faq-answer p {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
     /* ---- CONTACT ---- */
     .contact-grid {
       display: grid;
@@ -575,14 +788,15 @@
   <nav id="navbar">
     <div class="nav-inner">
       <a href="#" class="nav-logo">
-        <img src="https://callanannycare.vercel.app/logo-icon.png" alt="Call a Nanny">
+        <img src="/logo-icon.png" alt="Call a Nanny">
         <span>call a nanny</span>
       </a>
       <ul class="nav-links" id="navLinks">
         <li><a href="#about">About</a></li>
         <li><a href="#services">Services</a></li>
         <li><a href="#how">How It Works</a></li>
-        <li><a href="#contact">Contact</a></li>
+        <li><a href="#testimonials">Reviews</a></li>
+        <li><a href="#faq">FAQ</a></li>
         <li><a href="#book" class="btn btn-primary btn-sm">Book Now</a></li>
       </ul>
       <button class="hamburger" id="hamburger" aria-label="Menu">
@@ -726,6 +940,104 @@
     </div>
   </section>
 
+  <!-- TESTIMONIALS -->
+  <section class="testimonials" id="testimonials">
+    <div class="section-inner fade-up">
+      <div class="section-header">
+        <h2>What Parents Say</h2>
+        <p>Trusted by over 1,000 families in Marrakech</p>
+      </div>
+      <div class="testimonials-grid">
+        <div class="testimonial-card">
+          <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+          <blockquote>We booked a nanny for three evenings during our stay at a riad in the Medina. She was wonderful with our two kids and even taught them a few Arabic words. We could finally enjoy dinner worry-free!</blockquote>
+          <div class="testimonial-author">Sophie L. <span>&mdash; Paris, France</span></div>
+        </div>
+        <div class="testimonial-card">
+          <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+          <blockquote>Same-day booking saved our anniversary dinner plans. The nanny arrived on time, was incredibly professional, and our daughter didn't want her to leave. Will definitely book again next trip!</blockquote>
+          <div class="testimonial-author">James &amp; Emily R. <span>&mdash; London, UK</span></div>
+        </div>
+        <div class="testimonial-card">
+          <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+          <blockquote>As a solo mum travelling with a toddler, having a trusted nanny for a few hours each day made my Marrakech trip possible. The booking process was so easy and the nanny spoke perfect English.</blockquote>
+          <div class="testimonial-author">Anna M. <span>&mdash; Stockholm, Sweden</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICE BANNER -->
+  <div class="price-banner">
+    <p>Trusted childcare starting from just <span>&euro;10/hour</span></p>
+  </div>
+
+  <!-- FAQ -->
+  <section id="faq">
+    <div class="section-inner fade-up">
+      <div class="section-header">
+        <h2>Frequently Asked Questions</h2>
+        <p>Everything you need to know before booking</p>
+      </div>
+      <div class="faq-list">
+        <div class="faq-item">
+          <button class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+            How are your nannies verified?
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="faq-answer">
+            <p>Every nanny undergoes thorough background checks, in-person interviews, and reference verification. They hold certifications in childcare and first aid. We only accept nannies who pass our rigorous vetting process.</p>
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+            How much does a nanny cost?
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="faq-answer">
+            <p>Our nanny services start from just &euro;10 per hour. Evening sessions (7 PM &ndash; 7 AM) include a small taxi supplement of &euro;10 per date. No hidden fees.</p>
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+            Can I book a nanny the same day?
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="faq-answer">
+            <p>Yes! Same-day bookings are available subject to nanny availability. We recommend booking in advance during peak season (December&ndash;March) for the best selection.</p>
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+            What languages do your nannies speak?
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="faq-answer">
+            <p>Our nannies speak Arabic, French, English, and some speak Spanish. We match families with nannies who speak their preferred language.</p>
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+            What is your cancellation policy?
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="faq-answer">
+            <p>Free cancellation up to 24 hours before the session. Cancellations within 24 hours may incur a fee. We understand plans change, especially when travelling!</p>
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question" onclick="this.parentElement.classList.toggle('open')">
+            Where in Marrakech do you provide service?
+            <span class="chevron">&#9660;</span>
+          </button>
+          <div class="faq-answer">
+            <p>We cover all of Marrakech including Gueliz, Hivernage, Medina, and Palmeraie. Our nannies come to your hotel, riad, villa, or any accommodation.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- BOOKING -->
   <section class="booking" id="book">
     <div class="section-inner fade-up">
@@ -734,10 +1046,10 @@
         <p>Select your dates and preferences below</p>
       </div>
       <div class="booking-frame-wrapper">
-        <iframe src="https://callanannycare.vercel.app" title="Book a Nanny" loading="lazy" allow="clipboard-write"></iframe>
+        <iframe src="/app" title="Book a Nanny" loading="lazy" allow="clipboard-write"></iframe>
         <div class="booking-fallback">
           <p>Having trouble viewing? Open the booking form directly.</p>
-          <a href="https://callanannycare.vercel.app" target="_blank" rel="noopener" class="btn btn-outline btn-sm">Open Booking Form &rarr;</a>
+          <a href="/app" class="btn btn-outline btn-sm">Open Booking Form &rarr;</a>
         </div>
       </div>
     </div>
@@ -779,7 +1091,7 @@
   <footer>
     <div class="footer-inner">
       <div class="footer-brand">
-        <img src="https://callanannycare.vercel.app/logo-icon.png" alt="Call a Nanny">
+        <img src="/logo-icon.png" alt="Call a Nanny">
         <span>call a nanny</span>
       </div>
       <ul class="footer-links">
