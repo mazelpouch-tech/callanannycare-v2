@@ -392,6 +392,17 @@ export function DataProvider({ children }: DataProviderProps) {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [fetchBookings]);
 
+  // Auto-poll bookings every 30s so admin/nanny dashboards stay current
+  useEffect(() => {
+    if (!isAdmin && !isNanny) return;
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchBookings().catch(() => { /* best effort */ });
+      }
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [isAdmin, isNanny, fetchBookings]);
+
   const addBooking = useCallback(
     async (booking: Partial<Booking>, meta?: { locale?: string; skipMinHours?: boolean; skipConflictCheck?: boolean; skipParentNotifications?: boolean; skipNannyPush?: boolean }): Promise<Booking> => {
       const nanny = nannies.find((n) => n.id === booking.nannyId);
@@ -930,6 +941,18 @@ export function DataProvider({ children }: DataProviderProps) {
       console.warn("Failed to mark notifications as read");
     }
   }, []);
+
+  // Auto-poll nanny bookings & notifications every 30s
+  useEffect(() => {
+    if (!isNanny || !nannyProfile?.id) return;
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchNannyBookings().catch(() => { /* best effort */ });
+        fetchNannyNotifications().catch(() => { /* best effort */ });
+      }
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [isNanny, nannyProfile, fetchNannyBookings, fetchNannyNotifications]);
 
   const updateNannyProfile = useCallback(async (updates: Partial<NannyProfile>) => {
     if (!nannyProfile?.id) return { success: false as const, error: "No profile" };
