@@ -1616,6 +1616,15 @@ export default function Book() {
       saveChildrenInfo(childrenInfo);
       setIsSubmitting(false);
       setIsSuccess(true);
+
+      // Fire Google Ads conversion event
+      if (typeof window.gtag === "function") {
+        window.gtag("event", "conversion", {
+          send_to: "AW-17101498498/CONVERSION_LABEL",
+          value: totalPrice,
+          currency: "EUR",
+        });
+      }
     } catch (err) {
       console.error("Booking failed:", err);
       const msg = err instanceof Error ? err.message : "Booking failed. Please try again.";

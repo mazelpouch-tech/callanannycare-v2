@@ -20,6 +20,10 @@ declare module "html2pdf.js" {
   export default html2pdf;
 }
 
+interface Window {
+  gtag?: (...args: unknown[]) => void;
+}
+
 interface ImportMetaEnv {
   readonly VITE_API_URL?: string;
   readonly VITE_WEB3FORMS_KEY?: string;
