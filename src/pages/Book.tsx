@@ -1,5 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
 import {
   format,
   addDays,
@@ -1616,8 +1622,21 @@ export default function Book() {
       saveChildrenInfo(childrenInfo);
       setIsSubmitting(false);
 
-      // Navigate to booking confirmed page (fires Google Ads conversion)
-      navigate(`/booking-confirmed?value=${totalPrice}`);
+      // Show success screen with WhatsApp link
+      setIsSuccess(true);
+
+      // Fire Google Ads conversion + GA4 purchase event
+      if (typeof window.gtag === "function") {
+        window.gtag("event", "conversion", {
+          send_to: "AW-18034320545/KBenCLqPio4cEKHJt5dD",
+          value: totalPrice ? parseFloat(String(totalPrice)) : undefined,
+          currency: "EUR",
+        });
+        window.gtag("event", "purchase", {
+          value: totalPrice ? parseFloat(String(totalPrice)) : 0,
+          currency: "EUR",
+        });
+      }
     } catch (err) {
       console.error("Booking failed:", err);
       const msg = err instanceof Error ? err.message : "Booking failed. Please try again.";
