@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDb } from '../_db.js';
+import { getDb, setCors } from '../_db.js';
 import type { DbNanny, DbNotification } from '@/types';
 
 interface UpdateProfileBody {
@@ -24,10 +24,7 @@ interface UpdateProfileBody {
 interface BlockedDateRow { id: number; date: string; reason: string; created_at: string }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (setCors(req, res)) return;
 
   try {
     const sql = getDb();

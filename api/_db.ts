@@ -1,4 +1,30 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
+
+const ALLOWED_ORIGINS = [
+  'https://callanannycare.vercel.app',
+  'https://callanannycare.com',
+  'https://www.callanannycare.com',
+];
+
+/** Set CORS headers, restricting to known origins. Returns true if preflight (caller should return). */
+export function setCors(req: VercelRequest, res: VercelResponse): boolean {
+  const origin = req.headers.origin as string | undefined;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (!origin) {
+    // Same-origin requests (no Origin header) — allow
+    res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGINS[0]);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Vary', 'Origin');
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return true;
+  }
+  return false;
+}
 
 export function getDb() {
   const url = process.env.DATABASE_URL;

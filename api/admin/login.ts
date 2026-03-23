@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDb } from '../_db.js';
+import { getDb, setCors } from '../_db.js';
 import crypto from 'crypto';
 import type { DbAdminUser, DbNanny } from '@/types';
 import { sendAdminInviteEmail } from '../_emailTemplates.js';
@@ -24,10 +24,7 @@ interface AdminIdRoleRow { id: number; role: string }
 interface AdminResetRow { id: number; reset_token_expires: string | null }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (setCors(req, res)) return;
 
   const sql = getDb();
 
@@ -312,8 +309,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Unknown action' });
     }
 
-    // GET: List admin users (for admin panel)
+    // GET: List admin users (for admin panel — requires valid admin email)
     if (req.method === 'GET') {
+      const callerEmail = req.query.adminEmail as string;
+      if (!callerEmail) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      const callerCheck = await sql`SELECT id FROM admin_users WHERE LOWER(email) = LOWER(${callerEmail}) AND is_active = true` as AdminIdRow[];
+      if (callerCheck.length === 0) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+
       const admins = await sql`
         SELECT id, name, email, role, is_active, last_login, login_count, created_at
         FROM admin_users

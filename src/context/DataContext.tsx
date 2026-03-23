@@ -1177,7 +1177,9 @@ export function DataProvider({ children }: DataProviderProps) {
 
   const fetchAdminUsers = useCallback(async (): Promise<AdminUser[]> => {
     try {
-      const data = await apiFetch<AdminUser[]>("/admin/login");
+      const email = adminProfile?.email;
+      if (!email) return [];
+      const data = await apiFetch<AdminUser[]>(`/admin/login?adminEmail=${encodeURIComponent(email)}`);
       setAdminUsers(data);
       return data;
     } catch {

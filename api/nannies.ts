@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDb } from './_db.js';
+import { getDb, setCors } from './_db.js';
 import type { DbNanny, DbAdminUser } from '@/types';
 import { sendRateUpdateNotificationEmail, sendNannyDeletionNotificationEmail } from './_emailTemplates.js';
 
@@ -30,11 +30,7 @@ interface CreateNannyBody {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const sql = getDb();
   
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (setCors(req, res)) return;
 
   try {
     // Auto-create nanny_payments table if it doesn't exist
