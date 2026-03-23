@@ -53,6 +53,16 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Track page views in GA4 on route change
+  useEffect(() => {
+    if (typeof window.gtag === 'function') {
+      window.gtag('event', 'page_view', {
+        page_path: location.pathname + location.search,
+        page_title: document.title,
+      });
+    }
+  }, [location]);
+
   // Listen for notification click URLs from the service worker (iOS PWA fix)
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;

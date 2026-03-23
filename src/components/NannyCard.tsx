@@ -116,7 +116,16 @@ export default function NannyCard({ nanny, showBookButton = true, onViewDetails,
       <div className="mt-4 flex items-center justify-end gap-2 pt-3 border-t border-border">
         {onViewDetails && (
           <button
-            onClick={onViewDetails}
+            onClick={() => {
+              if (typeof window.gtag === 'function') {
+                window.gtag('event', 'view_nanny_details', {
+                  nanny_name: name,
+                  nanny_location: location,
+                  nanny_rating: rating,
+                });
+              }
+              onViewDetails();
+            }}
             className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
           >
             <Eye className="w-3.5 h-3.5" />
@@ -126,6 +135,15 @@ export default function NannyCard({ nanny, showBookButton = true, onViewDetails,
         {showBookButton && available && (
           <Link
             to="/book"
+            onClick={() => {
+              if (typeof window.gtag === 'function') {
+                window.gtag('event', 'click_book_now', {
+                  nanny_name: name,
+                  nanny_location: location,
+                  nanny_rating: rating,
+                });
+              }
+            }}
             className="gradient-warm text-white text-sm font-semibold px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
           >
             {t("common.bookNow")}
