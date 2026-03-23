@@ -13,10 +13,10 @@ export default function Footer() {
   ];
 
   const services = [
-    t("footer.hourlyCare"),
-    t("footer.hotelBabysitting"),
-    t("footer.eventChildcare"),
-    t("footer.regularCare"),
+    { label: t("footer.hourlyCare"), to: "/babysitting-marrakech" },
+    { label: t("footer.hotelBabysitting"), to: "/hotel-nanny-marrakech" },
+    { label: t("footer.eventChildcare"), to: "/family-travel-marrakech" },
+    { label: t("footer.regularCare"), to: "/book" },
   ];
 
   return (
@@ -60,11 +60,13 @@ export default function Footer() {
             </h4>
             <ul className="space-y-3">
               {services.map((service) => (
-                <li
-                  key={service}
-                  className="text-background/70 text-sm"
-                >
-                  {service}
+                <li key={service.to}>
+                  <Link
+                    to={service.to}
+                    className="text-background/70 hover:text-background text-sm transition-colors"
+                  >
+                    {service.label}
+                  </Link>
                 </li>
               ))}
             </ul>

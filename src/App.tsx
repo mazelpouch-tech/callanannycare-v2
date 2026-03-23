@@ -45,6 +45,9 @@ import NannyBookings from './pages/nanny/NannyBookings'
 import NannyNotifications from './pages/nanny/NannyNotifications'
 import NannyMessages from './pages/nanny/NannyMessages'
 import NannyProfile from './pages/nanny/NannyProfile'
+import BabysittingMarrakech from './pages/seo/BabysittingMarrakech'
+import FamilyTravelMarrakech from './pages/seo/FamilyTravelMarrakech'
+import HotelNannyMarrakech from './pages/seo/HotelNannyMarrakech'
 
 export default function App() {
   const navigate = useNavigate();
@@ -85,6 +88,9 @@ export default function App() {
         <Route path="/nannies" element={<Nannies />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/book" element={<Book />} />
+        <Route path="/babysitting-marrakech" element={<BabysittingMarrakech />} />
+        <Route path="/family-travel-marrakech" element={<FamilyTravelMarrakech />} />
+        <Route path="/hotel-nanny-marrakech" element={<HotelNannyMarrakech />} />
         <Route path="*" element={<NotFound />} />
       </Route>
 
