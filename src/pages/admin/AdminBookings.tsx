@@ -193,6 +193,9 @@ export default function AdminBookings() {
   const [scrollToBooking, setScrollToBooking] = useState<string | null>(() => searchParams.get("booking"));
   const [deleteConfirm, setDeleteConfirm] = useState<number | string | null>(null);
 
+  // Refresh bookings when page mounts so new bookings are visible immediately
+  useEffect(() => { fetchBookings(); }, [fetchBookings]);
+
   // Extract booking deep-link param and clean up URL on mount
   useEffect(() => {
     const bookingParam = searchParams.get("booking");

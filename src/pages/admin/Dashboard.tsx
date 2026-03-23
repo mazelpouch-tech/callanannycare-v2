@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   CalendarDays, Clock,
@@ -53,8 +53,11 @@ function DashboardUrgencyBadge({ booking }: { booking: Booking }) {
 // ─── Main Dashboard ──────────────────────────────────────────────
 
 export default function Dashboard() {
-  const { bookings, stats, adminProfile, updateBookingStatus } = useData();
+  const { bookings, fetchBookings, stats, adminProfile, updateBookingStatus } = useData();
   const { toDH } = useExchangeRate();
+
+  // Refresh bookings when Dashboard mounts so new bookings are visible immediately
+  useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
   const todaysBookings = bookings.filter((b) => isBookingOnDate(b, todayStr));
