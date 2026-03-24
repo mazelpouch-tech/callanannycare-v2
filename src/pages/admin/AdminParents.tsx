@@ -124,7 +124,7 @@ export default function AdminParents() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"spent" | "bookings" | "recent" | "hours">("spent");
   const [paymentFilter, setPaymentFilter] = useState<"all" | "unpaid" | "paid">("all");
-  const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month" | "custom">("week");
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month" | "custom">("all");
   const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = previous, etc.
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -1054,9 +1054,9 @@ function sharePdf(){
           )}
 
           {/* Active filter count + reset */}
-          {(paymentFilter !== "all" || dateFilter !== "week" || weekOffset !== 0) && (
+          {(paymentFilter !== "all" || dateFilter !== "all" || weekOffset !== 0) && (
             <button
-              onClick={() => { setPaymentFilter("all"); setDateFilter("week"); setWeekOffset(0); setDateFrom(""); setDateTo(""); }}
+              onClick={() => { setPaymentFilter("all"); setDateFilter("all"); setWeekOffset(0); setDateFrom(""); setDateTo(""); }}
               className="px-3 py-1.5 rounded-xl text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
             >
               Reset filters
