@@ -202,11 +202,10 @@ export default function AdminInvoices() {
   // ── Derived Data ──
 
   const invoices = useMemo(() => {
-    return bookings
-      .filter((b) => (b.status === "completed" && b.clockOut) || b.collectedAt)
+    return [...bookings]
       .sort((a, b) => {
-        const da = new Date(a.clockOut!).getTime();
-        const db = new Date(b.clockOut!).getTime();
+        const da = a.clockOut ? new Date(a.clockOut).getTime() : a.date ? new Date(a.date).getTime() : 0;
+        const db = b.clockOut ? new Date(b.clockOut).getTime() : b.date ? new Date(b.date).getTime() : 0;
         return sortOrder === "newest" ? db - da : da - db;
       });
   }, [bookings, sortOrder]);
