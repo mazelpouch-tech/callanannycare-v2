@@ -714,6 +714,147 @@ function sharePdf(){
     downloadInvoicePdf(html, `Invoice_INV-${inv.id}.pdf`);
   };
 
+  const downloadCombinedPDF = (group: ParentGroup) => {
+    const grandTotal = group.totalAmount;
+    const grandTotalDH = toDH(grandTotal);
+    const allPaid = group.allPaid;
+    const dateRange = (() => {
+      const dates = group.bookings.map((b) => b.clockIn ? new Date(b.clockIn).toISOString().slice(0, 10) : b.date).filter(Boolean).sort();
+      if (dates.length === 0) return "N/A";
+      if (dates.length === 1) return fmtDate(dates[0]);
+      return `${fmtDate(dates[0])} — ${fmtDate(dates[dates.length - 1])}`;
+    })();
+
+    // Build service rows
+    const serviceRows = group.bookings.map((inv) => {
+      const bookedH = inv.startTime && inv.endTime
+        ? calcTotalBookedHours(inv.startTime, inv.endTime, inv.extraTimes, inv.date, inv.endDate)
+        : 0;
+      const hours = bookedH > 0 ? bookedH.toFixed(1) : calcWorkedHours(inv.clockIn, inv.clockOut);
+      const dateStr = inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A";
+      const timeSlot = `${inv.startTime || formatClockTime(inv.clockIn)} – ${inv.endTime || formatClockTime(inv.clockOut)}`;
+      return `
+      <div class="card-row">
+        <span class="card-row-label" style="flex-direction:column;align-items:flex-start;gap:2px;">
+          <span style="font-weight:600;color:#1a202c;">${dateStr}</span>
+          <span style="font-size:11px;">${inv.nannyName || "Unassigned"} · ${timeSlot} · ${hours}h</span>
+        </span>
+        <span class="card-row-value">${(inv.totalPrice || 0)}€</span>
+      </div>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8"/>
+<title>Combined Invoice — ${group.clientName}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: #2d3748; background: #fff; padding: 0; margin: 0; }
+  .page { max-width: 480px; margin: 0 auto; background: #fff; overflow: hidden; }
+  .header { background: linear-gradient(135deg, #c2703a 0%, #e8956e 50%, #f0b08a 100%); padding: 24px 28px 20px; color: #fff; }
+  .header-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; opacity: 0.85; }
+  .header-num { font-size: 24px; font-weight: 800; margin: 2px 0 4px; }
+  .header-date { font-size: 13px; opacity: 0.85; }
+  .paid-badge { display: inline-block; background: rgba(255,255,255,0.25); color: #fff; padding: 6px 18px; border-radius: 20px; font-size: 14px; font-weight: 700; letter-spacing: 2px; margin-top: 6px; }
+  .body-content { padding: 16px 24px 20px; }
+  .addresses { display: flex; gap: 20px; margin-bottom: 16px; }
+  .addr { flex: 1; }
+  .addr-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #a0937e; margin-bottom: 6px; }
+  .addr-name { font-size: 15px; font-weight: 700; color: #1a202c; margin-bottom: 4px; }
+  .addr-line { font-size: 12px; color: #718096; line-height: 1.7; display: flex; align-items: center; gap: 6px; }
+  .card { background: #faf8f5; border: 1px solid #f0ece6; border-radius: 14px; padding: 14px 18px; margin-bottom: 12px; }
+  .card-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #8a7e6e; margin-bottom: 10px; }
+  .card-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid #f0ece6; }
+  .card-row:last-child { border-bottom: none; }
+  .card-row-label { font-size: 13px; color: #5a5a5a; display: flex; align-items: center; gap: 8px; }
+  .card-row-value { font-size: 14px; font-weight: 700; color: #1a202c; }
+  .total-box { background: linear-gradient(135deg, #c2703a 0%, #e8956e 50%, #f0b08a 100%); border-radius: 14px; padding: 18px; text-align: center; margin-top: 6px; }
+  .total-box.paid { background: linear-gradient(135deg, #16a34a 0%, #22c55e 50%, #4ade80 100%); }
+  .total-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.8); margin-bottom: 6px; }
+  .total-amount { font-size: 36px; font-weight: 800; color: #fff; }
+  .total-amount .currency { font-size: 22px; font-weight: 600; vertical-align: super; margin-left: 2px; opacity: 0.85; }
+  .total-dh { font-size: 14px; color: rgba(255,255,255,0.75); margin-top: 2px; }
+  .total-paid-note { font-size: 15px; color: rgba(255,255,255,0.9); margin-top: 8px; font-weight: 800; letter-spacing: 2px; }
+  .summary-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+  .back-bar { max-width: 480px; margin: 0 auto; padding: 12px 16px; display: flex; gap: 8px; position: sticky; top: 0; z-index: 100; background: #fff; }
+  .back-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px 20px; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .back-btn.close { background: linear-gradient(135deg, #c2703a 0%, #e8956e 100%); color: #fff; }
+  .back-btn.print { background: #f0ece6; color: #5a5a5a; }
+  .back-btn.share { background: #e8f4e8; color: #16a34a; }
+  @media print {
+    body { background: #fff; padding: 0; margin: 0; }
+    .page { max-width: 100%; margin: 0; }
+    .back-bar { display: none !important; }
+    @page { margin: 6mm; size: A4; }
+    * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  }
+</style>
+</head><body>
+<script>
+function goBack(){try{window.close()}catch(e){}setTimeout(function(){if(!window.closed){history.length>1?history.back():location.href='/'}},400)}
+function sharePdf(){
+  var title=document.title||'Invoice';
+  var html='<!DOCTYPE html>'+document.documentElement.outerHTML;
+  var blob=new Blob([html],{type:'text/html'});
+  var file=new File([blob],title.replace(/[^a-zA-Z0-9-_#]/g,'_')+'.html',{type:'text/html'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    navigator.share({title:title,files:[file]}).catch(function(){window.print()});
+  }else if(navigator.share){
+    navigator.share({title:title,text:title+' - Call a Nanny'}).catch(function(){window.print()});
+  }else{window.print()}
+}
+</script>
+<div class="back-bar">
+  <button class="back-btn close" onclick="goBack()">&#8592; Back</button>
+  <button class="back-btn print" onclick="window.print()">&#128424; Save PDF</button>
+  <button class="back-btn share" onclick="sharePdf()">&#8599; Share</button>
+</div>
+<div class="page">
+  <div class="header">
+    <div class="header-label">COMBINED INVOICE</div>
+    <div class="header-num">${group.clientName}</div>
+    <div class="header-date">${group.bookings.length} bookings · ${dateRange}</div>
+    ${allPaid ? `<div class="paid-badge">&#10003; ALL PAID</div>` : ""}
+  </div>
+
+  <div class="body-content">
+    <div class="addresses">
+      <div class="addr">
+        <div class="addr-label">FROM</div>
+        <div class="addr-name">Call a Nanny</div>
+        <div class="addr-line">Professional Childcare</div>
+        <div class="addr-line">Marrakech, Morocco</div>
+      </div>
+      <div class="addr">
+        <div class="addr-label">BILLED TO</div>
+        <div class="addr-name">${group.clientName}</div>
+        ${group.clientPhone ? `<div class="addr-line"><span class="icon">&#9742;</span> ${group.clientPhone}</div>` : ""}
+        ${group.clientEmail ? `<div class="addr-line"><span class="icon">&#9993;</span> ${group.clientEmail}</div>` : ""}
+        ${group.hotel ? `<div class="addr-line"><span class="icon">&#127976;</span> ${group.hotel}</div>` : ""}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">SERVICES (${group.bookings.length} sessions)</div>
+      ${serviceRows}
+    </div>
+
+    <div class="total-box${allPaid ? " paid" : ""}">
+      <div class="total-label">${allPaid ? "TOTAL CHARGED" : "GRAND TOTAL"}</div>
+      <div class="total-amount">${grandTotal.toLocaleString()}<span class="currency">&euro;</span></div>
+      <div class="total-dh">${grandTotalDH.toLocaleString()} DH</div>
+      ${allPaid ? `
+      <div style="border-top:1px solid rgba(255,255,255,0.3);margin:10px 0 6px;"></div>
+      <div class="total-paid-note">&#10003; ALL PAID</div>
+      ` : ""}
+    </div>
+  </div>
+</div>
+</body></html>`;
+
+    downloadInvoicePdf(html, `Combined_Invoice_${group.clientName.replace(/\s+/g, "_")}.pdf`);
+  };
+
   const exportCSV = () => {
     const headers = ["Invoice #", "Billed To (Parent)", "Email", "Phone", "Caregiver", "Date", "Clock In", "Clock Out", "Hours", "Amount (€)", "Amount (DH)"];
     const rows = filteredInvoices.map((inv) => [
@@ -1264,6 +1405,12 @@ function sharePdf(){
                           <Mail className="w-3 h-3" /> Email All
                         </button>
                       )}
+                      <button
+                        onClick={() => downloadCombinedPDF(group)}
+                        className="flex items-center gap-1 text-xs font-medium text-purple-700 bg-purple-50 px-3 py-1.5 rounded-lg hover:bg-purple-100 transition-colors"
+                      >
+                        <Download className="w-3 h-3" /> Combined PDF
+                      </button>
                     </div>
                     {/* Individual bookings list */}
                     <div className="divide-y divide-border">
