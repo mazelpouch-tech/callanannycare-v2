@@ -1,10 +1,10 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   Search, Trash2, ChevronDown,
   Plus, X, Loader2, CheckCircle,
   FileText, Pencil, Download, DollarSign, AlertCircle,
   Clock, User, Phone, Mail, Hotel, Baby, Calculator, Car,
-  Share2, MessageCircle, Send,
+  Share2, MessageCircle, Send, Users, ChevronRight,
 } from "lucide-react";
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, subMonths } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -96,6 +96,16 @@ export default function AdminInvoices() {
 
   // View invoice
   const [viewInvoice, setViewInvoice] = useState<Booking | null>(null);
+
+  // Selection
+  const [selectedIds, setSelectedIds] = useState<Set<number | string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkEmailing, setBulkEmailing] = useState(false);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+
+  // Grouped view
+  const [viewMode, setViewMode] = useState<"individual" | "grouped">("grouped");
+  const [expandedParent, setExpandedParent] = useState<string | null>(null);
 
   // Share menu
   const [shareMenuId, setShareMenuId] = useState<number | string | null>(null);
@@ -259,6 +269,149 @@ export default function AdminInvoices() {
       })
       .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
   }, [invoices]);
+
+  // ── Grouped by parent ──
+
+  interface ParentGroup {
+    key: string; // clientName or clientPhone or clientEmail
+    clientName: string;
+    clientEmail: string;
+    clientPhone: string;
+    hotel: string;
+    bookings: Booking[];
+    totalAmount: number;
+    allPaid: boolean;
+  }
+
+  const groupedByParent = useMemo(() => {
+    const map = new Map<string, Booking[]>();
+    for (const inv of filteredInvoices) {
+      // Group by phone > email > name (best unique key)
+      const key = (inv.clientPhone || "").trim() || (inv.clientEmail || "").trim().toLowerCase() || (inv.clientName || "Unknown").trim().toLowerCase();
+      const existing = map.get(key) || [];
+      existing.push(inv);
+      map.set(key, existing);
+    }
+    const groups: ParentGroup[] = [];
+    for (const [key, bks] of map) {
+      const first = bks[0];
+      groups.push({
+        key,
+        clientName: first.clientName || "Unknown",
+        clientEmail: first.clientEmail || "",
+        clientPhone: first.clientPhone || "",
+        hotel: first.hotel || "",
+        bookings: bks,
+        totalAmount: bks.reduce((s, b) => s + (b.totalPrice || 0), 0),
+        allPaid: bks.every((b) => !!b.collectedAt),
+      });
+    }
+    return groups.sort((a, b) => b.totalAmount - a.totalAmount);
+  }, [filteredInvoices]);
+
+  // ── Selection helpers ──
+
+  const allFilteredIds = useMemo(() => filteredInvoices.map((i) => i.id), [filteredInvoices]);
+  const allSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selectedIds.has(id));
+  const someSelected = selectedIds.size > 0;
+
+  const toggleSelectAll = useCallback(() => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(allFilteredIds));
+    }
+  }, [allSelected, allFilteredIds]);
+
+  const toggleSelect = useCallback((id: number | string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const selectGroupBookings = useCallback((group: ParentGroup) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const groupIds = group.bookings.map((b) => b.id);
+      const allInGroup = groupIds.every((id) => next.has(id));
+      if (allInGroup) {
+        groupIds.forEach((id) => next.delete(id));
+      } else {
+        groupIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  }, []);
+
+  const selectedInvoices = useMemo(() => filteredInvoices.filter((i) => selectedIds.has(i.id)), [filteredInvoices, selectedIds]);
+
+  // ── Bulk actions ──
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    for (const inv of selectedInvoices) {
+      try { await deleteBooking(inv.id); } catch { /* best-effort */ }
+    }
+    setSelectedIds(new Set());
+    setBulkDeleting(false);
+    setBulkDeleteConfirm(false);
+  };
+
+  const handleBulkEmail = async () => {
+    setBulkEmailing(true);
+    for (const inv of selectedInvoices) {
+      if (inv.clientEmail) {
+        try { await resendInvoice(inv.id); } catch { /* best-effort */ }
+      }
+    }
+    setBulkEmailing(false);
+    setSelectedIds(new Set());
+    alert(`Emailed ${selectedInvoices.filter((i) => i.clientEmail).length} invoice(s).`);
+  };
+
+  const handleBulkWhatsApp = () => {
+    // For grouped: build one combined message per parent phone
+    const byPhone = new Map<string, Booking[]>();
+    for (const inv of selectedInvoices) {
+      const phone = (inv.clientPhone || "").replace(/[^0-9]/g, "");
+      if (!phone) continue;
+      const existing = byPhone.get(phone) || [];
+      existing.push(inv);
+      byPhone.set(phone, existing);
+    }
+    for (const [phone, invs] of byPhone) {
+      const totalAll = invs.reduce((s, i) => s + (i.totalPrice || 0), 0);
+      const totalDH = toDH(totalAll);
+      const lines: string[] = [
+        invs.length > 1 ? `*Combined Invoice — ${invs.length} bookings*` : `*Invoice #INV-${invs[0].id}*`,
+        `From: Call a Nanny`,
+        ``,
+      ];
+      for (const inv of invs) {
+        const bookedH = inv.startTime && inv.endTime
+          ? calcTotalBookedHours(inv.startTime, inv.endTime, inv.extraTimes, inv.date, inv.endDate)
+          : 0;
+        const hours = bookedH > 0 ? bookedH.toFixed(1) : calcWorkedHours(inv.clockIn, inv.clockOut);
+        const dateStr = inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A";
+        lines.push(`*#INV-${inv.id}* — ${dateStr}`);
+        lines.push(`  Caregiver: ${inv.nannyName || "Unassigned"}`);
+        lines.push(`  Time: ${inv.startTime || formatClockTime(inv.clockIn)} – ${inv.endTime || formatClockTime(inv.clockOut)} (${hours}h)`);
+        lines.push(`  Amount: ${inv.totalPrice || 0}€`);
+        lines.push(``);
+      }
+      lines.push(`*Grand Total: ${totalAll}€ (${totalDH.toLocaleString()} DH)*`);
+      lines.push(``);
+      lines.push(`Issued by Call a Nanny · callanannycare.com`);
+      const msg = lines.filter(Boolean).join("\n");
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank");
+    }
+    if (byPhone.size === 0) {
+      alert("No phone numbers found on selected invoices.");
+    }
+  };
 
   // ── Handlers ──
 
@@ -695,7 +848,90 @@ function sharePdf(){
         </div>
       </div>
 
+      {/* ── View Mode Toggle + Bulk Actions ── */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setViewMode("individual"); setExpandedParent(null); }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === "individual" ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+          >
+            <FileText className="w-3.5 h-3.5 inline mr-1" />Individual
+          </button>
+          <button
+            onClick={() => setViewMode("grouped")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === "grouped" ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+          >
+            <Users className="w-3.5 h-3.5 inline mr-1" />By Parent
+          </button>
+        </div>
+        {viewMode === "individual" && (
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleSelectAll}
+                className="rounded border-border text-primary focus:ring-primary/30 w-3.5 h-3.5 cursor-pointer"
+              />
+              Select all ({filteredInvoices.length})
+            </label>
+          </div>
+        )}
+      </div>
+
+      {/* ── Bulk Actions Bar ── */}
+      {someSelected && viewMode === "individual" && (
+        <div className="flex flex-wrap items-center gap-2 bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
+          <span className="text-sm font-medium text-foreground mr-2">{selectedIds.size} selected</span>
+          <button
+            onClick={handleBulkWhatsApp}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
+          >
+            <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+          </button>
+          <button
+            onClick={handleBulkEmail}
+            disabled={bulkEmailing}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+          >
+            {bulkEmailing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />} Email
+          </button>
+          {bulkDeleteConfirm ? (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-red-600 font-medium">Delete {selectedIds.size}?</span>
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                className="text-xs font-semibold text-white bg-red-500 px-3 py-1.5 rounded-lg hover:bg-red-600 disabled:opacity-50"
+              >
+                {bulkDeleting ? <Loader2 className="w-3 h-3 animate-spin inline" /> : "Yes, Delete"}
+              </button>
+              <button
+                onClick={() => setBulkDeleteConfirm(false)}
+                className="text-xs font-semibold text-muted-foreground bg-muted px-3 py-1.5 rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setBulkDeleteConfirm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Delete
+            </button>
+          )}
+          <button
+            onClick={() => { setSelectedIds(new Set()); setBulkDeleteConfirm(false); }}
+            className="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
       {/* ── Invoice Table ── */}
+      {viewMode === "individual" ? (
       <div className="bg-card rounded-xl border border-border shadow-soft">
         {filteredInvoices.length === 0 ? (
           <div className="px-6 py-12 text-center">
@@ -712,6 +948,14 @@ function sharePdf(){
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
+                    <th className="px-3 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleSelectAll}
+                        className="rounded border-border text-primary focus:ring-primary/30 w-3.5 h-3.5 cursor-pointer"
+                      />
+                    </th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Invoice #</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Billed To (Parent)</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Caregiver</th>
@@ -723,7 +967,15 @@ function sharePdf(){
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filteredInvoices.map((inv) => (
-                    <tr key={inv.id} className="hover:bg-muted/50 transition-colors">
+                    <tr key={inv.id} className={`hover:bg-muted/50 transition-colors ${selectedIds.has(inv.id) ? "bg-primary/5" : ""}`}>
+                      <td className="px-3 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(inv.id)}
+                          onChange={() => toggleSelect(inv.id)}
+                          className="rounded border-border text-primary focus:ring-primary/30 w-3.5 h-3.5 cursor-pointer"
+                        />
+                      </td>
                       <td className="px-5 py-4">
                         <button
                           onClick={() => setViewInvoice(inv)}
@@ -822,14 +1074,22 @@ function sharePdf(){
             {/* Mobile Cards */}
             <div className="lg:hidden divide-y divide-border">
               {filteredInvoices.map((inv) => (
-                <div key={inv.id} className="px-5 py-4 space-y-3">
+                <div key={inv.id} className={`px-5 py-4 space-y-3 ${selectedIds.has(inv.id) ? "bg-primary/5" : ""}`}>
                   <div className="flex items-center justify-between">
-                    <button
-                      onClick={() => setViewInvoice(inv)}
-                      className="text-sm font-mono font-medium text-primary hover:underline cursor-pointer"
-                    >
-                      #INV-{inv.id}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(inv.id)}
+                        onChange={() => toggleSelect(inv.id)}
+                        className="rounded border-border text-primary focus:ring-primary/30 w-3.5 h-3.5 cursor-pointer"
+                      />
+                      <button
+                        onClick={() => setViewInvoice(inv)}
+                        className="text-sm font-mono font-medium text-primary hover:underline cursor-pointer"
+                      >
+                        #INV-{inv.id}
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
@@ -905,6 +1165,154 @@ function sharePdf(){
           </>
         )}
       </div>
+      ) : (
+      /* ── Grouped by Parent View ── */
+      <div className="space-y-3">
+        {groupedByParent.length === 0 ? (
+          <div className="bg-card rounded-xl border border-border shadow-soft px-6 py-12 text-center">
+            <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground font-medium">No invoices found</p>
+          </div>
+        ) : (
+          groupedByParent.map((group) => {
+            const isExpanded = expandedParent === group.key;
+            const groupAllSelected = group.bookings.every((b) => selectedIds.has(b.id));
+            return (
+              <div key={group.key} className="bg-card rounded-xl border border-border shadow-soft overflow-hidden">
+                {/* Parent header */}
+                <div
+                  className="flex items-center gap-3 px-5 py-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                  onClick={() => setExpandedParent(isExpanded ? null : group.key)}
+                >
+                  <input
+                    type="checkbox"
+                    checked={groupAllSelected}
+                    onChange={(e) => { e.stopPropagation(); selectGroupBookings(group); }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="rounded border-border text-primary focus:ring-primary/30 w-4 h-4 cursor-pointer flex-shrink-0"
+                  />
+                  <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform flex-shrink-0 ${isExpanded ? "rotate-90" : ""}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-foreground truncate">{group.clientName}</p>
+                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{group.bookings.length} booking{group.bookings.length !== 1 ? "s" : ""}</span>
+                      {group.allPaid && (
+                        <span className="text-[11px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">All Paid</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                      {group.clientPhone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{group.clientPhone}</span>}
+                      {group.clientEmail && <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{group.clientEmail}</span>}
+                      {group.hotel && <span className="flex items-center gap-1"><Hotel className="w-3 h-3" />{group.hotel}</span>}
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-lg font-bold text-foreground">{group.totalAmount.toLocaleString()}€</p>
+                    <p className="text-[10px] text-muted-foreground">{toDH(group.totalAmount).toLocaleString()} DH</p>
+                  </div>
+                </div>
+
+                {/* Expanded bookings */}
+                {isExpanded && (
+                  <div className="border-t border-border">
+                    {/* Bulk actions for this group */}
+                    <div className="flex items-center gap-2 px-5 py-2 bg-muted/20 border-b border-border">
+                      <button
+                        onClick={() => {
+                          const phone = (group.clientPhone || "").replace(/[^0-9]/g, "");
+                          if (!phone) { alert("No phone number for this parent."); return; }
+                          // Select all group bookings and send combined WhatsApp
+                          const totalAll = group.totalAmount;
+                          const totalDH = toDH(totalAll);
+                          const lines: string[] = [
+                            group.bookings.length > 1 ? `*Combined Invoice — ${group.bookings.length} bookings*` : `*Invoice #INV-${group.bookings[0].id}*`,
+                            `From: Call a Nanny`,
+                            `Client: ${group.clientName}`,
+                            ``,
+                          ];
+                          for (const inv of group.bookings) {
+                            const bookedH = inv.startTime && inv.endTime
+                              ? calcTotalBookedHours(inv.startTime, inv.endTime, inv.extraTimes, inv.date, inv.endDate)
+                              : 0;
+                            const hours = bookedH > 0 ? bookedH.toFixed(1) : calcWorkedHours(inv.clockIn, inv.clockOut);
+                            const dateStr = inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A";
+                            lines.push(`*#INV-${inv.id}* — ${dateStr}`);
+                            lines.push(`  Caregiver: ${inv.nannyName || "Unassigned"}`);
+                            lines.push(`  Time: ${inv.startTime || formatClockTime(inv.clockIn)} – ${inv.endTime || formatClockTime(inv.clockOut)} (${hours}h)`);
+                            lines.push(`  Amount: ${inv.totalPrice || 0}€`);
+                            lines.push(``);
+                          }
+                          lines.push(`*Grand Total: ${totalAll}€ (${totalDH.toLocaleString()} DH)*`);
+                          lines.push(``);
+                          lines.push(`Issued by Call a Nanny · callanannycare.com`);
+                          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(lines.filter(Boolean).join("\n"))}`, "_blank");
+                        }}
+                        className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-3 py-1.5 rounded-lg hover:bg-green-100 transition-colors"
+                      >
+                        <MessageCircle className="w-3 h-3" /> Send Combined WhatsApp
+                      </button>
+                      {group.clientEmail && (
+                        <button
+                          onClick={async () => {
+                            for (const inv of group.bookings) {
+                              try { await resendInvoice(inv.id); } catch { /* best-effort */ }
+                            }
+                            alert(`Emailed ${group.bookings.length} invoice(s) to ${group.clientEmail}`);
+                          }}
+                          className="flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors"
+                        >
+                          <Mail className="w-3 h-3" /> Email All
+                        </button>
+                      )}
+                    </div>
+                    {/* Individual bookings list */}
+                    <div className="divide-y divide-border">
+                      {group.bookings.map((inv) => (
+                        <div key={inv.id} className={`flex items-center gap-3 px-5 py-3 hover:bg-muted/30 transition-colors ${selectedIds.has(inv.id) ? "bg-primary/5" : ""}`}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(inv.id)}
+                            onChange={() => toggleSelect(inv.id)}
+                            className="rounded border-border text-primary focus:ring-primary/30 w-3.5 h-3.5 cursor-pointer flex-shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <button
+                                onClick={() => setViewInvoice(inv)}
+                                className="text-xs font-mono font-medium text-primary hover:underline cursor-pointer"
+                              >
+                                #INV-{inv.id}
+                              </button>
+                              <span className="text-xs text-muted-foreground">
+                                {inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A"}
+                              </span>
+                              <span className="text-xs text-muted-foreground">· {inv.nannyName || "Unassigned"}</span>
+                              <span className="text-xs text-muted-foreground">· {inv.startTime || formatClockTime(inv.clockIn)} – {inv.endTime || formatClockTime(inv.clockOut)}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="text-sm font-semibold text-foreground">{(inv.totalPrice || 0).toLocaleString()}€</span>
+                            {inv.collectedAt && (
+                              <span className="text-[10px] font-bold text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full">Paid</span>
+                            )}
+                            <button onClick={() => openEdit(inv)} className="p-1 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors" title="Edit">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => downloadPDF(inv)} className="p-1 rounded-lg text-muted-foreground hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Download PDF">
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+      )}
 
       {/* ── View Invoice Modal ── */}
       {viewInvoice && (() => {
