@@ -1630,11 +1630,11 @@ export default function Book() {
         window.gtag("event", "conversion", {
           send_to: "AW-18034320545/6JUVCP-fhpIcEKHJt5dD",
           value: totalPrice ? parseFloat(String(totalPrice)) : 1.0,
-          currency: "CAD",
+          currency: "EUR",
         });
         window.gtag("event", "booking_submitted", {
           value: totalPrice ? parseFloat(String(totalPrice)) : 0,
-          currency: "CAD",
+          currency: "EUR",
         });
       }
     } catch (err) {

@@ -21,12 +21,12 @@ export default function BookingConfirmed() {
       window.gtag("event", "conversion", {
         send_to: "AW-18034320545/6JUVCP-fhpIcEKHJt5dD",
         value: value ? parseFloat(value) : 1.0,
-        currency: "CAD",
+        currency: "EUR",
       });
       // GA4 booking_submitted event
       window.gtag("event", "booking_submitted", {
         value: value ? parseFloat(value) : 0,
-        currency: "CAD",
+        currency: "EUR",
       });
     }
   }, [value]);
