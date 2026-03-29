@@ -10,6 +10,7 @@ export default function Footer() {
     { label: t("footer.ourNannies"), to: "/nannies" },
     { label: t("footer.howItWorks"), to: "/how-it-works" },
     { label: t("footer.bookANanny"), to: "/book" },
+    { label: t("footer.careers"), to: "/careers" },
   ];
 
   const services = [
