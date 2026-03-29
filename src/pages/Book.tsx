@@ -1625,16 +1625,16 @@ export default function Book() {
       // Show success screen with WhatsApp link
       setIsSuccess(true);
 
-      // Fire Google Ads conversion + GA4 purchase event
+      // Fire Google Ads conversion + GA4 booking_submitted event
       if (typeof window.gtag === "function") {
         window.gtag("event", "conversion", {
-          send_to: "AW-18034320545/KBenCLqPio4cEKHJt5dD",
-          value: totalPrice ? parseFloat(String(totalPrice)) : undefined,
-          currency: "EUR",
+          send_to: "AW-18034320545/6JUVCP-fhpIcEKHJt5dD",
+          value: totalPrice ? parseFloat(String(totalPrice)) : 1.0,
+          currency: "CAD",
         });
-        window.gtag("event", "purchase", {
+        window.gtag("event", "booking_submitted", {
           value: totalPrice ? parseFloat(String(totalPrice)) : 0,
-          currency: "EUR",
+          currency: "CAD",
         });
       }
     } catch (err) {

@@ -14,19 +14,19 @@ export default function BookingConfirmed() {
   const [searchParams] = useSearchParams();
   const value = searchParams.get("value");
 
-  // Fire Google Ads conversion + GA4 purchase event on page load
+  // Fire Google Ads conversion + GA4 booking_submitted event on page load
   useEffect(() => {
     if (typeof window.gtag === "function") {
-      // Google Ads conversion
+      // Google Ads conversion – "Booking Submitted" (Leads > Book appointment)
       window.gtag("event", "conversion", {
-        send_to: "AW-18034320545/KBenCLqPio4cEKHJt5dD",
-        value: value ? parseFloat(value) : undefined,
-        currency: "EUR",
+        send_to: "AW-18034320545/6JUVCP-fhpIcEKHJt5dD",
+        value: value ? parseFloat(value) : 1.0,
+        currency: "CAD",
       });
-      // GA4 purchase event
-      window.gtag("event", "purchase", {
+      // GA4 booking_submitted event
+      window.gtag("event", "booking_submitted", {
         value: value ? parseFloat(value) : 0,
-        currency: "EUR",
+        currency: "CAD",
       });
     }
   }, [value]);
