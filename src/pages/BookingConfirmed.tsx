@@ -1,35 +1,13 @@
-import { useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { CheckCircle } from "lucide-react";
 
-// Declare gtag on window
-declare global {
-  interface Window {
-    gtag?: (...args: unknown[]) => void;
-  }
-}
+// NOTE: Conversion tracking has been REMOVED from this page.
+// The actual conversion fires in Book.tsx after successful form submission.
+// This page is a legacy route — conversions must NOT fire here to avoid
+// double-counting from bots, ad previews, or direct URL visits.
 
 export default function BookingConfirmed() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const value = searchParams.get("value");
-
-  // Fire Google Ads conversion + GA4 booking_submitted event on page load
-  useEffect(() => {
-    if (typeof window.gtag === "function") {
-      // Google Ads conversion – "Booking Submitted" (Leads > Book appointment)
-      window.gtag("event", "conversion", {
-        send_to: "AW-18034320545/6JUVCP-fhpIcEKHJt5dD",
-        value: value ? parseFloat(value) : 1.0,
-        currency: "EUR",
-      });
-      // GA4 booking_submitted event
-      window.gtag("event", "booking_submitted", {
-        value: value ? parseFloat(value) : 0,
-        currency: "EUR",
-      });
-    }
-  }, [value]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
