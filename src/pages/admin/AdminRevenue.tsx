@@ -4,7 +4,7 @@ import {
   Phone, User, Calendar, ChevronDown, ChevronUp,
   Hotel, Search, X, AlertTriangle, MessageCircle,
   ArrowUpRight, ArrowDownRight, Banknote, CreditCard, Wallet,
-  Square, CheckSquare,
+  Square, CheckSquare, Users, Plus, Trash2,
 } from "lucide-react";
 import {
   format, parseISO, isWithinInterval,
@@ -17,7 +17,7 @@ import type { Booking } from "@/types";
 import { calcShiftPayBreakdown, estimateNannyPayBreakdown, calcTotalBookedHours, HOURLY_RATE, getSaturdayPeriod } from "@/utils/shiftHelpers";
 import PaymentPanel from "../../components/PaymentPanel";
 
-type ViewTab = "to-collect" | "collected" | "by-nanny";
+type ViewTab = "to-collect" | "collected" | "by-nanny" | "split";
 type FinancialPeriod = "week" | "month" | "year" | "custom";
 
 export default function AdminRevenue() {
@@ -52,6 +52,12 @@ export default function AdminRevenue() {
   const [financialPeriod, setFinancialPeriod] = useState<FinancialPeriod>("month");
   const [customStart, setCustomStart] = useState<string>(() => format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [customEnd, setCustomEnd] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
+
+  // ── Revenue split (associates) ──
+  const [splitPercent, setSplitPercent] = useState(50); // each associate gets this %
+  const [extraExpenses, setExtraExpenses] = useState<Array<{ label: string; amount: number }>>([]);
+  const [newExpLabel, setNewExpLabel] = useState("");
+  const [newExpAmount, setNewExpAmount] = useState("");
 
   const now = new Date();
 
@@ -209,6 +215,7 @@ export default function AdminRevenue() {
     { key: "to-collect", label: "To Collect", count: toCollect.length, overdue: overdueCount },
     { key: "collected",  label: "Collected",  count: collected.length },
     { key: "by-nanny",   label: "By Nanny",   count: byNanny.length },
+    { key: "split",      label: "Revenue Split", count: 0 },
   ];
 
   const handleCollect = async () => {
@@ -816,6 +823,240 @@ export default function AdminRevenue() {
           )}
         </div>
       )}
+
+      {/* ── Revenue Split Tab ── */}
+      {tab === "split" && (() => {
+        const totalExtraExpenses = extraExpenses.reduce((s, e) => s + e.amount, 0);
+        const totalExpensesEUR = filteredExpenseEUR + totalExtraExpenses;
+        const netAfterAll = filteredRevenue - totalExpensesEUR;
+        const lamiaaShare = Math.round(netAfterAll * splitPercent / 100);
+        const ysShare = netAfterAll - lamiaaShare; // remainder to avoid rounding issues
+
+        return (
+          <div className="space-y-4">
+            {/* Period notice */}
+            <div className="bg-muted/30 rounded-xl border border-border p-3 text-xs text-muted-foreground flex items-center gap-2">
+              <Calendar className="w-4 h-4 shrink-0" />
+              Uses the same period filter from the Financial Summary above ({financialPeriod === "week" ? "This Week" : financialPeriod === "month" ? "This Month" : financialPeriod === "year" ? "This Year" : `${customStart} → ${customEnd}`})
+            </div>
+
+            {/* Revenue breakdown */}
+            <div className="bg-card rounded-xl border border-border shadow-soft p-5 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Users className="w-4 h-4 text-primary" />
+                <h3 className="font-serif text-base font-semibold text-foreground">Revenue Split Calculator</h3>
+              </div>
+
+              {/* Waterfall: Revenue → Nanny Pay → Extra Expenses → Net */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-100">
+                  <div className="flex items-center gap-2">
+                    <ArrowUpRight className="w-4 h-4 text-green-700" />
+                    <span className="text-sm font-medium text-green-800">Total Revenue</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-green-800">{filteredRevenue.toLocaleString()}€</span>
+                    <span className="text-[10px] text-green-600/70 ml-1">({toDH(filteredRevenue).toLocaleString()} DH)</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg bg-orange-50 border border-orange-100">
+                  <div className="flex items-center gap-2">
+                    <ArrowDownRight className="w-4 h-4 text-orange-700" />
+                    <span className="text-sm font-medium text-orange-800">Nanny Pay</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-orange-800">-{filteredExpenseEUR.toLocaleString()}€</span>
+                    <span className="text-[10px] text-orange-600/70 ml-1">({filteredExpenseDH.toLocaleString()} DH)</span>
+                  </div>
+                </div>
+
+                {/* Extra expenses list */}
+                {extraExpenses.map((exp, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-red-50 border border-red-100">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <ArrowDownRight className="w-4 h-4 text-red-700 shrink-0" />
+                      <span className="text-sm font-medium text-red-800 truncate">{exp.label}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-sm font-bold text-red-800">-{exp.amount.toLocaleString()}€</span>
+                      <button
+                        onClick={() => setExtraExpenses((prev) => prev.filter((_, i) => i !== idx))}
+                        className="p-1 rounded-lg hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add expense row */}
+                <div className="flex items-center gap-2 p-2 rounded-lg border border-dashed border-border">
+                  <input
+                    type="text"
+                    value={newExpLabel}
+                    onChange={(e) => setNewExpLabel(e.target.value)}
+                    placeholder="Expense name..."
+                    className="flex-1 min-w-0 px-2 py-1.5 text-sm bg-transparent border-none focus:outline-none placeholder:text-muted-foreground/50"
+                  />
+                  <input
+                    type="number"
+                    value={newExpAmount}
+                    onChange={(e) => setNewExpAmount(e.target.value)}
+                    placeholder="€"
+                    className="w-20 px-2 py-1.5 text-sm bg-transparent border-l border-border focus:outline-none placeholder:text-muted-foreground/50 text-right"
+                  />
+                  <button
+                    onClick={() => {
+                      const amt = parseFloat(newExpAmount);
+                      if (newExpLabel.trim() && amt > 0) {
+                        setExtraExpenses((prev) => [...prev, { label: newExpLabel.trim(), amount: amt }]);
+                        setNewExpLabel("");
+                        setNewExpAmount("");
+                      }
+                    }}
+                    disabled={!newExpLabel.trim() || !newExpAmount || parseFloat(newExpAmount) <= 0}
+                    className="p-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-border my-1" />
+
+                {/* Net after all */}
+                <div className={`flex items-center justify-between p-3 rounded-lg border ${netAfterAll >= 0 ? "bg-blue-50 border-blue-100" : "bg-red-50 border-red-100"}`}>
+                  <div className="flex items-center gap-2">
+                    <DollarSign className={`w-4 h-4 ${netAfterAll >= 0 ? "text-blue-700" : "text-red-700"}`} />
+                    <span className={`text-sm font-semibold ${netAfterAll >= 0 ? "text-blue-800" : "text-red-800"}`}>
+                      Net Income (after all expenses)
+                    </span>
+                  </div>
+                  <span className={`text-base font-bold ${netAfterAll >= 0 ? "text-blue-800" : "text-red-800"}`}>
+                    {netAfterAll.toLocaleString()}€
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Split percentage control */}
+            <div className="bg-card rounded-xl border border-border shadow-soft p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-sm font-semibold text-foreground">Split Ratio</h4>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSplitPercent(50)}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${splitPercent === 50 ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                  >
+                    50/50
+                  </button>
+                  <button
+                    onClick={() => setSplitPercent(60)}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${splitPercent === 60 ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                  >
+                    60/40
+                  </button>
+                  <button
+                    onClick={() => setSplitPercent(70)}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${splitPercent === 70 ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                  >
+                    70/30
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-xs text-muted-foreground w-16 shrink-0">Lamiaa</span>
+                <input
+                  type="range"
+                  min={0} max={100} step={5}
+                  value={splitPercent}
+                  onChange={(e) => setSplitPercent(Number(e.target.value))}
+                  className="flex-1 accent-primary"
+                />
+                <span className="text-xs font-bold text-foreground w-10 text-right">{splitPercent}%</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground w-16 shrink-0">Ys</span>
+                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${100 - splitPercent}%` }} />
+                </div>
+                <span className="text-xs font-bold text-foreground w-10 text-right">{100 - splitPercent}%</span>
+              </div>
+            </div>
+
+            {/* Associate cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Lamiaa */}
+              <div className="bg-card rounded-2xl border border-purple-200 overflow-hidden">
+                <div className="bg-purple-50 px-5 py-3 border-b border-purple-100 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-purple-200 flex items-center justify-center">
+                    <span className="text-purple-700 font-bold text-sm">L</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-purple-900">Lamiaa</p>
+                    <p className="text-[10px] text-purple-600">Associate · {splitPercent}%</p>
+                  </div>
+                </div>
+                <div className="p-5 space-y-3">
+                  <div className="text-center">
+                    <p className={`text-3xl font-bold ${lamiaaShare >= 0 ? "text-purple-700" : "text-red-700"}`}>{lamiaaShare.toLocaleString()}€</p>
+                    <p className="text-xs text-muted-foreground mt-1">{toDH(lamiaaShare).toLocaleString()} DH</p>
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-2.5 text-[11px] text-muted-foreground space-y-1">
+                    <div className="flex justify-between"><span>Revenue share ({splitPercent}%)</span><span>{Math.round(filteredRevenue * splitPercent / 100).toLocaleString()}€</span></div>
+                    <div className="flex justify-between"><span>Nanny pay share</span><span>-{Math.round(filteredExpenseEUR * splitPercent / 100).toLocaleString()}€</span></div>
+                    {totalExtraExpenses > 0 && (
+                      <div className="flex justify-between"><span>Other expenses share</span><span>-{Math.round(totalExtraExpenses * splitPercent / 100).toLocaleString()}€</span></div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Ys */}
+              <div className="bg-card rounded-2xl border border-teal-200 overflow-hidden">
+                <div className="bg-teal-50 px-5 py-3 border-b border-teal-100 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-teal-200 flex items-center justify-center">
+                    <span className="text-teal-700 font-bold text-sm">Y</span>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-teal-900">Ys</p>
+                    <p className="text-[10px] text-teal-600">Associate · {100 - splitPercent}%</p>
+                  </div>
+                </div>
+                <div className="p-5 space-y-3">
+                  <div className="text-center">
+                    <p className={`text-3xl font-bold ${ysShare >= 0 ? "text-teal-700" : "text-red-700"}`}>{ysShare.toLocaleString()}€</p>
+                    <p className="text-xs text-muted-foreground mt-1">{toDH(ysShare).toLocaleString()} DH</p>
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-2.5 text-[11px] text-muted-foreground space-y-1">
+                    <div className="flex justify-between"><span>Revenue share ({100 - splitPercent}%)</span><span>{Math.round(filteredRevenue * (100 - splitPercent) / 100).toLocaleString()}€</span></div>
+                    <div className="flex justify-between"><span>Nanny pay share</span><span>-{Math.round(filteredExpenseEUR * (100 - splitPercent) / 100).toLocaleString()}€</span></div>
+                    {totalExtraExpenses > 0 && (
+                      <div className="flex justify-between"><span>Other expenses share</span><span>-{Math.round(totalExtraExpenses * (100 - splitPercent) / 100).toLocaleString()}€</span></div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Summary footer */}
+            <div className={`rounded-2xl border p-4 flex items-center justify-between ${netAfterAll >= 0 ? "bg-blue-50 border-blue-200" : "bg-red-50 border-red-200"}`}>
+              <div>
+                <p className={`text-sm font-medium ${netAfterAll >= 0 ? "text-blue-800" : "text-red-800"}`}>
+                  Total distributed: {filteredRevenue.toLocaleString()}€ revenue − {totalExpensesEUR.toLocaleString()}€ expenses
+                </p>
+                <p className={`text-xs mt-0.5 ${netAfterAll >= 0 ? "text-blue-600/70" : "text-red-600/70"}`}>
+                  Lamiaa: {lamiaaShare.toLocaleString()}€ · Ys: {ysShare.toLocaleString()}€
+                </p>
+              </div>
+              <p className={`text-lg font-bold ${netAfterAll >= 0 ? "text-blue-800" : "text-red-800"}`}>
+                {netAfterAll.toLocaleString()}€
+              </p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Bulk Collect Modal ── */}
       {bulkModal && (() => {
