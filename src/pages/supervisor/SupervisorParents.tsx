@@ -421,8 +421,11 @@ function sharePdf(){
       <div class="addr">
         <div class="addr-label">FROM</div>
         <div class="addr-name">Call a Nanny</div>
-        <div class="addr-line">Professional Childcare</div>
+        <div class="addr-line">Elam Childcare SARL</div>
+        <div class="addr-line">RC Marrakech N° 179297</div>
         <div class="addr-line">Marrakech, Morocco</div>
+        <div class="addr-line" style="margin-top:6px;font-size:11px;">IBAN: MA64 011450000012210003599237</div>
+        <div class="addr-line" style="font-size:11px;">SWIFT: BMCEMAMC</div>
       </div>
       <div class="addr">
         <div class="addr-label">BILLED TO</div>

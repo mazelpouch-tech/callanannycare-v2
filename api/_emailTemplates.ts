@@ -800,9 +800,12 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
         <td style="vertical-align:top;width:50%;padding-right:16px;">
           <p style="margin:0 0 4px;color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">${s.from}</p>
           <p style="margin:0;color:#1a1a1a;font-size:15px;font-weight:700;">Call a Nanny</p>
-          <p style="margin:2px 0 0;color:#666;font-size:13px;">Professional Childcare Services</p>
+          <p style="margin:2px 0 0;color:#666;font-size:13px;">Elam Childcare SARL</p>
+          <p style="margin:2px 0 0;color:#666;font-size:13px;">RC Marrakech N° 179297</p>
           <p style="margin:2px 0 0;color:#666;font-size:13px;">Marrakech, Morocco</p>
           <p style="margin:2px 0 0;color:#666;font-size:13px;">info@callanannycare.com</p>
+          <p style="margin:6px 0 0;color:#999;font-size:11px;">IBAN: MA64 011450000012210003599237</p>
+          <p style="margin:2px 0 0;color:#999;font-size:11px;">SWIFT: BMCEMAMC</p>
         </td>
         <td style="vertical-align:top;width:50%;padding-left:16px;">
           <p style="margin:0 0 4px;color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">${s.billedTo}</p>
@@ -847,7 +850,7 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
       <a href="${baseUrl}/rebook/${data.bookingId}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:50px;box-shadow:0 2px 8px rgba(236,72,153,0.3);">${s.rebookBtn}</a>
     </div>
 
-    <p style="margin:0 0 4px;color:#999;font-size:12px;text-align:center;font-style:italic;">${s.issuedBy}: Call a Nanny · callanannycare.com</p>
+    <p style="margin:0 0 4px;color:#999;font-size:12px;text-align:center;font-style:italic;">${s.issuedBy}: Call a Nanny · Elam Childcare SARL · RC Marrakech 179297</p>
     <p style="margin:12px 0 0;color:#999;font-size:13px;text-align:center;">${s.thankYouService}</p>
     <p style="margin:4px 0 0;color:#999;font-size:13px;text-align:center;">${s.contactUs} <a href="mailto:info@callanannycare.com" style="color:#f97316;">info@callanannycare.com</a></p>
   `;
