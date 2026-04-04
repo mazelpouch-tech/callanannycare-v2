@@ -107,6 +107,8 @@ export default function AdminInvoices() {
   // Grouped view
   const [viewMode, setViewMode] = useState<"individual" | "grouped">("grouped");
   const [expandedParent, setExpandedParent] = useState<string | null>(null);
+  const [editingBilledToKey, setEditingBilledToKey] = useState<string | null>(null);
+  const [billedToValue, setBilledToValue] = useState("");
 
   // Share menu
   const [shareMenuId, setShareMenuId] = useState<number | string | null>(null);
@@ -1423,6 +1425,44 @@ function sharePdf(){
                       >
                         <Download className="w-3 h-3" /> Combined PDF
                       </button>
+                      {/* Billed To edit */}
+                      {editingBilledToKey === group.key ? (
+                        <div className="flex items-center gap-1.5 ml-auto">
+                          <input
+                            type="text"
+                            value={billedToValue}
+                            onChange={(e) => setBilledToValue(e.target.value)}
+                            placeholder="e.g. Club Med La Palmeraie"
+                            className="px-2 py-1 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-primary/30 w-52"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                const val = billedToValue.trim();
+                                group.bookings.forEach((b) => updateBooking(b.id, { billedTo: val }));
+                                setEditingBilledToKey(null);
+                              } else if (e.key === "Escape") {
+                                setEditingBilledToKey(null);
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={() => {
+                              const val = billedToValue.trim();
+                              group.bookings.forEach((b) => updateBooking(b.id, { billedTo: val }));
+                              setEditingBilledToKey(null);
+                            }}
+                            className="px-2 py-1 text-xs font-medium text-white bg-primary rounded-lg hover:opacity-90"
+                          >Save</button>
+                          <button onClick={() => setEditingBilledToKey(null)} className="text-xs text-muted-foreground hover:text-foreground">✕</button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => { setBilledToValue(group.bookings[0]?.billedTo || ""); setEditingBilledToKey(group.key); }}
+                          className="flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors ml-auto"
+                        >
+                          <Pencil className="w-3 h-3" /> {group.bookings[0]?.billedTo ? `Billed to: ${group.bookings[0].billedTo}` : "Set Billed To"}
+                        </button>
+                      )}
                     </div>
                     {/* Individual bookings list */}
                     <div className="divide-y divide-border">
