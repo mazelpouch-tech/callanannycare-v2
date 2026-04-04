@@ -30,6 +30,7 @@ interface UpdateBookingBody {
   payment_method?: string;
   restore?: boolean; // Restore a soft-deleted booking
   admin_notes?: string;
+  billed_to?: string;
   extra_dates?: string | null;
   extra_times?: string | null;
   skip_conflict_check?: boolean;
@@ -44,6 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // Ensure migration columns exist
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS admin_notes TEXT DEFAULT ''`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS billed_to TEXT DEFAULT ''`;
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS extra_dates TEXT DEFAULT NULL`;
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS extra_times TEXT`;
 
@@ -131,7 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ────────────────────────────────────────────────────────────────
     
     if (req.method === 'PUT') {
-      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder, cancellation_reason, cancelled_by, collected_by, collected_at, collection_note, payment_method, restore, admin_notes, extra_dates, extra_times, skip_conflict_check } = req.body as UpdateBookingBody;
+      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder, cancellation_reason, cancelled_by, collected_by, collected_at, collection_note, payment_method, restore, admin_notes, billed_to, extra_dates, extra_times, skip_conflict_check } = req.body as UpdateBookingBody;
 
       // Restore a soft-deleted booking
       if (restore) {
@@ -215,6 +217,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const _collection_note = collection_note || null;
       const _payment_method = payment_method || null;
       const _admin_notes = admin_notes !== undefined ? admin_notes : null;
+      const _billed_to = billed_to !== undefined ? billed_to : null;
       const _extra_dates = extra_dates !== undefined ? extra_dates : null;
       const _extra_times = extra_times !== undefined ? extra_times : null;
 
@@ -245,6 +248,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           collection_note = COALESCE(${_collection_note}, collection_note),
           payment_method = COALESCE(${_payment_method}, payment_method),
           admin_notes = COALESCE(${_admin_notes}, admin_notes),
+          billed_to = COALESCE(${_billed_to}, billed_to),
           extra_dates = COALESCE(${_extra_dates}, extra_dates),
           extra_times = CASE WHEN ${extra_times !== undefined} THEN ${_extra_times} ELSE extra_times END,
           updated_at = NOW()
@@ -781,6 +785,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             totalPrice: result[0].total_price,
             nannyName: nannyName2,
             locale: result[0].locale || 'en',
+            billedTo: result[0].billed_to || '',
           });
         } catch (resendError: unknown) {
           console.error('Resend invoice email failed:', resendError);

@@ -729,6 +729,7 @@ export interface InvoiceEmailData {
   totalPrice: number;
   nannyName: string;
   locale: string;
+  billedTo?: string;
 }
 
 function formatClockTime(isoString: string): string {
@@ -809,7 +810,8 @@ export async function sendInvoiceEmail(data: InvoiceEmailData): Promise<void> {
         </td>
         <td style="vertical-align:top;width:50%;padding-left:16px;">
           <p style="margin:0 0 4px;color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">${s.billedTo}</p>
-          <p style="margin:0;color:#1a1a1a;font-size:15px;font-weight:700;">${data.clientName}</p>
+          <p style="margin:0;color:#1a1a1a;font-size:15px;font-weight:700;">${data.billedTo || data.clientName}</p>
+          ${data.billedTo ? `<p style="margin:2px 0 0;color:#666;font-size:13px;font-style:italic;">On behalf of ${data.clientName}</p>` : ''}
           <p style="margin:2px 0 0;color:#666;font-size:13px;">${data.clientEmail}</p>
           ${data.clientPhone ? `<p style="margin:2px 0 0;color:#666;font-size:13px;">${data.clientPhone}</p>` : ''}
           ${data.hotel ? `<p style="margin:2px 0 0;color:#666;font-size:13px;">${data.hotel}</p>` : ''}

@@ -688,7 +688,8 @@ function sharePdf(){
       </div>
       <div class="addr">
         <div class="addr-label">BILLED TO</div>
-        <div class="addr-name">${p.name}</div>
+        <div class="addr-name">${activeBookings[0]?.billedTo || p.name}</div>
+        ${activeBookings[0]?.billedTo ? `<div class="addr-line">On behalf of ${p.name}</div>` : ""}
         ${p.phone ? `<div class="addr-line"><span class="icon">&#9742;</span> ${p.phone}</div>` : ""}
         ${p.hotel ? `<div class="addr-line"><span class="icon">&#127976;</span> ${p.hotel}</div>` : ""}
       </div>
@@ -1738,7 +1739,8 @@ function sharePdf(){
                   </div>
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold mb-1">Billed To</p>
-                    <p className="text-sm font-semibold text-foreground">{p.name}</p>
+                    <p className="text-sm font-semibold text-foreground">{p.bookings[0]?.billedTo || p.name}</p>
+                    {p.bookings[0]?.billedTo && <p className="text-xs text-muted-foreground italic">On behalf of {p.name}</p>}
                     {p.email && <p className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="w-3 h-3" />{p.email}</p>}
                     {p.phone && <p className="text-xs text-muted-foreground flex items-center gap-1">{p.phone}</p>}
                     {p.hotel && <p className="text-xs text-muted-foreground flex items-center gap-1">{p.hotel}</p>}

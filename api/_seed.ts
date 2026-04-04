@@ -223,6 +223,7 @@ export default async function seedHandler(req: VercelRequest, res: VercelRespons
 
     // ─── Admin Notes (internal notes per booking) ────────────────────
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS admin_notes TEXT DEFAULT ''`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS billed_to TEXT DEFAULT ''`;
     // ────────────────────────────────────────────────────────────────
 
     // ─── Extra Time Blocks (morning + evening bookings) ────────────

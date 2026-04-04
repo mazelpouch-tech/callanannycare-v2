@@ -75,6 +75,7 @@ export interface DbBooking {
   deleted_at: string | null;
   deleted_by: string;
   admin_notes: string;
+  billed_to: string;
   extra_dates: string | null; // JSON array of additional non-contiguous dates
   extra_times: string | null; // JSON array of additional time blocks e.g. [{"start_time":"18h00","end_time":"21h00"}]
 }
@@ -170,6 +171,7 @@ export interface Booking {
   deletedAt: string | null;
   deletedBy: string;
   adminNotes: string;
+  billedTo: string;
   extraDates: string[] | null; // non-contiguous additional dates for multi-date bookings
   extraTimes: Array<{ startTime: string; endTime: string }> | null; // additional time blocks (e.g. morning + evening)
 }
