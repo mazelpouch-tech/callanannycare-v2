@@ -429,10 +429,10 @@ function sharePdf(){
       </div>
       <div class="addr">
         <div class="addr-label">BILLED TO</div>
-        <div class="addr-name">${p.name}</div>
+        <div class="addr-name">${activeBookings[0]?.billedTo || p.name}</div>
+        ${activeBookings[0]?.billedTo ? `<div class="addr-line" style="margin-top:4px;"><strong>Client:</strong> ${p.name}</div>` : ""}
         ${p.phone ? `<div class="addr-line"><span class="icon">&#9742;</span> ${p.phone}</div>` : ""}
         ${p.hotel ? `<div class="addr-line"><span class="icon">&#127976;</span> ${p.hotel}</div>` : ""}
-        ${activeBookings[0]?.billedTo ? `<div class="addr-line" style="margin-top:6px;font-style:italic;color:#666;">Billed to: ${activeBookings[0].billedTo}</div>` : ""}
       </div>
     </div>
 
