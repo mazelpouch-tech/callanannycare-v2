@@ -25,6 +25,7 @@ import {
   Car,
   ChevronLeft,
   ChevronRight,
+  Pencil,
 } from "lucide-react";
 import { format, parseISO, startOfMonth, endOfMonth, subDays } from "date-fns";
 import { useData } from "../../context/DataContext";
@@ -120,6 +121,8 @@ export default function AdminParents() {
   const [viewParentInvoice, setViewParentInvoice] = useState<ParentSummary | null>(null);
   const [emailSending, setEmailSending] = useState<number | string | null>(null);
   const [emailSendingParent, setEmailSendingParent] = useState(false);
+  const [editingBilledTo, setEditingBilledTo] = useState(false);
+  const [billedToValue, setBilledToValue] = useState("");
 
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"spent" | "bookings" | "recent" | "hours">("spent");
@@ -683,8 +686,11 @@ function sharePdf(){
       <div class="addr">
         <div class="addr-label">FROM</div>
         <div class="addr-name">Call a Nanny</div>
-        <div class="addr-line">Professional Childcare</div>
+        <div class="addr-line">Elam Childcare SARL</div>
+        <div class="addr-line">RC Marrakech N° 179297</div>
         <div class="addr-line">Marrakech, Morocco</div>
+        <div class="addr-line" style="margin-top:6px;font-size:11px;">IBAN: MA64 011450000012210003599237</div>
+        <div class="addr-line" style="font-size:11px;">SWIFT: BMCEMAMC</div>
       </div>
       <div class="addr">
         <div class="addr-label">BILLED TO</div>
@@ -1734,16 +1740,57 @@ function sharePdf(){
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold mb-1">From</p>
                     <p className="text-sm font-semibold text-foreground">Call a Nanny</p>
-                    <p className="text-xs text-muted-foreground">Professional Childcare</p>
+                    <p className="text-xs text-muted-foreground">Elam Childcare SARL</p>
+                    <p className="text-xs text-muted-foreground">RC Marrakech N° 179297</p>
                     <p className="text-xs text-muted-foreground">Marrakech, Morocco</p>
+                    <p className="text-xs text-muted-foreground mt-1 font-mono">IBAN: MA64 0114...9237</p>
+                    <p className="text-xs text-muted-foreground font-mono">SWIFT: BMCEMAMC</p>
                   </div>
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold mb-1">Billed To</p>
                     <p className="text-sm font-semibold text-foreground">{p.name}</p>
-                    {p.bookings[0]?.billedTo && <p className="text-xs text-muted-foreground italic">Billed to: {p.bookings[0].billedTo}</p>}
                     {p.email && <p className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="w-3 h-3" />{p.email}</p>}
                     {p.phone && <p className="text-xs text-muted-foreground flex items-center gap-1">{p.phone}</p>}
                     {p.hotel && <p className="text-xs text-muted-foreground flex items-center gap-1">{p.hotel}</p>}
+                    {/* Editable Billed To */}
+                    {editingBilledTo ? (
+                      <div className="mt-2 flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={billedToValue}
+                          onChange={(e) => setBilledToValue(e.target.value)}
+                          placeholder="e.g. Club Med La Palmeraie"
+                          className="flex-1 px-2 py-1 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-primary/30"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              const val = billedToValue.trim();
+                              activeBookings.forEach((b) => updateBooking(b.id, { billedTo: val }));
+                              setEditingBilledTo(false);
+                            } else if (e.key === "Escape") {
+                              setEditingBilledTo(false);
+                            }
+                          }}
+                        />
+                        <button
+                          onClick={() => {
+                            const val = billedToValue.trim();
+                            activeBookings.forEach((b) => updateBooking(b.id, { billedTo: val }));
+                            setEditingBilledTo(false);
+                          }}
+                          className="px-2 py-1 text-xs font-medium text-white bg-primary rounded-lg hover:opacity-90"
+                        >Save</button>
+                        <button onClick={() => setEditingBilledTo(false)} className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground">Cancel</button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setBilledToValue(activeBookings[0]?.billedTo || ""); setEditingBilledTo(true); }}
+                        className="mt-2 flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        {activeBookings[0]?.billedTo ? `Billed to: ${activeBookings[0].billedTo}` : "Add billed to..."}
+                      </button>
+                    )}
                   </div>
                 </div>
 
