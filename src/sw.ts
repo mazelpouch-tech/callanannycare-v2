@@ -24,7 +24,14 @@ precacheAndRoute(self.__WB_MANIFEST);
 // a direct network request, bypassing any potential Workbox interference.
 self.addEventListener('fetch', (event: FetchEvent) => {
   if (new URL(event.request.url).pathname.startsWith('/api/')) {
-    event.respondWith(fetch(event.request));
+    event.respondWith(
+      fetch(event.request).catch(() =>
+        new Response(JSON.stringify({ error: 'Network request failed' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+    );
   }
 });
 
