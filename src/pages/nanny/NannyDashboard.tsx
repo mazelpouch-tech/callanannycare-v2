@@ -33,6 +33,7 @@ import {
   toDateStr,
   estimateNannyPayBreakdown,
   calcBookedHours,
+  calcTotalBookedHours,
   formatPeriodLabel,
 } from "@/utils/shiftHelpers";
 import ExtendBookingModal from "../../components/ExtendBookingModal";
@@ -201,8 +202,8 @@ function TodayBookingsSection({ bookings, updateBookingStatus, fetchNannyBooking
 
         <div className="space-y-3">
           {todayConfirmed.map((booking) => {
-            const hours = calcBookedHours(booking.startTime || "", booking.endTime || "", booking.date, booking.endDate);
-            const pay = estimateNannyPayBreakdown(booking.startTime || "", booking.endTime || "", booking.date, booking.endDate);
+            const hours = calcTotalBookedHours(booking.startTime || "", booking.endTime || "", booking.extraTimes, booking.date, booking.endDate);
+            const pay = estimateNannyPayBreakdown(booking.startTime || "", booking.endTime || "", booking.date, booking.endDate, booking.extraTimes);
             return (
               <div key={booking.id} className="bg-muted/30 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">

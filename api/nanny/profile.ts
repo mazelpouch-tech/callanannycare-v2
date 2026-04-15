@@ -2,6 +2,38 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb, setCors } from '../_db.js';
 import type { DbNanny, DbNotification } from '@/types';
 
+/** Parse time string like "09h00" or "14:30" to decimal hours */
+function parseTimeToHours(t: string): number | null {
+  if (!t) return null;
+  const hFormat = t.match(/^(\d{1,2})h(\d{2})$/i);
+  if (hFormat) return parseInt(hFormat[1]) + parseInt(hFormat[2]) / 60;
+  const colonFormat = t.match(/^(\d{1,2}):(\d{2})/);
+  if (colonFormat) {
+    let h = parseInt(colonFormat[1]);
+    const m = parseInt(colonFormat[2]);
+    if (/pm/i.test(t) && h < 12) h += 12;
+    if (/am/i.test(t) && h === 12) h = 0;
+    return h + m / 60;
+  }
+  return null;
+}
+
+/** Calculate booked hours from start/end time strings, matching frontend logic */
+function parseBookedHours(startTime: string, endTime: string, startDate?: string, endDate?: string | null): number {
+  const s = parseTimeToHours(startTime);
+  const e = parseTimeToHours(endTime);
+  if (s === null || e === null) return 0;
+  const hoursPerDay = e > s ? e - s : (24 - s) + e;
+  if (hoursPerDay <= 0) return 0;
+  let days = 1;
+  if (startDate && endDate) {
+    const d1 = new Date(startDate).getTime();
+    const d2 = new Date(endDate).getTime();
+    if (d2 > d1) days = Math.round((d2 - d1) / 86400000) + 1;
+  }
+  return hoursPerDay * days;
+}
+
 interface UpdateProfileBody {
   nannyId: number;
   bio?: string;
@@ -46,23 +78,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           WHERE nanny_id = ${nannyId}
         ` as { completed_bookings: string; upcoming_bookings: string; pending_bookings: string; total_earnings: string; this_week_bookings: string }[];
 
-        const hoursResult = await sql`
-          SELECT
-            COALESCE(SUM(
-              EXTRACT(EPOCH FROM (clock_out::timestamptz - clock_in::timestamptz)) / 3600
-            ), 0) as total_hours_worked
+        // Calculate hours from booked times (start_time/end_time + extra_times) instead of clock data
+        // This correctly accounts for split bookings (e.g. 10h00-13h00 + 18h00-21h30)
+        const completedRows = await sql`
+          SELECT start_time, end_time, extra_times, date, end_date
           FROM bookings
           WHERE nanny_id = ${nannyId}
             AND status = 'completed'
-            AND clock_in IS NOT NULL
-            AND clock_out IS NOT NULL
-        ` as { total_hours_worked: string }[];
+            AND start_time IS NOT NULL
+            AND end_time IS NOT NULL
+        ` as { start_time: string; end_time: string; extra_times: string | null; date: string; end_date: string | null }[];
+
+        let totalHours = 0;
+        for (const row of completedRows) {
+          totalHours += parseBookedHours(row.start_time, row.end_time, row.date, row.end_date);
+          if (row.extra_times) {
+            try {
+              const extras = typeof row.extra_times === 'string' ? JSON.parse(row.extra_times) : row.extra_times;
+              if (Array.isArray(extras)) {
+                for (const et of extras) {
+                  const s = et.start_time || et.startTime;
+                  const e = et.end_time || et.endTime;
+                  if (s && e) totalHours += parseBookedHours(s, e, row.date, row.end_date);
+                }
+              }
+            } catch { /* ignore malformed JSON */ }
+          }
+        }
 
         const stats = statsResult[0];
-        const hours = hoursResult[0];
 
         return res.status(200).json({
-          totalHoursWorked: parseFloat(parseFloat(hours.total_hours_worked).toFixed(1)),
+          totalHoursWorked: parseFloat(totalHours.toFixed(1)),
           completedBookings: parseInt(stats.completed_bookings),
           upcomingBookings: parseInt(stats.upcoming_bookings),
           pendingBookings: parseInt(stats.pending_bookings),
