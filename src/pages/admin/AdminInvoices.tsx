@@ -563,7 +563,16 @@ export default function AdminInvoices() {
     const endH = inv.endTime ? parseTimeToHours(inv.endTime) : (inv.clockOut ? new Date(inv.clockOut).getHours() : 0);
     const inHour = startH ?? 0;
     const outHour = endH ?? 0;
-    const hasTaxi = inHour >= 19 || inHour < 7 || outHour >= 19 || outHour < 7 || hoursNum > 12;
+    let hasTaxi = inHour >= 19 || inHour < 7 || outHour >= 19 || outHour < 7 || hoursNum > 12;
+    // Also check extra time blocks for evening hours
+    if (!hasTaxi && inv.extraTimes) {
+      for (const et of inv.extraTimes) {
+        const s = parseTimeToHours(et.startTime);
+        const e = parseTimeToHours(et.endTime);
+        if (s !== null && (s >= 19 || s < 7)) { hasTaxi = true; break; }
+        if (e !== null && (e >= 19 || e < 7)) { hasTaxi = true; break; }
+      }
+    }
     const dateStr = inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A";
     const total = inv.totalPrice || 0;
     const totalDH = toDH(total);
@@ -677,7 +686,9 @@ function sharePdf(){
       </div>
       <div class="card-row">
         <span class="card-row-label"><span class="icon">&#9201;</span> Time Slot</span>
-        <span class="card-row-value">${inv.startTime || formatClockTime(inv.clockIn)} – ${inv.endTime || formatClockTime(inv.clockOut)}</span>
+        <span class="card-row-value" style="text-align:right;">
+          ${inv.startTime || formatClockTime(inv.clockIn)} – ${inv.endTime || formatClockTime(inv.clockOut)}${inv.extraTimes && inv.extraTimes.length > 0 ? inv.extraTimes.map((et: { startTime: string; endTime: string }) => `<br/>${et.startTime} – ${et.endTime}`).join("") : ""}
+        </span>
       </div>
       <div class="card-row">
         <span class="card-row-label">Service Hours</span>
@@ -741,12 +752,15 @@ function sharePdf(){
         : 0;
       const hours = bookedH > 0 ? bookedH.toFixed(1) : calcWorkedHours(inv.clockIn, inv.clockOut);
       const dateStr = inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A";
-      const timeSlot = `${inv.startTime || formatClockTime(inv.clockIn)} – ${inv.endTime || formatClockTime(inv.clockOut)}`;
+      const mainSlot = `${inv.startTime || formatClockTime(inv.clockIn)} – ${inv.endTime || formatClockTime(inv.clockOut)}`;
+      const extraSlots = inv.extraTimes && inv.extraTimes.length > 0
+        ? inv.extraTimes.map((et: { startTime: string; endTime: string }) => ` + ${et.startTime} – ${et.endTime}`).join("")
+        : "";
       return `
       <div class="card-row">
         <span class="card-row-label" style="flex-direction:column;align-items:flex-start;gap:2px;">
           <span style="font-weight:600;color:#1a202c;">${dateStr}</span>
-          <span style="font-size:11px;">${inv.nannyName || "Unassigned"} · ${timeSlot} · ${hours}h</span>
+          <span style="font-size:11px;">${inv.nannyName || "Unassigned"} · ${mainSlot}${extraSlots} · ${hours}h</span>
         </span>
         <span class="card-row-value">${(inv.totalPrice || 0)}€</span>
       </div>`;
