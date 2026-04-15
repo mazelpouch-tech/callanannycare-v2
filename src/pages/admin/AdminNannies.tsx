@@ -46,6 +46,7 @@ import {
   calcNannyPayBreakdown,
   estimateNannyPayBreakdown,
   calcBookedHours,
+  calcTotalBookedHours,
   calcActualHoursWorked,
   isWithinGracePeriod,
   HOURLY_RATE,
@@ -169,8 +170,8 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
       const nannyId = b.nannyId;
       if (nannyId == null) return;
       ensureNanny(nannyId, b.nannyName || "Unknown");
-      const hours = calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
-      const bd = estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate);
+      const hours = calcTotalBookedHours(b.startTime, b.endTime, b.extraTimes, b.date, b.endDate);
+      const bd = estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate, b.extraTimes);
 
       nannyMap[nannyId].shifts += 1;
       nannyMap[nannyId].totalHours += hours;
@@ -199,8 +200,8 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
       const nannyId = b.nannyId;
       if (nannyId == null) return;
       ensureNanny(nannyId, b.nannyName || "Unknown");
-      const hours = calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
-      const bd = estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate);
+      const hours = calcTotalBookedHours(b.startTime, b.endTime, b.extraTimes, b.date, b.endDate);
+      const bd = estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate, b.extraTimes);
 
       nannyMap[nannyId].upcomingShifts += 1;
       nannyMap[nannyId].upcomingHours += hours;
@@ -233,7 +234,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
     completedBookings.forEach((b) => {
       const nannyId = b.nannyId;
       if (nannyId == null) return;
-      const booked = Math.round(calcBookedHours(b.startTime, b.endTime, b.date, b.endDate) * 10) / 10;
+      const booked = Math.round(calcTotalBookedHours(b.startTime, b.endTime, b.extraTimes, b.date, b.endDate) * 10) / 10;
       const actual = Math.round(calcActualHoursWorked(b.clockIn!, b.clockOut!) * 10) / 10;
       const diff = Math.round((actual - booked) * 10) / 10;
       // Only flag bookings outside the grace period (10 min each end)
@@ -1172,7 +1173,7 @@ export default function AdminNannies() {
       const eP = estimateNannyPayBreakdown(b.startTime, b.endTime, b.date, b.endDate);
       const pay = aP.total > 0 ? aP : eP;
       s.pay += pay.total;
-      s.hours += calcBookedHours(b.startTime, b.endTime, b.date, b.endDate);
+      s.hours += calcTotalBookedHours(b.startTime, b.endTime, b.extraTimes, b.date, b.endDate);
     }
 
     const rows = Array.from(byNanny.entries())

@@ -2444,7 +2444,7 @@ export default function AdminBookings() {
                         <span>
                           {formatTime(booking.startTime)}{booking.endTime ? ` - ${booking.endTime}` : ""}
                           {(() => {
-                            const h = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                            const h = calcTotalBookedHours(booking.startTime, booking.endTime, booking.extraTimes, booking.date, booking.endDate);
                             return h > 0 ? ` (${h}h)` : "";
                           })()}
                         </span>
@@ -2467,12 +2467,12 @@ export default function AdminBookings() {
                           <span className="text-[10px] text-muted-foreground ml-1">({toDH(booking.totalPrice).toLocaleString()} DH)</span>
                         )}
                         {(() => {
-                          const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                          const hours = calcTotalBookedHours(booking.startTime, booking.endTime, booking.extraTimes, booking.date, booking.endDate);
                           const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 150;
                           const actualPay = calcNannyPayBreakdown(booking);
                           const estPay = actualPay.total > 0
                             ? actualPay
-                            : estimateNannyPayBreakdown(booking.startTime, booking.endTime, booking.date, booking.endDate);
+                            : estimateNannyPayBreakdown(booking.startTime, booking.endTime, booking.date, booking.endDate, booking.extraTimes);
                           const isActual = actualPay.total > 0;
 
                           return (
