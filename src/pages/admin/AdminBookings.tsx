@@ -50,7 +50,7 @@ import ExtendBookingModal from "../../components/ExtendBookingModal";
 import type { DaySchedule } from "../../components/ExtendBookingModal";
 import ForwardBookingModal from "../../components/ForwardBookingModal";
 import type { Booking, BookingStatus, BookingPlan } from "@/types";
-import { calcBookedHours, calcTotalBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE, isTomorrow as isTomorrowDate, timesOverlap } from "@/utils/shiftHelpers";
+import { calcBookedHours, calcTotalBookedHours, calcNannyPayBreakdown, estimateNannyPayBreakdown, HOURLY_RATE, isTomorrow as isTomorrowDate, timesOverlap, bookingPerDayPrice } from "@/utils/shiftHelpers";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { downloadQuotePdf, shareQuotePdf, generateQuoteRef } from "@/utils/quotePdf";
 import type { QuotePdfData } from "@/utils/quotePdf";
@@ -1686,7 +1686,7 @@ export default function AdminBookings() {
                         <div className="truncate font-medium">{b.clientName}</div>
                         <div className="truncate text-[9px] opacity-70">{b.nannyName}</div>
                         {b.totalPrice && (
-                          <div className="font-semibold mt-0.5">{b.totalPrice}€</div>
+                          <div className="font-semibold mt-0.5">{bookingPerDayPrice(b)}€</div>
                         )}
                       </button>
                     ))
@@ -1696,9 +1696,9 @@ export default function AdminBookings() {
                   {dayBookings.length > 0 && (
                     <div className="mt-auto pt-1 border-t border-border/50 text-[9px] text-muted-foreground text-center">
                       {dayBookings.length} booking{dayBookings.length !== 1 ? "s" : ""}
-                      {dayBookings.reduce((s, b) => s + (b.totalPrice || 0), 0) > 0 && (
+                      {dayBookings.reduce((s, b) => s + bookingPerDayPrice(b), 0) > 0 && (
                         <span className="ml-1 font-semibold text-foreground">
-                          · {dayBookings.reduce((s, b) => s + (b.totalPrice || 0), 0)}€
+                          · {dayBookings.reduce((s, b) => s + bookingPerDayPrice(b), 0)}€
                         </span>
                       )}
                     </div>

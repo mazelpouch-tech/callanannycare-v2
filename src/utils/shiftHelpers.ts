@@ -30,6 +30,26 @@ export function isBookingOnDate(b: Booking, dateStr: string): boolean {
   return false;
 }
 
+/** Count how many distinct dates a booking covers (endDate range + extraDates). */
+export function bookingDayCount(b: Booking): number {
+  let count = 1;
+  if (b.endDate && b.date && b.endDate !== b.date) {
+    const diff = Math.round((new Date(b.endDate).getTime() - new Date(b.date).getTime()) / 86400000);
+    count = Math.max(1, diff + 1);
+  }
+  if (b.extraDates && b.extraDates.length > 0) {
+    count += b.extraDates.length;
+  }
+  return count;
+}
+
+/** Per-day share of a booking's totalPrice (for rendering multi-day records on a single day). */
+export function bookingPerDayPrice(b: Booking): number {
+  const total = b.totalPrice || 0;
+  const days = bookingDayCount(b);
+  return days > 1 ? Math.round(total / days) : total;
+}
+
 export function isTomorrow(dateStr: string): boolean {
   if (!dateStr) return false;
   const tomorrow = new Date();
