@@ -10,7 +10,7 @@ import {
 } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
-import { isBookingOnDate } from "@/utils/shiftHelpers";
+import { isBookingOnDate, bookingPerDayPrice } from "@/utils/shiftHelpers";
 import type { Booking, BookingStatus } from "@/types";
 
 // ─── Urgency Badge ───────────────────────────────────────────────
@@ -217,7 +217,7 @@ export default function Dashboard() {
         {/* Day columns */}
         <div className="grid grid-cols-3 gap-2">
           {agendaDays.map(({ day, dateStr, bookings: dayBookings, isToday: isDayToday }) => {
-            const dayTotal = dayBookings.reduce((s, b) => s + (b.totalPrice || 0), 0);
+            const dayTotal = dayBookings.reduce((s, b) => s + bookingPerDayPrice(b), 0);
             return (
               <div key={dateStr} className={`flex flex-col gap-1.5 min-w-0 rounded-xl border p-2 ${isDayToday ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
                 {/* Day header */}
@@ -251,7 +251,7 @@ export default function Dashboard() {
                       ))}
                       <div className="truncate font-medium">{b.clientName}</div>
                       <div className="truncate text-[9px] opacity-70">{b.nannyName || "Unassigned"}</div>
-                      {b.totalPrice ? <div className="font-semibold mt-0.5">{b.totalPrice}€</div> : null}
+                      {b.totalPrice ? <div className="font-semibold mt-0.5">{bookingPerDayPrice(b)}€</div> : null}
                     </div>
                   ))
                 )}

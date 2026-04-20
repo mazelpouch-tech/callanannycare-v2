@@ -24,6 +24,7 @@ import {
   isAfter,
 } from "date-fns";
 import { useData } from "../../context/DataContext";
+import { bookingPerDayPrice } from "@/utils/shiftHelpers";
 import type { Booking, BookingStatus } from "@/types";
 
 const statusDots: Record<BookingStatus, string> = {
@@ -267,7 +268,7 @@ export default function AdminCalendar() {
                       </div>
                       <div className="flex items-center justify-between pt-1">
                         <span className="text-sm font-bold text-foreground">
-                          {booking.totalPrice}€
+                          {bookingPerDayPrice(booking)}€
                         </span>
                         {booking.clientPhone && (
                           <button
