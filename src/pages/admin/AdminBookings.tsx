@@ -1881,7 +1881,7 @@ export default function AdminBookings() {
                           <td className="px-4 py-3.5">
                             {(() => {
                               const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate) + (booking.extraTimes ? booking.extraTimes.reduce((s, et) => s + calcBookedHours(et.startTime, et.endTime), 0) : 0);
-                              const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 150;
+                              const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 10;
                               const actualPay = calcNannyPayBreakdown(booking);
                               const estPay = actualPay.total > 0
                                 ? actualPay
@@ -2116,7 +2116,7 @@ export default function AdminBookings() {
                                 </div>
                                 {(() => {
                                   const hours = calcBookedHours(booking.startTime, booking.endTime, booking.date, booking.endDate) + (booking.extraTimes ? booking.extraTimes.reduce((s, et) => s + calcBookedHours(et.startTime, et.endTime), 0) : 0);
-                                  const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 150;
+                                  const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 10;
                                   const actualPay = calcNannyPayBreakdown(booking);
                                   const estPay = actualPay.total > 0
                                     ? actualPay
@@ -2469,7 +2469,7 @@ export default function AdminBookings() {
                         )}
                         {(() => {
                           const hours = calcTotalBookedHours(booking.startTime, booking.endTime, booking.extraTimes, booking.date, booking.endDate);
-                          const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 150;
+                          const nannyRate = nannies.find((n) => n.id === booking.nannyId)?.rate || 10;
                           const actualPay = calcNannyPayBreakdown(booking);
                           const estPay = actualPay.total > 0
                             ? actualPay
@@ -3697,7 +3697,7 @@ export default function AdminBookings() {
       {extendBooking && (
         <ExtendBookingModal
           booking={extendBooking}
-          rate={nannies.find((n) => n.id === extendBooking.nannyId)?.rate || 150}
+          rate={nannies.find((n) => n.id === extendBooking.nannyId)?.rate || 10}
           onConfirm={async (newStartTime: string, newEndTime: string, newTotalPrice: number, perDaySchedule?: DaySchedule[]) => {
             if (perDaySchedule && perDaySchedule.length > 1) {
               // Split into individual daily bookings

@@ -67,6 +67,9 @@ export default async function seedHandler(req: VercelRequest, res: VercelRespons
     // Backfill existing nannies to 'active'
     await sql`UPDATE nannies SET status = 'active', registered_at = NOW() WHERE pin IS NOT NULL AND pin != '' AND status IS NULL`;
 
+    // Normalize all nanny hourly rates to the 10 EUR/hr client rate
+    await sql`UPDATE nannies SET rate = 10 WHERE rate IS NULL OR rate <> 10`;
+
     // Add age column and widen image to TEXT for base64 photos
     await sql`ALTER TABLE nannies ADD COLUMN IF NOT EXISTS age VARCHAR(10)`;
     await sql`ALTER TABLE nannies ALTER COLUMN image TYPE TEXT`;
