@@ -114,7 +114,7 @@ function formatClockTime(iso: string | null): string {
 }
 
 export default function AdminParents() {
-  const { bookings, nannies, markAsCollected, updateBooking, adminProfile, resendInvoice } = useData();
+  const { bookings, markAsCollected, updateBooking, adminProfile, resendInvoice } = useData();
   const { toDH } = useExchangeRate();
 
   // Invoice detail view
@@ -215,8 +215,7 @@ export default function AdminParents() {
         const isOvernight = endDec <= startDec;
         const isEvening = isOvernight || sH >= 19 || sH < 7 || eH > 19 || (eH === 19 && eM > 0);
         const taxiFee = isEvening ? TAXI_FEE * days : 0;
-        const rate = nannies.find((n) => n.id === b.nannyId)?.rate ?? SERVICE_RATE;
-        const newPrice = Math.round(rate * hours * days) + taxiFee;
+        const newPrice = Math.round(SERVICE_RATE * hours * days) + taxiFee;
 
         await updateBooking(b.id, {
           startTime: bulkModifyStart,
@@ -236,8 +235,7 @@ export default function AdminParents() {
     if (!modifyingBooking || !modifyStart || !modifyEnd) return;
     setModifySaving(true);
     try {
-      // Calculate new price using the assigned nanny's actual rate
-      const rate = nannies.find((n) => n.id === modifyingBooking.nannyId)?.rate ?? SERVICE_RATE;
+      const rate = SERVICE_RATE;
       const startH = parseFloat(modifyStart.replace("h", ".").replace(/(\d{2})\.(\d{2})/, (_, h, m) => String(parseInt(h) + parseInt(m) / 60)));
       const endH = parseFloat(modifyEnd.replace("h", ".").replace(/(\d{2})\.(\d{2})/, (_, h, m) => String(parseInt(h) + parseInt(m) / 60)));
       const hours = endH > startH ? endH - startH : (24 - startH) + endH;
@@ -1434,8 +1432,7 @@ function sharePdf(){
               : 1;
             const taxiFee = isEvening ? TAXI_FEE * days : 0;
             previewTaxiTotal += taxiFee;
-            const rate = nannies.find((n) => n.id === b.nannyId)?.rate ?? SERVICE_RATE;
-            previewTotal += Math.round(rate * hours * days) + taxiFee;
+            previewTotal += Math.round(SERVICE_RATE * hours * days) + taxiFee;
           });
         }
         const currentTotal = active.reduce((s, b) => s + (b.totalPrice || 0), 0);
@@ -1650,8 +1647,7 @@ function sharePdf(){
                 const isOvernight = endDec <= startDec;
                 const isEvening = isOvernight || sH >= 19 || sH < 7 || eH > 19 || (eH === 19 && eM > 0);
                 const taxiFee = isEvening ? TAXI_FEE * days : 0;
-                const rate = nannies.find((n) => n.id === modifyingBooking.nannyId)?.rate ?? SERVICE_RATE;
-                const newPrice = Math.round(rate * hours * days) + taxiFee;
+                const newPrice = Math.round(SERVICE_RATE * hours * days) + taxiFee;
                 const priceDiff = newPrice - (modifyingBooking.totalPrice || 0);
 
                 return (

@@ -1346,8 +1346,7 @@ export default function AdminBookings() {
           ? Math.max(1, Math.round((new Date(b.endDate).getTime() - new Date(b.date).getTime()) / 86400000) + 1)
           : 1;
         const taxiFee = isEvening ? TAXI_FEE_AMOUNT * days : 0;
-        const rate = nannies.find((n) => n.id === b.nannyId)?.rate ?? SERVICE_RATE;
-        const newPrice = Math.round(rate * hours * days) + taxiFee;
+        const newPrice = Math.round(SERVICE_RATE * hours * days) + taxiFee;
 
         await updateBooking(b.id, {
           startTime: bulkModifyStart,
@@ -3906,8 +3905,7 @@ export default function AdminBookings() {
               : 1;
             const taxiFee = isEvening ? TAXI_FEE_AMOUNT * days : 0;
             previewTaxiTotal += taxiFee;
-            const rate = nannies.find((n) => n.id === b.nannyId)?.rate ?? SERVICE_RATE;
-            previewTotal += Math.round(rate * hours * days) + taxiFee;
+            previewTotal += Math.round(SERVICE_RATE * hours * days) + taxiFee;
           });
         }
         const currentTotal = activeSelected.reduce((s, b) => s + (b.totalPrice || 0), 0);
