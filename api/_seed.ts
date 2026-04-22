@@ -306,7 +306,10 @@ export default async function seedHandler(req: VercelRequest, res: VercelRespons
         const [sh, sm] = b.start_time.split('h').map(Number);
         const [eh, em] = b.end_time.split('h').map(Number);
         if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) continue;
-        const hours = Math.max(0, (eh + em / 60) - (sh + sm / 60));
+        const startDec = sh + sm / 60;
+        const endDec = eh + em / 60;
+        const isOvernight = endDec <= startDec;
+        const hours = isOvernight ? (24 - startDec) + endDec : endDec - startDec;
         if (hours <= 0) continue;
 
         let dayCount = 1;
@@ -318,7 +321,7 @@ export default async function seedHandler(req: VercelRequest, res: VercelRespons
           }
         }
 
-        const isEvening = eh > 19 || (eh === 19 && em > 0) || sh < 7;
+        const isEvening = isOvernight || sh >= 19 || sh < 7 || eh > 19 || (eh === 19 && em > 0);
         const taxiFee = isEvening ? REPAIR_TAXI * dayCount : 0;
         const expectedPrice = Math.round(REPAIR_RATE * hours * dayCount + taxiFee);
 
