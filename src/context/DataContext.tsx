@@ -1020,7 +1020,7 @@ export function DataProvider({ children }: DataProviderProps) {
           bio: "",
           specialties: [],
           languages: [],
-          rate: 150,
+          rate: 10,
           image: "",
           experience: "",
           available: false,
