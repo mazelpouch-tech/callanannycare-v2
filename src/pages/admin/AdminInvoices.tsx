@@ -200,8 +200,7 @@ export default function AdminInvoices() {
       const ms = outTime.getTime() - inTime.getTime();
       if (ms <= 0) return;
       const hours = ms / 3600000;
-      const rate = nannies.find((n) => n.id === Number(formData.nannyId))?.rate ?? SERVICE_RATE;
-      let total = Math.round(hours * rate);
+      let total = Math.round(hours * SERVICE_RATE);
       // Add taxi fee if any part of the shift falls in night hours (7 PM – 7 AM)
       const inHour = inTime.getHours();
       const outHour = outTime.getHours();
@@ -211,7 +210,7 @@ export default function AdminInvoices() {
     } catch {
       // skip
     }
-  }, [formData.date, formData.clockIn, formData.clockOut, formData.nannyId, nannies]);
+  }, [formData.date, formData.clockIn, formData.clockOut]);
 
   // ── Derived Data ──
 
@@ -558,8 +557,7 @@ export default function AdminInvoices() {
       : 0;
     const hours = bookedHoursNum > 0 ? bookedHoursNum.toFixed(1) : calcWorkedHours(inv.clockIn, inv.clockOut);
     const hoursNum = bookedHoursNum > 0 ? bookedHoursNum : (inv.clockIn && inv.clockOut ? (new Date(inv.clockOut).getTime() - new Date(inv.clockIn).getTime()) / 3600000 : 0);
-    const invRate = nannies.find((n) => n.id === inv.nannyId)?.rate ?? SERVICE_RATE;
-    const basePay = Math.round(hoursNum * invRate);
+    const basePay = Math.round(hoursNum * SERVICE_RATE);
     // Detect evening shift from booked times when available, otherwise from clock times
     const startH = inv.startTime ? parseTimeToHours(inv.startTime) : (inv.clockIn ? new Date(inv.clockIn).getHours() : 0);
     const endH = inv.endTime ? parseTimeToHours(inv.endTime) : (inv.clockOut ? new Date(inv.clockOut).getHours() : 0);
@@ -705,7 +703,7 @@ function sharePdf(){
     <div class="card">
       <div class="card-title">PRICE BREAKDOWN</div>
       <div class="card-row">
-        <span class="card-row-label">${hours}h &times; ${invRate}&euro;/hr</span>
+        <span class="card-row-label">${hours}h &times; ${SERVICE_RATE}&euro;/hr</span>
         <span class="card-row-value">${basePay}&euro;</span>
       </div>
       ${hasTaxi ? `<div class="card-row taxi-row">
@@ -1538,8 +1536,7 @@ function sharePdf(){
           : 0;
         const hours = viewBookedH > 0 ? viewBookedH.toFixed(1) : calcWorkedHours(inv.clockIn, inv.clockOut);
         const hoursNum = viewBookedH > 0 ? viewBookedH : (inv.clockIn && inv.clockOut ? (new Date(inv.clockOut).getTime() - new Date(inv.clockIn).getTime()) / 3600000 : 0);
-        const viewRate = nannies.find((n) => n.id === inv.nannyId)?.rate ?? SERVICE_RATE;
-        const basePay = Math.round(hoursNum * viewRate);
+        const basePay = Math.round(hoursNum * SERVICE_RATE);
         const vStartH = inv.startTime ? parseTimeToHours(inv.startTime) : (inv.clockIn ? new Date(inv.clockIn).getHours() : 0);
         const vEndH = inv.endTime ? parseTimeToHours(inv.endTime) : (inv.clockOut ? new Date(inv.clockOut).getHours() : 0);
         const inHour = vStartH ?? 0;
@@ -1624,7 +1621,7 @@ function sharePdf(){
                   </div>
                   <div className="divide-y divide-border">
                     <div className="flex justify-between px-4 py-2.5">
-                      <span className="text-sm text-muted-foreground">{hours}h × {viewRate}€/hr</span>
+                      <span className="text-sm text-muted-foreground">{hours}h × {SERVICE_RATE}€/hr</span>
                       <span className="text-sm font-medium text-foreground">{basePay}€</span>
                     </div>
                     {hasTaxi && (
@@ -1853,8 +1850,7 @@ function sharePdf(){
                   const ms = outT.getTime() - inT.getTime();
                   if (ms <= 0) return null;
                   const hours = ms / 3600000;
-                  const previewRate = nannies.find((n) => n.id === Number(formData.nannyId))?.rate ?? SERVICE_RATE;
-                  const base = Math.round(hours * previewRate);
+                  const base = Math.round(hours * SERVICE_RATE);
                   const inHour = inT.getHours();
                   const outHour = outT.getHours();
                   const isNight = inHour >= 19 || inHour < 7 || outHour >= 19 || outHour < 7 || hours > 12;
@@ -1865,7 +1861,7 @@ function sharePdf(){
                         Auto-calculated breakdown
                       </div>
                       <div className="flex items-center justify-between">
-                        <span>{hours.toFixed(1)}h × {previewRate}€/hr</span>
+                        <span>{hours.toFixed(1)}h × {SERVICE_RATE}€/hr</span>
                         <span className="font-medium">{base}€</span>
                       </div>
                       {isNight && (
