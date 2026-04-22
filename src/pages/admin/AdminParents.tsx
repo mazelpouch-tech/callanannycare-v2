@@ -114,7 +114,7 @@ function formatClockTime(iso: string | null): string {
 }
 
 export default function AdminParents() {
-  const { bookings, markAsCollected, updateBooking, adminProfile, resendInvoice } = useData();
+  const { bookings, nannies, markAsCollected, updateBooking, adminProfile, resendInvoice } = useData();
   const { toDH } = useExchangeRate();
 
   // Invoice detail view
@@ -215,7 +215,8 @@ export default function AdminParents() {
         const isOvernight = endDec <= startDec;
         const isEvening = isOvernight || sH >= 19 || sH < 7 || eH > 19 || (eH === 19 && eM > 0);
         const taxiFee = isEvening ? TAXI_FEE * days : 0;
-        const newPrice = Math.round(SERVICE_RATE * hours * days) + taxiFee;
+        const rate = nannies.find((n) => n.id === b.nannyId)?.rate ?? SERVICE_RATE;
+        const newPrice = Math.round(rate * hours * days) + taxiFee;
 
         await updateBooking(b.id, {
           startTime: bulkModifyStart,
@@ -235,9 +236,8 @@ export default function AdminParents() {
     if (!modifyingBooking || !modifyStart || !modifyEnd) return;
     setModifySaving(true);
     try {
-      // Calculate new price
-      const nanny = bookings.find(bk => bk.nannyId === modifyingBooking.nannyId);
-      const rate = SERVICE_RATE;
+      // Calculate new price using the assigned nanny's actual rate
+      const rate = nannies.find((n) => n.id === modifyingBooking.nannyId)?.rate ?? SERVICE_RATE;
       const startH = parseFloat(modifyStart.replace("h", ".").replace(/(\d{2})\.(\d{2})/, (_, h, m) => String(parseInt(h) + parseInt(m) / 60)));
       const endH = parseFloat(modifyEnd.replace("h", ".").replace(/(\d{2})\.(\d{2})/, (_, h, m) => String(parseInt(h) + parseInt(m) / 60)));
       const hours = endH > startH ? endH - startH : (24 - startH) + endH;
@@ -730,7 +730,7 @@ function sharePdf(){
         <span class="card-row-value">${p.totalHours.toFixed(1)}h</span>
       </div>
       <div class="card-row">
-        <span class="card-row-label">${p.totalHours.toFixed(1)}h &times; ${SERVICE_RATE}&euro;/hr</span>
+        <span class="card-row-label">Service (${p.totalHours.toFixed(1)}h)</span>
         <span class="card-row-value">${pdfTotalService}&euro;</span>
       </div>
       ${pdfTotalTaxi > 0 ? `<div class="card-row taxi-row">
@@ -1434,7 +1434,8 @@ function sharePdf(){
               : 1;
             const taxiFee = isEvening ? TAXI_FEE * days : 0;
             previewTaxiTotal += taxiFee;
-            previewTotal += Math.round(SERVICE_RATE * hours * days) + taxiFee;
+            const rate = nannies.find((n) => n.id === b.nannyId)?.rate ?? SERVICE_RATE;
+            previewTotal += Math.round(rate * hours * days) + taxiFee;
           });
         }
         const currentTotal = active.reduce((s, b) => s + (b.totalPrice || 0), 0);
@@ -1649,7 +1650,8 @@ function sharePdf(){
                 const isOvernight = endDec <= startDec;
                 const isEvening = isOvernight || sH >= 19 || sH < 7 || eH > 19 || (eH === 19 && eM > 0);
                 const taxiFee = isEvening ? TAXI_FEE * days : 0;
-                const newPrice = Math.round(SERVICE_RATE * hours * days) + taxiFee;
+                const rate = nannies.find((n) => n.id === modifyingBooking.nannyId)?.rate ?? SERVICE_RATE;
+                const newPrice = Math.round(rate * hours * days) + taxiFee;
                 const priceDiff = newPrice - (modifyingBooking.totalPrice || 0);
 
                 return (
@@ -1842,7 +1844,7 @@ function sharePdf(){
                       <span className="text-sm font-medium text-foreground">{p.totalHours.toFixed(1)}h</span>
                     </div>
                     <div className="flex justify-between px-4 py-2.5">
-                      <span className="text-sm text-muted-foreground">{p.totalHours.toFixed(1)}h × {SERVICE_RATE}€/hr</span>
+                      <span className="text-sm text-muted-foreground">Service ({p.totalHours.toFixed(1)}h)</span>
                       <span className="text-sm font-medium text-foreground">{totalService}€</span>
                     </div>
                     {totalTaxi > 0 && (
