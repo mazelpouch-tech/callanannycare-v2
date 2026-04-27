@@ -1,15 +1,16 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   DollarSign, CheckCircle, Clock, TrendingUp,
   Phone, User, Calendar, ChevronDown, ChevronUp,
   Hotel, Search, X, AlertTriangle, MessageCircle,
   ArrowUpRight, ArrowDownRight, Banknote, CreditCard, Wallet,
-  Square, CheckSquare, Users, Plus, Trash2,
+  Square, CheckSquare, Users, Plus, Trash2, Briefcase,
 } from "lucide-react";
 import {
   format, parseISO, isWithinInterval,
   startOfMonth, endOfMonth,
   startOfYear, endOfYear,
+  differenceInDays,
 } from "date-fns";
 import { useData } from "../../context/DataContext";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
@@ -19,6 +20,40 @@ import PaymentPanel from "../../components/PaymentPanel";
 
 type ViewTab = "to-collect" | "collected" | "by-nanny" | "split";
 type FinancialPeriod = "week" | "month" | "year" | "custom";
+type ExpenseCurrency = "DH" | "EUR";
+type ExtraExpense = { label: string; amount: number; currency: ExpenseCurrency };
+type AllowanceRecipient = "none" | "lamiaa" | "ys";
+
+const SPLIT_STORAGE_KEY = "admin_revenue_split_v1";
+const DEFAULT_ADMIN_ALLOWANCE_DH = 5000;
+const DAYS_PER_MONTH = 30.4375;
+
+interface SplitSettings {
+  splitPercent: number;
+  extraExpenses: ExtraExpense[];
+  adminAllowanceDH: number;
+  adminAllowanceEnabled: boolean;
+  adminAllowanceRecipient: AllowanceRecipient;
+}
+
+function loadSplitSettings(): Partial<SplitSettings> {
+  try {
+    const raw = localStorage.getItem(SPLIT_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    // Migrate any legacy expense entries missing the currency field
+    if (Array.isArray(parsed.extraExpenses)) {
+      parsed.extraExpenses = parsed.extraExpenses.map((e: { label: string; amount: number; currency?: ExpenseCurrency }) => ({
+        label: e.label,
+        amount: e.amount,
+        currency: e.currency ?? "EUR",
+      }));
+    }
+    return parsed;
+  } catch {
+    return {};
+  }
+}
 
 export default function AdminRevenue() {
   const { bookings, nannies, markAsCollected, adminProfile } = useData();
@@ -53,11 +88,30 @@ export default function AdminRevenue() {
   const [customStart, setCustomStart] = useState<string>(() => format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [customEnd, setCustomEnd] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
 
-  // ── Revenue split (associates) ──
-  const [splitPercent, setSplitPercent] = useState(50); // each associate gets this %
-  const [extraExpenses, setExtraExpenses] = useState<Array<{ label: string; amount: number }>>([]);
+  // ── Revenue split (associates) — persisted to localStorage ──
+  const initialSplit = useMemo(() => loadSplitSettings(), []);
+  const [splitPercent, setSplitPercent] = useState<number>(initialSplit.splitPercent ?? 50); // each associate gets this %
+  const [extraExpenses, setExtraExpenses] = useState<ExtraExpense[]>(initialSplit.extraExpenses ?? []);
   const [newExpLabel, setNewExpLabel] = useState("");
   const [newExpAmount, setNewExpAmount] = useState("");
+  const [newExpCurrency, setNewExpCurrency] = useState<ExpenseCurrency>("DH");
+  const [adminAllowanceDH, setAdminAllowanceDH] = useState<number>(initialSplit.adminAllowanceDH ?? DEFAULT_ADMIN_ALLOWANCE_DH);
+  const [adminAllowanceEnabled, setAdminAllowanceEnabled] = useState<boolean>(initialSplit.adminAllowanceEnabled ?? true);
+  const [adminAllowanceRecipient, setAdminAllowanceRecipient] = useState<AllowanceRecipient>(initialSplit.adminAllowanceRecipient ?? "none");
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SPLIT_STORAGE_KEY, JSON.stringify({
+        splitPercent,
+        extraExpenses,
+        adminAllowanceDH,
+        adminAllowanceEnabled,
+        adminAllowanceRecipient,
+      } satisfies SplitSettings));
+    } catch {
+      // localStorage unavailable — just skip
+    }
+  }, [splitPercent, extraExpenses, adminAllowanceDH, adminAllowanceEnabled, adminAllowanceRecipient]);
 
   const now = new Date();
 
@@ -826,11 +880,41 @@ export default function AdminRevenue() {
 
       {/* ── Revenue Split Tab ── */}
       {tab === "split" && (() => {
-        const totalExtraExpenses = extraExpenses.reduce((s, e) => s + e.amount, 0);
-        const totalExpensesEUR = filteredExpenseEUR + totalExtraExpenses;
+        // Convert any DH-denominated expense to EUR using the current rate
+        const dhToEUR = (dh: number) => (rate > 0 ? Math.round(dh / rate) : 0);
+        const expenseEUR = (e: ExtraExpense) => e.currency === "EUR" ? e.amount : dhToEUR(e.amount);
+        const totalExtraExpensesEUR = extraExpenses.reduce((s, e) => s + expenseEUR(e), 0);
+
+        // Prorate the monthly admin allowance to match the active period filter
+        let proratedAllowanceDH = 0;
+        if (adminAllowanceEnabled && adminAllowanceDH > 0) {
+          if (financialPeriod === "month") {
+            proratedAllowanceDH = adminAllowanceDH;
+          } else if (financialPeriod === "year") {
+            proratedAllowanceDH = adminAllowanceDH * 12;
+          } else if (financialPeriod === "week") {
+            proratedAllowanceDH = Math.round(adminAllowanceDH * 7 / DAYS_PER_MONTH);
+          } else {
+            try {
+              const start = parseISO(customStart);
+              const end = parseISO(customEnd);
+              const days = Math.max(1, differenceInDays(end, start) + 1);
+              proratedAllowanceDH = Math.round(adminAllowanceDH * days / DAYS_PER_MONTH);
+            } catch {
+              proratedAllowanceDH = 0;
+            }
+          }
+        }
+        const proratedAllowanceEUR = dhToEUR(proratedAllowanceDH);
+
+        const totalExpensesEUR = filteredExpenseEUR + totalExtraExpensesEUR + proratedAllowanceEUR;
         const netAfterAll = filteredRevenue - totalExpensesEUR;
-        const lamiaaShare = Math.round(netAfterAll * splitPercent / 100);
-        const ysShare = netAfterAll - lamiaaShare; // remainder to avoid rounding issues
+        const lamiaaBaseShare = Math.round(netAfterAll * splitPercent / 100);
+        const ysBaseShare = netAfterAll - lamiaaBaseShare; // remainder to avoid rounding issues
+        const lamiaaAllowanceCredit = adminAllowanceRecipient === "lamiaa" ? proratedAllowanceEUR : 0;
+        const ysAllowanceCredit = adminAllowanceRecipient === "ys" ? proratedAllowanceEUR : 0;
+        const lamiaaTakeHome = lamiaaBaseShare + lamiaaAllowanceCredit;
+        const ysTakeHome = ysBaseShare + ysAllowanceCredit;
 
         return (
           <div className="space-y-4">
@@ -840,6 +924,65 @@ export default function AdminRevenue() {
               Uses the same period filter from the Financial Summary above ({financialPeriod === "week" ? "This Week" : financialPeriod === "month" ? "This Month" : financialPeriod === "year" ? "This Year" : `${customStart} → ${customEnd}`})
             </div>
 
+            {/* ── Admin Allowance settings ── */}
+            <div className="bg-card rounded-xl border border-border shadow-soft p-5 space-y-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-primary" />
+                  <h3 className="font-serif text-base font-semibold text-foreground">Admin Allowance</h3>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <input
+                    type="checkbox"
+                    checked={adminAllowanceEnabled}
+                    onChange={(e) => setAdminAllowanceEnabled(e.target.checked)}
+                    className="w-4 h-4 accent-primary cursor-pointer"
+                  />
+                  <span className="text-foreground">Enabled</span>
+                </label>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Monthly amount</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      value={adminAllowanceDH}
+                      onChange={(e) => setAdminAllowanceDH(Math.max(0, Number(e.target.value) || 0))}
+                      disabled={!adminAllowanceEnabled}
+                      className="flex-1 px-3 py-2 bg-card border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
+                    />
+                    <span className="text-xs text-muted-foreground shrink-0">DH / month</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Credit allowance to</label>
+                  <select
+                    value={adminAllowanceRecipient}
+                    onChange={(e) => setAdminAllowanceRecipient(e.target.value as AllowanceRecipient)}
+                    disabled={!adminAllowanceEnabled}
+                    className="w-full px-3 py-2 bg-card border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
+                  >
+                    <option value="none">Treat as expense only</option>
+                    <option value="lamiaa">Lamiaa (admin)</option>
+                    <option value="ys">Ys (admin)</option>
+                  </select>
+                </div>
+              </div>
+              {adminAllowanceEnabled && proratedAllowanceDH > 0 && (
+                <div className="text-xs bg-muted/30 rounded-lg px-3 py-2 flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-muted-foreground">
+                    Applied for this period{financialPeriod !== "month" ? " (prorated)" : ""}:
+                  </span>
+                  <span className="font-bold text-foreground">
+                    {proratedAllowanceDH.toLocaleString()} DH
+                    <span className="font-normal text-muted-foreground ml-1">({proratedAllowanceEUR.toLocaleString()}€)</span>
+                  </span>
+                </div>
+              )}
+            </div>
+
             {/* Revenue breakdown */}
             <div className="bg-card rounded-xl border border-border shadow-soft p-5 space-y-4">
               <div className="flex items-center gap-2 mb-2">
@@ -847,7 +990,7 @@ export default function AdminRevenue() {
                 <h3 className="font-serif text-base font-semibold text-foreground">Revenue Split Calculator</h3>
               </div>
 
-              {/* Waterfall: Revenue → Nanny Pay → Extra Expenses → Net */}
+              {/* Waterfall: Revenue → Nanny Pay → Extra Expenses → Admin Allowance → Net */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-100">
                   <div className="flex items-center gap-2">
@@ -872,23 +1015,53 @@ export default function AdminRevenue() {
                 </div>
 
                 {/* Extra expenses list */}
-                {extraExpenses.map((exp, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-red-50 border border-red-100">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <ArrowDownRight className="w-4 h-4 text-red-700 shrink-0" />
-                      <span className="text-sm font-medium text-red-800 truncate">{exp.label}</span>
+                {extraExpenses.map((exp, idx) => {
+                  const eur = expenseEUR(exp);
+                  const dh = exp.currency === "DH" ? exp.amount : toDH(exp.amount);
+                  return (
+                    <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-red-50 border border-red-100">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <ArrowDownRight className="w-4 h-4 text-red-700 shrink-0" />
+                        <span className="text-sm font-medium text-red-800 truncate">{exp.label}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="text-right">
+                          <span className="text-sm font-bold text-red-800">
+                            -{exp.currency === "DH" ? `${exp.amount.toLocaleString()} DH` : `${exp.amount.toLocaleString()}€`}
+                          </span>
+                          <span className="text-[10px] text-red-600/70 ml-1">
+                            ({exp.currency === "DH" ? `${eur.toLocaleString()}€` : `${dh.toLocaleString()} DH`})
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => setExtraExpenses((prev) => prev.filter((_, i) => i !== idx))}
+                          className="p-1 rounded-lg hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-sm font-bold text-red-800">-{exp.amount.toLocaleString()}€</span>
-                      <button
-                        onClick={() => setExtraExpenses((prev) => prev.filter((_, i) => i !== idx))}
-                        className="p-1 rounded-lg hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                  );
+                })}
+
+                {/* Admin allowance row in the breakdown */}
+                {adminAllowanceEnabled && proratedAllowanceDH > 0 && (
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-red-50 border border-red-100">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <Briefcase className="w-4 h-4 text-red-700 shrink-0" />
+                      <span className="text-sm font-medium text-red-800 truncate">
+                        Admin Allowance
+                        {adminAllowanceRecipient !== "none" && (
+                          <span className="text-red-500/80 font-normal"> · {adminAllowanceRecipient === "lamiaa" ? "Lamiaa" : "Ys"}</span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-sm font-bold text-red-800">-{proratedAllowanceDH.toLocaleString()} DH</span>
+                      <span className="text-[10px] text-red-600/70 ml-1">({proratedAllowanceEUR.toLocaleString()}€)</span>
                     </div>
                   </div>
-                ))}
+                )}
 
                 {/* Add expense row */}
                 <div className="flex items-center gap-2 p-2 rounded-lg border border-dashed border-border">
@@ -896,21 +1069,30 @@ export default function AdminRevenue() {
                     type="text"
                     value={newExpLabel}
                     onChange={(e) => setNewExpLabel(e.target.value)}
-                    placeholder="Expense name..."
+                    placeholder="Insurance, banking fees, ..."
                     className="flex-1 min-w-0 px-2 py-1.5 text-sm bg-transparent border-none focus:outline-none placeholder:text-muted-foreground/50"
                   />
                   <input
                     type="number"
                     value={newExpAmount}
                     onChange={(e) => setNewExpAmount(e.target.value)}
-                    placeholder="€"
+                    placeholder={newExpCurrency === "DH" ? "DH" : "€"}
                     className="w-20 px-2 py-1.5 text-sm bg-transparent border-l border-border focus:outline-none placeholder:text-muted-foreground/50 text-right"
                   />
+                  <select
+                    value={newExpCurrency}
+                    onChange={(e) => setNewExpCurrency(e.target.value as ExpenseCurrency)}
+                    className="px-1.5 py-1.5 text-xs bg-transparent border-l border-border focus:outline-none text-muted-foreground"
+                    aria-label="Currency"
+                  >
+                    <option value="DH">DH</option>
+                    <option value="EUR">EUR</option>
+                  </select>
                   <button
                     onClick={() => {
                       const amt = parseFloat(newExpAmount);
                       if (newExpLabel.trim() && amt > 0) {
-                        setExtraExpenses((prev) => [...prev, { label: newExpLabel.trim(), amount: amt }]);
+                        setExtraExpenses((prev) => [...prev, { label: newExpLabel.trim(), amount: amt, currency: newExpCurrency }]);
                         setNewExpLabel("");
                         setNewExpAmount("");
                       }
@@ -993,21 +1175,25 @@ export default function AdminRevenue() {
                   <div className="w-10 h-10 rounded-full bg-purple-200 flex items-center justify-center">
                     <span className="text-purple-700 font-bold text-sm">L</span>
                   </div>
-                  <div>
-                    <p className="font-semibold text-purple-900">Lamiaa</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-purple-900">
+                      Lamiaa
+                      {adminAllowanceRecipient === "lamiaa" && (
+                        <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-200 text-purple-800 align-middle">Admin</span>
+                      )}
+                    </p>
                     <p className="text-[10px] text-purple-600">Associate · {splitPercent}%</p>
                   </div>
                 </div>
                 <div className="p-5 space-y-3">
                   <div className="text-center">
-                    <p className={`text-3xl font-bold ${lamiaaShare >= 0 ? "text-purple-700" : "text-red-700"}`}>{lamiaaShare.toLocaleString()}€</p>
-                    <p className="text-xs text-muted-foreground mt-1">{toDH(lamiaaShare).toLocaleString()} DH</p>
+                    <p className={`text-3xl font-bold ${lamiaaTakeHome >= 0 ? "text-purple-700" : "text-red-700"}`}>{lamiaaTakeHome.toLocaleString()}€</p>
+                    <p className="text-xs text-muted-foreground mt-1">{toDH(lamiaaTakeHome).toLocaleString()} DH</p>
                   </div>
                   <div className="bg-muted/30 rounded-lg p-2.5 text-[11px] text-muted-foreground space-y-1">
-                    <div className="flex justify-between"><span>Revenue share ({splitPercent}%)</span><span>{Math.round(filteredRevenue * splitPercent / 100).toLocaleString()}€</span></div>
-                    <div className="flex justify-between"><span>Nanny pay share</span><span>-{Math.round(filteredExpenseEUR * splitPercent / 100).toLocaleString()}€</span></div>
-                    {totalExtraExpenses > 0 && (
-                      <div className="flex justify-between"><span>Other expenses share</span><span>-{Math.round(totalExtraExpenses * splitPercent / 100).toLocaleString()}€</span></div>
+                    <div className="flex justify-between"><span>Net share ({splitPercent}%)</span><span>{lamiaaBaseShare.toLocaleString()}€</span></div>
+                    {lamiaaAllowanceCredit > 0 && (
+                      <div className="flex justify-between text-purple-700 font-medium"><span>+ Admin allowance</span><span>+{lamiaaAllowanceCredit.toLocaleString()}€</span></div>
                     )}
                   </div>
                 </div>
@@ -1019,21 +1205,25 @@ export default function AdminRevenue() {
                   <div className="w-10 h-10 rounded-full bg-teal-200 flex items-center justify-center">
                     <span className="text-teal-700 font-bold text-sm">Y</span>
                   </div>
-                  <div>
-                    <p className="font-semibold text-teal-900">Ys</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-teal-900">
+                      Ys
+                      {adminAllowanceRecipient === "ys" && (
+                        <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-teal-200 text-teal-800 align-middle">Admin</span>
+                      )}
+                    </p>
                     <p className="text-[10px] text-teal-600">Associate · {100 - splitPercent}%</p>
                   </div>
                 </div>
                 <div className="p-5 space-y-3">
                   <div className="text-center">
-                    <p className={`text-3xl font-bold ${ysShare >= 0 ? "text-teal-700" : "text-red-700"}`}>{ysShare.toLocaleString()}€</p>
-                    <p className="text-xs text-muted-foreground mt-1">{toDH(ysShare).toLocaleString()} DH</p>
+                    <p className={`text-3xl font-bold ${ysTakeHome >= 0 ? "text-teal-700" : "text-red-700"}`}>{ysTakeHome.toLocaleString()}€</p>
+                    <p className="text-xs text-muted-foreground mt-1">{toDH(ysTakeHome).toLocaleString()} DH</p>
                   </div>
                   <div className="bg-muted/30 rounded-lg p-2.5 text-[11px] text-muted-foreground space-y-1">
-                    <div className="flex justify-between"><span>Revenue share ({100 - splitPercent}%)</span><span>{Math.round(filteredRevenue * (100 - splitPercent) / 100).toLocaleString()}€</span></div>
-                    <div className="flex justify-between"><span>Nanny pay share</span><span>-{Math.round(filteredExpenseEUR * (100 - splitPercent) / 100).toLocaleString()}€</span></div>
-                    {totalExtraExpenses > 0 && (
-                      <div className="flex justify-between"><span>Other expenses share</span><span>-{Math.round(totalExtraExpenses * (100 - splitPercent) / 100).toLocaleString()}€</span></div>
+                    <div className="flex justify-between"><span>Net share ({100 - splitPercent}%)</span><span>{ysBaseShare.toLocaleString()}€</span></div>
+                    {ysAllowanceCredit > 0 && (
+                      <div className="flex justify-between text-teal-700 font-medium"><span>+ Admin allowance</span><span>+{ysAllowanceCredit.toLocaleString()}€</span></div>
                     )}
                   </div>
                 </div>
@@ -1047,7 +1237,7 @@ export default function AdminRevenue() {
                   Total distributed: {filteredRevenue.toLocaleString()}€ revenue − {totalExpensesEUR.toLocaleString()}€ expenses
                 </p>
                 <p className={`text-xs mt-0.5 ${netAfterAll >= 0 ? "text-blue-600/70" : "text-red-600/70"}`}>
-                  Lamiaa: {lamiaaShare.toLocaleString()}€ · Ys: {ysShare.toLocaleString()}€
+                  Lamiaa: {lamiaaTakeHome.toLocaleString()}€ · Ys: {ysTakeHome.toLocaleString()}€
                 </p>
               </div>
               <p className={`text-lg font-bold ${netAfterAll >= 0 ? "text-blue-800" : "text-red-800"}`}>
