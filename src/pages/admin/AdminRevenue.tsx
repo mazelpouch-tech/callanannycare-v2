@@ -22,7 +22,6 @@ type ViewTab = "to-collect" | "collected" | "by-nanny" | "split";
 type FinancialPeriod = "week" | "month" | "year" | "custom";
 type ExpenseCurrency = "DH" | "EUR";
 type ExtraExpense = { label: string; amount: number; currency: ExpenseCurrency };
-type AllowanceRecipient = "none" | "lamiaa" | "ys";
 
 const SPLIT_STORAGE_KEY = "admin_revenue_split_v1";
 const DEFAULT_ADMIN_ALLOWANCE_DH = 5000;
@@ -33,7 +32,6 @@ interface SplitSettings {
   extraExpenses: ExtraExpense[];
   adminAllowanceDH: number;
   adminAllowanceEnabled: boolean;
-  adminAllowanceRecipient: AllowanceRecipient;
 }
 
 function loadSplitSettings(): Partial<SplitSettings> {
@@ -97,7 +95,6 @@ export default function AdminRevenue() {
   const [newExpCurrency, setNewExpCurrency] = useState<ExpenseCurrency>("DH");
   const [adminAllowanceDH, setAdminAllowanceDH] = useState<number>(initialSplit.adminAllowanceDH ?? DEFAULT_ADMIN_ALLOWANCE_DH);
   const [adminAllowanceEnabled, setAdminAllowanceEnabled] = useState<boolean>(initialSplit.adminAllowanceEnabled ?? true);
-  const [adminAllowanceRecipient, setAdminAllowanceRecipient] = useState<AllowanceRecipient>(initialSplit.adminAllowanceRecipient ?? "none");
 
   useEffect(() => {
     try {
@@ -106,12 +103,11 @@ export default function AdminRevenue() {
         extraExpenses,
         adminAllowanceDH,
         adminAllowanceEnabled,
-        adminAllowanceRecipient,
       } satisfies SplitSettings));
     } catch {
       // localStorage unavailable — just skip
     }
-  }, [splitPercent, extraExpenses, adminAllowanceDH, adminAllowanceEnabled, adminAllowanceRecipient]);
+  }, [splitPercent, extraExpenses, adminAllowanceDH, adminAllowanceEnabled]);
 
   const now = new Date();
 
@@ -911,10 +907,10 @@ export default function AdminRevenue() {
         const netAfterAll = filteredRevenue - totalExpensesEUR;
         const lamiaaBaseShare = Math.round(netAfterAll * splitPercent / 100);
         const ysBaseShare = netAfterAll - lamiaaBaseShare; // remainder to avoid rounding issues
-        const lamiaaAllowanceCredit = adminAllowanceRecipient === "lamiaa" ? proratedAllowanceEUR : 0;
-        const ysAllowanceCredit = adminAllowanceRecipient === "ys" ? proratedAllowanceEUR : 0;
+        // Admin allowance is reserved for Lamiaa — Ys is not entitled to it
+        const lamiaaAllowanceCredit = adminAllowanceEnabled ? proratedAllowanceEUR : 0;
         const lamiaaTakeHome = lamiaaBaseShare + lamiaaAllowanceCredit;
-        const ysTakeHome = ysBaseShare + ysAllowanceCredit;
+        const ysTakeHome = ysBaseShare;
 
         return (
           <div className="space-y-4">
@@ -957,17 +953,11 @@ export default function AdminRevenue() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Credit allowance to</label>
-                  <select
-                    value={adminAllowanceRecipient}
-                    onChange={(e) => setAdminAllowanceRecipient(e.target.value as AllowanceRecipient)}
-                    disabled={!adminAllowanceEnabled}
-                    className="w-full px-3 py-2 bg-card border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
-                  >
-                    <option value="none">Treat as expense only</option>
-                    <option value="lamiaa">Lamiaa (admin)</option>
-                    <option value="ys">Ys (admin)</option>
-                  </select>
+                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Credited to</label>
+                  <div className="px-3 py-2 bg-muted/40 border border-border rounded-xl text-sm text-foreground flex items-center justify-between">
+                    <span className="font-medium">Lamiaa</span>
+                    <span className="text-[10px] text-muted-foreground">Admin</span>
+                  </div>
                 </div>
               </div>
               {adminAllowanceEnabled && proratedAllowanceDH > 0 && (
@@ -1051,9 +1041,7 @@ export default function AdminRevenue() {
                       <Briefcase className="w-4 h-4 text-red-700 shrink-0" />
                       <span className="text-sm font-medium text-red-800 truncate">
                         Admin Allowance
-                        {adminAllowanceRecipient !== "none" && (
-                          <span className="text-red-500/80 font-normal"> · {adminAllowanceRecipient === "lamiaa" ? "Lamiaa" : "Ys"}</span>
-                        )}
+                        <span className="text-red-500/80 font-normal"> · Lamiaa</span>
                       </span>
                     </div>
                     <div className="text-right shrink-0">
@@ -1178,9 +1166,7 @@ export default function AdminRevenue() {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-purple-900">
                       Lamiaa
-                      {adminAllowanceRecipient === "lamiaa" && (
-                        <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-200 text-purple-800 align-middle">Admin</span>
-                      )}
+                      <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-200 text-purple-800 align-middle">Admin</span>
                     </p>
                     <p className="text-[10px] text-purple-600">Associate · {splitPercent}%</p>
                   </div>
@@ -1206,12 +1192,7 @@ export default function AdminRevenue() {
                     <span className="text-teal-700 font-bold text-sm">Y</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-teal-900">
-                      Ys
-                      {adminAllowanceRecipient === "ys" && (
-                        <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-teal-200 text-teal-800 align-middle">Admin</span>
-                      )}
-                    </p>
+                    <p className="font-semibold text-teal-900">Ys</p>
                     <p className="text-[10px] text-teal-600">Associate · {100 - splitPercent}%</p>
                   </div>
                 </div>
@@ -1222,9 +1203,6 @@ export default function AdminRevenue() {
                   </div>
                   <div className="bg-muted/30 rounded-lg p-2.5 text-[11px] text-muted-foreground space-y-1">
                     <div className="flex justify-between"><span>Net share ({100 - splitPercent}%)</span><span>{ysBaseShare.toLocaleString()}€</span></div>
-                    {ysAllowanceCredit > 0 && (
-                      <div className="flex justify-between text-teal-700 font-medium"><span>+ Admin allowance</span><span>+{ysAllowanceCredit.toLocaleString()}€</span></div>
-                    )}
                   </div>
                 </div>
               </div>
