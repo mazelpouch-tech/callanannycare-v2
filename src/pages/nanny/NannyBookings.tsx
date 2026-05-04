@@ -10,10 +10,8 @@ import {
   CheckCircle,
   MessageCircle,
   Loader2,
-  TimerReset,
   Plus,
   X,
-  ArrowRightLeft,
   Pencil,
   RotateCcw,
   Check,
@@ -27,8 +25,6 @@ import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { Fragment } from "react";
 import PhoneInput from "../../components/PhoneInput";
-import ExtendBookingModal from "../../components/ExtendBookingModal";
-import ForwardBookingModal from "../../components/ForwardBookingModal";
 import {
   statusColors,
   calcBookedHours,
@@ -78,7 +74,7 @@ const RATE = 10; // € per hour
 const TAXI_FEE = 10; // € flat fee for night bookings
 
 export default function NannyBookings() {
-  const { nannyBookings, fetchNannyBookings, updateBookingStatus, updateBooking, addBooking, deleteBooking, nannyProfile, nannies } = useData();
+  const { nannyBookings, fetchNannyBookings, updateBookingStatus, addBooking, deleteBooking, nannyProfile } = useData();
   const { t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
@@ -166,14 +162,6 @@ export default function NannyBookings() {
     }
   }, [nannyBookings, scrollToBooking]);
 
-  const [extendBooking, setExtendBooking] = useState<typeof nannyBookings[0] | null>(null);
-  const [forwardBooking, setForwardBooking] = useState<typeof nannyBookings[0] | null>(null);
-
-  // Edit booking state
-  const [editBooking, setEditBooking] = useState<typeof nannyBookings[0] | null>(null);
-  const [editForm, setEditForm] = useState({ startDate: "", endDate: "", startTime: "", endTime: "", hotel: "", numChildren: "1", childrenAges: "", notes: "" });
-  const [editLoading, setEditLoading] = useState(false);
-
   /** Convert stored time label (e.g. "09h00") to TIME_SLOTS value (e.g. "9:00") */
   const parseTime = (t: string) => {
     if (!t) return "";
@@ -182,69 +170,6 @@ export default function NannyBookings() {
     }
     const m = t.match(/^(\d{1,2})h(\d{2})$/i);
     return m ? `${parseInt(m[1])}:${m[2]}` : "";
-  };
-
-  const openEditModal = (booking: typeof nannyBookings[0]) => {
-    setEditForm({
-      startDate: booking.date || "",
-      endDate: booking.endDate || "",
-      startTime: parseTime(booking.startTime),
-      endTime: parseTime(booking.endTime),
-      hotel: booking.hotel || "",
-      numChildren: String(booking.childrenCount || 1),
-      childrenAges: booking.childrenAges || "",
-      notes: booking.notes || "",
-    });
-    setEditBooking(booking);
-  };
-
-  const handleEditSubmit = async () => {
-    if (!editBooking) return;
-    setEditLoading(true);
-    const startLabel = TIME_SLOTS.find(s => s.value === editForm.startTime)?.label || editForm.startTime;
-    const endLabel = TIME_SLOTS.find(s => s.value === editForm.endTime)?.label || editForm.endTime;
-
-    // Recalculate price (handles overnight e.g. 18:00→01:00)
-    const [sh, sm] = (editForm.startTime || "0:0").split(":").map(Number);
-    const [eh, em] = (editForm.endTime || "0:0").split(":").map(Number);
-    const startH = sh + sm / 60;
-    const endH = eh + em / 60;
-    const hours = endH > startH ? endH - startH : (24 - startH) + endH;
-    const startDate = new Date(editForm.startDate);
-    const endDate = editForm.endDate ? new Date(editForm.endDate) : startDate;
-    const dayCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1);
-    const isEvening = endH <= startH || sh >= 19 || sh < 7 || eh > 19 || (eh === 19 && em > 0);
-    const taxiFee = isEvening ? TAXI_FEE * dayCount : 0;
-    const totalPrice = RATE * hours * dayCount + taxiFee;
-
-    try {
-      await updateBooking(editBooking.id, {
-        date: editForm.startDate,
-        endDate: editForm.endDate || null,
-        startTime: startLabel,
-        endTime: endLabel,
-        hotel: editForm.hotel,
-        childrenCount: parseInt(editForm.numChildren) || 1,
-        childrenAges: editForm.childrenAges,
-        notes: editForm.notes,
-        totalPrice,
-      });
-      await fetchNannyBookings();
-      setEditBooking(null);
-    } catch (err) {
-      console.error("Edit booking failed:", err);
-      alert("Failed to save booking changes. Please try again.");
-    } finally {
-      setEditLoading(false);
-    }
-  };
-
-  // Manual complete
-  const handleComplete = async (id: number | string) => {
-    setActionLoading(id);
-    await updateBookingStatus(id, "completed");
-    await fetchNannyBookings();
-    setActionLoading(null);
   };
 
   // New booking form state
@@ -850,54 +775,6 @@ export default function NannyBookings() {
                                   )}
                                 </button>
                             )}
-                            {/* Extend for confirmed bookings */}
-                            {booking.status === "confirmed" && (
-                              <button
-                                onClick={() => setExtendBooking(booking)}
-                                className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-lg hover:bg-blue-100 transition-colors"
-                                title={t("extend.extendBooking")}
-                              >
-                                <TimerReset className="w-3.5 h-3.5" />
-                                {t("extend.extendShift")}
-                              </button>
-                            )}
-                            {/* Forward for pending/confirmed bookings */}
-                            {(booking.status === "confirmed" || booking.status === "pending") && (
-                              <button
-                                onClick={() => setForwardBooking(booking)}
-                                className="flex items-center gap-1 px-2.5 py-1.5 bg-orange-50 text-orange-700 text-xs font-medium rounded-lg hover:bg-orange-100 transition-colors"
-                                title={t("forward.forwardBooking")}
-                              >
-                                <ArrowRightLeft className="w-3.5 h-3.5" />
-                                {t("forward.forwardShift")}
-                              </button>
-                            )}
-                            {/* Mark Complete */}
-                            {booking.status === "confirmed" && (
-                              <button
-                                onClick={() => handleComplete(booking.id)}
-                                disabled={actionLoading === booking.id}
-                                className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                                title="Mark as completed"
-                              >
-                                {actionLoading === booking.id ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <CheckCircle className="w-3.5 h-3.5" />
-                                )}
-                                Complete
-                              </button>
-                            )}
-                            {/* Edit booking (pending/confirmed only) */}
-                            {(booking.status === "pending" || booking.status === "confirmed") && (
-                              <button
-                                onClick={() => openEditModal(booking)}
-                                className="p-1.5 rounded-lg text-violet-600 hover:bg-violet-50 transition-colors"
-                                title="Edit booking"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </button>
-                            )}
                             {/* WhatsApp parent */}
                             {booking.clientPhone && (
                               <button
@@ -1051,52 +928,6 @@ export default function NannyBookings() {
                           {t("nanny.bookings.accept")}
                         </button>
                     )}
-
-                    {/* Extend for confirmed bookings */}
-                    {booking.status === "confirmed" && (
-                      <button
-                        onClick={() => setExtendBooking(booking)}
-                        className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors"
-                      >
-                        <TimerReset className="w-4 h-4" />
-                        {t("extend.extendShift")}
-                      </button>
-                    )}
-                    {/* Forward for pending/confirmed */}
-                    {(booking.status === "confirmed" || booking.status === "pending") && (
-                      <button
-                        onClick={() => setForwardBooking(booking)}
-                        className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg bg-orange-50 text-orange-700 text-sm font-medium hover:bg-orange-100 transition-colors"
-                      >
-                        <ArrowRightLeft className="w-4 h-4" />
-                        {t("forward.forwardShift")}
-                      </button>
-                    )}
-                    {/* Mark Complete */}
-                    {booking.status === "confirmed" && (
-                      <button
-                        onClick={() => handleComplete(booking.id)}
-                        disabled={actionLoading === booking.id}
-                        className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                      >
-                        {actionLoading === booking.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <CheckCircle className="w-4 h-4" />
-                        )}
-                        Complete
-                      </button>
-                    )}
-                    {/* Edit booking (pending/confirmed) */}
-                    {(booking.status === "pending" || booking.status === "confirmed") && (
-                      <button
-                        onClick={() => openEditModal(booking)}
-                        className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100 transition-colors"
-                      >
-                        <Pencil className="w-4 h-4" />
-                        Edit
-                      </button>
-                    )}
                   </div>
 
                   {/* WhatsApp + details toggle */}
@@ -1221,179 +1052,6 @@ export default function NannyBookings() {
             <X className="w-4 h-4" />
           </button>
         </div>
-      )}
-
-      {/* Edit Booking Modal */}
-      {editBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-border">
-              <h2 className="font-serif text-xl font-bold text-foreground">Edit Booking — {editBooking.clientName}</h2>
-              <button onClick={() => setEditBooking(null)} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              {/* Date Range */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">{t("shared.date")} *</label>
-                  <input
-                    type="date"
-                    required
-                    value={editForm.startDate}
-                    onChange={(e) => setEditForm(f => ({ ...f, startDate: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.endDate")}</label>
-                  <input
-                    type="date"
-                    value={editForm.endDate}
-                    min={editForm.startDate}
-                    onChange={(e) => setEditForm(f => ({ ...f, endDate: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                  />
-                </div>
-              </div>
-
-              {/* Start / End Time */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.startTime")} *</label>
-                  <div className="relative">
-                    <select
-                      required
-                      value={editForm.startTime}
-                      onChange={(e) => setEditForm(f => ({ ...f, startTime: e.target.value }))}
-                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 appearance-none"
-                    >
-                      <option value="">{t("shared.select")}</option>
-                      {TIME_SLOTS.map((ts) => (
-                        <option key={ts.value} value={ts.value}>{ts.label}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.endTime")}</label>
-                  <div className="relative">
-                    <select
-                      value={editForm.endTime}
-                      onChange={(e) => setEditForm(f => ({ ...f, endTime: e.target.value }))}
-                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 appearance-none"
-                    >
-                      <option value="">{t("shared.select")}</option>
-                      {TIME_SLOTS.map((ts) => (
-                        <option key={ts.value} value={ts.value}>{ts.label}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Hotel */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.hotelLocation")}</label>
-                <input
-                  type="text"
-                  value={editForm.hotel}
-                  onChange={(e) => setEditForm(f => ({ ...f, hotel: e.target.value }))}
-                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                />
-              </div>
-
-              {/* Children */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">{t("shared.children")}</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={editForm.numChildren}
-                    onChange={(e) => setEditForm(f => ({ ...f, numChildren: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.ages")}</label>
-                  <input
-                    type="text"
-                    value={editForm.childrenAges}
-                    onChange={(e) => setEditForm(f => ({ ...f, childrenAges: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                  />
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">{t("shared.notes")}</label>
-                <textarea
-                  value={editForm.notes}
-                  onChange={(e) => setEditForm(f => ({ ...f, notes: e.target.value }))}
-                  rows={2}
-                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 resize-none"
-                />
-              </div>
-
-              {/* Submit */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setEditBooking(null)}
-                  className="flex-1 px-4 py-2.5 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors"
-                >
-                  {t("shared.cancel")}
-                </button>
-                <button
-                  onClick={handleEditSubmit}
-                  disabled={editLoading || !editForm.startDate || !editForm.startTime}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 gradient-warm text-white text-sm font-medium rounded-lg shadow-warm hover:opacity-90 transition-opacity disabled:opacity-50"
-                >
-                  {editLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Save Changes
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Extend Booking Modal */}
-      {extendBooking && (
-        <ExtendBookingModal
-          booking={extendBooking}
-          onConfirm={async (newStartTime, newEndTime, newTotalPrice) => {
-            await updateBooking(extendBooking.id, { startTime: newStartTime, endTime: newEndTime, totalPrice: newTotalPrice });
-            await fetchNannyBookings();
-          }}
-          onClose={() => setExtendBooking(null)}
-          t={t}
-        />
-      )}
-
-      {/* Forward Booking Modal */}
-      {forwardBooking && (
-        <ForwardBookingModal
-          booking={forwardBooking}
-          nannies={nannies}
-          currentNannyId={nannyProfile?.id ?? null}
-          onConfirm={async (newNannyId) => {
-            const newNanny = nannies.find((n) => n.id === newNannyId);
-            await updateBooking(forwardBooking.id, {
-              nannyId: newNannyId,
-              nannyName: newNanny?.name || "",
-            });
-            await fetchNannyBookings();
-          }}
-          onClose={() => setForwardBooking(null)}
-          t={t}
-        />
       )}
 
     </div>
