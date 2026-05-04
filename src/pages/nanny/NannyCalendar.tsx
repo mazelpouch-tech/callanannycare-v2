@@ -17,10 +17,47 @@ import {
   isAfter,
   addDays,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, MapPin, User, Clock, Ban, Loader2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  MapPin,
+  User,
+  Clock,
+  Ban,
+  Loader2,
+  TimerReset,
+  ArrowRightLeft,
+  CheckCircle,
+  Pencil,
+  X,
+} from "lucide-react";
 import { useData } from "../../context/DataContext";
 import { useLanguage } from "../../context/LanguageContext";
+import ExtendBookingModal from "../../components/ExtendBookingModal";
+import ForwardBookingModal from "../../components/ForwardBookingModal";
 import type { Booking, BookingStatus } from "@/types";
+
+const TIME_SLOTS: { value: string; label: string }[] = [];
+for (let i = 0; i < 96; i++) {
+  const h = (6 + Math.floor(i / 4)) % 24;
+  const m = (i % 4) * 15;
+  const hh = String(h).padStart(2, "0");
+  const mm = String(m).padStart(2, "0");
+  TIME_SLOTS.push({ value: `${h}:${mm}`, label: `${hh}h${mm}` });
+}
+
+const RATE = 10;
+const TAXI_FEE = 10;
+
+const parseTime = (t: string) => {
+  if (!t) return "";
+  if (t.includes(":")) {
+    return TIME_SLOTS.find((s) => s.value === t) ? t : "";
+  }
+  const m = t.match(/^(\d{1,2})h(\d{2})$/i);
+  return m ? `${parseInt(m[1])}:${m[2]}` : "";
+};
 
 interface BlockedDate {
   id: number;
@@ -46,13 +83,80 @@ const statusColors: Record<BookingStatus, string> = {
 const API_BASE = "/api";
 
 export default function NannyCalendar() {
-  const { nannyBookings, fetchNannyBookings, nannyProfile } = useData();
+  const { nannyBookings, fetchNannyBookings, updateBookingStatus, updateBooking, nannyProfile, nannies } = useData();
   const { t } = useLanguage();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
   const [blockReason, setBlockReason] = useState("");
   const [blockLoading, setBlockLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState<number | string | null>(null);
+  const [extendBooking, setExtendBooking] = useState<Booking | null>(null);
+  const [forwardBooking, setForwardBooking] = useState<Booking | null>(null);
+  const [editBooking, setEditBooking] = useState<Booking | null>(null);
+  const [editForm, setEditForm] = useState({ startDate: "", endDate: "", startTime: "", endTime: "", hotel: "", numChildren: "1", childrenAges: "", notes: "" });
+  const [editLoading, setEditLoading] = useState(false);
+
+  const handleComplete = async (id: number | string) => {
+    setActionLoading(id);
+    await updateBookingStatus(id, "completed");
+    await fetchNannyBookings();
+    setActionLoading(null);
+  };
+
+  const openEditModal = (booking: Booking) => {
+    setEditForm({
+      startDate: booking.date || "",
+      endDate: booking.endDate || "",
+      startTime: parseTime(booking.startTime),
+      endTime: parseTime(booking.endTime),
+      hotel: booking.hotel || "",
+      numChildren: String(booking.childrenCount || 1),
+      childrenAges: booking.childrenAges || "",
+      notes: booking.notes || "",
+    });
+    setEditBooking(booking);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editBooking) return;
+    setEditLoading(true);
+    const startLabel = TIME_SLOTS.find((s) => s.value === editForm.startTime)?.label || editForm.startTime;
+    const endLabel = TIME_SLOTS.find((s) => s.value === editForm.endTime)?.label || editForm.endTime;
+
+    const [sh, sm] = (editForm.startTime || "0:0").split(":").map(Number);
+    const [eh, em] = (editForm.endTime || "0:0").split(":").map(Number);
+    const startH = sh + sm / 60;
+    const endH = eh + em / 60;
+    const hours = endH > startH ? endH - startH : 24 - startH + endH;
+    const startDateObj = new Date(editForm.startDate);
+    const endDateObj = editForm.endDate ? new Date(editForm.endDate) : startDateObj;
+    const dayCount = Math.max(1, Math.round((endDateObj.getTime() - startDateObj.getTime()) / 86400000) + 1);
+    const isEvening = endH <= startH || sh >= 19 || sh < 7 || eh > 19 || (eh === 19 && em > 0);
+    const taxiFee = isEvening ? TAXI_FEE * dayCount : 0;
+    const totalPrice = RATE * hours * dayCount + taxiFee;
+
+    try {
+      await updateBooking(editBooking.id, {
+        date: editForm.startDate,
+        endDate: editForm.endDate || null,
+        startTime: startLabel,
+        endTime: endLabel,
+        hotel: editForm.hotel,
+        childrenCount: parseInt(editForm.numChildren) || 1,
+        childrenAges: editForm.childrenAges,
+        notes: editForm.notes,
+        totalPrice,
+      });
+      await fetchNannyBookings();
+      setEditBooking(null);
+    } catch (err) {
+      console.error("Edit booking failed:", err);
+      alert("Failed to save booking changes. Please try again.");
+    } finally {
+      setEditLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchNannyBookings();
@@ -430,6 +534,49 @@ export default function NannyCalendar() {
                         {booking.hotel}
                       </div>
                     )}
+
+                    {/* Action buttons — Extend / Forward / Complete / Edit */}
+                    {(booking.status === "pending" || booking.status === "confirmed") && (
+                      <div className="grid grid-cols-2 gap-2 pt-2">
+                        {booking.status === "confirmed" && (
+                          <button
+                            onClick={() => setExtendBooking(booking)}
+                            className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
+                          >
+                            <TimerReset className="w-3.5 h-3.5" />
+                            {t("extend.extendShift")}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setForwardBooking(booking)}
+                          className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-orange-50 text-orange-700 text-xs font-medium hover:bg-orange-100 transition-colors"
+                        >
+                          <ArrowRightLeft className="w-3.5 h-3.5" />
+                          {t("forward.forwardShift")}
+                        </button>
+                        {booking.status === "confirmed" && (
+                          <button
+                            onClick={() => handleComplete(booking.id)}
+                            disabled={actionLoading === booking.id}
+                            className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                          >
+                            {actionLoading === booking.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <CheckCircle className="w-3.5 h-3.5" />
+                            )}
+                            Complete
+                          </button>
+                        )}
+                        <button
+                          onClick={() => openEditModal(booking)}
+                          className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-violet-50 text-violet-700 text-xs font-medium hover:bg-violet-100 transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          Edit
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -437,6 +584,173 @@ export default function NannyCalendar() {
           )}
         </div>
       </div>
+
+      {/* Extend Booking Modal */}
+      {extendBooking && (
+        <ExtendBookingModal
+          booking={extendBooking}
+          onConfirm={async (newStartTime, newEndTime, newTotalPrice) => {
+            await updateBooking(extendBooking.id, { startTime: newStartTime, endTime: newEndTime, totalPrice: newTotalPrice });
+            await fetchNannyBookings();
+          }}
+          onClose={() => setExtendBooking(null)}
+          t={t}
+        />
+      )}
+
+      {/* Forward Booking Modal */}
+      {forwardBooking && (
+        <ForwardBookingModal
+          booking={forwardBooking}
+          nannies={nannies}
+          currentNannyId={nannyProfile?.id ?? null}
+          onConfirm={async (newNannyId) => {
+            const newNanny = nannies.find((n) => n.id === newNannyId);
+            await updateBooking(forwardBooking.id, {
+              nannyId: newNannyId,
+              nannyName: newNanny?.name || "",
+            });
+            await fetchNannyBookings();
+          }}
+          onClose={() => setForwardBooking(null)}
+          t={t}
+        />
+      )}
+
+      {/* Edit Booking Modal */}
+      {editBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h2 className="font-serif text-xl font-bold text-foreground">Edit Booking — {editBooking.clientName}</h2>
+              <button onClick={() => setEditBooking(null)} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">{t("shared.date")} *</label>
+                  <input
+                    type="date"
+                    required
+                    value={editForm.startDate}
+                    onChange={(e) => setEditForm((f) => ({ ...f, startDate: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.endDate")}</label>
+                  <input
+                    type="date"
+                    value={editForm.endDate}
+                    min={editForm.startDate}
+                    onChange={(e) => setEditForm((f) => ({ ...f, endDate: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.startTime")} *</label>
+                  <div className="relative">
+                    <select
+                      required
+                      value={editForm.startTime}
+                      onChange={(e) => setEditForm((f) => ({ ...f, startTime: e.target.value }))}
+                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 appearance-none"
+                    >
+                      <option value="">{t("shared.select")}</option>
+                      {TIME_SLOTS.map((ts) => (
+                        <option key={ts.value} value={ts.value}>{ts.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.endTime")}</label>
+                  <div className="relative">
+                    <select
+                      value={editForm.endTime}
+                      onChange={(e) => setEditForm((f) => ({ ...f, endTime: e.target.value }))}
+                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 appearance-none"
+                    >
+                      <option value="">{t("shared.select")}</option>
+                      {TIME_SLOTS.map((ts) => (
+                        <option key={ts.value} value={ts.value}>{ts.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.hotelLocation")}</label>
+                <input
+                  type="text"
+                  value={editForm.hotel}
+                  onChange={(e) => setEditForm((f) => ({ ...f, hotel: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">{t("shared.children")}</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={editForm.numChildren}
+                    onChange={(e) => setEditForm((f) => ({ ...f, numChildren: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">{t("nanny.bookings.ages")}</label>
+                  <input
+                    type="text"
+                    value={editForm.childrenAges}
+                    onChange={(e) => setEditForm((f) => ({ ...f, childrenAges: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">{t("shared.notes")}</label>
+                <textarea
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                  rows={2}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-card text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditBooking(null)}
+                  className="flex-1 px-4 py-2.5 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors"
+                >
+                  {t("shared.cancel")}
+                </button>
+                <button
+                  onClick={handleEditSubmit}
+                  disabled={editLoading || !editForm.startDate || !editForm.startTime}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 gradient-warm text-white text-sm font-medium rounded-lg shadow-warm hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {editLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
