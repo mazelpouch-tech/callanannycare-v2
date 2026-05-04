@@ -315,11 +315,20 @@ export default function NannyBookings() {
     if (statusFilter !== "all") {
       result = result.filter((b) => b.status === statusFilter);
     }
-    result.sort((a, b) =>
-      sortOrder === "newest"
+    const today = new Date().toISOString().slice(0, 10);
+    const isTodayBooking = (b: typeof result[0]) => {
+      const start = b.date || "";
+      const end = b.endDate || start;
+      return start <= today && today <= end;
+    };
+    result.sort((a, b) => {
+      const aToday = isTodayBooking(a);
+      const bToday = isTodayBooking(b);
+      if (aToday !== bToday) return aToday ? -1 : 1;
+      return sortOrder === "newest"
         ? (b.date || "").localeCompare(a.date || "")
-        : (a.date || "").localeCompare(b.date || "")
-    );
+        : (a.date || "").localeCompare(b.date || "");
+    });
     return result;
   }, [nannyBookings, search, statusFilter, sortOrder]);
 
