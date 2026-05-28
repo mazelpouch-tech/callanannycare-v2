@@ -17,6 +17,26 @@ import { calcTotalBookedHours, parseTimeToHours } from "@/utils/shiftHelpers";
 const SERVICE_RATE = 10; // €/hr — client rate (same as booking page)
 const TAXI_FEE = 10;
 
+// Default invoice sender ("FROM" block). Used when an invoice has no per-invoice override.
+const DEFAULT_SENDER = {
+  name: "Call a Nanny",
+  company: "Elam Childcare SARL",
+  registration: "RC Marrakech N° 179297",
+  address: "Marrakech, Morocco",
+  iban: "MA64 011450000012210003599237",
+  swift: "BMCEMAMC",
+};
+
+/** Escape user-supplied text before injecting it into the invoice HTML. */
+function escapeHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // 24h time slots from 06:00 to 05:45 (business-day ordering, 15-min steps)
 const TIME_SLOTS: string[] = [];
 for (let i = 0; i < 96; i++) {
@@ -65,6 +85,12 @@ interface InvoiceForm {
   totalPrice: string;
   notes: string;
   manualPrice: boolean;
+  senderName: string;
+  senderCompany: string;
+  senderRegistration: string;
+  senderAddress: string;
+  senderIban: string;
+  senderSwift: string;
 }
 
 const emptyForm: InvoiceForm = {
@@ -72,6 +98,7 @@ const emptyForm: InvoiceForm = {
   hotel: "", billedTo: "", date: "",
   clockIn: "", clockOut: "",
   childrenCount: "1", childrenAges: "", totalPrice: "", notes: "", manualPrice: false,
+  senderName: "", senderCompany: "", senderRegistration: "", senderAddress: "", senderIban: "", senderSwift: "",
 };
 
 // ─── Main Component ─────────────────────────────────────────
@@ -139,7 +166,7 @@ export default function AdminInvoices() {
     const dateStr = inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A";
     const msg = [
       `*Invoice #INV-${inv.id}*`,
-      `From: Call a Nanny`,
+      `From: ${inv.senderInfo?.name || DEFAULT_SENDER.name}`,
       `Date: ${dateStr}`,
       ``,
       `*Service Details*`,
@@ -392,7 +419,7 @@ export default function AdminInvoices() {
       const totalDH = toDH(totalAll);
       const lines: string[] = [
         invs.length > 1 ? `*Combined Invoice — ${invs.length} bookings*` : `*Invoice #INV-${invs[0].id}*`,
-        `From: Call a Nanny`,
+        `From: ${invs[0]?.senderInfo?.name || DEFAULT_SENDER.name}`,
         ``,
       ];
       for (const inv of invs) {
@@ -464,6 +491,13 @@ export default function AdminInvoices() {
       notes: inv.notes || "",
       // Respect the existing invoice amount; auto-calc would otherwise overwrite it.
       manualPrice: true,
+      // Pre-fill the "FROM" block with the effective sender (override or defaults).
+      senderName: inv.senderInfo?.name ?? DEFAULT_SENDER.name,
+      senderCompany: inv.senderInfo?.company ?? DEFAULT_SENDER.company,
+      senderRegistration: inv.senderInfo?.registration ?? DEFAULT_SENDER.registration,
+      senderAddress: inv.senderInfo?.address ?? DEFAULT_SENDER.address,
+      senderIban: inv.senderInfo?.iban ?? DEFAULT_SENDER.iban,
+      senderSwift: inv.senderInfo?.swift ?? DEFAULT_SENDER.swift,
     });
     setIsEditing(true);
     setFormError("");
@@ -526,6 +560,21 @@ export default function AdminInvoices() {
         clockOutIso = clockOutDate.toISOString();
       }
 
+      // Build the per-invoice sender override. Store null when blank or unchanged
+      // from the defaults, so those invoices keep following the live default block.
+      const senderFields = {
+        name: formData.senderName.trim(),
+        company: formData.senderCompany.trim(),
+        registration: formData.senderRegistration.trim(),
+        address: formData.senderAddress.trim(),
+        iban: formData.senderIban.trim(),
+        swift: formData.senderSwift.trim(),
+      };
+      const senderBlank = Object.values(senderFields).every((v) => v === "");
+      const senderIsDefault = (Object.keys(DEFAULT_SENDER) as (keyof typeof DEFAULT_SENDER)[])
+        .every((k) => senderFields[k] === DEFAULT_SENDER[k]);
+      const senderInfo = senderBlank || senderIsDefault ? null : senderFields;
+
       const payload = {
         nannyId: formData.nannyId ? Number(formData.nannyId) : null,
         nannyName: nanny?.name || "",
@@ -543,6 +592,7 @@ export default function AdminInvoices() {
         childrenAges: formData.childrenAges.trim(),
         totalPrice: Number(formData.totalPrice),
         notes: formData.notes.trim(),
+        senderInfo,
         status: "completed" as const,
         createdBy: 'admin' as const,
         createdByName: adminProfile?.name || 'Admin',
@@ -593,6 +643,7 @@ export default function AdminInvoices() {
     const total = inv.totalPrice || 0;
     const totalDH = toDH(total);
     const isPaid = !!inv.collectedAt;
+    const sender = inv.senderInfo || DEFAULT_SENDER;
 
     const html = `<!DOCTYPE html>
 <html><head>
@@ -678,12 +729,12 @@ function sharePdf(){
     <div class="addresses">
       <div class="addr">
         <div class="addr-label">FROM</div>
-        <div class="addr-name">Call a Nanny</div>
-        <div class="addr-line">Elam Childcare SARL</div>
-        <div class="addr-line">RC Marrakech N° 179297</div>
-        <div class="addr-line">Marrakech, Morocco</div>
-        <div class="addr-line" style="margin-top:6px;font-size:11px;">IBAN: MA64 011450000012210003599237</div>
-        <div class="addr-line" style="font-size:11px;">SWIFT: BMCEMAMC</div>
+        <div class="addr-name">${escapeHtml(sender.name)}</div>
+        ${sender.company ? `<div class="addr-line">${escapeHtml(sender.company)}</div>` : ""}
+        ${sender.registration ? `<div class="addr-line">${escapeHtml(sender.registration)}</div>` : ""}
+        ${sender.address ? `<div class="addr-line">${escapeHtml(sender.address)}</div>` : ""}
+        ${sender.iban ? `<div class="addr-line" style="margin-top:6px;font-size:11px;">IBAN: ${escapeHtml(sender.iban)}</div>` : ""}
+        ${sender.swift ? `<div class="addr-line" style="font-size:11px;">SWIFT: ${escapeHtml(sender.swift)}</div>` : ""}
       </div>
       <div class="addr">
         <div class="addr-label">BILLED TO</div>
@@ -754,6 +805,7 @@ function sharePdf(){
     const grandTotal = group.totalAmount;
     const grandTotalDH = toDH(grandTotal);
     const allPaid = group.allPaid;
+    const sender = group.bookings[0]?.senderInfo || DEFAULT_SENDER;
     const dateRange = (() => {
       const dates = group.bookings.map((b) => b.clockIn ? new Date(b.clockIn).toISOString().slice(0, 10) : b.date).filter(Boolean).sort();
       if (dates.length === 0) return "N/A";
@@ -860,12 +912,12 @@ function sharePdf(){
     <div class="addresses">
       <div class="addr">
         <div class="addr-label">FROM</div>
-        <div class="addr-name">Call a Nanny</div>
-        <div class="addr-line">Elam Childcare SARL</div>
-        <div class="addr-line">RC Marrakech N° 179297</div>
-        <div class="addr-line">Marrakech, Morocco</div>
-        <div class="addr-line" style="margin-top:6px;font-size:11px;">IBAN: MA64 011450000012210003599237</div>
-        <div class="addr-line" style="font-size:11px;">SWIFT: BMCEMAMC</div>
+        <div class="addr-name">${escapeHtml(sender.name)}</div>
+        ${sender.company ? `<div class="addr-line">${escapeHtml(sender.company)}</div>` : ""}
+        ${sender.registration ? `<div class="addr-line">${escapeHtml(sender.registration)}</div>` : ""}
+        ${sender.address ? `<div class="addr-line">${escapeHtml(sender.address)}</div>` : ""}
+        ${sender.iban ? `<div class="addr-line" style="margin-top:6px;font-size:11px;">IBAN: ${escapeHtml(sender.iban)}</div>` : ""}
+        ${sender.swift ? `<div class="addr-line" style="font-size:11px;">SWIFT: ${escapeHtml(sender.swift)}</div>` : ""}
       </div>
       <div class="addr">
         <div class="addr-label">BILLED TO</div>
@@ -1411,7 +1463,7 @@ function sharePdf(){
                           const totalDH = toDH(totalAll);
                           const lines: string[] = [
                             group.bookings.length > 1 ? `*Combined Invoice — ${group.bookings.length} bookings*` : `*Invoice #INV-${group.bookings[0].id}*`,
-                            `From: Call a Nanny`,
+                            `From: ${group.bookings[0]?.senderInfo?.name || DEFAULT_SENDER.name}`,
                             `Client: ${group.clientName}`,
                             ``,
                           ];
@@ -1804,6 +1856,80 @@ function sharePdf(){
                 />
                 <p className="text-xs text-muted-foreground mt-1">Leave empty if the parent pays directly. If a hotel pays on behalf, enter the hotel/company name.</p>
               </div>
+
+              {/* Invoice Sender (FROM block) */}
+              <details className="rounded-lg border border-border bg-background/40">
+                <summary className="cursor-pointer select-none px-3 py-2.5 text-sm font-medium text-foreground">
+                  Invoice Sender (From)
+                </summary>
+                <div className="px-3 pb-3 pt-1 space-y-3">
+                  <p className="text-xs text-muted-foreground">Shown at the top of the invoice. Leave a field blank to drop that line; clear all fields to use the default {DEFAULT_SENDER.name} details.</p>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Business Name</label>
+                    <input
+                      type="text"
+                      value={formData.senderName}
+                      onChange={(e) => updateField("senderName", e.target.value)}
+                      placeholder={DEFAULT_SENDER.name}
+                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">Company</label>
+                      <input
+                        type="text"
+                        value={formData.senderCompany}
+                        onChange={(e) => updateField("senderCompany", e.target.value)}
+                        placeholder={DEFAULT_SENDER.company}
+                        className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">Registration</label>
+                      <input
+                        type="text"
+                        value={formData.senderRegistration}
+                        onChange={(e) => updateField("senderRegistration", e.target.value)}
+                        placeholder={DEFAULT_SENDER.registration}
+                        className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Address</label>
+                    <input
+                      type="text"
+                      value={formData.senderAddress}
+                      onChange={(e) => updateField("senderAddress", e.target.value)}
+                      placeholder={DEFAULT_SENDER.address}
+                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">IBAN</label>
+                      <input
+                        type="text"
+                        value={formData.senderIban}
+                        onChange={(e) => updateField("senderIban", e.target.value)}
+                        placeholder={DEFAULT_SENDER.iban}
+                        className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">SWIFT</label>
+                      <input
+                        type="text"
+                        value={formData.senderSwift}
+                        onChange={(e) => updateField("senderSwift", e.target.value)}
+                        placeholder={DEFAULT_SENDER.swift}
+                        className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </details>
 
               {/* Date */}
               <div>

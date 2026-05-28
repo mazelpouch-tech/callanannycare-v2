@@ -78,6 +78,7 @@ export interface DbBooking {
   billed_to: string;
   extra_dates: string | null; // JSON array of additional non-contiguous dates
   extra_times: string | null; // JSON array of additional time blocks e.g. [{"start_time":"18h00","end_time":"21h00"}]
+  sender_info: string | null; // JSON object overriding the invoice "FROM" block (see InvoiceSender)
 }
 
 /** Booking row from a JOIN with nannies (includes nanny_name, nanny_image) */
@@ -137,6 +138,17 @@ export interface Nanny {
   status: NannyStatus;
 }
 
+/** Per-invoice override of the "FROM"/sender block shown at the top of an invoice.
+ *  Any empty field falls back to the default Call a Nanny details when rendered. */
+export interface InvoiceSender {
+  name: string;
+  company: string;
+  registration: string;
+  address: string;
+  iban: string;
+  swift: string;
+}
+
 export interface Booking {
   id: number | string;
   nannyId: number | null;
@@ -174,6 +186,7 @@ export interface Booking {
   billedTo: string;
   extraDates: string[] | null; // non-contiguous additional dates for multi-date bookings
   extraTimes: Array<{ startTime: string; endTime: string }> | null; // additional time blocks (e.g. morning + evening)
+  senderInfo: InvoiceSender | null; // per-invoice override of the "FROM" block
 }
 
 export interface Notification {
@@ -421,7 +434,7 @@ export interface DataContextValue {
   bookings: Booking[];
   fetchBookings: () => Promise<void>;
   addBooking: (booking: Partial<Booking>, meta?: { locale?: string; skipMinHours?: boolean; skipConflictCheck?: boolean; skipParentNotifications?: boolean }) => Promise<Booking>;
-  updateBooking: (id: number | string, updates: Partial<Booking>) => Promise<void>;
+  updateBooking: (id: number | string, updates: Partial<Booking>, options?: { skipConflictCheck?: boolean }) => Promise<void>;
   updateBookingStatus: (id: number | string, status: BookingStatus, meta?: { reason?: string; cancelledBy?: string }) => Promise<void>;
   clockInBooking: (id: number | string) => Promise<void>;
   clockOutBooking: (id: number | string) => Promise<void>;
