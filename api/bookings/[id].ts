@@ -33,6 +33,7 @@ interface UpdateBookingBody {
   billed_to?: string;
   extra_dates?: string | null;
   extra_times?: string | null;
+  sender_info?: string | null;
   skip_conflict_check?: boolean;
 }
 
@@ -48,6 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS billed_to TEXT DEFAULT ''`;
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS extra_dates TEXT DEFAULT NULL`;
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS extra_times TEXT`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS sender_info TEXT DEFAULT NULL`;
 
     if (req.method === 'GET') {
       const result = await sql`
@@ -133,7 +135,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ────────────────────────────────────────────────────────────────
     
     if (req.method === 'PUT') {
-      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder, cancellation_reason, cancelled_by, collected_by, collected_at, collection_note, payment_method, restore, admin_notes, billed_to, extra_dates, extra_times, skip_conflict_check } = req.body as UpdateBookingBody;
+      const { nanny_id, status, client_name, client_email, client_phone, hotel, date, end_date, start_time, end_time, plan, children_count, children_ages, notes, total_price, clock_in, clock_out, resend_invoice, send_reminder, cancellation_reason, cancelled_by, collected_by, collected_at, collection_note, payment_method, restore, admin_notes, billed_to, extra_dates, extra_times, sender_info, skip_conflict_check } = req.body as UpdateBookingBody;
 
       // Restore a soft-deleted booking
       if (restore) {
@@ -220,6 +222,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const _billed_to = billed_to !== undefined ? billed_to : null;
       const _extra_dates = extra_dates !== undefined ? extra_dates : null;
       const _extra_times = extra_times !== undefined ? extra_times : null;
+      const _sender_info = sender_info !== undefined ? sender_info : null;
 
       const result = await sql`
         UPDATE bookings SET
@@ -251,6 +254,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           billed_to = COALESCE(${_billed_to}, billed_to),
           extra_dates = COALESCE(${_extra_dates}, extra_dates),
           extra_times = CASE WHEN ${extra_times !== undefined} THEN ${_extra_times} ELSE extra_times END,
+          sender_info = CASE WHEN ${sender_info !== undefined} THEN ${_sender_info} ELSE sender_info END,
           updated_at = NOW()
         WHERE id = ${id}
         RETURNING *

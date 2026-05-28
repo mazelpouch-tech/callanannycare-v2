@@ -191,6 +191,7 @@ export function DataProvider({ children }: DataProviderProps) {
           billedTo: b.billed_to || '',
           extraDates: b.extra_dates ? (() => { try { return JSON.parse(b.extra_dates!); } catch { return null; } })() : null,
           extraTimes: b.extra_times ? (() => { try { const arr = JSON.parse(b.extra_times!); return arr.map((t: { start_time: string; end_time: string }) => ({ startTime: t.start_time, endTime: t.end_time })); } catch { return null; } })() : null,
+          senderInfo: b.sender_info ? (() => { try { return JSON.parse(b.sender_info!); } catch { return null; } })() : null,
         }));
         setBookings(normalizedBookings);
         saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -374,6 +375,7 @@ export function DataProvider({ children }: DataProviderProps) {
         billedTo: b.billed_to || '',
         extraDates: b.extra_dates ? (() => { try { return JSON.parse(b.extra_dates!); } catch { return null; } })() : null,
         extraTimes: b.extra_times ? (() => { try { const arr = JSON.parse(b.extra_times!); return arr.map((t: { start_time: string; end_time: string }) => ({ startTime: t.start_time, endTime: t.end_time })); } catch { return null; } })() : null,
+        senderInfo: b.sender_info ? (() => { try { return JSON.parse(b.sender_info!); } catch { return null; } })() : null,
       }));
       setBookings(normalizedBookings);
       saveToStorage(STORAGE_KEYS.bookings, normalizedBookings);
@@ -434,6 +436,7 @@ export function DataProvider({ children }: DataProviderProps) {
             created_by_name: booking.createdByName || "",
             extra_dates: booking.extraDates ? JSON.stringify(booking.extraDates) : null,
             extra_times: booking.extraTimes ? JSON.stringify(booking.extraTimes.map(t => ({ start_time: t.startTime, end_time: t.endTime }))) : null,
+            sender_info: booking.senderInfo ? JSON.stringify(booking.senderInfo) : null,
             skip_min_hours: meta?.skipMinHours || false,
             skip_conflict_check: meta?.skipConflictCheck || false,
             skip_parent_notifications: meta?.skipParentNotifications || false,
@@ -478,6 +481,7 @@ export function DataProvider({ children }: DataProviderProps) {
           billedTo: created.billed_to || '',
           extraDates: created.extra_dates ? (() => { try { return JSON.parse(created.extra_dates!); } catch { return null; } })() : null,
           extraTimes: created.extra_times ? (() => { try { const arr = JSON.parse(created.extra_times!); return arr.map((t: { start_time: string; end_time: string }) => ({ startTime: t.start_time, endTime: t.end_time })); } catch { return null; } })() : null,
+          senderInfo: created.sender_info ? (() => { try { return JSON.parse(created.sender_info!); } catch { return null; } })() : null,
         };
         setBookings((prev) => {
           const updated = [...prev, normalized];
@@ -554,6 +558,7 @@ export function DataProvider({ children }: DataProviderProps) {
     if (updates.adminNotes !== undefined) apiBody.admin_notes = updates.adminNotes;
     if (updates.billedTo !== undefined) apiBody.billed_to = updates.billedTo;
     if (updates.extraTimes !== undefined) apiBody.extra_times = updates.extraTimes ? JSON.stringify(updates.extraTimes.map(t => ({ start_time: t.startTime, end_time: t.endTime }))) : null;
+    if (updates.senderInfo !== undefined) apiBody.sender_info = updates.senderInfo ? JSON.stringify(updates.senderInfo) : null;
     if (updates.totalPrice !== undefined) apiBody.total_price = updates.totalPrice;
     if (updates.status !== undefined) apiBody.status = updates.status;
     if (updates.clockIn !== undefined) apiBody.clock_in = updates.clockIn;
@@ -678,6 +683,7 @@ export function DataProvider({ children }: DataProviderProps) {
         billedTo: b.billed_to || '',
         extraDates: b.extra_dates ? (() => { try { return JSON.parse(b.extra_dates!); } catch { return null; } })() : null,
         extraTimes: b.extra_times ? (() => { try { const arr = JSON.parse(b.extra_times!); return arr.map((t: { start_time: string; end_time: string }) => ({ startTime: t.start_time, endTime: t.end_time })); } catch { return null; } })() : null,
+        senderInfo: b.sender_info ? (() => { try { return JSON.parse(b.sender_info!); } catch { return null; } })() : null,
       }));
     } catch {
       return [];
@@ -893,6 +899,7 @@ export function DataProvider({ children }: DataProviderProps) {
     billedTo: b.billed_to || '',
     extraDates: b.extra_dates ? (() => { try { return JSON.parse(b.extra_dates!); } catch { return null; } })() : null,
     extraTimes: b.extra_times ? (() => { try { const arr = JSON.parse(b.extra_times!); return arr.map((t: { start_time: string; end_time: string }) => ({ startTime: t.start_time, endTime: t.end_time })); } catch { return null; } })() : null,
+    senderInfo: b.sender_info ? (() => { try { return JSON.parse(b.sender_info!); } catch { return null; } })() : null,
   }), []);
 
   const fetchNannyBookings = useCallback(async () => {

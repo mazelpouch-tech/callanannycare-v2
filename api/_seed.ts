@@ -233,6 +233,10 @@ export default async function seedHandler(req: VercelRequest, res: VercelRespons
     await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS extra_times TEXT`;
     // ────────────────────────────────────────────────────────────────
 
+    // ─── Per-invoice sender ("FROM" block) override ────────────────
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS sender_info TEXT DEFAULT NULL`;
+    // ────────────────────────────────────────────────────────────────
+
     // ─── Nanny Period Payments (mark-as-paid tracking) ─────────────
     await sql`
       CREATE TABLE IF NOT EXISTS nanny_payments (
