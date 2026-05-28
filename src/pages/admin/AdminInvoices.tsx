@@ -64,13 +64,14 @@ interface InvoiceForm {
   childrenAges: string;
   totalPrice: string;
   notes: string;
+  manualPrice: boolean;
 }
 
 const emptyForm: InvoiceForm = {
   nannyId: "", clientName: "", clientEmail: "", clientPhone: "",
   hotel: "", billedTo: "", date: "",
   clockIn: "", clockOut: "",
-  childrenCount: "1", childrenAges: "", totalPrice: "", notes: "",
+  childrenCount: "1", childrenAges: "", totalPrice: "", notes: "", manualPrice: false,
 };
 
 // ─── Main Component ─────────────────────────────────────────
@@ -188,8 +189,9 @@ export default function AdminInvoices() {
     return new Date(`${date}T${time}`);
   };
 
-  // Auto-calculate total when clock times change
+  // Auto-calculate total when times change (unless the admin set the price manually)
   useEffect(() => {
+    if (formData.manualPrice) return;
     if (!formData.date || !formData.clockIn || !formData.clockOut) return;
     try {
       const inTime = buildDateTime(formData.date, formData.clockIn);
@@ -210,7 +212,7 @@ export default function AdminInvoices() {
     } catch {
       // skip
     }
-  }, [formData.date, formData.clockIn, formData.clockOut]);
+  }, [formData.date, formData.clockIn, formData.clockOut, formData.manualPrice]);
 
   // ── Derived Data ──
 
@@ -436,17 +438,15 @@ export default function AdminInvoices() {
   };
 
   const openEdit = (inv: Booking) => {
-    // Extract date from clockIn or fall back to inv.date
-    const editDate = inv.clockIn
-      ? new Date(inv.clockIn).toISOString().slice(0, 10)
-      : inv.date || "";
-    // Extract time-only (HH:mm) from clockIn/clockOut, falling back to booked times
-    const editClockIn = inv.clockIn
-      ? new Date(inv.clockIn).toTimeString().slice(0, 5)
-      : bookingTimeToHHmm(inv.startTime);
-    const editClockOut = inv.clockOut
-      ? new Date(inv.clockOut).toTimeString().slice(0, 5)
-      : bookingTimeToHHmm(inv.endTime);
+    // Prefer the booked service date/times that actually appear on the invoice,
+    // falling back to the recorded clock times.
+    const editDate = inv.date || (inv.clockIn ? new Date(inv.clockIn).toISOString().slice(0, 10) : "");
+    const editClockIn = inv.startTime
+      ? bookingTimeToHHmm(inv.startTime)
+      : inv.clockIn ? new Date(inv.clockIn).toTimeString().slice(0, 5) : "";
+    const editClockOut = inv.endTime
+      ? bookingTimeToHHmm(inv.endTime)
+      : inv.clockOut ? new Date(inv.clockOut).toTimeString().slice(0, 5) : "";
     setFormData({
       id: inv.id,
       nannyId: String(inv.nannyId || ""),
@@ -462,6 +462,8 @@ export default function AdminInvoices() {
       childrenAges: inv.childrenAges || "",
       totalPrice: String(inv.totalPrice || 0),
       notes: inv.notes || "",
+      // Respect the existing invoice amount; auto-calc would otherwise overwrite it.
+      manualPrice: true,
     });
     setIsEditing(true);
     setFormError("");
@@ -487,16 +489,16 @@ export default function AdminInvoices() {
       setFormError("Parent name is required");
       return;
     }
-    if (!formData.nannyId) {
-      setFormError("Please select a nanny");
+    if (!isEditing && !formData.nannyId) {
+      setFormError("Please select a caregiver");
       return;
     }
     if (!formData.date) {
       setFormError("Date is required");
       return;
     }
-    if (!formData.clockIn || !formData.clockOut) {
-      setFormError("Clock-in and clock-out are required");
+    if ((formData.clockIn && !formData.clockOut) || (!formData.clockIn && formData.clockOut)) {
+      setFormError("Please provide both start and end times, or leave both empty");
       return;
     }
     if (!formData.totalPrice || Number(formData.totalPrice) <= 0) {
@@ -506,15 +508,26 @@ export default function AdminInvoices() {
 
     setFormLoading(true);
     try {
-      const nanny = nannies.find((n) => n.id === Number(formData.nannyId));
-      // Combine date + time into full ISO strings
-      const clockInDate = buildDateTime(formData.date, formData.clockIn)!;
-      const clockOutDate = buildDateTime(formData.date, formData.clockOut)!;
-      // If clock-out is earlier than clock-in, assume next day
-      if (clockOutDate <= clockInDate) clockOutDate.setDate(clockOutDate.getDate() + 1);
+      const nanny = formData.nannyId ? nannies.find((n) => n.id === Number(formData.nannyId)) : null;
+
+      // Booked service times shown on the invoice, in the "HHhMM" label format.
+      const startLabel = formData.clockIn ? formData.clockIn.replace(":", "h") : "";
+      const endLabel = formData.clockOut ? formData.clockOut.replace(":", "h") : "";
+
+      // Keep ISO clock timestamps in sync with the booked slot when times are set.
+      let clockInIso: string | null = null;
+      let clockOutIso: string | null = null;
+      if (formData.date && formData.clockIn && formData.clockOut) {
+        const clockInDate = buildDateTime(formData.date, formData.clockIn)!;
+        const clockOutDate = buildDateTime(formData.date, formData.clockOut)!;
+        // If clock-out is earlier than clock-in, assume next day
+        if (clockOutDate <= clockInDate) clockOutDate.setDate(clockOutDate.getDate() + 1);
+        clockInIso = clockInDate.toISOString();
+        clockOutIso = clockOutDate.toISOString();
+      }
 
       const payload = {
-        nannyId: Number(formData.nannyId),
+        nannyId: formData.nannyId ? Number(formData.nannyId) : null,
         nannyName: nanny?.name || "",
         clientName: formData.clientName.trim(),
         clientEmail: formData.clientEmail.trim(),
@@ -522,8 +535,10 @@ export default function AdminInvoices() {
         hotel: formData.hotel.trim(),
         billedTo: formData.billedTo.trim(),
         date: formData.date,
-        clockIn: clockInDate.toISOString(),
-        clockOut: clockOutDate.toISOString(),
+        startTime: startLabel,
+        endTime: endLabel,
+        clockIn: clockInIso,
+        clockOut: clockOutIso,
         childrenCount: Number(formData.childrenCount) || 1,
         childrenAges: formData.childrenAges.trim(),
         totalPrice: Number(formData.totalPrice),
@@ -534,7 +549,8 @@ export default function AdminInvoices() {
       };
 
       if (isEditing && formData.id) {
-        await updateBooking(formData.id, payload);
+        // Invoices are historical records — don't block manual edits on scheduling conflicts.
+        await updateBooking(formData.id, payload, { skipConflictCheck: true });
       } else {
         await addBooking(payload);
       }
@@ -1718,12 +1734,11 @@ function sharePdf(){
 
               {/* Caregiver */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Caregiver (Nanny) *</label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Caregiver (Nanny){isEditing ? "" : " *"}</label>
                 <select
                   value={formData.nannyId}
                   onChange={(e) => updateField("nannyId", e.target.value)}
                   className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                  required
                 >
                   <option value="">Select nanny...</option>
                   {activeNannies.map((n) => (
@@ -1802,46 +1817,47 @@ function sharePdf(){
                 />
               </div>
 
-              {/* Clock In/Out */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Clock In *</label>
-                  <div className="relative">
-                    <select
-                      value={formData.clockIn}
-                      onChange={(e) => updateField("clockIn", e.target.value)}
-                      className="w-full appearance-none px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary cursor-pointer"
-                      required
-                    >
-                      <option value="">Select...</option>
-                      {TIME_SLOTS.map((t) => (
-                        <option key={t} value={t}>{t.replace(":", "h")}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+              {/* Service time slot */}
+              <div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Start Time</label>
+                    <div className="relative">
+                      <select
+                        value={formData.clockIn}
+                        onChange={(e) => updateField("clockIn", e.target.value)}
+                        className="w-full appearance-none px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary cursor-pointer"
+                      >
+                        <option value="">Select...</option>
+                        {TIME_SLOTS.map((t) => (
+                          <option key={t} value={t}>{t.replace(":", "h")}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">End Time</label>
+                    <div className="relative">
+                      <select
+                        value={formData.clockOut}
+                        onChange={(e) => updateField("clockOut", e.target.value)}
+                        className="w-full appearance-none px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary cursor-pointer"
+                      >
+                        <option value="">Select...</option>
+                        {TIME_SLOTS.map((t) => (
+                          <option key={t} value={t}>{t.replace(":", "h")}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Clock Out *</label>
-                  <div className="relative">
-                    <select
-                      value={formData.clockOut}
-                      onChange={(e) => updateField("clockOut", e.target.value)}
-                      className="w-full appearance-none px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary cursor-pointer"
-                      required
-                    >
-                      <option value="">Select...</option>
-                      {TIME_SLOTS.map((t) => (
-                        <option key={t} value={t}>{t.replace(":", "h")}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-                  </div>
-                </div>
+                <p className="text-xs text-muted-foreground mt-1">Shown on the invoice as the time slot and used for service hours.</p>
               </div>
 
               {/* Auto-calc breakdown */}
-              {formData.date && formData.clockIn && formData.clockOut && (() => {
+              {!formData.manualPrice && formData.date && formData.clockIn && formData.clockOut && (() => {
                 try {
                   const inT = buildDateTime(formData.date, formData.clockIn);
                   const outT = buildDateTime(formData.date, formData.clockOut);
@@ -1879,6 +1895,17 @@ function sharePdf(){
                 } catch { return null; }
               })()}
 
+              {/* Manual price toggle */}
+              <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={formData.manualPrice}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, manualPrice: e.target.checked }))}
+                  className="rounded border-border text-primary focus:ring-2 focus:ring-primary/30"
+                />
+                Set price manually (override auto-calculation)
+              </label>
+
               {/* Children & Price */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
@@ -1909,7 +1936,7 @@ function sharePdf(){
                     min={0}
                     step={0.01}
                     value={formData.totalPrice}
-                    onChange={(e) => updateField("totalPrice", e.target.value)}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, totalPrice: e.target.value, manualPrice: true }))}
                     className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary font-semibold"
                     required
                   />
