@@ -39,8 +39,7 @@ export default function Navbar() {
               to="/"
               className="flex items-center gap-2 font-serif text-xl font-bold text-gradient-warm tracking-tight"
             >
-              <img src="/logo-icon.png" alt="" className="w-10 h-10 object-contain" />
-              call a nanny
+              <img src="/logo-icon.png" alt="call a nanny" className="w-12 h-12 object-contain" />
             </Link>
 
             {/* Desktop Navigation */}
@@ -104,8 +103,7 @@ export default function Navbar() {
         {/* Panel Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <span className="flex items-center gap-2 font-serif text-lg font-bold text-gradient-warm">
-            <img src="/logo-icon.png" alt="" className="w-9 h-9 object-contain" />
-            call a nanny
+            <img src="/logo-icon.png" alt="call a nanny" className="w-11 h-11 object-contain" />
           </span>
           <button
             onClick={() => setMobileOpen(false)}
