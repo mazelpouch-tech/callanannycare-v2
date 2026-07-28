@@ -27,7 +27,7 @@ export default function Footer() {
           {/* Brand Column */}
           <div className="space-y-4">
             <h3 className="font-serif text-2xl font-bold flex items-center gap-3">
-              <img src="/logo-icon.png" alt="" className="w-12 h-12 object-contain brightness-200" />
+              <img src="/logo-icon.png" alt="" className="w-12 h-12 object-contain" />
               call a nanny
             </h3>
             <p className="text-background/70 text-sm leading-relaxed">
