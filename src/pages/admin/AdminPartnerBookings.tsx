@@ -85,13 +85,16 @@ export function PartnerBookingsView({ slug, mode = "admin" }: { slug: string | u
 
   const stats = useMemo(() => {
     const active = partnerBookings.filter((b) => b.status !== "cancelled");
+    const revenue = active.reduce((sum, b) => sum + (Number(b.totalPrice) || 0), 0);
+    const pct = partner?.commissionPercent ?? 0;
     return {
       total: partnerBookings.length,
       pending: partnerBookings.filter((b) => b.status === "pending").length,
       confirmed: partnerBookings.filter((b) => b.status === "confirmed").length,
-      revenue: active.reduce((sum, b) => sum + (Number(b.totalPrice) || 0), 0),
+      revenue,
+      commission: Math.round(revenue * pct) / 100,
     };
-  }, [partnerBookings]);
+  }, [partnerBookings, partner]);
 
   if (!partner) {
     return (
@@ -116,7 +119,8 @@ export function PartnerBookingsView({ slug, mode = "admin" }: { slug: string | u
               <h1 className="text-2xl font-serif font-bold text-foreground">{partner.name}</h1>
               <p className="text-muted-foreground text-sm">
                 Bookings made through the {partner.name} portal · {partner.rate}€/hr
-                {partner.taxiFee > 0 ? ` + ${partner.taxiFee}€ night taxi fee` : " · no night taxi fee"}
+                {partner.taxiFee > 0 && ` + ${partner.taxiFee}€ night taxi fee`}
+                {partner.commissionPercent > 0 && ` · ${partner.commissionPercent}% commission`}
               </p>
             </div>
           </div>
@@ -144,7 +148,7 @@ export function PartnerBookingsView({ slug, mode = "admin" }: { slug: string | u
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-2 gap-4 ${partner.commissionPercent > 0 ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
         <div className="bg-card rounded-2xl border border-border p-5">
           <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
             <CalendarDays className="w-4 h-4" />
@@ -173,6 +177,15 @@ export function PartnerBookingsView({ slug, mode = "admin" }: { slug: string | u
           </div>
           <p className="text-2xl font-bold text-foreground">{stats.revenue}€</p>
         </div>
+        {partner.commissionPercent > 0 && (
+          <div className="bg-card rounded-2xl border border-accent/30 p-5">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+              <Handshake className="w-4 h-4" />
+              {mode === "partner" ? "Your Commission" : "Commission Owed"} ({partner.commissionPercent}%)
+            </div>
+            <p className="text-2xl font-bold text-accent">{stats.commission}€</p>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -274,6 +287,11 @@ export function PartnerBookingsView({ slug, mode = "admin" }: { slug: string | u
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-xl font-bold text-foreground">{booking.totalPrice}€</p>
+                  {partner.commissionPercent > 0 && booking.status !== "cancelled" && (
+                    <p className="text-xs text-accent font-semibold">
+                      Commission: {Math.round((Number(booking.totalPrice) || 0) * partner.commissionPercent) / 100}€
+                    </p>
+                  )}
                   {mode === "admin" && (
                     <Link
                       to="/admin/bookings"

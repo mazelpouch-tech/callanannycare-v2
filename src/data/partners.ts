@@ -16,6 +16,8 @@ export interface PartnerConfig {
   rate: number;
   /** Flat EUR fee added per night-window booking day */
   taxiFee: number;
+  /** Percentage of each booking's total owed to the partner as commission */
+  commissionPercent: number;
   /** Former names still present in old bookings' notes tags */
   aliases?: string[];
 }
@@ -26,12 +28,14 @@ export const PARTNERS: Record<string, PartnerConfig> = {
     name: "Club Med",
     rate: 10,
     taxiFee: 10,
+    commissionPercent: 0,
   },
   seanjeztagana: {
     slug: "seanjeztagana",
     name: "Seanjeztagana Agency",
-    rate: 12,
-    taxiFee: 0, // no night taxi fee for this partner
+    rate: 12, // 12€/hr because the agency takes a 20% commission
+    taxiFee: 10,
+    commissionPercent: 20,
     aliases: ["Seanjeztagana Conciergerie"],
   },
 };
