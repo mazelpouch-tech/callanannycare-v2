@@ -412,7 +412,7 @@ export default function PartnerDemo() {
             <div className="relative">
               <div className="rounded-2xl overflow-hidden shadow-2xl">
                 <img
-                  src="/hero-photo.jpg"
+                  src="/hero-poolside.jpg"
                   alt="Professional childcare in Marrakech"
                   className="w-full h-[360px] object-cover"
                 />
