@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'DM Sans', sans-serif;
-  --font-serif: 'Playfair Display', serif;
+  /* Body & booking questions: Nunito Regular/SemiBold */
+  --font-sans: 'Nunito', sans-serif;
+  /* Headings & buttons: Fredoka SemiBold/Bold (kept under the historical
+     --font-serif name so the existing font-serif utility keeps working) */
+  --font-serif: 'Fredoka', sans-serif;
   --color-background: hsl(30 25% 97%);
   --color-foreground: hsl(20 20% 15%);
   --color-card: hsl(30 20% 95%);
@@ -33,6 +36,19 @@ body {
 
 .font-serif {
   font-family: var(--font-serif);
+}
+
+/* Headings and buttons use Fredoka (SemiBold/Bold); body stays Nunito.
+   The anchor selectors catch link-styled CTA buttons (rounded pill/box links). */
+h1, h2, h3, h4, h5, h6,
+button,
+a[class*="rounded-full"],
+a[class*="rounded-xl"] {
+  font-family: var(--font-serif);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
 }
 
 .gradient-warm {

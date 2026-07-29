@@ -170,7 +170,7 @@ const copy = {
 
 function BookingMockup() {
   return (
-    <div className="bg-[#faf7f4] rounded-2xl overflow-hidden shadow-xl border border-[#e8dfd6] text-[#2b1f17]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="bg-[#faf7f4] rounded-2xl overflow-hidden shadow-xl border border-[#e8dfd6] text-[#2b1f17]" style={{ fontFamily: "'Nunito', sans-serif" }}>
       <div className="bg-white border-b border-[#e8dfd6] px-4 py-3 flex items-center gap-2">
         <div className="w-3 h-3 rounded-full bg-red-400" />
         <div className="w-3 h-3 rounded-full bg-amber-400" />
@@ -223,7 +223,7 @@ function AdminMockup() {
     { name: "Emma Clarke", nanny: "Doha E.", status: "confirmed", time: "4:00 PM", color: "bg-green-100 text-green-700" },
   ];
   return (
-    <div className="bg-[#faf7f4] rounded-2xl overflow-hidden shadow-xl border border-[#e8dfd6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="bg-[#faf7f4] rounded-2xl overflow-hidden shadow-xl border border-[#e8dfd6]" style={{ fontFamily: "'Nunito', sans-serif" }}>
       <div className="bg-white border-b border-[#e8dfd6] px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-lg bg-[#c17448] flex items-center justify-center">
@@ -271,7 +271,7 @@ function AdminMockup() {
 
 function NannyMockup() {
   return (
-    <div className="bg-[#faf7f4] rounded-2xl overflow-hidden shadow-xl border border-[#e8dfd6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="bg-[#faf7f4] rounded-2xl overflow-hidden shadow-xl border border-[#e8dfd6]" style={{ fontFamily: "'Nunito', sans-serif" }}>
       <div className="bg-white border-b border-[#e8dfd6] px-4 py-3 flex items-center gap-3">
         <div className="w-8 h-8 rounded-full bg-[#e8dfd6] flex items-center justify-center text-[11px] font-bold text-[#c17448]">FZ</div>
         <div>
@@ -337,14 +337,14 @@ export default function PartnerDemo() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#faf7f4]" style={{ fontFamily: "'DM Sans', sans-serif", color: "#2b1f17" }}>
+    <div className="min-h-screen bg-[#faf7f4]" style={{ fontFamily: "'Nunito', sans-serif", color: "#2b1f17" }}>
 
       {/* ── Nav ── */}
       <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-[#e8dfd6]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img src="/logo-icon.png" alt="Call a Nanny" className="w-9 h-9 object-contain" />
-            <span className="font-bold text-lg text-[#2b1f17]" style={{ fontFamily: "'Playfair Display', serif" }}>
+            <span className="font-bold text-lg text-[#2b1f17]" style={{ fontFamily: "'Fredoka', sans-serif" }}>
               call a nanny
             </span>
           </div>
@@ -377,7 +377,7 @@ export default function PartnerDemo() {
                 <Star className="w-3.5 h-3.5" />
                 {c.hero.badge}
               </span>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight mb-5" style={{ fontFamily: "'Playfair Display', serif" }}>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight mb-5" style={{ fontFamily: "'Fredoka', sans-serif" }}>
                 {c.hero.title.split("Childcare").map((part, i) => (
                   i === 0
                     ? <span key={i}>{part}<span className="text-[#c17448]">Childcare</span></span>
@@ -445,7 +445,7 @@ export default function PartnerDemo() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {c.stats.map((s, i) => (
               <div key={i} className="text-center">
-                <p className="text-3xl font-bold text-[#c17448] mb-1" style={{ fontFamily: "'Playfair Display', serif" }}>{s.value}</p>
+                <p className="text-3xl font-bold text-[#c17448] mb-1" style={{ fontFamily: "'Fredoka', sans-serif" }}>{s.value}</p>
                 <p className="text-sm text-[#9a8878]">{s.label}</p>
               </div>
             ))}
@@ -457,7 +457,7 @@ export default function PartnerDemo() {
       <section id="how-it-works" className="py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ fontFamily: "'Fredoka', sans-serif" }}>
               {c.howTitle}
             </h2>
             <p className="text-[#6b5a50] max-w-xl mx-auto">{c.howSub}</p>
@@ -471,10 +471,10 @@ export default function PartnerDemo() {
                   </div>
                 )}
                 <div className="flex items-center gap-3 mb-4">
-                  <span className="text-3xl font-bold text-[#c17448]/20" style={{ fontFamily: "'Playfair Display', serif" }}>{step.num}</span>
+                  <span className="text-3xl font-bold text-[#c17448]/20" style={{ fontFamily: "'Fredoka', sans-serif" }}>{step.num}</span>
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#c17448]/10 text-[#c17448]">{step.role}</span>
                 </div>
-                <h3 className="font-bold text-lg text-[#2b1f17] mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>{step.title}</h3>
+                <h3 className="font-bold text-lg text-[#2b1f17] mb-2" style={{ fontFamily: "'Fredoka', sans-serif" }}>{step.title}</h3>
                 <p className="text-sm text-[#6b5a50] leading-relaxed">{step.desc}</p>
               </div>
             ))}
@@ -486,7 +486,7 @@ export default function PartnerDemo() {
       <section className="py-16 bg-white border-y border-[#e8dfd6]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ fontFamily: "'Fredoka', sans-serif" }}>
               {c.platformTitle}
             </h2>
             <p className="text-[#6b5a50]">{c.platformSub}</p>
@@ -512,7 +512,7 @@ export default function PartnerDemo() {
       <section className="py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ fontFamily: "'Fredoka', sans-serif" }}>
               {c.featuresTitle}
             </h2>
             <p className="text-[#6b5a50] max-w-lg mx-auto">{c.featuresSub}</p>
@@ -538,7 +538,7 @@ export default function PartnerDemo() {
       <section className="py-16 bg-[#2b1f17] text-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-3" style={{ fontFamily: "'Fredoka', sans-serif" }}>
               {c.partnerTitle}
             </h2>
             <p className="text-[#c8b5a5]">{c.partnerSub}</p>
@@ -563,7 +563,7 @@ export default function PartnerDemo() {
       {/* ── FAQ ── */}
       <section className="py-16 sm:py-20">
         <div className="max-w-2xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-10" style={{ fontFamily: "'Playfair Display', serif" }}>
+          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-10" style={{ fontFamily: "'Fredoka', sans-serif" }}>
             {lang === "en" ? "Common Questions" : "Questions Fréquentes"}
           </h2>
           <div className="space-y-3">
@@ -590,7 +590,7 @@ export default function PartnerDemo() {
       {/* ── CTA ── */}
       <section className="py-16 sm:py-20 bg-gradient-to-br from-[#c17448] to-[#a85e38] text-white">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-4" style={{ fontFamily: "'Fredoka', sans-serif" }}>
             {c.ctaTitle}
           </h2>
           <p className="text-white/80 mb-8 text-sm sm:text-base leading-relaxed">{c.ctaSub}</p>
