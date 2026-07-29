@@ -111,8 +111,8 @@ export default function Home() {
         <div className="w-full h-[50vh] sm:h-[60vh] lg:h-[70vh] overflow-hidden">
           <img
             src="/hero-photo.jpg"
-            alt="A nanny playing with children in a beautiful Marrakech garden"
-            className="w-full h-full object-cover"
+            alt="A Call a Nanny nanny playing with a child beside a Marrakech hotel pool"
+            className="w-full h-full object-cover object-top md:object-[50%_62%]"
           />
         </div>
       </section>
