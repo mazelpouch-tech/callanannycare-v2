@@ -30,6 +30,7 @@ import AdminRevenue from './pages/admin/AdminRevenue'
 import AdminAnalytics from './pages/admin/AdminAnalytics'
 import AdminParents from './pages/admin/AdminParents'
 import AdminQuotes from './pages/admin/AdminQuotes'
+import AdminPartnerBookings from './pages/admin/AdminPartnerBookings'
 import SupervisorLayout from './pages/supervisor/SupervisorLayout'
 import SupervisorDashboard from './pages/supervisor/SupervisorDashboard'
 import SupervisorBookings from './pages/supervisor/SupervisorBookings'
@@ -139,6 +140,7 @@ export default function App() {
         <Route path="analytics" element={<AdminAnalytics />} />
         <Route path="parents" element={<AdminParents />} />
         <Route path="quotes" element={<AdminQuotes />} />
+        <Route path="partners/:slug" element={<AdminPartnerBookings />} />
       </Route>
 
       {/* Supervisor routes */}

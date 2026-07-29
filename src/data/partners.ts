@@ -16,6 +16,8 @@ export interface PartnerConfig {
   rate: number;
   /** Flat EUR fee added per night-window booking day */
   taxiFee: number;
+  /** Former names still present in old bookings' notes tags */
+  aliases?: string[];
 }
 
 export const PARTNERS: Record<string, PartnerConfig> = {
@@ -30,7 +32,22 @@ export const PARTNERS: Record<string, PartnerConfig> = {
     name: "Seanjeztagana Agency",
     rate: 12,
     taxiFee: 0, // no night taxi fee for this partner
+    aliases: ["Seanjeztagana Conciergerie"],
   },
 };
 
 export const PARTNER_LIST: PartnerConfig[] = Object.values(PARTNERS);
+
+/** Matches the "--- PARTNER: <name> ---" tag written into partner bookings' notes. */
+const PARTNER_TAG_RE = /--- PARTNER: (.+?) ---/;
+
+/** Returns the partner a booking belongs to, based on its notes tag, or null. */
+export function getBookingPartner(notes: string | null | undefined): PartnerConfig | null {
+  if (!notes) return null;
+  const match = notes.match(PARTNER_TAG_RE);
+  if (!match) return null;
+  const tagged = match[1].trim();
+  return (
+    PARTNER_LIST.find((p) => p.name === tagged || p.aliases?.includes(tagged)) ?? null
+  );
+}

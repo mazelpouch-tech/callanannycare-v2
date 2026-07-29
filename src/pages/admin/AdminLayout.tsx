@@ -19,7 +19,9 @@ import {
   TrendingUp,
   BarChart2,
   Calculator,
+  Handshake,
 } from "lucide-react";
+import { PARTNER_LIST } from "../../data/partners";
 import { useData } from "../../context/DataContext";
 import AdminToast, { type AdminToastItem } from "../../components/AdminToast";
 import PushNotificationBanner from "../../components/PushNotificationBanner";
@@ -36,6 +38,12 @@ interface SidebarLink {
 const sidebarLinks: SidebarLink[] = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/admin/bookings", label: "Bookings", icon: CalendarDays },
+  // Partner portals — each shows only that partner's bookings
+  ...PARTNER_LIST.map((p) => ({
+    to: `/admin/partners/${p.slug}`,
+    label: p.name,
+    icon: Handshake,
+  })),
   { to: "/admin/revenue", label: "Revenue", icon: TrendingUp },
   { to: "/admin/analytics", label: "Analytics", icon: BarChart2 },
   { to: "/admin/invoices", label: "Invoices", icon: FileText },
