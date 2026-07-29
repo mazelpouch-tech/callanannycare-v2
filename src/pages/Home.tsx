@@ -15,7 +15,6 @@ import {
   Loader2,
 } from "lucide-react";
 import { useData } from "../context/DataContext";
-import { pricingPlans } from "../data/initialData";
 import NannyCard from "../components/NannyCard";
 import { useLanguage } from "../context/LanguageContext";
 import type { Nanny } from "../types";
@@ -270,81 +269,6 @@ export default function Home() {
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
-        </div>
-      </section>
-
-      {/* ===== Pricing Section ===== */}
-      <section id="pricing" className="py-20 px-4 sm:px-6 lg:px-8 gradient-sand">
-        <div className="mx-auto max-w-7xl">
-          <div className="text-center mb-14">
-            <h2 className="font-serif text-3xl sm:text-4xl font-bold text-foreground">
-              {t("home.pricingTitle")}
-            </h2>
-          </div>
-
-          <div className="flex flex-wrap justify-center gap-8">
-            {pricingPlans.map((plan) => (
-              <div
-                key={plan.id}
-                className={`bg-card rounded-xl p-8 relative w-full max-w-sm ${
-                  plan.highlight
-                    ? "border-2 border-primary shadow-warm"
-                    : "shadow-soft"
-                }`}
-              >
-                {plan.highlight && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <span className="gradient-warm text-white text-sm font-semibold px-4 py-1.5 rounded-full">
-                      {t("home.mostPopular")}
-                    </span>
-                  </div>
-                )}
-
-                <div className={plan.highlight ? "pt-2" : ""}>
-                  <h3 className="text-xl font-bold text-foreground mb-2">
-                    {plan.name}
-                  </h3>
-                  <div className="flex items-baseline gap-1 mb-6">
-                    <span className="text-4xl font-bold text-foreground">
-                      {plan.price}
-                    </span>
-                    <span className="text-muted-foreground text-lg">
-                      € / {plan.unit}
-                    </span>
-                  </div>
-
-                  <ul className="space-y-3 mb-8">
-                    {plan.features.map((feature) => (
-                      <li
-                        key={feature}
-                        className="flex items-start gap-3 text-muted-foreground"
-                      >
-                        <Check className="w-5 h-5 text-accent shrink-0 mt-0.5" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Link
-                    to="/book"
-                    className={`w-full flex items-center justify-center gap-2 rounded-full px-6 py-3 font-semibold transition-all ${
-                      plan.highlight
-                        ? "gradient-warm text-white hover:opacity-90 shadow-warm"
-                        : "border border-primary text-primary hover:bg-primary/5"
-                    }`}
-                  >
-                    {t("common.bookNow")}
-                    <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Taxi fee note */}
-          <p className="text-center text-sm text-muted-foreground mt-6">
-            🚕 {t("home.pricingTaxiNote")}
-          </p>
         </div>
       </section>
 

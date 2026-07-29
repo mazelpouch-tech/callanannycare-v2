@@ -115,12 +115,8 @@ interface StepReviewProps {
   endTime: string;
   details: BookingDetails;
   childrenInfo: ChildInfo[];
-  totalPrice: number;
   hours: number;
   dateCount: number;
-  taxiFeeTotal: number;
-  isEveningBooking: boolean;
-  rate: number;
   onEdit: (step: number) => void;
   onConfirm: () => void;
   isSubmitting: boolean;
@@ -993,12 +989,8 @@ function StepReview({
   endTime,
   details,
   childrenInfo,
-  totalPrice,
   hours,
   dateCount,
-  taxiFeeTotal,
-  isEveningBooking,
-  rate,
   onEdit,
   onConfirm,
   isSubmitting,
@@ -1182,24 +1174,8 @@ function StepReview({
           </div>
         </div>
 
-        {/* Total */}
+        {/* Confirm */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">
-                {rate}€ &times; {hours} {t("book.hrs")} &times; {dateCount} {t("book.dateUnit")}
-                {" = "}{rate * hours * dateCount}€
-              </p>
-              {isEveningBooking && taxiFeeTotal > 0 && (
-                <p className="text-sm text-amber-600 font-medium mt-1">
-                  🚕 {t("book.taxiFee")}: +{taxiFeeTotal}€ ({t("book.taxiFeeNote")})
-                </p>
-              )}
-            </div>
-            <p className="text-2xl font-bold text-foreground">
-              {totalPrice}€
-            </p>
-          </div>
           {bookingError && (
             <p className="text-red-600 text-sm font-medium bg-red-50 border border-red-200 rounded-lg px-4 py-3">
               {bookingError}
@@ -1752,12 +1728,8 @@ export default function Book() {
             endTime={endTime}
             details={details}
             childrenInfo={childrenInfo}
-            totalPrice={totalPrice}
             hours={hours}
             dateCount={selectedDates.length}
-            taxiFeeTotal={taxiFeeTotal}
-            isEveningBooking={isEveningBooking}
-            rate={rate}
             onEdit={(s: number) => setStep(s)}
             onConfirm={handleConfirm}
             isSubmitting={isSubmitting}

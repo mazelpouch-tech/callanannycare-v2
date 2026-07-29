@@ -11,19 +11,7 @@ export default function Navbar() {
   const navLinks = [
     { label: t("nav.howItWorks"), to: "/how-it-works" },
     { label: t("nav.ourNannies"), to: "/nannies" },
-    { label: t("nav.pricing"), to: "/#pricing" },
   ];
-
-  const handlePricingClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (location.pathname === "/") {
-      e.preventDefault();
-      const section = document.getElementById("pricing");
-      if (section) {
-        section.scrollIntoView({ behavior: "smooth" });
-      }
-      setMobileOpen(false);
-    }
-  };
 
   const toggleLanguage = () => {
     setLocale(locale === "en" ? "fr" : "en");
@@ -48,7 +36,6 @@ export default function Navbar() {
                 <Link
                   key={link.to}
                   to={link.to}
-                  onClick={link.to === "/#pricing" ? handlePricingClick : undefined}
                   className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {link.label}
@@ -120,10 +107,7 @@ export default function Navbar() {
             <Link
               key={link.to}
               to={link.to}
-              onClick={(e) => {
-                if (link.to === "/#pricing") handlePricingClick(e);
-                setMobileOpen(false);
-              }}
+              onClick={() => setMobileOpen(false)}
               className="text-gray-800 hover:text-orange-500 font-medium py-3.5 px-4 rounded-xl hover:bg-orange-50 transition-all text-[15px]"
             >
               {link.label}
