@@ -223,7 +223,7 @@ export default function AdminQRCode() {
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary mt-0.5">•</span>
-            Give each partner (Club Med, Seanjeztagana Conciergerie) their own QR code so bookings are tagged with their name and pricing
+            Give each partner (Club Med, Seanjeztagana Agency) their own QR code so bookings are tagged with their name and pricing
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary mt-0.5">•</span>

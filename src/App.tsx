@@ -100,7 +100,7 @@ export default function App() {
         <Route path="/nannies" element={<Nannies />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/book" element={<Book />} />
-        {/* Partner booking portals (Club Med, Seanjeztagana Conciergerie, ...) — same flow, partner pricing */}
+        {/* Partner booking portals (Club Med, Seanjeztagana Agency, ...) — same flow, partner pricing */}
         <Route path="/book/:partnerSlug" element={<Book />} />
         <Route path="/babysitting-marrakech" element={<BabysittingMarrakech />} />
         <Route path="/family-travel-marrakech" element={<FamilyTravelMarrakech />} />

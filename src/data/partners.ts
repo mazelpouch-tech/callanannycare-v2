@@ -27,9 +27,9 @@ export const PARTNERS: Record<string, PartnerConfig> = {
   },
   seanjeztagana: {
     slug: "seanjeztagana",
-    name: "Seanjeztagana Conciergerie",
-    rate: 10,
-    taxiFee: 10,
+    name: "Seanjeztagana Agency",
+    rate: 12,
+    taxiFee: 0, // no night taxi fee for this partner
   },
 };
 

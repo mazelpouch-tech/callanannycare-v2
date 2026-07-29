@@ -1190,7 +1190,7 @@ function StepReview({
                 {rate}€ &times; {hours} {t("book.hrs")} &times; {dateCount} {t("book.dateUnit")}
                 {" = "}{rate * hours * dateCount}€
               </p>
-              {isEveningBooking && (
+              {isEveningBooking && taxiFeeTotal > 0 && (
                 <p className="text-sm text-amber-600 font-medium mt-1">
                   🚕 {t("book.taxiFee")}: +{taxiFeeTotal}€ ({t("book.taxiFeeNote")})
                 </p>
