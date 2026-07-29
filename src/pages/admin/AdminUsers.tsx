@@ -2,17 +2,28 @@ import { useState, useEffect } from "react";
 import {
   UserPlus, Shield, ShieldOff, Trash2, Key, Mail, User,
   AlertCircle, CheckCircle, Loader2, Eye, EyeOff, Clock,
-  LogIn, Copy, Search, X, ShieldCheck, Crown, Pencil
+  LogIn, Copy, Search, X, ShieldCheck, Crown, Pencil, Handshake
 } from "lucide-react";
 import { format } from "date-fns";
 import { useData } from "../../context/DataContext";
+import { PARTNERS, PARTNER_LIST } from "../../data/partners";
 import type { AdminUser, AdminRole } from "@/types";
 
 const ROLE_BADGES: Record<AdminRole, { label: string; color: string; icon: typeof Crown }> = {
   super_admin: { label: "Super Admin", color: "bg-purple-50 text-purple-700 border-purple-200", icon: Crown },
   admin: { label: "Admin", color: "bg-blue-50 text-blue-700 border-blue-200", icon: ShieldCheck },
   supervisor: { label: "Supervisor", color: "bg-violet-50 text-violet-700 border-violet-200", icon: Eye },
+  partner: { label: "Partner", color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: Handshake },
 };
+
+/** Badge label — for partner accounts, include which partner they belong to */
+function roleLabelFor(user: AdminUser): string {
+  if (user.role === "partner") {
+    const partnerName = user.partnerSlug ? PARTNERS[user.partnerSlug]?.name ?? user.partnerSlug : null;
+    return partnerName ? `Partner · ${partnerName}` : "Partner";
+  }
+  return (ROLE_BADGES[user.role] || ROLE_BADGES.admin).label;
+}
 
 export default function AdminUsers() {
   const {
@@ -31,7 +42,7 @@ export default function AdminUsers() {
 
   // Add User Modal
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addForm, setAddForm] = useState({ name: "", email: "" });
+  const [addForm, setAddForm] = useState({ name: "", email: "", role: "admin" as AdminRole, partnerSlug: "" });
   const [addError, setAddError] = useState("");
   const [addSuccess, setAddSuccess] = useState("");
   const [addLoading, setAddLoading] = useState(false);
@@ -76,10 +87,15 @@ export default function AdminUsers() {
     setAddError("");
     setAddSuccess("");
     setAddLoading(true);
-    const result = await addAdminUser(addForm);
+    const result = await addAdminUser({
+      name: addForm.name,
+      email: addForm.email,
+      role: addForm.role,
+      partnerSlug: addForm.role === "partner" ? addForm.partnerSlug : "",
+    });
     if (result.success) {
       setAddSuccess("Invitation sent! A registration email has been sent to " + addForm.email);
-      setAddForm({ name: "", email: "" });
+      setAddForm({ name: "", email: "", role: "admin", partnerSlug: "" });
       setTimeout(() => {
         setShowAddModal(false);
         setAddSuccess("");
@@ -226,7 +242,7 @@ export default function AdminUsers() {
             className="flex items-center gap-2 gradient-warm text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-opacity shadow-warm"
           >
             <UserPlus className="w-4 h-4" />
-            <span>Invite Admin</span>
+            <span>Invite User</span>
           </button>
         </div>
       </div>
@@ -291,7 +307,7 @@ export default function AdminUsers() {
                   <td className="px-5 py-4">
                     <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${role.color}`}>
                       <RoleIcon className="w-3 h-3" />
-                      {role.label}
+                      {roleLabelFor(user)}
                     </span>
                   </td>
                   <td className="px-5 py-4">
@@ -409,7 +425,7 @@ export default function AdminUsers() {
                 </div>
                 <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border ${role.color}`}>
                   <RoleIcon className="w-3 h-3" />
-                  {role.label}
+                  {roleLabelFor(user)}
                 </span>
               </div>
 
@@ -479,7 +495,7 @@ export default function AdminUsers() {
           <div className="bg-card rounded-2xl shadow-xl border border-border w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="font-serif text-lg font-bold text-foreground">Invite Admin</h2>
+                <h2 className="font-serif text-lg font-bold text-foreground">Invite User</h2>
                 <p className="text-xs text-muted-foreground mt-1">A registration email will be sent to set their password</p>
               </div>
               <button onClick={() => { setShowAddModal(false); setAddError(""); setAddSuccess(""); }} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
@@ -541,9 +557,51 @@ export default function AdminUsers() {
                     required
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-muted-foreground" />
+                      Role
+                    </span>
+                  </label>
+                  <select
+                    value={addForm.role}
+                    onChange={(e) => setAddForm({ ...addForm, role: e.target.value as AdminRole })}
+                    className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
+                  >
+                    <option value="admin">Admin — full dashboard access</option>
+                    <option value="supervisor">Supervisor — supervisor portal</option>
+                    <option value="partner">Partner — sees only their partner's bookings</option>
+                  </select>
+                </div>
+                {addForm.role === "partner" && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">
+                      <span className="flex items-center gap-1.5">
+                        <Handshake className="w-3.5 h-3.5 text-muted-foreground" />
+                        Partner
+                      </span>
+                    </label>
+                    <select
+                      value={addForm.partnerSlug}
+                      onChange={(e) => setAddForm({ ...addForm, partnerSlug: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition text-sm"
+                      required
+                    >
+                      <option value="">Select a partner…</option>
+                      {PARTNER_LIST.map((p) => (
+                        <option key={p.slug} value={p.slug}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="bg-amber-50 text-amber-700 text-xs px-4 py-3 rounded-lg border border-amber-100 flex items-start gap-2">
                   <Mail className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                  <span>The admin will receive an email with a registration link to set their own password. The link expires in 24 hours.</span>
+                  <span>
+                    {addForm.role === "partner"
+                      ? "The partner will receive an email with a registration link to set their own password, then log in at /admin/login to reach their partner portal. The link expires in 24 hours."
+                      : "The admin will receive an email with a registration link to set their own password. The link expires in 24 hours."}
+                  </span>
                 </div>
                 <button
                   type="submit"

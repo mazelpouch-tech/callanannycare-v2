@@ -31,6 +31,7 @@ import AdminAnalytics from './pages/admin/AdminAnalytics'
 import AdminParents from './pages/admin/AdminParents'
 import AdminQuotes from './pages/admin/AdminQuotes'
 import AdminPartnerBookings from './pages/admin/AdminPartnerBookings'
+import PartnerPortal from './pages/partner/PartnerPortal'
 import SupervisorLayout from './pages/supervisor/SupervisorLayout'
 import SupervisorDashboard from './pages/supervisor/SupervisorDashboard'
 import SupervisorBookings from './pages/supervisor/SupervisorBookings'
@@ -142,6 +143,9 @@ export default function App() {
         <Route path="quotes" element={<AdminQuotes />} />
         <Route path="partners/:slug" element={<AdminPartnerBookings />} />
       </Route>
+
+      {/* Partner portal (partner-role accounts see only their bookings) */}
+      <Route path="/partner-portal" element={<PartnerPortal />} />
 
       {/* Supervisor routes */}
       <Route path="/supervisor" element={<SupervisorLayout />}>

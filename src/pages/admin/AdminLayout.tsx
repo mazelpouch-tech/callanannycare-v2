@@ -156,6 +156,11 @@ export default function AdminLayout() {
     return <Navigate to="/supervisor" replace />;
   }
 
+  // Redirect partner accounts to their own portal
+  if (adminProfile?.role === 'partner') {
+    return <Navigate to="/partner-portal" replace />;
+  }
+
   return (
     <div className="min-h-screen bg-background flex">
       {/* Mobile overlay */}

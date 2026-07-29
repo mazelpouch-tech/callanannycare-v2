@@ -117,6 +117,9 @@ export default async function seedHandler(req: VercelRequest, res: VercelRespons
       )
     `;
 
+    // Partner portal accounts: which partner (by slug) a 'partner'-role user belongs to
+    await sql`ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS partner_slug VARCHAR(50) DEFAULT ''`;
+
     // Create login_logs table for audit trail
     await sql`
       CREATE TABLE IF NOT EXISTS login_logs (

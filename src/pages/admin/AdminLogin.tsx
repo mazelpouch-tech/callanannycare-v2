@@ -14,7 +14,7 @@ import {
 } from "../../utils/native";
 
 export default function AdminLogin() {
-  const { isAdmin, isSupervisor, adminLogin, forgotAdminPassword, resetAdminPassword, registerAdmin } = useData();
+  const { isAdmin, isSupervisor, adminProfile, adminLogin, forgotAdminPassword, resetAdminPassword, registerAdmin } = useData();
   const [searchParams] = useSearchParams();
   const resetToken = searchParams.get("reset");
   const registerToken = searchParams.get("register");
@@ -61,6 +61,10 @@ export default function AdminLogin() {
     // Redirect supervisors to their own portal
     if (isSupervisor) {
       return <Navigate to="/supervisor" replace />;
+    }
+    // Redirect partner accounts to their own portal
+    if (adminProfile?.role === "partner") {
+      return <Navigate to="/partner-portal" replace />;
     }
     return <Navigate to="/admin" replace />;
   }

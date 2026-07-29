@@ -47,8 +47,15 @@ function formatBookingDate(date: string): string {
   }
 }
 
+/** Admin page: reads the partner from the /admin/partners/:slug route */
 export default function AdminPartnerBookings() {
   const { slug } = useParams<{ slug: string }>();
+  return <PartnerBookingsView slug={slug} />;
+}
+
+/** Partner-scoped bookings view — also used by the standalone partner portal.
+ *  mode "partner" hides links into the internal admin pages. */
+export function PartnerBookingsView({ slug, mode = "admin" }: { slug: string | undefined; mode?: "admin" | "partner" }) {
   const { bookings } = useData();
   const [statusFilter, setStatusFilter] = useState<(typeof statusFilters)[number]>("all");
   const [search, setSearch] = useState("");
@@ -124,13 +131,15 @@ export default function AdminPartnerBookings() {
             <ExternalLink className="w-4 h-4" />
             Open Portal
           </a>
-          <Link
-            to="/admin/qr-codes"
-            className="inline-flex items-center gap-2 px-3 py-2 bg-muted text-foreground rounded-xl text-sm font-medium hover:bg-muted/80 transition-colors"
-          >
-            <QrCode className="w-4 h-4" />
-            QR Code
-          </Link>
+          {mode === "admin" && (
+            <Link
+              to="/admin/qr-codes"
+              className="inline-flex items-center gap-2 px-3 py-2 bg-muted text-foreground rounded-xl text-sm font-medium hover:bg-muted/80 transition-colors"
+            >
+              <QrCode className="w-4 h-4" />
+              QR Code
+            </Link>
+          )}
         </div>
       </div>
 
@@ -265,12 +274,14 @@ export default function AdminPartnerBookings() {
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-xl font-bold text-foreground">{booking.totalPrice}€</p>
-                  <Link
-                    to="/admin/bookings"
-                    className="text-xs text-primary font-semibold hover:underline"
-                  >
-                    Manage in Bookings
-                  </Link>
+                  {mode === "admin" && (
+                    <Link
+                      to="/admin/bookings"
+                      className="text-xs text-primary font-semibold hover:underline"
+                    >
+                      Manage in Bookings
+                    </Link>
+                  )}
                 </div>
               </div>
             );

@@ -17,6 +17,7 @@ interface AdminLoginBody {
   resetToken?: string;
   isActive?: boolean;
   role?: string;
+  partnerSlug?: string;
 }
 
 interface AdminIdRow { id: number }
@@ -45,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const result = await sql`
-          SELECT id, name, email, password, role, is_active, last_login, login_count
+          SELECT id, name, email, password, role, partner_slug, is_active, last_login, login_count
           FROM admin_users
           WHERE LOWER(email) = LOWER(${email})
         ` as DbAdminUser[];
@@ -110,6 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             name: admin.name,
             email: admin.email,
             role: admin.role,
+            partnerSlug: admin.partner_slug || '',
             lastLogin: admin.last_login,
             loginCount: (admin.login_count || 0) + 1
           },
@@ -119,8 +121,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // --- Add Admin User (invite via email) ---
       if (action === 'add_user') {
+        const { role: newRole, partnerSlug } = (req.body || {}) as AdminLoginBody;
         if (!name || !email) {
           return res.status(400).json({ error: 'Name and email are required' });
+        }
+
+        const inviteRole = newRole || 'admin';
+        if (!['admin', 'supervisor', 'partner'].includes(inviteRole)) {
+          return res.status(400).json({ error: 'Invalid role' });
+        }
+        if (inviteRole === 'partner' && !partnerSlug) {
+          return res.status(400).json({ error: 'A partner must be selected for partner accounts' });
         }
 
         const existing = await sql`SELECT id FROM admin_users WHERE LOWER(email) = LOWER(${email})` as AdminIdRow[];
@@ -135,9 +146,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
         const created = await sql`
-          INSERT INTO admin_users (name, email, password, role, is_active, reset_token, reset_token_expires)
-          VALUES (${name}, ${email}, ${tempPassword}, 'admin', false, ${registrationToken}, ${tokenExpires.toISOString()})
-          RETURNING id, name, email, role, is_active, created_at
+          INSERT INTO admin_users (name, email, password, role, partner_slug, is_active, reset_token, reset_token_expires)
+          VALUES (${name}, ${email}, ${tempPassword}, ${inviteRole}, ${inviteRole === 'partner' ? (partnerSlug || '') : ''}, false, ${registrationToken}, ${tokenExpires.toISOString()})
+          RETURNING id, name, email, role, partner_slug, is_active, created_at
         ` as DbAdminUser[];
 
         // Send registration email
@@ -164,6 +175,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             name: created[0].name,
             email: created[0].email,
             role: created[0].role,
+            partnerSlug: created[0].partner_slug || '',
             isActive: created[0].is_active,
             createdAt: created[0].created_at
           }
@@ -321,7 +333,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const admins = await sql`
-        SELECT id, name, email, role, is_active, last_login, login_count, created_at
+        SELECT id, name, email, role, partner_slug, is_active, last_login, login_count, created_at
         FROM admin_users
         ORDER BY created_at ASC
       ` as DbAdminUser[];
@@ -331,6 +343,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         name: a.name,
         email: a.email,
         role: a.role,
+        partnerSlug: a.partner_slug || '',
         isActive: a.is_active,
         lastLogin: a.last_login,
         loginCount: a.login_count || 0,
@@ -340,7 +353,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // PUT: Update admin user (toggle active, update name/email/role)
     if (req.method === 'PUT') {
-      const { adminId, name, email, isActive, role } = req.body as AdminLoginBody;
+      const { adminId, name, email, isActive, role, partnerSlug } = req.body as AdminLoginBody;
 
       if (!adminId) {
         return res.status(400).json({ error: 'Admin ID is required' });
@@ -360,7 +373,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // Validate role if provided
-      const validRoles = ['super_admin', 'admin', 'supervisor'];
+      const validRoles = ['super_admin', 'admin', 'supervisor', 'partner'];
       if (role && !validRoles.includes(role)) {
         return res.status(400).json({ error: 'Invalid role' });
       }
@@ -371,9 +384,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           email = COALESCE(${email || null}, email),
           is_active = COALESCE(${isActive !== undefined ? isActive : null}, is_active),
           role = COALESCE(${role || null}, role),
+          partner_slug = COALESCE(${partnerSlug !== undefined ? partnerSlug : null}, partner_slug),
           updated_at = NOW()
         WHERE id = ${adminId}
-        RETURNING id, name, email, role, is_active, last_login, login_count, created_at
+        RETURNING id, name, email, role, partner_slug, is_active, last_login, login_count, created_at
       ` as DbAdminUser[];
 
       const a = updated[0];
@@ -384,6 +398,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           name: a.name,
           email: a.email,
           role: a.role,
+          partnerSlug: a.partner_slug || '',
           isActive: a.is_active,
           lastLogin: a.last_login,
           loginCount: a.login_count || 0,

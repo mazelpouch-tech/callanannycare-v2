@@ -12,6 +12,7 @@ import type {
   NannyStats,
   AdminProfile,
   AdminUser,
+  AdminRole,
   DashboardStats,
   BookingStatus,
   ChatMessage,
@@ -1146,6 +1147,7 @@ export function DataProvider({ children }: DataProviderProps) {
           name: a.name,
           email: a.email,
           role: a.role,
+          partnerSlug: a.partnerSlug || '',
           lastLogin: a.lastLogin,
           loginCount: a.loginCount,
         };
@@ -1224,11 +1226,11 @@ export function DataProvider({ children }: DataProviderProps) {
     }
   }, []);
 
-  const addAdminUser = useCallback(async ({ name, email }: { name: string; email: string }) => {
+  const addAdminUser = useCallback(async ({ name, email, role, partnerSlug }: { name: string; email: string; role?: AdminRole; partnerSlug?: string }) => {
     try {
       const result = await apiFetch<ApiResult<{ admin: AdminUser }>>("/admin/login", {
         method: "POST",
-        body: JSON.stringify({ action: "add_user", name, email }),
+        body: JSON.stringify({ action: "add_user", name, email, role, partnerSlug }),
       });
       if (result.success) {
         setAdminUsers((prev) => [...prev, result.admin]);

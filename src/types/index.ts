@@ -7,7 +7,7 @@ export type BookingPlan = 'hourly' | 'half-day' | 'full-day';
 export type BookingCreator = 'parent' | 'nanny' | 'admin';
 export type NannyStatus = 'active' | 'blocked' | 'invited';
 export type NotificationType = 'new_booking' | 'booking_confirmed' | 'booking_cancelled' | 'booking_completed';
-export type AdminRole = 'super_admin' | 'admin' | 'supervisor';
+export type AdminRole = 'super_admin' | 'admin' | 'supervisor' | 'partner';
 export type MessageSenderType = 'admin' | 'nanny';
 
 // ============================================================
@@ -106,6 +106,8 @@ export interface DbAdminUser {
   email: string;
   password: string;
   role: AdminRole;
+  /** For role 'partner': the partner portal slug this user belongs to */
+  partner_slug: string;
   is_active: boolean;
   last_login: string | null;
   login_count: number;
@@ -205,6 +207,7 @@ export interface AdminUser {
   name: string;
   email: string;
   role: AdminRole;
+  partnerSlug?: string;
   isActive: boolean;
   lastLogin: string | null;
   loginCount: number;
@@ -216,6 +219,7 @@ export interface AdminProfile {
   name: string;
   email: string;
   role: AdminRole;
+  partnerSlug?: string;
   lastLogin: string | null;
   loginCount: number;
 }
@@ -407,6 +411,7 @@ export interface AdminLoginResponseAdmin {
   name: string;
   email: string;
   role: AdminRole;
+  partnerSlug?: string;
   lastLogin: string | null;
   loginCount: number;
 }
@@ -454,7 +459,7 @@ export interface DataContextValue {
   adminLogin: (email: string, password: string) => Promise<ApiResult>;
   adminLogout: () => void;
   fetchAdminUsers: () => Promise<AdminUser[]>;
-  addAdminUser: (data: { name: string; email: string }) => Promise<ApiResult<{ admin: AdminUser }>>;
+  addAdminUser: (data: { name: string; email: string; role?: AdminRole; partnerSlug?: string }) => Promise<ApiResult<{ admin: AdminUser }>>;
   updateAdminUser: (adminId: number, updates: Partial<AdminUser>) => Promise<ApiResult>;
   deleteAdminUser: (adminId: number) => Promise<ApiResult>;
   changeAdminPassword: (adminId: number, currentPassword: string, newPassword: string) => Promise<ApiResult>;
