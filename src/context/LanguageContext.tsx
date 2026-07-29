@@ -17,6 +17,9 @@ function getInitialLocale(): Locale {
   if (typeof window !== "undefined") {
     const stored = localStorage.getItem("callanannycare-lang");
     if (stored === "fr" || stored === "en") return stored;
+    // Auto-detect from browser locale — show French for French-speaking regions
+    const browserLang = navigator.language || (navigator as any).userLanguage || "";
+    if (browserLang.startsWith("fr")) return "fr";
   }
   return "en";
 }
