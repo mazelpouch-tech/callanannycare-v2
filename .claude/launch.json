@@ -2,9 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "website",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["serve", "website", "-l", "3456", "--no-clipboard"],
+      "name": "dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "autoPort": true,
       "port": 3456
     }
   ]

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 declare global {
   interface Window {
@@ -48,6 +48,7 @@ import { useData } from "../context/DataContext";
 import { useLanguage } from "../context/LanguageContext";
 import PhoneInput from "../components/PhoneInput";
 import { NATIVE_API_BASE } from "../utils/native";
+import { PARTNERS } from "../data/partners";
 import type { BookingPlan } from "@/types";
 
 // ---- Interfaces ----
@@ -119,6 +120,7 @@ interface StepReviewProps {
   dateCount: number;
   taxiFeeTotal: number;
   isEveningBooking: boolean;
+  rate: number;
   onEdit: (step: number) => void;
   onConfirm: () => void;
   isSubmitting: boolean;
@@ -996,6 +998,7 @@ function StepReview({
   dateCount,
   taxiFeeTotal,
   isEveningBooking,
+  rate,
   onEdit,
   onConfirm,
   isSubmitting,
@@ -1184,8 +1187,8 @@ function StepReview({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">
-                {RATE}€ &times; {hours} {t("book.hrs")} &times; {dateCount} {t("book.dateUnit")}
-                {" = "}{RATE * hours * dateCount}€
+                {rate}€ &times; {hours} {t("book.hrs")} &times; {dateCount} {t("book.dateUnit")}
+                {" = "}{rate * hours * dateCount}€
               </p>
               {isEveningBooking && (
                 <p className="text-sm text-amber-600 font-medium mt-1">
@@ -1378,6 +1381,13 @@ export default function Book() {
   const { t, locale } = useLanguage();
   const navigate = useNavigate();
 
+  // Partner portal support: /book/<partnerSlug> reuses this exact flow with
+  // partner-specific pricing and branding (see src/data/partners.ts)
+  const { partnerSlug } = useParams<{ partnerSlug: string }>();
+  const partner = partnerSlug ? PARTNERS[partnerSlug] : undefined;
+  const rate = partner?.rate ?? RATE;
+  const taxiFee = partner?.taxiFee ?? TAXI_FEE;
+
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
@@ -1430,12 +1440,12 @@ export default function Book() {
   }, [startTime, endTime]);
 
   const taxiFeeTotal = useMemo(() => {
-    return isEveningBooking ? TAXI_FEE * selectedDates.length : 0;
-  }, [isEveningBooking, selectedDates.length]);
+    return isEveningBooking ? taxiFee * selectedDates.length : 0;
+  }, [isEveningBooking, selectedDates.length, taxiFee]);
 
   const totalPrice = useMemo(() => {
-    return RATE * hours * selectedDates.length + taxiFeeTotal;
-  }, [hours, selectedDates.length, taxiFeeTotal]);
+    return rate * hours * selectedDates.length + taxiFeeTotal;
+  }, [rate, hours, selectedDates.length, taxiFeeTotal]);
 
   const handleDatesChange = (dates: Date[]) => {
     setSelectedDates(dates.sort((a, b) => a.getTime() - b.getTime()));
@@ -1467,7 +1477,12 @@ export default function Book() {
     });
     childSummaryParts.push(`Photo/video updates: ${wantUpdates ? "Yes" : "No"}`);
 
-    const enrichedNotes = [details.notes, "--- CHILD INFO ---", ...childSummaryParts].filter(Boolean).join("\n");
+    const enrichedNotes = [
+      partner ? `--- PARTNER: ${partner.name} ---` : "",
+      details.notes,
+      "--- CHILD INFO ---",
+      ...childSummaryParts,
+    ].filter(Boolean).join("\n");
 
     // Build child names for booking records
     const allChildNames = childrenInfo
@@ -1515,7 +1530,7 @@ export default function Book() {
           // Recalculate price for this day including taxi fee if evening
           const oIsOvernight = (oeh + oem / 60) <= (osh + osm / 60);
           const oIsEvening = oIsOvernight || osh >= 19 || osh < 7 || oeh > 19 || (oeh === 19 && oem > 0);
-          const scaledPrice = Math.round(RATE * oHours) + (oIsEvening ? TAXI_FEE : 0);
+          const scaledPrice = Math.round(rate * oHours) + (oIsEvening ? taxiFee : 0);
           const dayStartTime = TIME_SLOTS.find((s) => s.value === override.startTime)?.label || override.startTime;
           const dayEndTime = TIME_SLOTS.find((s) => s.value === override.endTime)?.label || override.endTime;
           result = await addBooking({
@@ -1579,8 +1594,9 @@ export default function Book() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               access_key: WEB3FORMS_KEY,
-              subject: `New Booking: ${allChildNames} (${details.fullName})`,
+              subject: `New Booking${partner ? ` [${partner.name}]` : ""}: ${allChildNames} (${details.fullName})`,
               from_name: "Call a Nanny - Booking Form",
+              ...(partner ? { Partner: partner.name } : {}),
               "Parent Name": details.fullName,
               "Parent Phone": details.phone,
               "Parent Email": details.email,
@@ -1622,21 +1638,11 @@ export default function Book() {
       saveChildrenInfo(childrenInfo);
       setIsSubmitting(false);
 
-      // Show success screen with WhatsApp link
-      setIsSuccess(true);
-
-      // Fire Google Ads conversion + GA4 booking_submitted event
-      if (typeof window.gtag === "function") {
-        window.gtag("event", "conversion", {
-          send_to: "AW-18034320545/6JUVCP-fhpIcEKHJt5dD",
-          value: totalPrice ? parseFloat(String(totalPrice)) : 1.0,
-          currency: "EUR",
-        });
-        window.gtag("event", "booking_submitted", {
-          value: totalPrice ? parseFloat(String(totalPrice)) : 0,
-          currency: "EUR",
-        });
-      }
+      // Redirect to the confirmation page. That page is the single source of
+      // truth for the Google Ads / GA4 conversion, and it only fires tracking
+      // when it receives real booking data via router state — this prevents
+      // page views, bots, and direct URL visits from counting as conversions.
+      navigate("/booking-confirmed", { state: { bookingData: lastBooking } });
     } catch (err) {
       console.error("Booking failed:", err);
       const msg = err instanceof Error ? err.message : "Booking failed. Please try again.";
@@ -1684,6 +1690,12 @@ export default function Book() {
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* Header */}
         <div className="text-center mb-6">
+          {partner && (
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 mb-3 rounded-full bg-primary/10 text-primary text-sm font-semibold">
+              <Hotel className="w-4 h-4" />
+              {locale === "fr" ? `En partenariat avec ${partner.name}` : `In partnership with ${partner.name}`}
+            </span>
+          )}
           <h1 className="font-serif text-3xl sm:text-4xl font-bold text-foreground">
             {t("book.title")}
           </h1>
@@ -1745,6 +1757,7 @@ export default function Book() {
             dateCount={selectedDates.length}
             taxiFeeTotal={taxiFeeTotal}
             isEveningBooking={isEveningBooking}
+            rate={rate}
             onEdit={(s: number) => setStep(s)}
             onConfirm={handleConfirm}
             isSubmitting={isSubmitting}
