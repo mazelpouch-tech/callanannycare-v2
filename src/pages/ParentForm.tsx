@@ -47,6 +47,8 @@ const T = {
     // Consent
     consentText:
       "J'autorise Call a Nanny a prendre soin de mon enfant selon les informations fournies ci-dessus. Je certifie que toutes les informations sont exactes et completes.",
+    siblingsOnlyNotice:
+      "Une nounou ne peut garder deux enfants que s'ils sont freres et/ou soeurs d'une meme famille. Des enfants de deux familles differentes necessitent chacun leur propre nounou.",
     agreeTerms: "J'accepte les conditions generales de service",
     allowPhotos: "J'autorise la nounou a prendre des photos et videos de mon enfant",
     // Actions
@@ -90,6 +92,8 @@ const T = {
     // Consent
     consentText:
       "I authorize Call a Nanny to care for my child according to the information provided above. I certify that all information is accurate and complete.",
+    siblingsOnlyNotice:
+      "One nanny may only look after two children if they are siblings from the same family. Children from two different families each require their own nanny.",
     agreeTerms: "I agree to the general terms of service",
     allowPhotos: "I allow the nanny to take photos and videos of my child",
     // Actions
@@ -489,6 +493,10 @@ export default function ParentForm() {
           <Section icon={Shield} title={t.consent}>
             <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground leading-relaxed mb-4">
               {t.consentText}
+            </div>
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900 leading-relaxed mb-4">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{t.siblingsOnlyNotice}</span>
             </div>
             <div className="space-y-3">
               <label className="flex items-start gap-3 cursor-pointer">
