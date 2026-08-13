@@ -57,7 +57,11 @@ const T = {
         body: "Call-a-Nanny shall not be held responsible for delays or inability to provide service due to circumstances beyond its control, including but not limited to:\n\u2022 Transportation disruptions\n\u2022 Severe weather\n\u2022 Government restrictions\n\u2022 Health emergencies",
       },
       {
-        heading: "13. Acceptance of Terms",
+        heading: "13. Children per Nanny \u2014 Siblings Only",
+        body: "One nanny may care for a maximum of two children at the same time, and only if those two children are siblings belonging to the same family.\n\nChildren from two different families cannot be looked after by the same nanny. In that case, two separate nannies must be booked \u2014 one per family \u2014 and each booking is charged separately at the applicable hourly rate.\n\nCall-a-Nanny reserves the right to require an additional nanny, or to decline or terminate a service, if children from different families are presented for care under a single booking.",
+      },
+      {
+        heading: "14. Acceptance of Terms",
         body: "By confirming a booking with Call-a-Nanny, the client acknowledges that they have read, understood, and accepted these General Terms and Conditions.",
       },
     ],
@@ -116,7 +120,11 @@ const T = {
         body: "Call-a-Nanny ne pourra \u00eatre tenu responsable des retards ou de l\u2019impossibilit\u00e9 de fournir le service en raison de circonstances ind\u00e9pendantes de sa volont\u00e9, notamment :\n\u2022 Perturbations des transports\n\u2022 Conditions m\u00e9t\u00e9orologiques s\u00e9v\u00e8res\n\u2022 Restrictions gouvernementales\n\u2022 Urgences sanitaires",
       },
       {
-        heading: "13. Acceptation des Conditions",
+        heading: "13. Enfants par Nounou \u2014 Fratrie Uniquement",
+        body: "Une nounou peut garder au maximum deux enfants en m\u00eame temps, et uniquement si ces deux enfants sont fr\u00e8res et/ou s\u0153urs d\u2019une m\u00eame famille.\n\nDes enfants appartenant \u00e0 deux familles diff\u00e9rentes ne peuvent pas \u00eatre gard\u00e9s par la m\u00eame nounou. Dans ce cas, deux nounous distinctes doivent \u00eatre r\u00e9serv\u00e9es \u2014 une par famille \u2014 et chaque r\u00e9servation est factur\u00e9e s\u00e9par\u00e9ment au tarif horaire applicable.\n\nCall-a-Nanny se r\u00e9serve le droit d\u2019exiger une nounou suppl\u00e9mentaire, ou de refuser ou d\u2019interrompre un service, si des enfants de familles diff\u00e9rentes sont pr\u00e9sent\u00e9s dans le cadre d\u2019une seule r\u00e9servation.",
+      },
+      {
+        heading: "14. Acceptation des Conditions",
         body: "En confirmant une r\u00e9servation avec Call-a-Nanny, le client reconna\u00eet avoir lu, compris et accept\u00e9 les pr\u00e9sentes Conditions G\u00e9n\u00e9rales.",
       },
     ],
