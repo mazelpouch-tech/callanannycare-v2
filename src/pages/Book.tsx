@@ -103,6 +103,8 @@ interface StepChildInfoProps {
   onChange: (info: ChildInfo[]) => void;
   agreeTerms: boolean;
   onAgreeTermsChange: (val: boolean) => void;
+  confirmSiblings: boolean;
+  onConfirmSiblingsChange: (val: boolean) => void;
   wantUpdates: boolean;
   onWantUpdatesChange: (val: boolean) => void;
   onBack: () => void;
@@ -740,7 +742,7 @@ function StepDetails({ details, onChange, onBack, onNext }: StepDetailsProps) {
 }
 
 // --- Step 3: Child Info (multi-child support) ---
-function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange, wantUpdates, onWantUpdatesChange, onBack, onNext }: StepChildInfoProps) {
+function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange, confirmSiblings, onConfirmSiblingsChange, wantUpdates, onWantUpdatesChange, onBack, onNext }: StepChildInfoProps) {
   const { t } = useLanguage();
   const [activeChild, setActiveChild] = useState(0);
   const isPlural = childrenInfo.length > 1;
@@ -762,7 +764,10 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
     onChange(updated);
   };
 
-  const isValid = childrenInfo.every((c) => c.childFirstName.trim() && c.childAge.trim()) && agreeTerms;
+  const isValid =
+    childrenInfo.every((c) => c.childFirstName.trim() && c.childAge.trim()) &&
+    agreeTerms &&
+    (!isPlural || confirmSiblings);
 
   const renderChildForm = (child: ChildInfo, index: number) => (
     <div className="space-y-6 max-w-xl">
@@ -933,6 +938,20 @@ function StepChildInfo({ childrenInfo, onChange, agreeTerms, onAgreeTermsChange,
           <span>{t("book.siblingsOnlyNotice")}</span>
         </div>
         <div className="space-y-3">
+          {isPlural && (
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={confirmSiblings}
+                onChange={(e) => onConfirmSiblingsChange(e.target.checked)}
+                className="w-4 h-4 rounded border-border text-primary focus:ring-primary mt-0.5"
+              />
+              <span className="text-sm text-foreground">
+                {t("book.confirmSiblings")}
+                <span className="text-destructive"> *</span>
+              </span>
+            </label>
+          )}
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
@@ -1385,6 +1404,7 @@ export default function Book() {
   // Step 3 state — array of children (initialize from localStorage)
   const [childrenInfo, setChildrenInfo] = useState<ChildInfo[]>(loadSavedChildren);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [confirmSiblings, setConfirmSiblings] = useState(false);
   const [wantUpdates, setWantUpdates] = useState(false);
 
   // Sync childrenInfo array length with numChildren
@@ -1587,6 +1607,9 @@ export default function Book() {
               "Booking Time": `${startLabel} - ${endLabel}`,
               "Total Price": `${totalPrice}€`,
               "Number of Children": details.numChildren,
+              ...(childrenInfo.length > 1
+                ? { "Siblings Confirmed": confirmSiblings ? "Yes" : "No" }
+                : {}),
               "Photo/Video Updates": wantUpdates ? "Yes" : "No",
               ...childFields,
             }),
@@ -1639,6 +1662,7 @@ export default function Book() {
     setDetails(loadSavedParent());
     setChildrenInfo(loadSavedChildren());
     setAgreeTerms(false);
+    setConfirmSiblings(false);
     setWantUpdates(false);
     setIsSuccess(false);
   };
@@ -1718,6 +1742,8 @@ export default function Book() {
             onChange={setChildrenInfo}
             agreeTerms={agreeTerms}
             onAgreeTermsChange={setAgreeTerms}
+            confirmSiblings={confirmSiblings}
+            onConfirmSiblingsChange={setConfirmSiblings}
             wantUpdates={wantUpdates}
             onWantUpdatesChange={setWantUpdates}
             onBack={() => setStep(2)}
