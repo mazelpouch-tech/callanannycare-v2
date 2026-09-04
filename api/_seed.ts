@@ -350,11 +350,11 @@ export default async function seedHandler(req: VercelRequest, res: VercelRespons
     }
 
     // Seed Doha's admin account if missing (role/password managed via Admin Users page — never reset here)
-    const dohaCheck = await sql`SELECT id, role FROM admin_users WHERE LOWER(email) = 'doha@callanannycare.com'` as { id: number; role: string }[];
+    const dohaCheck = await sql`SELECT id, role FROM admin_users WHERE LOWER(email) = 'dohaelktam@gmail.com'` as { id: number; role: string }[];
     if (dohaCheck.length === 0) {
       await sql`
         INSERT INTO admin_users (name, email, password, role, is_active)
-        VALUES ('Doha', 'doha@callanannycare.com', 'doha2024', 'admin', true)
+        VALUES ('Doha', 'dohaelktam@gmail.com', 'doha2024', 'admin', true)
       `;
     }
 
