@@ -1147,7 +1147,7 @@ export default function AdminRevenue() {
                 <span className="text-xs font-bold text-foreground w-10 text-right">{splitPercent}%</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground w-16 shrink-0">Ys</span>
+                <span className="text-xs text-muted-foreground w-16 shrink-0">Tech Sup.</span>
                 <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                   <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${100 - splitPercent}%` }} />
                 </div>
@@ -1185,14 +1185,14 @@ export default function AdminRevenue() {
                 </div>
               </div>
 
-              {/* Ys */}
+              {/* Technical Support */}
               <div className="bg-card rounded-2xl border border-teal-200 overflow-hidden">
                 <div className="bg-teal-50 px-5 py-3 border-b border-teal-100 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-teal-200 flex items-center justify-center">
-                    <span className="text-teal-700 font-bold text-sm">Y</span>
+                    <span className="text-teal-700 font-bold text-sm">T</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-teal-900">Ys</p>
+                    <p className="font-semibold text-teal-900">Technical Support</p>
                     <p className="text-[10px] text-teal-600">Associate · {100 - splitPercent}%</p>
                   </div>
                 </div>
@@ -1215,7 +1215,7 @@ export default function AdminRevenue() {
                   Total distributed: {filteredRevenue.toLocaleString()}€ revenue − {totalExpensesEUR.toLocaleString()}€ expenses
                 </p>
                 <p className={`text-xs mt-0.5 ${netAfterAll >= 0 ? "text-blue-600/70" : "text-red-600/70"}`}>
-                  Lamiaa: {lamiaaTakeHome.toLocaleString()}€ · Ys: {ysTakeHome.toLocaleString()}€
+                  Lamiaa: {lamiaaTakeHome.toLocaleString()}€ · Technical Support: {ysTakeHome.toLocaleString()}€
                 </p>
               </div>
               <p className={`text-lg font-bold ${netAfterAll >= 0 ? "text-blue-800" : "text-red-800"}`}>
