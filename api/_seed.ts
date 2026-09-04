@@ -349,17 +349,12 @@ export default async function seedHandler(req: VercelRequest, res: VercelRespons
       `;
     }
 
-    // Seed supervisor account (Doha) — create or fix if exists with wrong role
+    // Seed Doha's admin account if missing (role/password managed via Admin Users page — never reset here)
     const dohaCheck = await sql`SELECT id, role FROM admin_users WHERE LOWER(email) = 'doha@callanannycare.com'` as { id: number; role: string }[];
     if (dohaCheck.length === 0) {
       await sql`
         INSERT INTO admin_users (name, email, password, role, is_active)
-        VALUES ('Doha', 'doha@callanannycare.com', 'doha2024', 'supervisor', true)
-      `;
-    } else if (dohaCheck[0].role !== 'supervisor') {
-      await sql`
-        UPDATE admin_users SET role = 'supervisor', is_active = true, password = 'doha2024', updated_at = NOW()
-        WHERE id = ${dohaCheck[0].id}
+        VALUES ('Doha', 'doha@callanannycare.com', 'doha2024', 'admin', true)
       `;
     }
 
