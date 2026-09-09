@@ -101,13 +101,16 @@ export function calcBookedHours(startTime: string, endTime: string, startDate?: 
   // If end <= start, the shift crosses midnight (e.g. 18:00 → 01:00 = 7h)
   const hoursPerDay = e > s ? e - s : (24 - s) + e;
   if (hoursPerDay <= 0) return 0;
-  let days = 1;
-  if (startDate && endDate) {
-    const d1 = new Date(startDate).getTime();
-    const d2 = new Date(endDate).getTime();
-    if (d2 > d1) days = Math.round((d2 - d1) / 86400000) + 1;
-  }
-  return hoursPerDay * days;
+  return hoursPerDay * calcDayCount(startDate, endDate);
+}
+
+/** Number of days covered by a contiguous date → endDate range (1 when no range). */
+export function calcDayCount(startDate?: string, endDate?: string | null): number {
+  if (!startDate || !endDate) return 1;
+  const d1 = new Date(startDate).getTime();
+  const d2 = new Date(endDate).getTime();
+  if (Number.isNaN(d1) || Number.isNaN(d2) || d2 <= d1) return 1;
+  return Math.round((d2 - d1) / 86400000) + 1;
 }
 
 /** Calculate total booked hours including extra time blocks */
@@ -150,7 +153,7 @@ export function timesOverlap(start1: string, end1: string, start2: string, end2:
 /** Pay breakdown: base hourly pay + taxi fee */
 export interface PayBreakdown {
   basePay: number;    // hours × HOURLY_RATE
-  taxiFee: number;    // 100 DH if evening shift, else 0
+  taxiFee: number;    // 100 DH per day if evening shift, else 0
   total: number;      // basePay + taxiFee
 }
 
@@ -218,7 +221,8 @@ export function estimateNannyPayBreakdown(
       if (s !== null && e !== null && isEveningShift(s, e)) { hasEvening = true; break; }
     }
   }
-  const taxiFee = hasEvening ? 100 : 0;
+  // Taxi fee is owed once per day of the booking, not once per booking
+  const taxiFee = hasEvening ? 100 * calcDayCount(startDate, endDate) : 0;
   return { basePay, taxiFee, total: basePay + taxiFee };
 }
 

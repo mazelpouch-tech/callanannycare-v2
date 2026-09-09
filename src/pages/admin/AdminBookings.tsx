@@ -2003,11 +2003,12 @@ export default function AdminBookings() {
                                       + (booking.extraTimes ? booking.extraTimes.reduce((s, et) => s + calcBookedHours(et.startTime, et.endTime), 0) : 0);
                                     const sH = booking.startTime ? parseInt(booking.startTime) : 0;
                                     const eH = booking.endTime ? parseInt(booking.endTime) : 0;
-                                    const isEve = sH >= 19 || sH < 7 || eH >= 19 || eH < 7 || hrs > 12;
                                     const d = booking.endDate && booking.date
                                       ? Math.max(1, Math.round((new Date(booking.endDate).getTime() - new Date(booking.date).getTime()) / 86400000) + 1)
                                       : 1;
                                     const hpd = d > 0 ? Math.round((hrs / d) * 10) / 10 : hrs;
+                                    // Evening check must use per-day hours, otherwise a multi-day booking is always flagged evening
+                                    const isEve = sH >= 19 || sH < 7 || eH >= 19 || eH < 7 || hpd > 12;
                                     return {
                                       parentName: booking.clientName || undefined,
                                       hotel: booking.hotel || undefined,
