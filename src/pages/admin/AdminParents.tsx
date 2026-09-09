@@ -579,7 +579,7 @@ export default function AdminParents() {
       </tr>`;
       if (taxi > 0) {
         row += `<tr class="taxi-row">
-          <td colspan="4" style="text-align:right;color:#c2703a;font-size:10px;">&#128663; Taxi fee (evening)</td>
+          <td colspan="4" style="text-align:right;color:#c2703a;font-size:10px;">&#128663; Evening supplement</td>
           <td style="color:#c2703a;font-weight:700;">+${taxi}€</td>
         </tr>`;
       }
@@ -732,7 +732,7 @@ function sharePdf(){
         <span class="card-row-value">${pdfTotalService}&euro;</span>
       </div>
       ${pdfTotalTaxi > 0 ? `<div class="card-row taxi-row">
-        <span class="card-row-label"><span class="icon">&#128663;</span> Taxi fees</span>
+        <span class="card-row-label"><span class="icon">&#128663;</span> Evening supplements</span>
         <span class="card-row-value">+${pdfTotalTaxi}&euro;</span>
       </div>` : ""}
     </div>
@@ -786,7 +786,7 @@ function sharePdf(){
                   await updateBooking(b.id, { totalPrice: (b.totalPrice || 0) + TAXI_FEE });
                 }}
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 transition-colors cursor-pointer"
-                title="Add 10€ taxi fee"
+                title="Add 10€ evening supplement"
               >
                 <Car className="w-3 h-3" /> +{TAXI_FEE}&euro;
               </button>
@@ -798,7 +798,7 @@ function sharePdf(){
                   await updateBooking(b.id, { totalPrice: (b.totalPrice || 0) - TAXI_FEE });
                 }}
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors cursor-pointer"
-                title="Remove 10€ taxi fee"
+                title="Remove 10€ evening supplement"
               >
                 <Car className="w-3 h-3" /> -{TAXI_FEE}&euro;
               </button>
@@ -1524,7 +1524,7 @@ function sharePdf(){
                     </div>
                     {previewTaxiTotal > 0 && (
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Taxi fees included</span>
+                        <span className="text-muted-foreground">Evening supplements included</span>
                         <span className="text-orange-600 font-medium">{previewTaxiTotal}&euro;</span>
                       </div>
                     )}
@@ -1658,7 +1658,7 @@ function sharePdf(){
                     </div>
                     {taxiFee > 0 && (
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Taxi fee</span>
+                        <span className="text-muted-foreground">Evening supplement</span>
                         <span className="text-orange-600 font-medium">{taxiFee}&euro;</span>
                       </div>
                     )}
@@ -1815,7 +1815,7 @@ function sharePdf(){
                           </div>
                           {taxi > 0 && (
                             <div className="flex justify-between mt-1 text-amber-700">
-                              <span className="flex items-center gap-1 pl-[calc(3rem+12px)]"><Car className="w-3 h-3" /> Taxi fee (evening)</span>
+                              <span className="flex items-center gap-1 pl-[calc(3rem+12px)]"><Car className="w-3 h-3" /> Evening supplement</span>
                               <span className="font-bold">+{taxi}€</span>
                             </div>
                           )}
@@ -1845,7 +1845,7 @@ function sharePdf(){
                     </div>
                     {totalTaxi > 0 && (
                       <div className="flex justify-between px-4 py-2.5">
-                        <span className="text-sm text-amber-700 flex items-center gap-1.5"><Car className="w-3.5 h-3.5" /> Taxi fees</span>
+                        <span className="text-sm text-amber-700 flex items-center gap-1.5"><Car className="w-3.5 h-3.5" /> Evening supplements</span>
                         <span className="text-sm font-medium text-amber-700">+{totalTaxi}€</span>
                       </div>
                     )}

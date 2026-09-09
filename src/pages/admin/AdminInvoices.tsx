@@ -774,7 +774,7 @@ function sharePdf(){
         <span class="card-row-value">${basePay}&euro;</span>
       </div>
       ${hasTaxi ? `<div class="card-row taxi-row">
-        <span class="card-row-label"><span class="icon">&#128663;</span> Taxi fee (7 PM &ndash; 7 AM)</span>
+        <span class="card-row-label"><span class="icon">&#128663;</span> Evening supplement (7 PM &ndash; 7 AM)</span>
         <span class="card-row-value">+${TAXI_FEE}&euro;</span>
       </div>` : ""}
     </div>
@@ -1694,7 +1694,7 @@ function sharePdf(){
                     </div>
                     {hasTaxi && (
                       <div className="flex justify-between px-4 py-2.5">
-                        <span className="text-sm text-amber-700 flex items-center gap-1.5"><Car className="w-3.5 h-3.5" />Taxi fee (7 PM – 7 AM)</span>
+                        <span className="text-sm text-amber-700 flex items-center gap-1.5"><Car className="w-3.5 h-3.5" />Evening supplement (7 PM – 7 AM)</span>
                         <span className="text-sm font-medium text-amber-700">+{TAXI_FEE}€</span>
                       </div>
                     )}
@@ -2008,7 +2008,7 @@ function sharePdf(){
                       </div>
                       {isNight && (
                         <div className="flex items-center justify-between text-amber-700">
-                          <span className="flex items-center gap-1"><Car className="w-3 h-3" /> Taxi fee (7 PM – 7 AM)</span>
+                          <span className="flex items-center gap-1"><Car className="w-3 h-3" /> Evening supplement (7 PM – 7 AM)</span>
                           <span className="font-medium">+{TAXI_FEE}€</span>
                         </div>
                       )}

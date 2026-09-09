@@ -1907,7 +1907,7 @@ export default function AdminBookings() {
                                       </span>
                                       {estPay.taxiFee > 0 && (
                                         <span className={isActual ? "text-orange-500 font-medium" : "text-orange-500/70"}>
-                                          {" "}+ {estPay.taxiFee} DH taxi
+                                          {" "}+ {estPay.taxiFee} DH evening supplement
                                         </span>
                                       )}
                                       {!isActual && (
@@ -2154,7 +2154,7 @@ export default function AdminBookings() {
                                               {estPay.taxiFee > 0 && (
                                                 <>
                                                   <span className="text-orange-500">+ {estPay.taxiFee} DH</span>
-                                                  <span className="text-muted-foreground ml-1">taxi</span>
+                                                  <span className="text-muted-foreground ml-1">evening supplement</span>
                                                 </>
                                               )}
                                               <span className="text-foreground ml-2 font-bold">= {estPay.total} DH</span>
@@ -2485,7 +2485,7 @@ export default function AdminBookings() {
                                 <div className="text-[10px] mt-0.5">
                                   Nanny: <span className={isActual ? "text-emerald-600 font-medium" : "text-emerald-600/70"}>{estPay.basePay}</span>
                                   {estPay.taxiFee > 0 && (
-                                    <span className={isActual ? "text-orange-500 font-medium" : "text-orange-500/70"}> + {estPay.taxiFee} taxi</span>
+                                    <span className={isActual ? "text-orange-500 font-medium" : "text-orange-500/70"}> + {estPay.taxiFee} evening supplement</span>
                                   )}
                                   {!isActual && <span className="text-muted-foreground/50 italic ml-0.5">est.</span>}
                                 </div>
@@ -3996,7 +3996,7 @@ export default function AdminBookings() {
                     </div>
                     {previewTaxiTotal > 0 && (
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Taxi fees included</span>
+                        <span className="text-muted-foreground">Evening supplements included</span>
                         <span className="text-orange-600 font-medium">{previewTaxiTotal}&euro;</span>
                       </div>
                     )}

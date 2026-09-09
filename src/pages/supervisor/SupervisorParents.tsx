@@ -316,7 +316,7 @@ export default function SupervisorParents() {
       </tr>`;
       if (taxi > 0) {
         row += `<tr class="taxi-row">
-          <td colspan="4" style="text-align:right;color:#c2703a;font-size:10px;">&#128663; Taxi fee (evening)</td>
+          <td colspan="4" style="text-align:right;color:#c2703a;font-size:10px;">&#128663; Evening supplement</td>
           <td style="color:#c2703a;font-weight:700;">+${taxi}€</td>
         </tr>`;
       }
@@ -469,7 +469,7 @@ function sharePdf(){
         <span class="card-row-value">${pdfTotalService}&euro;</span>
       </div>
       ${pdfTotalTaxi > 0 ? `<div class="card-row taxi-row">
-        <span class="card-row-label"><span class="icon">&#128663;</span> Taxi fees</span>
+        <span class="card-row-label"><span class="icon">&#128663;</span> Evening supplements</span>
         <span class="card-row-value">+${pdfTotalTaxi}&euro;</span>
       </div>` : ""}
     </div>

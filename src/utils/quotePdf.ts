@@ -233,7 +233,7 @@ function sharePdf(){
         <span class="card-row-value">${baseCost}&euro;</span>
       </div>
       ${data.isEvening ? `<div class="card-row taxi-row">
-        <span class="card-row-label"><span class="icon">&#128663;</span> Taxi supplement (${data.taxiFee}&euro; &times; ${data.days} day${data.days > 1 ? "s" : ""})</span>
+        <span class="card-row-label"><span class="icon">&#128663;</span> Evening supplement (${data.taxiFee}&euro; &times; ${data.days} day${data.days > 1 ? "s" : ""})</span>
         <span class="card-row-value">+${taxiTotal}&euro;</span>
       </div>` : ""}
     </div>
@@ -253,7 +253,7 @@ function sharePdf(){
       <div class="policy-title">Terms &amp; Conditions</div>
       <div class="policy-item"><span class="bullet">&#9679;</span> This quote is valid for ${validDays} days from the date of issue.</div>
       <div class="policy-item"><span class="bullet">&#9679;</span> A minimum booking of 3 hours applies to all reservations.</div>
-      <div class="policy-item"><span class="bullet">&#9679;</span> Evening &amp; night bookings (after 7 PM) include a ${data.taxiFee}&euro; taxi supplement per day for nanny transport.</div>
+      <div class="policy-item"><span class="bullet">&#9679;</span> Evening &amp; night bookings (after 7 PM) include a ${data.taxiFee}&euro; evening supplement per day for nanny transport.</div>
       <div class="policy-item"><span class="bullet">&#9679;</span> Payment is due at the end of each session. We accept cash (EUR or MAD) and bank transfer.</div>
       <div class="policy-item"><span class="bullet">&#9679;</span> Cancellations must be made at least 4 hours before the scheduled start time to avoid a cancellation fee.</div>
       <div class="policy-item"><span class="bullet">&#9679;</span> All nannies are experienced, background-checked childcare professionals.</div>

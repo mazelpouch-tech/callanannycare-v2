@@ -119,7 +119,7 @@ export function PartnerBookingsView({ slug, mode = "admin" }: { slug: string | u
               <h1 className="text-2xl font-serif font-bold text-foreground">{partner.name}</h1>
               <p className="text-muted-foreground text-sm">
                 Bookings made through the {partner.name} portal · {partner.rate}€/hr
-                {partner.taxiFee > 0 && ` + ${partner.taxiFee}€ night taxi fee`}
+                {partner.taxiFee > 0 && ` + ${partner.taxiFee}€ evening supplement`}
                 {partner.commissionPercent > 0 && ` · ${partner.commissionPercent}% commission`}
               </p>
             </div>

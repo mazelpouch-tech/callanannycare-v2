@@ -480,7 +480,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                         <span>{selHours.toFixed(1)}h total</span>
                         <span>Hourly: {selBasePay.toLocaleString()} DH</span>
                         {selTaxi > 0 && (
-                          <span className="text-orange-600 font-medium">Taxi: +{selTaxi.toLocaleString()} DH</span>
+                          <span className="text-orange-600 font-medium">Evening supplement: +{selTaxi.toLocaleString()} DH</span>
                         )}
                       </div>
                     </div>
@@ -592,7 +592,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Hrs</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Diff</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hourly Pay</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Taxi Fee</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Evening Supplement</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Pay</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
                 </tr>
@@ -808,7 +808,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                   <div className="flex items-center gap-3 text-xs text-muted-foreground pl-6">
                     <span>Hourly: {nanny.basePay} DH</span>
                     {nanny.taxiFee > 0 && (
-                      <span className="text-orange-600">Taxi: +{nanny.taxiFee} DH</span>
+                      <span className="text-orange-600">Evening supplement: +{nanny.taxiFee} DH</span>
                     )}
                   </div>
                 </div>
@@ -827,7 +827,7 @@ function NannyHoursReport({ bookings }: { bookings: Booking[] }) {
                   <span className="text-blue-600">({totalAllHours.toFixed(1)} done + {totalUpcomingHours.toFixed(1)} upcoming)</span>
                 )}
                 {totalAllTaxi > 0 && (
-                  <span className="text-orange-600">Taxi: +{totalAllTaxi.toLocaleString()} DH</span>
+                  <span className="text-orange-600">Evening supplement: +{totalAllTaxi.toLocaleString()} DH</span>
                 )}
               </div>
             </div>

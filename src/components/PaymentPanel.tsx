@@ -376,7 +376,7 @@ export default function PaymentPanel({ booking }: PaymentPanelProps) {
                 <span>· Base</span><span>{nannyPay.basePay} DH</span>
               </div>
               <div className="flex justify-between text-xs text-muted-foreground pl-2">
-                <span>· Taxi</span><span>{nannyPay.taxiFee} DH</span>
+                <span>· Evening supplement</span><span>{nannyPay.taxiFee} DH</span>
               </div>
             </>
           )}

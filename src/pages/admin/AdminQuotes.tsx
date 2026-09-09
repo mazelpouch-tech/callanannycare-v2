@@ -144,7 +144,7 @@ export default function AdminQuotes() {
             }`}
           >
             {isEvening ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-            {isEvening ? "Yes — +10€/day taxi supplement" : "No — daytime booking"}
+            {isEvening ? "Yes — +10€/day evening supplement" : "No — daytime booking"}
           </button>
         </div>
 
