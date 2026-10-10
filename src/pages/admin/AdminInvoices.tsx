@@ -3,7 +3,7 @@ import {
   Search, Trash2, ChevronDown,
   Plus, X, Loader2, CheckCircle,
   FileText, Pencil, Download, DollarSign, AlertCircle,
-  Clock, User, Phone, Mail, Hotel, Baby, Calculator, Car,
+  Clock, User, Phone, Mail, Hotel, Baby, Calculator, Car, Calendar,
   Share2, MessageCircle, Send, Users, ChevronRight,
 } from "lucide-react";
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, subMonths } from "date-fns";
@@ -12,7 +12,7 @@ import { useExchangeRate } from "@/hooks/useExchangeRate";
 import PhoneInput from "../../components/PhoneInput";
 import type { Booking } from "@/types";
 import { downloadInvoicePdf } from "@/utils/invoicePdf";
-import { calcTotalBookedHours, parseTimeToHours } from "@/utils/shiftHelpers";
+import { calcTotalBookedHours, calcDayCount, parseTimeToHours } from "@/utils/shiftHelpers";
 
 const SERVICE_RATE = 10; // €/hr — client rate (same as booking page)
 const TAXI_FEE = 10;
@@ -67,6 +67,34 @@ function fmtDate(dateStr: string): string {
   try { return format(parseISO(dateStr), "EEEE do MMMM"); } catch { return dateStr || "N/A"; }
 }
 
+/** Invoice date label: the booked date, or "start — end" for multi-day bookings. */
+function invoiceDateLabel(inv: Booking): string {
+  const start = inv.date || (inv.clockIn ? new Date(inv.clockIn).toISOString().slice(0, 10) : "");
+  if (!start) return "N/A";
+  if (inv.endDate && inv.endDate > start) return `${fmtDate(start)} — ${fmtDate(inv.endDate)}`;
+  return fmtDate(start);
+}
+
+/** Evening supplement charged on an invoice: once per booked day when the slot touches 7 PM – 7 AM. */
+function invoiceTaxiFee(inv: Booking, hoursNum: number): number {
+  const days = calcDayCount(inv.date, inv.endDate);
+  const hoursPerDay = hoursNum / days;
+  const startH = inv.startTime ? parseTimeToHours(inv.startTime) : (inv.clockIn ? new Date(inv.clockIn).getHours() : 0);
+  const endH = inv.endTime ? parseTimeToHours(inv.endTime) : (inv.clockOut ? new Date(inv.clockOut).getHours() : 0);
+  const inHour = startH ?? 0;
+  const outHour = endH ?? 0;
+  let hasTaxi = inHour >= 19 || inHour < 7 || outHour >= 19 || outHour < 7 || hoursPerDay > 12;
+  if (!hasTaxi && inv.extraTimes) {
+    for (const et of inv.extraTimes) {
+      const s = parseTimeToHours(et.startTime);
+      const e = parseTimeToHours(et.endTime);
+      if (s !== null && (s >= 19 || s < 7)) { hasTaxi = true; break; }
+      if (e !== null && (e >= 19 || e < 7)) { hasTaxi = true; break; }
+    }
+  }
+  return hasTaxi ? TAXI_FEE * days : 0;
+}
+
 // ─── Default Form ───────────────────────────────────────────
 
 interface InvoiceForm {
@@ -78,6 +106,7 @@ interface InvoiceForm {
   hotel: string;
   billedTo: string;
   date: string;
+  endDate: string;
   clockIn: string;
   clockOut: string;
   childrenCount: string;
@@ -95,7 +124,7 @@ interface InvoiceForm {
 
 const emptyForm: InvoiceForm = {
   nannyId: "", clientName: "", clientEmail: "", clientPhone: "",
-  hotel: "", billedTo: "", date: "",
+  hotel: "", billedTo: "", date: "", endDate: "",
   clockIn: "", clockOut: "",
   childrenCount: "1", childrenAges: "", totalPrice: "", notes: "", manualPrice: false,
   senderName: "", senderCompany: "", senderRegistration: "", senderAddress: "", senderIban: "", senderSwift: "",
@@ -163,7 +192,7 @@ export default function AdminInvoices() {
     const hours = bookedH > 0 ? bookedH.toFixed(1) : calcWorkedHours(inv.clockIn, inv.clockOut);
     const total = inv.totalPrice || 0;
     const totalDH = toDH(total);
-    const dateStr = inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A";
+    const dateStr = invoiceDateLabel(inv);
     const msg = [
       `*Invoice #INV-${inv.id}*`,
       `From: ${inv.senderInfo?.name || DEFAULT_SENDER.name}`,
@@ -216,30 +245,40 @@ export default function AdminInvoices() {
     return new Date(`${date}T${time}`);
   };
 
+  // Price the form's booked slot: hours per day × day count, evening supplement per day.
+  const calcFormPricing = () => {
+    if (!formData.date || !formData.clockIn || !formData.clockOut) return null;
+    const inTime = buildDateTime(formData.date, formData.clockIn);
+    const outTime = buildDateTime(formData.date, formData.clockOut);
+    if (!inTime || !outTime) return null;
+    // If clock-out is earlier than clock-in, assume it's the next day
+    if (outTime <= inTime) outTime.setDate(outTime.getDate() + 1);
+    const ms = outTime.getTime() - inTime.getTime();
+    if (ms <= 0) return null;
+    const hoursPerDay = ms / 3600000;
+    const days = calcDayCount(formData.date, formData.endDate || null);
+    const hours = hoursPerDay * days;
+    const base = Math.round(hours * SERVICE_RATE);
+    // Evening supplement if any part of the shift falls in night hours (7 PM – 7 AM)
+    const inHour = inTime.getHours();
+    const outHour = outTime.getHours();
+    const isNight = inHour >= 19 || inHour < 7 || outHour >= 19 || outHour < 7 || hoursPerDay > 12;
+    const taxi = isNight ? TAXI_FEE * days : 0;
+    return { days, hoursPerDay, hours, base, isNight, taxi, total: base + taxi };
+  };
+
   // Auto-calculate total when times change (unless the admin set the price manually)
   useEffect(() => {
     if (formData.manualPrice) return;
-    if (!formData.date || !formData.clockIn || !formData.clockOut) return;
     try {
-      const inTime = buildDateTime(formData.date, formData.clockIn);
-      const outTime = buildDateTime(formData.date, formData.clockOut);
-      if (!inTime || !outTime) return;
-      // If clock-out is earlier than clock-in, assume it's the next day
-      if (outTime <= inTime) outTime.setDate(outTime.getDate() + 1);
-      const ms = outTime.getTime() - inTime.getTime();
-      if (ms <= 0) return;
-      const hours = ms / 3600000;
-      let total = Math.round(hours * SERVICE_RATE);
-      // Add taxi fee if any part of the shift falls in night hours (7 PM – 7 AM)
-      const inHour = inTime.getHours();
-      const outHour = outTime.getHours();
-      const touchesNight = inHour >= 19 || inHour < 7 || outHour >= 19 || outHour < 7 || hours > 12;
-      if (touchesNight) total += TAXI_FEE;
-      setFormData((prev) => ({ ...prev, totalPrice: String(total) }));
+      const pricing = calcFormPricing();
+      if (!pricing) return;
+      setFormData((prev) => ({ ...prev, totalPrice: String(pricing.total) }));
     } catch {
       // skip
     }
-  }, [formData.date, formData.clockIn, formData.clockOut, formData.manualPrice]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.date, formData.endDate, formData.clockIn, formData.clockOut, formData.manualPrice]);
 
   // ── Derived Data ──
 
@@ -427,7 +466,7 @@ export default function AdminInvoices() {
           ? calcTotalBookedHours(inv.startTime, inv.endTime, inv.extraTimes, inv.date, inv.endDate)
           : 0;
         const hours = bookedH > 0 ? bookedH.toFixed(1) : calcWorkedHours(inv.clockIn, inv.clockOut);
-        const dateStr = inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A";
+        const dateStr = invoiceDateLabel(inv);
         lines.push(`*#INV-${inv.id}* — ${dateStr}`);
         lines.push(`  Caregiver: ${inv.nannyName || "Unassigned"}`);
         lines.push(`  Time: ${inv.startTime || formatClockTime(inv.clockIn)} – ${inv.endTime || formatClockTime(inv.clockOut)} (${hours}h)`);
@@ -483,6 +522,7 @@ export default function AdminInvoices() {
       hotel: inv.hotel || "",
       billedTo: inv.billedTo || "",
       date: editDate,
+      endDate: inv.endDate && inv.endDate !== editDate ? inv.endDate : "",
       clockIn: editClockIn,
       clockOut: editClockOut,
       childrenCount: String(inv.childrenCount || 1),
@@ -551,9 +591,11 @@ export default function AdminInvoices() {
       // Keep ISO clock timestamps in sync with the booked slot when times are set.
       let clockInIso: string | null = null;
       let clockOutIso: string | null = null;
+      const endDateValue = formData.endDate && formData.endDate > formData.date ? formData.endDate : null;
       if (formData.date && formData.clockIn && formData.clockOut) {
         const clockInDate = buildDateTime(formData.date, formData.clockIn)!;
-        const clockOutDate = buildDateTime(formData.date, formData.clockOut)!;
+        // Clock-out lands on the last day of a multi-day booking
+        const clockOutDate = buildDateTime(endDateValue || formData.date, formData.clockOut)!;
         // If clock-out is earlier than clock-in, assume next day
         if (clockOutDate <= clockInDate) clockOutDate.setDate(clockOutDate.getDate() + 1);
         clockInIso = clockInDate.toISOString();
@@ -584,6 +626,7 @@ export default function AdminInvoices() {
         hotel: formData.hotel.trim(),
         billedTo: formData.billedTo.trim(),
         date: formData.date,
+        endDate: endDateValue,
         startTime: startLabel,
         endTime: endLabel,
         clockIn: clockInIso,
@@ -624,22 +667,10 @@ export default function AdminInvoices() {
     const hours = bookedHoursNum > 0 ? bookedHoursNum.toFixed(1) : calcWorkedHours(inv.clockIn, inv.clockOut);
     const hoursNum = bookedHoursNum > 0 ? bookedHoursNum : (inv.clockIn && inv.clockOut ? (new Date(inv.clockOut).getTime() - new Date(inv.clockIn).getTime()) / 3600000 : 0);
     const basePay = Math.round(hoursNum * SERVICE_RATE);
-    // Detect evening shift from booked times when available, otherwise from clock times
-    const startH = inv.startTime ? parseTimeToHours(inv.startTime) : (inv.clockIn ? new Date(inv.clockIn).getHours() : 0);
-    const endH = inv.endTime ? parseTimeToHours(inv.endTime) : (inv.clockOut ? new Date(inv.clockOut).getHours() : 0);
-    const inHour = startH ?? 0;
-    const outHour = endH ?? 0;
-    let hasTaxi = inHour >= 19 || inHour < 7 || outHour >= 19 || outHour < 7 || hoursNum > 12;
-    // Also check extra time blocks for evening hours
-    if (!hasTaxi && inv.extraTimes) {
-      for (const et of inv.extraTimes) {
-        const s = parseTimeToHours(et.startTime);
-        const e = parseTimeToHours(et.endTime);
-        if (s !== null && (s >= 19 || s < 7)) { hasTaxi = true; break; }
-        if (e !== null && (e >= 19 || e < 7)) { hasTaxi = true; break; }
-      }
-    }
-    const dateStr = inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A";
+    const taxiTotal = invoiceTaxiFee(inv, hoursNum);
+    const hasTaxi = taxiTotal > 0;
+    const dayCount = calcDayCount(inv.date, inv.endDate);
+    const dateStr = invoiceDateLabel(inv);
     const total = inv.totalPrice || 0;
     const totalDH = toDH(total);
     const isPaid = !!inv.collectedAt;
@@ -751,6 +782,10 @@ function sharePdf(){
         <span class="card-row-label"><span class="icon">&#128100;</span> Caregiver</span>
         <span class="card-row-value">${inv.nannyName || "Unassigned"}</span>
       </div>
+      ${dayCount > 1 ? `<div class="card-row">
+        <span class="card-row-label"><span class="icon">&#128197;</span> Days</span>
+        <span class="card-row-value">${dayCount} days</span>
+      </div>` : ""}
       <div class="card-row">
         <span class="card-row-label"><span class="icon">&#9201;</span> Time Slot</span>
         <span class="card-row-value" style="text-align:right;">
@@ -774,8 +809,8 @@ function sharePdf(){
         <span class="card-row-value">${basePay}&euro;</span>
       </div>
       ${hasTaxi ? `<div class="card-row taxi-row">
-        <span class="card-row-label"><span class="icon">&#128663;</span> Evening supplement (7 PM &ndash; 7 AM)</span>
-        <span class="card-row-value">+${TAXI_FEE}&euro;</span>
+        <span class="card-row-label"><span class="icon">&#128663;</span> Evening supplement (7 PM &ndash; 7 AM)${dayCount > 1 ? ` &times; ${dayCount} days` : ""}</span>
+        <span class="card-row-value">+${taxiTotal}&euro;</span>
       </div>` : ""}
     </div>
 
@@ -819,7 +854,7 @@ function sharePdf(){
         ? calcTotalBookedHours(inv.startTime, inv.endTime, inv.extraTimes, inv.date, inv.endDate)
         : 0;
       const hours = bookedH > 0 ? bookedH.toFixed(1) : calcWorkedHours(inv.clockIn, inv.clockOut);
-      const dateStr = inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A";
+      const dateStr = invoiceDateLabel(inv);
       const mainSlot = `${inv.startTime || formatClockTime(inv.clockIn)} – ${inv.endTime || formatClockTime(inv.clockOut)}`;
       const extraSlots = inv.extraTimes && inv.extraTimes.length > 0
         ? inv.extraTimes.map((et: { startTime: string; endTime: string }) => ` + ${et.startTime} – ${et.endTime}`).join("")
@@ -1227,7 +1262,7 @@ function sharePdf(){
                       <td className="px-5 py-4 text-sm text-muted-foreground">{inv.nannyName || "Unassigned"}</td>
                       <td className="px-5 py-4">
                         <p className="text-sm text-foreground font-medium">{formatClockTime(inv.clockIn)} – {formatClockTime(inv.clockOut)}</p>
-                        <p className="text-xs text-muted-foreground/70">{inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : fmtDate(inv.date)}</p>
+                        <p className="text-xs text-muted-foreground/70">{invoiceDateLabel(inv)}</p>
                       </td>
                       <td className="px-5 py-4 text-sm text-muted-foreground">{calcWorkedHours(inv.clockIn, inv.clockOut)}h</td>
                       <td className="px-5 py-4">
@@ -1472,7 +1507,7 @@ function sharePdf(){
                               ? calcTotalBookedHours(inv.startTime, inv.endTime, inv.extraTimes, inv.date, inv.endDate)
                               : 0;
                             const hours = bookedH > 0 ? bookedH.toFixed(1) : calcWorkedHours(inv.clockIn, inv.clockOut);
-                            const dateStr = inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A";
+                            const dateStr = invoiceDateLabel(inv);
                             lines.push(`*#INV-${inv.id}* — ${dateStr}`);
                             lines.push(`  Caregiver: ${inv.nannyName || "Unassigned"}`);
                             lines.push(`  Time: ${inv.startTime || formatClockTime(inv.clockIn)} – ${inv.endTime || formatClockTime(inv.clockOut)} (${hours}h)`);
@@ -1565,7 +1600,7 @@ function sharePdf(){
                                 #INV-{inv.id}
                               </button>
                               <span className="text-xs text-muted-foreground">
-                                {inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A"}
+                                {invoiceDateLabel(inv)}
                               </span>
                               <span className="text-xs text-muted-foreground">· {inv.nannyName || "Unassigned"}</span>
                               <span className="text-xs text-muted-foreground">· {inv.startTime || formatClockTime(inv.clockIn)} – {inv.endTime || formatClockTime(inv.clockOut)}</span>
@@ -1605,11 +1640,9 @@ function sharePdf(){
         const hours = viewBookedH > 0 ? viewBookedH.toFixed(1) : calcWorkedHours(inv.clockIn, inv.clockOut);
         const hoursNum = viewBookedH > 0 ? viewBookedH : (inv.clockIn && inv.clockOut ? (new Date(inv.clockOut).getTime() - new Date(inv.clockIn).getTime()) / 3600000 : 0);
         const basePay = Math.round(hoursNum * SERVICE_RATE);
-        const vStartH = inv.startTime ? parseTimeToHours(inv.startTime) : (inv.clockIn ? new Date(inv.clockIn).getHours() : 0);
-        const vEndH = inv.endTime ? parseTimeToHours(inv.endTime) : (inv.clockOut ? new Date(inv.clockOut).getHours() : 0);
-        const inHour = vStartH ?? 0;
-        const outHour = vEndH ?? 0;
-        const hasTaxi = inHour >= 19 || inHour < 7 || outHour >= 19 || outHour < 7 || hoursNum > 12;
+        const taxiTotal = invoiceTaxiFee(inv, hoursNum);
+        const hasTaxi = taxiTotal > 0;
+        const viewDays = calcDayCount(inv.date, inv.endDate);
         return (
           <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-[8vh] overflow-y-auto" onClick={() => setViewInvoice(null)}>
             <div className="w-full max-w-lg bg-card rounded-2xl shadow-xl border border-border overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -1624,7 +1657,7 @@ function sharePdf(){
                     <X className="w-5 h-5" />
                   </button>
                 </div>
-                <p className="text-white/70 text-xs mt-1">{inv.clockIn ? fmtDate(new Date(inv.clockIn).toISOString().slice(0, 10)) : inv.date ? fmtDate(inv.date) : "N/A"}</p>
+                <p className="text-white/70 text-xs mt-1">{invoiceDateLabel(inv)}</p>
                 {inv.collectedAt && (
                   <div className="mt-2 inline-flex items-center gap-1.5 bg-green-500/90 text-white px-4 py-1.5 rounded-full text-sm font-bold tracking-wide shadow-lg">
                     <DollarSign className="w-4 h-4" /> PAID
@@ -1661,6 +1694,12 @@ function sharePdf(){
                       <span className="text-sm text-muted-foreground flex items-center gap-1.5"><User className="w-3.5 h-3.5" />Caregiver</span>
                       <span className="text-sm font-medium text-foreground">{inv.nannyName || "Unassigned"}</span>
                     </div>
+                    {viewDays > 1 && (
+                      <div className="flex justify-between px-4 py-2.5">
+                        <span className="text-sm text-muted-foreground flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />Days</span>
+                        <span className="text-sm font-medium text-foreground">{viewDays} days</span>
+                      </div>
+                    )}
                     {inv.startTime && inv.endTime && (
                       <div className="flex justify-between px-4 py-2.5">
                         <span className="text-sm text-muted-foreground flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />Booked Time</span>
@@ -1694,8 +1733,8 @@ function sharePdf(){
                     </div>
                     {hasTaxi && (
                       <div className="flex justify-between px-4 py-2.5">
-                        <span className="text-sm text-amber-700 flex items-center gap-1.5"><Car className="w-3.5 h-3.5" />Evening supplement (7 PM – 7 AM)</span>
-                        <span className="text-sm font-medium text-amber-700">+{TAXI_FEE}€</span>
+                        <span className="text-sm text-amber-700 flex items-center gap-1.5"><Car className="w-3.5 h-3.5" />Evening supplement (7 PM – 7 AM){viewDays > 1 ? ` × ${viewDays} days` : ""}</span>
+                        <span className="text-sm font-medium text-amber-700">+{taxiTotal}€</span>
                       </div>
                     )}
                   </div>
@@ -1931,16 +1970,41 @@ function sharePdf(){
                 </div>
               </details>
 
-              {/* Date */}
+              {/* Date range */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Date *</label>
-                <input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => updateField("date", e.target.value)}
-                  className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                  required
-                />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Start Date *</label>
+                    <input
+                      type="date"
+                      value={formData.date}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setFormData((prev) => ({ ...prev, date: v, endDate: prev.endDate && prev.endDate <= v ? "" : prev.endDate }));
+                      }}
+                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">End Date <span className="font-normal text-muted-foreground">(optional)</span></label>
+                    <input
+                      type="date"
+                      value={formData.endDate}
+                      min={formData.date || undefined}
+                      onChange={(e) => updateField("endDate", e.target.value)}
+                      className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    />
+                  </div>
+                </div>
+                {formData.endDate && formData.date && formData.endDate <= formData.date && (
+                  <p className="text-xs text-destructive mt-1">End date must be after the start date.</p>
+                )}
+                {formData.endDate && formData.date && formData.endDate > formData.date && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Multi-day booking: {calcDayCount(formData.date, formData.endDate)} days, same time slot each day.
+                  </p>
+                )}
               </div>
 
               {/* Service time slot */}
@@ -1983,19 +2047,11 @@ function sharePdf(){
               </div>
 
               {/* Auto-calc breakdown */}
-              {!formData.manualPrice && formData.date && formData.clockIn && formData.clockOut && (() => {
+              {!formData.manualPrice && (() => {
                 try {
-                  const inT = buildDateTime(formData.date, formData.clockIn);
-                  const outT = buildDateTime(formData.date, formData.clockOut);
-                  if (!inT || !outT) return null;
-                  if (outT <= inT) outT.setDate(outT.getDate() + 1);
-                  const ms = outT.getTime() - inT.getTime();
-                  if (ms <= 0) return null;
-                  const hours = ms / 3600000;
-                  const base = Math.round(hours * SERVICE_RATE);
-                  const inHour = inT.getHours();
-                  const outHour = outT.getHours();
-                  const isNight = inHour >= 19 || inHour < 7 || outHour >= 19 || outHour < 7 || hours > 12;
+                  const pricing = calcFormPricing();
+                  if (!pricing) return null;
+                  const { days, hoursPerDay, hours, base, isNight, taxi, total } = pricing;
                   return (
                     <div className="bg-blue-50 text-blue-800 text-xs px-4 py-3 rounded-lg border border-blue-100 space-y-1">
                       <div className="flex items-center gap-1.5 font-semibold">
@@ -2003,18 +2059,18 @@ function sharePdf(){
                         Auto-calculated breakdown
                       </div>
                       <div className="flex items-center justify-between">
-                        <span>{hours.toFixed(1)}h × {SERVICE_RATE}€/hr</span>
+                        <span>{days > 1 ? `${hoursPerDay.toFixed(1)}h × ${days} days = ${hours.toFixed(1)}h` : `${hours.toFixed(1)}h`} × {SERVICE_RATE}€/hr</span>
                         <span className="font-medium">{base}€</span>
                       </div>
                       {isNight && (
                         <div className="flex items-center justify-between text-amber-700">
-                          <span className="flex items-center gap-1"><Car className="w-3 h-3" /> Evening supplement (7 PM – 7 AM)</span>
-                          <span className="font-medium">+{TAXI_FEE}€</span>
+                          <span className="flex items-center gap-1"><Car className="w-3 h-3" /> Evening supplement (7 PM – 7 AM){days > 1 ? ` × ${days} days` : ""}</span>
+                          <span className="font-medium">+{taxi}€</span>
                         </div>
                       )}
                       <div className="flex items-center justify-between font-bold border-t border-blue-200 pt-1 mt-1">
                         <span>Total</span>
-                        <span>{isNight ? base + TAXI_FEE : base}€ <span className="font-normal text-blue-600/70">({toDH(isNight ? base + TAXI_FEE : base).toLocaleString()} DH)</span></span>
+                        <span>{total}€ <span className="font-normal text-blue-600/70">({toDH(total).toLocaleString()} DH)</span></span>
                       </div>
                     </div>
                   );
