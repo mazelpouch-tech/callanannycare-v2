@@ -60,8 +60,9 @@ function bookingHasTaxi(b: Booking): boolean {
   const startH = b.startTime ? parseTimeToHours(b.startTime) : null;
   const endH = b.endTime ? parseTimeToHours(b.endTime) : null;
   if (startH == null || endH == null) return false;
-  const hours = hoursForBooking(b);
-  return startH >= 19 || startH < 7 || endH >= 19 || endH < 7 || hours > 12;
+  // Compare hours per day, not the total across a multi-day booking
+  const hoursPerDay = hoursForBooking(b) / bookingDayCount(b);
+  return startH >= 19 || startH < 7 || endH >= 19 || endH < 7 || hoursPerDay > 12;
 }
 
 function bookingDayCount(b: Booking): number {
