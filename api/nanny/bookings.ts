@@ -13,7 +13,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!nannyId) return res.status(400).json({ error: 'nannyId is required' });
 
     const bookings = await sql`
-      SELECT b.*, n.name as nanny_name, n.image as nanny_image
+      SELECT b.*, n.name as nanny_name
       FROM bookings b
       LEFT JOIN nannies n ON b.nanny_id = n.id
       WHERE b.nanny_id = ${nannyId} AND b.deleted_at IS NULL

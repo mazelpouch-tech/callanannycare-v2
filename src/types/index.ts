@@ -81,10 +81,10 @@ export interface DbBooking {
   sender_info: string | null; // JSON object overriding the invoice "FROM" block (see InvoiceSender)
 }
 
-/** Booking row from a JOIN with nannies (includes nanny_name, nanny_image) */
+/** Booking row from a JOIN with nannies (includes nanny_name; nanny_image only on single-booking endpoints) */
 export interface DbBookingWithNanny extends DbBooking {
   nanny_name: string;
-  nanny_image: string;
+  nanny_image?: string | null;
 }
 
 /** Raw notifications table row */

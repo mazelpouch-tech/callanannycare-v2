@@ -102,9 +102,20 @@ export function DataProvider({ children }: DataProviderProps) {
   const [nannies, setNannies] = useState<Nanny[]>(() =>
     loadFromStorage(STORAGE_KEYS.nannies, initialNannies)
   );
-  const [bookings, setBookings] = useState<Booking[]>(() =>
+  // Raw bookings as returned by the API (no nanny photos — the list endpoint omits them to keep
+  // the payload small; a 12 MB response broke refreshes and localStorage on phones).
+  const [rawBookings, setBookings] = useState<Booking[]>(() =>
     loadFromStorage(STORAGE_KEYS.bookings, initialBookings)
   );
+  // Resolve each booking's nanny photo from the nannies list at render time.
+  const bookings = useMemo<Booking[]>(() => {
+    const imageById = new Map<number, string>();
+    for (const n of nannies) if (n.image) imageById.set(n.id, n.image);
+    return rawBookings.map((b) => {
+      const img = b.nannyId != null ? imageById.get(b.nannyId) : undefined;
+      return img && img !== b.nannyImage ? { ...b, nannyImage: img } : b;
+    });
+  }, [rawBookings, nannies]);
   const [isAdmin, setIsAdmin] = useState<boolean>(() =>
     loadFromStorage(STORAGE_KEYS.admin, false)
   );
