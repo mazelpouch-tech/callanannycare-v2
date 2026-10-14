@@ -5,7 +5,7 @@ import { ArrowLeft, FileText } from "lucide-react";
 const T = {
   en: {
     title: "General Terms & Conditions",
-    lastUpdated: "Last updated: March 2026",
+    lastUpdated: "Last updated: October 2026",
     backToHome: "Back to Home",
     sections: [
       {
@@ -26,7 +26,7 @@ const T = {
       },
       {
         heading: "5. Changes to Bookings",
-        body: "Changes to the booking (time, location, number of children, or special requests) must be communicated as early as possible.\n\nCall-a-Nanny will make every effort to accommodate changes, but availability cannot be guaranteed.",
+        body: "Changes to the booking (time, location, number of children, or special requests) must be communicated as early as possible.\n\nCall-a-Nanny will make every effort to accommodate changes, but availability cannot be guaranteed.\n\nThe client is bound to honour, as a minimum, the hours originally booked. Any modification that reduces the number of booked hours will be billed on the basis of the hours originally booked, unless the modification is communicated to Call-a-Nanny at least 12 hours before the start of the shift.",
       },
       {
         heading: "6. Babysitter Continuity",
@@ -68,7 +68,7 @@ const T = {
   },
   fr: {
     title: "Conditions G\u00e9n\u00e9rales",
-    lastUpdated: "Derni\u00e8re mise \u00e0 jour : Mars 2026",
+    lastUpdated: "Derni\u00e8re mise \u00e0 jour : Octobre 2026",
     backToHome: "Retour \u00e0 l\u2019Accueil",
     sections: [
       {
@@ -89,7 +89,7 @@ const T = {
       },
       {
         heading: "5. Modifications des R\u00e9servations",
-        body: "Les modifications de la r\u00e9servation (heure, lieu, nombre d\u2019enfants ou demandes sp\u00e9ciales) doivent \u00eatre communiqu\u00e9es le plus t\u00f4t possible.\n\nCall-a-Nanny fera tout son possible pour accommoder les changements, mais la disponibilit\u00e9 ne peut \u00eatre garantie.",
+        body: "Les modifications de la r\u00e9servation (heure, lieu, nombre d\u2019enfants ou demandes sp\u00e9ciales) doivent \u00eatre communiqu\u00e9es le plus t\u00f4t possible.\n\nCall-a-Nanny fera tout son possible pour accommoder les changements, mais la disponibilit\u00e9 ne peut \u00eatre garantie.\n\nLe client s\u2019engage \u00e0 honorer, au minimum, les heures initialement r\u00e9serv\u00e9es. Toute modification visant \u00e0 r\u00e9duire le nombre d\u2019heures r\u00e9serv\u00e9es sera factur\u00e9e sur la base des heures initialement r\u00e9serv\u00e9es, sauf si la modification est communiqu\u00e9e \u00e0 Call-a-Nanny au moins 12 heures avant le d\u00e9but de la prestation.",
       },
       {
         heading: "6. Continuit\u00e9 de la Baby-sitter",
