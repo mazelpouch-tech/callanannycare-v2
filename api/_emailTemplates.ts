@@ -89,6 +89,7 @@ const strings = {
     termsPayment: 'Payment due at end of stay (€10/hr per nanny, payable in EUR or MAD)',
     termsTaxi: 'Services starting after 7:00 PM include a €10 evening supplement',
     termsCancellation: 'Free cancellation up to 24 hours before service; cancellations within 24 hours will be charged',
+    termsReduction: 'Booked hours must be honoured: reducing hours is billed at the original booking unless notified at least 12 hours before the shift',
     termsParental: 'Parents remain fully responsible for their children at all times',
     termsOvertime: 'Time exceeding booked hours is charged at the applicable rate',
     termsViewFull: 'View Full Terms & Conditions',
@@ -177,6 +178,7 @@ const strings = {
     termsPayment: 'Paiement dû en fin de séjour (10€/h par nounou, payable en EUR ou MAD)',
     termsTaxi: 'Les services commençant après 19h00 incluent un supplément soirée de 10€',
     termsCancellation: 'Annulation gratuite jusqu\'à 24h avant le service ; annulation dans les 24h facturée',
+    termsReduction: 'Les heures réservées doivent être honorées : toute réduction d\'heures est facturée sur la réservation initiale, sauf avis au moins 12h avant la prestation',
     termsParental: 'Les parents restent entièrement responsables de leurs enfants à tout moment',
     termsOvertime: 'Le temps dépassant les heures réservées est facturé au tarif applicable',
     termsViewFull: 'Voir les Conditions Générales Complètes',
@@ -236,6 +238,7 @@ function termsBlock(s: ReturnType<typeof t>, baseUrl: string): string {
         <li>${s.termsPayment}</li>
         <li>${s.termsTaxi}</li>
         <li>${s.termsCancellation}</li>
+        <li>${s.termsReduction}</li>
         <li>${s.termsParental}</li>
         <li>${s.termsOvertime}</li>
       </ul>
